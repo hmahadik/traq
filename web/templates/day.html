@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+
+{% block title %}Activity Tracker - {{ date.strftime('%Y-%m-%d') }}{% endblock %}
+
+{% block header %}
+    Activity Tracker
+    <div class="date-nav">
+        <a href="/day/{{ (date - timedelta(days=1)).strftime('%Y-%m-%d') }}">&larr; Previous</a>
+        <span>{{ date.strftime('%A, %B %d, %Y') }}</span>
+        <a href="/day/{{ (date + timedelta(days=1)).strftime('%Y-%m-%d') }}">Next &rarr;</a>
+        {% if date != today %}
+            <a href="/">Today</a>
+        {% endif %}
+    </div>
+{% endblock %}
+
+{% block content %}
+    {% if screenshots %}
+        <div class="screenshot-grid">
+            {% for screenshot in screenshots %}
+                <div class="screenshot-item">
+                    <img 
+                        src="/screenshot/{{ screenshot.id }}" 
+                        alt="Screenshot at {{ screenshot.formatted_time }}"
+                        class="screenshot-thumbnail"
+                        loading="lazy"
+                    >
+                    <div class="screenshot-info">
+                        <div class="screenshot-time">{{ screenshot.formatted_time }}</div>
+                        <div class="screenshot-id">ID: {{ screenshot.id }}</div>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="empty-state">
+            <h2>No screenshots found</h2>
+            <p>No activity captured for {{ date.strftime('%B %d, %Y') }}.</p>
+            {% if date == today %}
+                <p>Make sure the tracker service is running.</p>
+            {% endif %}
+        </div>
+    {% endif %}
+{% endblock %}
