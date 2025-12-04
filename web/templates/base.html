@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Activity Tracker{% endblock %}</title>
+    {% block extra_head %}{% endblock %}
     <style>
         * {
             margin: 0;
@@ -12,93 +13,120 @@
         }
 
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background-color: #f5f5f5;
-            color: #333;
-            line-height: 1.4;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #0d1117;
+            color: #c9d1d9;
+            line-height: 1.6;
         }
 
-        .header {
-            background: #fff;
-            border-bottom: 1px solid #ddd;
-            padding: 1rem 2rem;
-            margin-bottom: 2rem;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        /* Navigation Header */
+        .main-header {
+            background: #161b22;
+            border-bottom: 1px solid #30363d;
+            padding: 0;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
         }
 
-        .header h1 {
-            font-size: 1.5rem;
-            font-weight: 600;
-            color: #2c3e50;
-        }
-
-        .date-nav {
-            margin-top: 0.5rem;
-            font-size: 0.9rem;
-            color: #666;
-        }
-
-        .date-nav a {
-            color: #3498db;
-            text-decoration: none;
-            margin: 0 0.5rem;
-        }
-
-        .date-nav a:hover {
-            text-decoration: underline;
-        }
-
-        .container {
-            max-width: 1400px;
+        .header-container {
+            max-width: 1600px;
             margin: 0 auto;
-            padding: 0 2rem;
+            padding: 0 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            height: 60px;
         }
 
-        .screenshot-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-            gap: 1.5rem;
-            margin-bottom: 2rem;
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 30px;
         }
 
-        .screenshot-item {
-            background: white;
-            border-radius: 8px;
-            overflow: hidden;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-            transition: transform 0.2s ease, box-shadow 0.2s ease;
-        }
-
-        .screenshot-item:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 16px rgba(0,0,0,0.15);
-        }
-
-        .screenshot-thumbnail {
-            width: 100%;
-            height: 200px;
-            object-fit: cover;
-            cursor: pointer;
-            display: block;
-        }
-
-        .screenshot-info {
-            padding: 1rem;
-            border-top: 1px solid #eee;
-        }
-
-        .screenshot-time {
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            text-decoration: none;
+            color: #c9d1d9;
+            font-size: 1.2rem;
             font-weight: 600;
-            color: #2c3e50;
+        }
+
+        .logo:hover {
+            color: #58a6ff;
+        }
+
+        .logo-icon {
+            font-size: 1.5rem;
+        }
+
+        .main-nav {
+            display: flex;
+            gap: 5px;
+            list-style: none;
+        }
+
+        .main-nav a {
+            display: block;
+            padding: 8px 16px;
+            color: #8b949e;
+            text-decoration: none;
+            border-radius: 6px;
+            transition: all 0.2s;
             font-size: 0.9rem;
         }
 
-        .screenshot-id {
-            font-size: 0.8rem;
-            color: #666;
-            margin-top: 0.25rem;
+        .main-nav a:hover {
+            background: #21262d;
+            color: #c9d1d9;
         }
 
+        .main-nav a.active {
+            background: #58a6ff;
+            color: #ffffff;
+        }
+
+        .header-stats {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            font-size: 0.85rem;
+            color: #8b949e;
+        }
+
+        .stat-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .stat-value {
+            color: #58a6ff;
+            font-weight: 600;
+        }
+
+        .help-btn {
+            background: #21262d;
+            color: #8b949e;
+            border: 1px solid #30363d;
+            padding: 6px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            transition: all 0.2s;
+        }
+
+        .help-btn:hover {
+            background: #30363d;
+            border-color: #58a6ff;
+            color: #c9d1d9;
+        }
+
+        /* Keyboard Shortcuts Modal */
         .modal {
             display: none;
             position: fixed;
@@ -107,119 +135,275 @@
             top: 0;
             width: 100%;
             height: 100%;
-            background-color: rgba(0,0,0,0.9);
+            background-color: rgba(0, 0, 0, 0.8);
         }
 
-        .modal-content {
-            position: relative;
-            margin: auto;
-            padding: 0;
-            width: 90%;
-            height: 90%;
+        .modal.active {
             display: flex;
             align-items: center;
             justify-content: center;
         }
 
-        .modal-image {
-            max-width: 100%;
-            max-height: 100%;
-            object-fit: contain;
+        .modal-content {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            padding: 30px;
+            max-width: 500px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
         }
 
-        .close {
-            position: absolute;
-            top: 20px;
-            right: 30px;
-            color: #f1f1f1;
-            font-size: 40px;
-            font-weight: bold;
-            cursor: pointer;
-            z-index: 1001;
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #30363d;
         }
 
-        .close:hover {
-            color: #bbb;
+        .modal-header h2 {
+            color: #58a6ff;
+            font-size: 1.3rem;
         }
 
-        .empty-state {
-            text-align: center;
-            padding: 4rem 2rem;
-            color: #666;
-        }
-
-        .empty-state h2 {
+        .modal-close {
+            background: none;
+            border: none;
+            color: #8b949e;
             font-size: 1.5rem;
-            margin-bottom: 1rem;
-            color: #999;
+            cursor: pointer;
+            padding: 0;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 4px;
+            transition: all 0.2s;
         }
 
+        .modal-close:hover {
+            background: #21262d;
+            color: #c9d1d9;
+        }
+
+        .shortcuts-list {
+            list-style: none;
+        }
+
+        .shortcut-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid #21262d;
+        }
+
+        .shortcut-item:last-child {
+            border-bottom: none;
+        }
+
+        .shortcut-desc {
+            color: #c9d1d9;
+            font-size: 0.9rem;
+        }
+
+        .shortcut-key {
+            background: #21262d;
+            border: 1px solid #30363d;
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 0.85rem;
+            color: #58a6ff;
+            min-width: 30px;
+            text-align: center;
+        }
+
+        /* Main Container */
+        .page-container {
+            max-width: 1600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        /* Responsive */
         @media (max-width: 768px) {
-            .screenshot-grid {
-                grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-                gap: 1rem;
+            .header-container {
+                flex-direction: column;
+                height: auto;
+                padding: 10px;
+                gap: 10px;
             }
-            
-            .container {
-                padding: 0 1rem;
+
+            .header-left {
+                width: 100%;
+                flex-direction: column;
+                gap: 10px;
+                align-items: flex-start;
             }
-            
-            .header {
-                padding: 1rem;
+
+            .main-nav {
+                width: 100%;
+                flex-wrap: wrap;
+            }
+
+            .header-stats {
+                width: 100%;
+                justify-content: space-between;
+                font-size: 0.75rem;
+            }
+
+            .logo {
+                font-size: 1rem;
+            }
+
+            .stat-item {
+                flex-direction: column;
+                gap: 2px;
             }
         }
+
+        {% block extra_styles %}{% endblock %}
     </style>
 </head>
 <body>
-    <div class="header">
-        <h1>{% block header %}Activity Tracker{% endblock %}</h1>
-        {% block nav %}{% endblock %}
-    </div>
-    
-    <div class="container">
+    <!-- Main Navigation Header -->
+    <header class="main-header">
+        <div class="header-container">
+            <div class="header-left">
+                <a href="/timeline" class="logo">
+                    <span class="logo-icon">📊</span>
+                    <span>Activity Tracker</span>
+                </a>
+                <nav>
+                    <ul class="main-nav">
+                        <li><a href="/day/{{ today }}" {% if page == 'day' %}class="active"{% endif %}>Today</a></li>
+                        <li><a href="/timeline" {% if page == 'timeline' %}class="active"{% endif %}>Timeline</a></li>
+                        <li><a href="/analytics" {% if page == 'analytics' %}class="active"{% endif %}>Analytics</a></li>
+                    </ul>
+                </nav>
+            </div>
+            <div class="header-stats">
+                <div class="stat-item">
+                    <span>Today:</span>
+                    <span class="stat-value" id="todayCount">—</span>
+                </div>
+                <button class="help-btn" onclick="toggleShortcutsModal()">
+                    ?
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <div class="page-container">
         {% block content %}{% endblock %}
     </div>
 
-    <!-- Modal for full-size images -->
-    <div id="imageModal" class="modal">
-        <span class="close">&times;</span>
+    <!-- Keyboard Shortcuts Modal -->
+    <div id="shortcutsModal" class="modal">
         <div class="modal-content">
-            <img id="modalImage" class="modal-image" alt="Full size screenshot">
+            <div class="modal-header">
+                <h2>Keyboard Shortcuts</h2>
+                <button class="modal-close" onclick="toggleShortcutsModal()">&times;</button>
+            </div>
+            <ul class="shortcuts-list">
+                <li class="shortcut-item">
+                    <span class="shortcut-desc">Go to Timeline</span>
+                    <kbd class="shortcut-key">T</kbd>
+                </li>
+                <li class="shortcut-item">
+                    <span class="shortcut-desc">Go to Analytics</span>
+                    <kbd class="shortcut-key">A</kbd>
+                </li>
+                <li class="shortcut-item">
+                    <span class="shortcut-desc">Go to Today</span>
+                    <kbd class="shortcut-key">D</kbd>
+                </li>
+                <li class="shortcut-item">
+                    <span class="shortcut-desc">Show Shortcuts</span>
+                    <kbd class="shortcut-key">?</kbd>
+                </li>
+                <li class="shortcut-item">
+                    <span class="shortcut-desc">Close Modal</span>
+                    <kbd class="shortcut-key">Esc</kbd>
+                </li>
+            </ul>
         </div>
     </div>
 
     <script>
-        // Modal functionality
-        const modal = document.getElementById('imageModal');
-        const modalImg = document.getElementById('modalImage');
-        const span = document.getElementsByClassName('close')[0];
-
-        // Open modal when thumbnail is clicked
-        document.addEventListener('click', function(e) {
-            if (e.target.classList.contains('screenshot-thumbnail')) {
-                modal.style.display = 'block';
-                modalImg.src = e.target.src;
-            }
-        });
-
-        // Close modal when X is clicked
-        span.onclick = function() {
-            modal.style.display = 'none';
-        }
-
-        // Close modal when clicking outside the image
-        modal.onclick = function(e) {
-            if (e.target === modal) {
-                modal.style.display = 'none';
-            }
-        }
-
-        // Close modal with Escape key
+        // Global keyboard shortcuts
         document.addEventListener('keydown', function(e) {
-            if (e.key === 'Escape') {
-                modal.style.display = 'none';
+            // Don't trigger if typing in input field
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+                return;
+            }
+
+            // Don't trigger if modal is open (except for ?)
+            const modal = document.getElementById('shortcutsModal');
+            if (modal.classList.contains('active') && e.key !== 'Escape') {
+                return;
+            }
+
+            switch(e.key.toLowerCase()) {
+                case 't':
+                    window.location.href = '/timeline';
+                    break;
+                case 'a':
+                    window.location.href = '/analytics';
+                    break;
+                case 'd':
+                    window.location.href = '/day/{{ today }}';
+                    break;
+                case '?':
+                    e.preventDefault();
+                    toggleShortcutsModal();
+                    break;
+                case 'escape':
+                    if (modal.classList.contains('active')) {
+                        toggleShortcutsModal();
+                    }
+                    break;
             }
         });
+
+        // Toggle shortcuts modal
+        function toggleShortcutsModal() {
+            const modal = document.getElementById('shortcutsModal');
+            modal.classList.toggle('active');
+        }
+
+        // Close modal when clicking outside
+        document.getElementById('shortcutsModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                toggleShortcutsModal();
+            }
+        });
+
+        // Fetch today's screenshot count
+        async function fetchTodayCount() {
+            try {
+                const today = '{{ today }}';
+                const response = await fetch(`/api/day/${today}/summary`);
+                const data = await response.json();
+
+                if (data.summary && data.summary.total_screenshots !== undefined) {
+                    document.getElementById('todayCount').textContent = data.summary.total_screenshots;
+                }
+            } catch (error) {
+                console.error('Failed to fetch today count:', error);
+            }
+        }
+
+        // Load today's count on page load
+        fetchTodayCount();
     </script>
+
+    {% block extra_scripts %}{% endblock %}
 </body>
 </html>

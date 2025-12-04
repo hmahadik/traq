@@ -1,13 +1,15 @@
 # Activity Tracker
 
-A Linux background service that automatically captures desktop screenshots at regular intervals, stores metadata in SQLite, and provides a simple web viewer for browsing your activity timeline.
+A Linux background service that automatically captures desktop screenshots at regular intervals, stores metadata in SQLite, and provides a rich web interface with timeline visualization and analytics for browsing your activity history.
 
 ## Features
 
 - **Automated Screenshot Capture**: Captures desktop screenshots every 30 seconds
 - **Perceptual Duplicate Detection**: Uses dhash algorithm to skip near-identical screenshots
 - **Window Context Extraction**: Records active window title and application name
-- **Web-based Viewer**: Simple Flask interface for browsing screenshots by date
+- **Timeline View**: Interactive calendar heatmap with hourly activity breakdown
+- **Analytics Dashboard**: Comprehensive charts showing activity patterns and trends
+- **Web-based Viewer**: Rich Flask interface with multiple views for browsing and analysis
 - **Efficient Storage**: WebP compression and organized directory structure
 - **Systemd Integration**: Runs as user service with automatic restart
 - **X11 Support**: Optimized for X11 display server (Wayland support planned)
@@ -34,9 +36,17 @@ A Linux background service that automatically captures desktop screenshots at re
    - Duplicate detection and storage optimization
 
 4. **Web Viewer (`web/app.py`)**
-   - Flask application for browsing screenshots
+   - Flask application with multiple views (timeline, analytics, day view)
+   - Interactive timeline with calendar heatmap and hourly breakdown
+   - Analytics dashboard with charts and statistics
    - Date-based navigation
    - REST API for programmatic access
+
+5. **Analytics Engine (`tracker/analytics.py`)**
+   - Activity pattern analysis and statistics
+   - Calendar heatmap data generation
+   - Hourly/daily/weekly aggregations
+   - Application usage tracking
 
 ### Data Storage Structure
 
@@ -104,14 +114,12 @@ pip install -r requirements.txt
 2. **Install as systemd service:**
 
 ```bash
-# Run the installation script
+# Run the installation script (automatically enables and starts the service)
 ./scripts/install.sh
 
-# Enable service to start on login
-systemctl --user enable activity-tracker
-
-# Start the service
-systemctl --user start activity-tracker
+# The script will ask: "Enable web interface? (y/N):"
+# - Answer 'y' to enable the integrated web server (accessible at http://0.0.0.0:55555)
+# - Answer 'n' to run capture-only mode (you can start web separately)
 ```
 
 3. **Verify installation:**
@@ -146,17 +154,48 @@ systemctl --user status activity-tracker
 
 ### Web Interface
 
-Access the web viewer to browse your screenshots:
+The web interface can run in two modes:
 
+**Option 1: Integrated Mode (Recommended)**
+If you enabled the web interface during installation, it runs automatically with the daemon:
+```bash
+# Web server is already running with the systemd service
+# Just open your browser
+firefox http://localhost:55555
+```
+
+**Option 2: Standalone Mode**
+Run the web interface separately (if you didn't enable it during install):
 ```bash
 # Start the web interface
 cd activity-tracker
 source venv/bin/activate
 python web/app.py
 
-# Open in browser
-firefox http://localhost:5000
+# Open in browser (runs on port 55555)
+firefox http://localhost:55555
 ```
+
+#### Available Views
+
+1. **Timeline View** (`http://localhost:55555/timeline`) - Default homepage
+   - Interactive calendar heatmap showing daily activity intensity
+   - Click any day to see hourly breakdown
+   - Click hourly bars to view screenshots from that hour
+   - Keyboard navigation: Arrow keys for day navigation, H/L for month navigation
+
+2. **Analytics Dashboard** (`http://localhost:55555/analytics`)
+   - Summary statistics (total screenshots, daily average, most active periods)
+   - Daily activity bar chart with weekend highlighting
+   - Top applications pie chart and detailed usage table
+   - Hourly activity heatmap (7 days × 24 hours)
+   - 30-day activity trend line chart
+   - Date range selector (last 7 days, last 30 days, this month)
+
+3. **Day View** (`http://localhost:55555/day/YYYY-MM-DD`)
+   - View all screenshots from a specific date
+   - Navigate between days using arrow buttons
+   - Shows window title and application for each screenshot
 
 ### Manual Operation
 
@@ -210,28 +249,41 @@ daemon.run()  # Blocks until interrupted
 
 ### REST API
 
-The web interface provides a REST API:
+The web interface provides a comprehensive REST API:
 
+#### Core Endpoints
+
+**Get screenshots in time range:**
 ```bash
-# Get screenshots in time range
-curl "http://localhost:5000/api/screenshots?start=1637000000&end=1637100000"
-
-# Response format:
-{
-  "screenshots": [
-    {
-      "id": 123,
-      "timestamp": 1637012345,
-      "file_path": "2021/11/15/20211115_143905_a1b2c3d4.webp",
-      "file_hash": "a1b2c3d4e5f67890",
-      "iso_time": "2021-11-15T14:39:05"
-    }
-  ],
-  "count": 1,
-  "start": 1637000000,
-  "end": 1637100000
-}
+curl "http://localhost:55555/api/screenshots?start=1637000000&end=1637100000"
 ```
+
+**Get calendar heatmap data:**
+```bash
+curl "http://localhost:55555/api/calendar/2024/12"
+```
+
+**Get daily summary statistics:**
+```bash
+curl "http://localhost:55555/api/day/2024-12-03/summary"
+```
+
+**Get hourly breakdown for a day:**
+```bash
+curl "http://localhost:55555/api/day/2024-12-03/hourly"
+```
+
+**Get screenshots for specific hour:**
+```bash
+curl "http://localhost:55555/api/screenshots/2024-12-03/14"
+```
+
+**Get weekly statistics:**
+```bash
+curl "http://localhost:55555/api/week/2024-12-03"
+```
+
+See [API_ENDPOINTS.md](API_ENDPOINTS.md) for complete documentation.
 
 ## Development
 
@@ -243,13 +295,23 @@ activity-tracker/
 │   ├── __init__.py            # Package exports and metadata
 │   ├── capture.py             # Screenshot capture and dhash
 │   ├── storage.py             # SQLite database interface
-│   └── daemon.py              # Background service process
+│   ├── daemon.py              # Background service process
+│   └── analytics.py           # Activity analytics and statistics
 ├── web/                       # Web interface
-│   ├── app.py                 # Flask application
+│   ├── app.py                 # Flask application with REST API
 │   └── templates/             # HTML templates
+│       ├── base.html          # Base template with navigation
+│       ├── timeline.html      # Calendar heatmap view
+│       ├── analytics.html     # Analytics dashboard
+│       └── day.html           # Daily screenshot view
 ├── scripts/                   # Installation and utilities
 │   ├── install.sh             # Systemd service setup
 │   └── uninstall.sh          # Service removal
+├── tests/                     # Test suite
+│   ├── conftest.py            # Pytest fixtures
+│   ├── test_capture.py        # Capture tests
+│   ├── test_storage.py        # Storage tests
+│   └── test_dhash.py          # Hash comparison tests
 ├── requirements.txt           # Python dependencies
 ├── CLAUDE.md                  # Project documentation
 └── README.md                  # This file
@@ -342,13 +404,20 @@ chmod 644 ~/activity-tracker-data/activity.db
 
 ## Roadmap
 
+### Completed ✓
+- [x] **Activity Analytics**: Usage patterns and application time tracking
+- [x] **Timeline View**: Calendar heatmap with hourly breakdown
+- [x] **Charts & Visualization**: Interactive charts using Chart.js
+- [x] **Comprehensive Test Suite**: Pytest-based testing with 85% coverage
+
+### Planned
 - [ ] **Wayland Support**: Add sway/wlroots integration for window information
 - [ ] **Multi-monitor Support**: Capture specific monitors or all monitors
 - [ ] **Configuration File**: YAML-based settings for intervals and thresholds
 - [ ] **OCR Integration**: Extract text content from screenshots
-- [ ] **Activity Analytics**: Usage patterns and application time tracking
 - [ ] **Privacy Filters**: Blur sensitive areas or skip certain applications
-- [ ] **Export Features**: Generate reports and data exports
+- [ ] **Export Features**: Generate reports and data exports (CSV/JSON/PDF)
+- [ ] **Search & Tagging**: Search screenshots by window title, add custom tags
 
 ## License
 
