@@ -53,6 +53,7 @@ from PIL import Image
 
 from .capture import ScreenCapture
 from .storage import ActivityStorage
+from .app_inference import get_app_name_with_inference
 
 
 class ActivityDaemon:
@@ -363,7 +364,10 @@ class ActivityDaemon:
                 
                 # Get window information
                 window_title, app_name = self._get_active_window_info()
-                
+
+                # Infer app_name from window_title if app_name is NULL
+                app_name = get_app_name_with_inference(app_name, window_title)
+
                 # Save to database
                 screenshot_id = self.storage.save_screenshot(
                     filepath=filepath,

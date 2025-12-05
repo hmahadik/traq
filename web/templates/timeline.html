@@ -75,14 +75,22 @@
             padding: 20px;
         }
 
+        .timeline-wrapper {
+            display: flex;
+            flex-direction: column;
+            height: calc(100vh - 160px);
+            overflow: hidden;
+        }
+
         header {
-            margin-bottom: 30px;
+            margin-bottom: 20px;
+            flex-shrink: 0;
         }
 
         h1 {
             font-size: 2rem;
             font-weight: 600;
-            color: var(--accent);
+            color: var(--text);
             margin-bottom: 10px;
         }
 
@@ -93,36 +101,75 @@
         }
 
         .nav-links a {
-            color: var(--accent);
+            color: var(--muted);
             text-decoration: none;
             font-size: 0.9rem;
+            padding: 8px 0;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            border-bottom: 2px solid transparent;
         }
 
         .nav-links a:hover {
-            text-decoration: underline;
+            color: var(--accent);
+            border-bottom-color: var(--accent);
+        }
+
+        .nav-links a.active {
+            color: var(--accent);
+            border-bottom-color: var(--accent);
+        }
+
+        .nav-icon {
+            width: 16px;
+            height: 16px;
+            stroke: currentColor;
+            fill: none;
+            stroke-width: 2;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+
+        .today-link {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            color: var(--muted);
+            text-decoration: none;
+            font-size: 0.9rem;
+            padding: 8px 0;
+            margin-bottom: 15px;
+            transition: color 0.2s;
+        }
+
+        .today-link:hover {
+            color: var(--accent);
         }
 
         /* Month selector */
         .month-selector {
             display: flex;
             align-items: center;
-            justify-content: center;
-            gap: 20px;
-            margin-bottom: 30px;
-            padding: 15px;
-            background: var(--surface);
-            border-radius: 8px;
+            justify-content: space-between;
+            gap: 10px;
+            margin-bottom: 20px;
+            padding: 12px;
+            background: var(--surface-2);
+            border-radius: 6px;
             border: 1px solid var(--border);
+            flex-shrink: 0;
         }
 
         .month-selector button {
-            background: var(--surface-2);
+            background: var(--surface);
             color: var(--text);
             border: 1px solid var(--border);
-            padding: 8px 16px;
-            border-radius: 6px;
+            padding: 6px 12px;
+            border-radius: 4px;
             cursor: pointer;
-            font-size: 1rem;
+            font-size: 0.9rem;
             transition: all 0.2s;
         }
 
@@ -137,18 +184,19 @@
         }
 
         .month-display {
-            font-size: 1.5rem;
+            font-size: 1.1rem;
             font-weight: 600;
-            min-width: 200px;
+            flex: 1;
             text-align: center;
         }
 
         /* Main layout */
         .timeline-layout {
             display: grid;
-            grid-template-columns: minmax(400px, 600px) 1fr;
-            gap: 30px;
-            margin-bottom: 30px;
+            grid-template-columns: 450px 1fr;
+            gap: 20px;
+            flex: 1;
+            overflow: hidden;
         }
 
         /* Calendar heatmap */
@@ -157,12 +205,16 @@
             border: 1px solid var(--border);
             border-radius: 8px;
             padding: 20px;
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
         }
 
         .calendar-panel h2 {
             font-size: 1.2rem;
             margin-bottom: 15px;
-            color: var(--accent);
+            color: var(--text);
+            font-weight: 600;
         }
 
         .calendar-weekdays {
@@ -221,15 +273,15 @@
         }
 
         .calendar-day.today {
-            border: 2px solid var(--danger);
+            box-shadow: 0 0 0 2px var(--accent-soft) inset;
         }
 
         /* Activity intensity colors */
-        .calendar-day[data-intensity="0"] { background: var(--intensity-0); }
-        .calendar-day[data-intensity="1"] { background: var(--intensity-1); }
-        .calendar-day[data-intensity="2"] { background: var(--intensity-2); }
-        .calendar-day[data-intensity="3"] { background: var(--intensity-3); }
-        .calendar-day[data-intensity="4"] { background: var(--intensity-4); }
+        .calendar-day[data-intensity="0"] { background: var(--intensity-0); color: var(--text); }
+        .calendar-day[data-intensity="1"] { background: var(--intensity-1); color: var(--text-inverse); }
+        .calendar-day[data-intensity="2"] { background: var(--intensity-2); color: var(--text-inverse); }
+        .calendar-day[data-intensity="3"] { background: var(--intensity-3); color: var(--text-inverse); }
+        .calendar-day[data-intensity="4"] { background: var(--intensity-4); color: var(--text-inverse); font-weight: 600; }
 
         .calendar-legend {
             display: flex;
@@ -254,16 +306,20 @@
             border-radius: 8px;
             padding: 20px;
             min-width: 0;
+            display: flex;
+            flex-direction: column;
             overflow: hidden;
         }
 
         .detail-header {
             margin-bottom: 20px;
+            flex-shrink: 0;
         }
 
         .detail-header h2 {
             font-size: 1.2rem;
-            color: var(--accent);
+            color: var(--text);
+            font-weight: 600;
             margin-bottom: 8px;
         }
 
@@ -288,8 +344,9 @@
 
         .chart-container {
             position: relative;
-            height: 300px;
-            margin-bottom: 20px;
+            height: 250px;
+            margin-bottom: 15px;
+            flex-shrink: 0;
         }
 
         .empty-state {
@@ -306,9 +363,13 @@
 
         /* Hour groups */
         .hour-groups {
-            margin-top: 30px;
-            padding-top: 20px;
-            border-top: 1px solid var(--border);
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        .detail-content-wrapper {
+            flex: 1;
+            overflow-y: auto;
         }
 
         .hour-group {
@@ -338,7 +399,7 @@
         .hour-title {
             font-size: 1rem;
             font-weight: 600;
-            color: var(--accent);
+            color: var(--text);
         }
 
         .hour-count {
@@ -396,7 +457,7 @@
         .screenshot-time {
             font-size: 0.85rem;
             font-weight: 600;
-            color: var(--accent);
+            color: var(--text);
             margin-bottom: 4px;
         }
 
@@ -716,22 +777,48 @@
 <body>
     <div class="container">
         <header>
-            <h1>Activity Timeline</h1>
+            <h1>Activity Tracker</h1>
             <div class="nav-links">
-                <a href="/">Today</a>
-                <a href="/timeline">Timeline</a>
-                <a href="/analytics">Analytics</a>
+                <a href="/timeline" id="timelineNav" class="active">
+                    <svg class="nav-icon" viewBox="0 0 24 24">
+                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                        <line x1="16" y1="2" x2="16" y2="6"></line>
+                        <line x1="8" y1="2" x2="8" y2="6"></line>
+                        <line x1="3" y1="10" x2="21" y2="10"></line>
+                    </svg>
+                    Timeline
+                </a>
+                <a href="/analytics" id="analyticsNav">
+                    <svg class="nav-icon" viewBox="0 0 24 24">
+                        <line x1="12" y1="20" x2="12" y2="10"></line>
+                        <line x1="18" y1="20" x2="18" y2="4"></line>
+                        <line x1="6" y1="20" x2="6" y2="16"></line>
+                    </svg>
+                    Analytics
+                </a>
             </div>
         </header>
 
-        <div class="month-selector">
-            <button id="prevMonth" title="Previous month (H key)">← Previous</button>
-            <div class="month-display" id="monthDisplay">Loading...</div>
-            <button id="nextMonth" title="Next month (L key)">Next →</button>
-        </div>
-
-        <div class="timeline-layout">
+        <div class="timeline-wrapper">
+            <div class="timeline-layout">
             <div class="calendar-panel">
+                <a href="#" id="todayNav" class="today-link">
+                    <svg class="nav-icon" viewBox="0 0 24 24">
+                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                        <line x1="16" y1="2" x2="16" y2="6"></line>
+                        <line x1="8" y1="2" x2="8" y2="6"></line>
+                        <line x1="3" y1="10" x2="21" y2="10"></line>
+                        <line x1="10" y1="14" x2="14" y2="14"></line>
+                    </svg>
+                    Go to Today
+                </a>
+
+                <div class="month-selector">
+                    <button id="prevMonth" title="Previous month (H key)">←</button>
+                    <div class="month-display" id="monthDisplay">Loading...</div>
+                    <button id="nextMonth" title="Next month (L key)">→</button>
+                </div>
+
                 <h2>Activity Calendar</h2>
                 <div class="calendar-weekdays">
                     <div class="weekday">Sun</div>
@@ -757,21 +844,29 @@
                     <div class="legend-item" style="background: var(--intensity-4);"></div>
                     <span>More</span>
                 </div>
+
+                <div id="leftChartSection" style="display: none; margin-top: 20px;">
+                    <h2>Hourly Activity</h2>
+                    <div class="detail-stats" id="detailStats"></div>
+                    <div class="chart-container" style="margin-top: 15px;">
+                        <canvas id="hourlyChart"></canvas>
+                    </div>
+                </div>
             </div>
 
             <div class="detail-panel">
                 <div class="detail-header">
                     <h2 id="selectedDate">Select a day</h2>
-                    <div class="detail-stats" id="detailStats"></div>
                 </div>
 
-                <div id="detailContent">
+                <div id="detailContent" class="detail-content-wrapper">
                     <div class="empty-state">
                         <div class="empty-state-icon">📅</div>
                         <p>Click a day on the calendar to view activity</p>
                     </div>
                 </div>
             </div>
+        </div>
         </div>
     </div>
 
@@ -869,6 +964,26 @@
             setupEventListeners();
             const themeMedia = window.matchMedia('(prefers-color-scheme: dark)');
             themeMedia.addEventListener('change', applyTimelineChartTheme);
+
+            // Today link handler - navigate to today's date and select it
+            const todayLink = document.getElementById('todayNav');
+            todayLink.addEventListener('click', (e) => {
+                e.preventDefault();
+                const today = new Date();
+                const todayStr = today.toISOString().split('T')[0];
+
+                // Check if we need to change month
+                const currentMonth = today.getMonth() + 1;
+                const currentYear = today.getFullYear();
+
+                if (currentMonth !== state.currentMonth || currentYear !== state.currentYear) {
+                    state.currentMonth = currentMonth;
+                    state.currentYear = currentYear;
+                    loadCalendar().then(() => selectDate(todayStr));
+                } else {
+                    selectDate(todayStr);
+                }
+            });
         });
 
         // Event listeners
@@ -901,7 +1016,8 @@
                         break;
                     case 'd':
                         if (!e.metaKey && !e.ctrlKey) {
-                            window.location.href = '/day/{{ today }}';
+                            const today = new Date().toISOString().split('T')[0];
+                            selectDate(today);
                         }
                         break;
                     // Timeline-specific navigation
@@ -1156,11 +1272,13 @@
         // Render hourly chart and all screenshots
         async function renderHourlyChart(hourlyData) {
             const detailContent = document.getElementById('detailContent');
+            const leftChartSection = document.getElementById('leftChartSection');
 
+            // Show left chart section
+            leftChartSection.style.display = 'block';
+
+            // Set up screenshot grid in right panel
             detailContent.innerHTML = `
-                <div class="chart-container">
-                    <canvas id="hourlyChart"></canvas>
-                </div>
                 <div class="hour-groups" id="hourGroups">
                     <div class="loading"><div class="spinner"></div><div>Loading screenshots...</div></div>
                 </div>
