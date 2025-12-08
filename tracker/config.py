@@ -1,61 +1,354 @@
-"""Configuration settings for Activity Tracker.
+"""Configuration management system for Activity Tracker.
 
-This module contains configurable settings for the activity tracker,
-including summarization model preferences and capture settings.
+This module provides a hierarchical configuration system using YAML files and
+Python dataclasses. It supports loading, saving, and updating configuration
+values at runtime with proper validation and defaults.
+
+Key Features:
+- YAML-based configuration files
+- Dataclass-based type safety
+- Hierarchical configuration sections
+- Default values for all settings
+- Live updates with automatic save
+- Backward compatibility with missing fields
+
+Configuration Sections:
+- capture: Screenshot capture settings
+- afk: AFK detection and session management
+- summarization: AI summarization settings
+- storage: Data storage and retention
+- web: Web server configuration
+- privacy: Privacy controls and exclusions
+
+Example:
+    >>> from tracker.config import ConfigManager
+    >>> config_mgr = ConfigManager()
+    >>> print(config_mgr.config.capture.interval_seconds)
+    30
+    >>> config_mgr.update('capture', 'interval_seconds', 60)
+    >>> config_mgr.save()
 """
 
-# Ollama Docker settings
-OLLAMA_HOST = "http://localhost:11434"
-"""Base URL for Ollama API.
+import logging
+from dataclasses import dataclass, field, asdict
+from pathlib import Path
+from typing import Optional
+import yaml
 
-Default assumes Ollama Docker container running with:
-  docker run -d --gpus=all -v ollama:/root/.ollama -p 11434:11434 --name ollama ollama/ollama
+logger = logging.getLogger(__name__)
 
-For remote Ollama servers, set to the appropriate URL (e.g., http://gpu-server:11434).
-"""
 
-# Summarizer settings
-SUMMARIZER_MODEL = "gemma3:27b-it-qat"
-"""Ollama model to use for vision summarization.
+@dataclass
+class CaptureConfig:
+    """Screenshot capture configuration.
 
-Recommended models:
-- gemma3:27b-it-qat: Best quality, requires ~18GB VRAM
-- gemma3:12b-it-qat: Good quality, requires ~8GB VRAM
-- gemma3:4b-it-qat: Acceptable quality, requires ~3GB VRAM
-"""
+    Attributes:
+        interval_seconds: Time between screenshots (default: 30)
+        format: Image format - webp, png, jpg (default: webp)
+        quality: Compression quality 1-100 for lossy formats (default: 80)
+        capture_active_monitor_only: Only capture monitor with focused window (default: True)
+    """
+    interval_seconds: int = 30
+    format: str = "webp"
+    quality: int = 80
+    capture_active_monitor_only: bool = True
 
-SUMMARIZER_SAMPLES_PER_HOUR = 5
-"""Number of screenshots to sample per hour for summarization.
 
-More samples provide better context but increase inference time.
-Recommended range: 4-6 screenshots.
-"""
+@dataclass
+class AFKConfig:
+    """AFK detection and session management configuration.
 
-OCR_ENABLED = True
-"""Whether to use Tesseract OCR for text extraction.
+    Attributes:
+        timeout_seconds: Seconds of inactivity before marking as AFK (default: 180)
+        min_session_minutes: Minimum session duration to keep (default: 5)
+    """
+    timeout_seconds: int = 180
+    min_session_minutes: int = 5
 
-When enabled, OCR text from a middle screenshot is included
-in the summarization prompt to ground the LLM's analysis.
-Requires tesseract-ocr to be installed.
-"""
 
-# Capture settings
-CAPTURE_INTERVAL_SECONDS = 30
-"""Interval between screenshot captures in seconds."""
+@dataclass
+class SummarizationConfig:
+    """AI summarization configuration.
 
-DUPLICATE_THRESHOLD = 3
-"""Hamming distance threshold for duplicate detection.
+    Attributes:
+        enabled: Enable automatic summarization (default: True)
+        model: Ollama model to use (default: gemma3:27b-it-qat)
+        max_samples_per_session: Max screenshots to send to LLM (default: 10)
+        auto_summarize_on_afk: Automatically summarize when going AFK (default: True)
+        ocr_enabled: Enable OCR text extraction (default: True)
+        crop_to_window: Use cropped window screenshots for better accuracy (default: True)
+    """
+    enabled: bool = True
+    model: str = "gemma3:27b-it-qat"
+    max_samples_per_session: int = 10
+    auto_summarize_on_afk: bool = True
+    ocr_enabled: bool = True
+    crop_to_window: bool = True
 
-Screenshots with a perceptual hash distance less than this
-value are considered duplicates and skipped.
-"""
 
-# Data paths
-DATA_DIR_NAME = "activity-tracker-data"
-"""Name of the data directory in user's home folder."""
+@dataclass
+class StorageConfig:
+    """Data storage and retention configuration.
 
-SCREENSHOTS_SUBDIR = "screenshots"
-"""Subdirectory for screenshot storage."""
+    Attributes:
+        data_dir: Directory for storing screenshots and database (default: ~/activity-tracker-data)
+        max_days_retention: Delete data older than this (0 = unlimited, default: 90)
+        max_gb_storage: Maximum storage space in GB (0 = unlimited, default: 50.0)
+    """
+    data_dir: str = "~/activity-tracker-data"
+    max_days_retention: int = 90
+    max_gb_storage: float = 50.0
 
-DATABASE_NAME = "activity.db"
-"""SQLite database filename."""
+
+@dataclass
+class WebConfig:
+    """Web server configuration.
+
+    Attributes:
+        host: Host address to bind to (default: 127.0.0.1)
+        port: Port number for web interface (default: 55555)
+    """
+    host: str = "127.0.0.1"
+    port: int = 55555
+
+
+@dataclass
+class PrivacyConfig:
+    """Privacy controls and exclusion rules.
+
+    Attributes:
+        excluded_apps: App class names to exclude from tracking
+        excluded_titles: Window title patterns to exclude
+        blur_screenshots: Blur sensitive areas (future feature, default: False)
+    """
+    excluded_apps: list[str] = field(default_factory=lambda: [
+        "1password",
+        "keepass",
+        "bitwarden",
+        "gnome-keyring"
+    ])
+    excluded_titles: list[str] = field(default_factory=lambda: [
+        "Private Browsing",
+        "Incognito",
+        "InPrivate"
+    ])
+    blur_screenshots: bool = False
+
+
+@dataclass
+class Config:
+    """Top-level configuration container.
+
+    Attributes:
+        capture: Screenshot capture settings
+        afk: AFK detection settings
+        summarization: AI summarization settings
+        storage: Storage and retention settings
+        web: Web server settings
+        privacy: Privacy controls
+    """
+    capture: CaptureConfig = field(default_factory=CaptureConfig)
+    afk: AFKConfig = field(default_factory=AFKConfig)
+    summarization: SummarizationConfig = field(default_factory=SummarizationConfig)
+    storage: StorageConfig = field(default_factory=StorageConfig)
+    web: WebConfig = field(default_factory=WebConfig)
+    privacy: PrivacyConfig = field(default_factory=PrivacyConfig)
+
+
+class ConfigManager:
+    """Manages configuration loading, saving, and updates.
+
+    Handles YAML configuration file I/O with automatic creation of default
+    configuration and merging of user settings with defaults.
+
+    Attributes:
+        DEFAULT_PATH: Default configuration file location
+        path: Actual configuration file path being used
+        config: Current configuration object
+
+    Example:
+        >>> config_mgr = ConfigManager()
+        >>> config_mgr.config.capture.interval_seconds = 60
+        >>> config_mgr.save()
+        >>>
+        >>> # Update and save in one call
+        >>> config_mgr.update('capture', 'quality', 90)
+    """
+
+    DEFAULT_PATH = Path("~/.config/activity-tracker/config.yaml").expanduser()
+
+    def __init__(self, path: Optional[Path] = None):
+        """Initialize ConfigManager.
+
+        Args:
+            path: Custom config file path (uses DEFAULT_PATH if None)
+        """
+        self.path = Path(path).expanduser() if path else self.DEFAULT_PATH
+        self.config = self._load()
+
+    def _load(self) -> Config:
+        """Load configuration from YAML file.
+
+        Returns:
+            Config object with loaded or default values
+
+        Note:
+            Missing fields use defaults from dataclass definitions.
+            Invalid YAML returns default Config.
+        """
+        if self.path.exists():
+            try:
+                with open(self.path) as f:
+                    data = yaml.safe_load(f) or {}
+                logger.info(f"Loaded configuration from {self.path}")
+                return self._dict_to_config(data)
+            except (yaml.YAMLError, OSError) as e:
+                logger.warning(f"Failed to load config from {self.path}: {e}")
+                logger.info("Using default configuration")
+                return Config()
+        else:
+            logger.info(f"No config file at {self.path}, using defaults")
+            return Config()
+
+    def _dict_to_config(self, data: dict) -> Config:
+        """Recursively construct Config from dictionary.
+
+        Args:
+            data: Dictionary from YAML file
+
+        Returns:
+            Config object with values from dict merged with defaults
+
+        Note:
+            Uses ** unpacking to merge dict values with dataclass defaults.
+            Missing keys in dict will use dataclass default values.
+        """
+        # Get data for each section, defaulting to empty dict if missing
+        capture_data = data.get('capture', {})
+        afk_data = data.get('afk', {})
+        summarization_data = data.get('summarization', {})
+        storage_data = data.get('storage', {})
+        web_data = data.get('web', {})
+        privacy_data = data.get('privacy', {})
+
+        return Config(
+            capture=CaptureConfig(**capture_data),
+            afk=AFKConfig(**afk_data),
+            summarization=SummarizationConfig(**summarization_data),
+            storage=StorageConfig(**storage_data),
+            web=WebConfig(**web_data),
+            privacy=PrivacyConfig(**privacy_data),
+        )
+
+    def save(self) -> None:
+        """Save current configuration to YAML file.
+
+        Creates parent directories if they don't exist.
+        Formats YAML with proper indentation and no flow style.
+
+        Raises:
+            OSError: If file write fails
+        """
+        try:
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+            with open(self.path, 'w') as f:
+                yaml.dump(
+                    asdict(self.config),
+                    f,
+                    default_flow_style=False,
+                    sort_keys=False,
+                    indent=2
+                )
+            logger.info(f"Saved configuration to {self.path}")
+        except OSError as e:
+            logger.error(f"Failed to save config to {self.path}: {e}")
+            raise
+
+    def update(self, section: str, key: str, value) -> bool:
+        """Update a single configuration value and save.
+
+        Args:
+            section: Config section name (e.g., 'capture', 'afk')
+            key: Setting name within section (e.g., 'interval_seconds')
+            value: New value to set
+
+        Returns:
+            True if value was changed and saved, False if unchanged or invalid
+
+        Example:
+            >>> config_mgr.update('capture', 'interval_seconds', 60)
+            True
+            >>> config_mgr.update('invalid_section', 'key', 'value')
+            False
+        """
+        section_obj = getattr(self.config, section, None)
+        if section_obj is None:
+            logger.warning(f"Invalid config section: {section}")
+            return False
+
+        if not hasattr(section_obj, key):
+            logger.warning(f"Invalid config key: {section}.{key}")
+            return False
+
+        old_value = getattr(section_obj, key)
+        if old_value != value:
+            setattr(section_obj, key, value)
+            self.save()
+            logger.info(f"Updated {section}.{key}: {old_value} → {value}")
+            return True
+
+        logger.debug(f"No change for {section}.{key} (already {value})")
+        return False
+
+    def to_dict(self) -> dict:
+        """Convert configuration to dictionary.
+
+        Returns:
+            Dictionary representation of entire configuration
+
+        Useful for serialization or API responses.
+        """
+        return asdict(self.config)
+
+    def reload(self) -> None:
+        """Reload configuration from file.
+
+        Useful for picking up external changes to the config file.
+        """
+        self.config = self._load()
+        logger.info("Configuration reloaded")
+
+    def create_default_file(self) -> None:
+        """Create default configuration file.
+
+        Creates the config file with default values if it doesn't exist.
+        Useful for initial setup or reset to defaults.
+        """
+        if not self.path.exists():
+            self.save()
+            logger.info(f"Created default configuration at {self.path}")
+        else:
+            logger.warning(f"Configuration file already exists at {self.path}")
+
+
+# Singleton instance for easy access throughout the application
+_default_config_manager: Optional[ConfigManager] = None
+
+
+def get_config_manager(path: Optional[Path] = None) -> ConfigManager:
+    """Get or create the default ConfigManager instance.
+
+    Args:
+        path: Optional custom config path (only used on first call)
+
+    Returns:
+        ConfigManager singleton instance
+
+    Example:
+        >>> config = get_config_manager()
+        >>> print(config.config.capture.interval_seconds)
+    """
+    global _default_config_manager
+    if _default_config_manager is None:
+        _default_config_manager = ConfigManager(path)
+    return _default_config_manager

@@ -20,6 +20,64 @@ SERVICE_FILE="$SYSTEMD_DIR/activity-tracker.service"
 
 echo -e "${GREEN}Installing Activity Tracker...${NC}"
 
+# Create default config file if it doesn't exist
+CONFIG_DIR="$HOME/.config/activity-tracker"
+CONFIG_FILE="$CONFIG_DIR/config.yaml"
+
+if [ ! -f "$CONFIG_FILE" ]; then
+    echo "Creating default configuration file..."
+    mkdir -p "$CONFIG_DIR"
+
+    # Use Python to create default config via ConfigManager
+    cd "$PROJECT_DIR"
+    if [ -d "venv" ]; then
+        venv/bin/python -c "from tracker.config import ConfigManager; ConfigManager().create_default_file()" 2>/dev/null || {
+            echo -e "${YELLOW}!${NC} Failed to create config via Python, creating manually"
+            # Fallback: create config manually
+            cat > "$CONFIG_FILE" << 'CONFIGEOF'
+capture:
+  interval_seconds: 30
+  format: webp
+  quality: 80
+  capture_active_monitor_only: true
+afk:
+  timeout_seconds: 180
+  min_session_minutes: 5
+summarization:
+  enabled: true
+  model: gemma3:27b-it-qat
+  max_samples_per_session: 10
+  auto_summarize_on_afk: true
+  ocr_enabled: true
+  crop_to_window: true
+storage:
+  data_dir: ~/activity-tracker-data
+  max_days_retention: 90
+  max_gb_storage: 50.0
+web:
+  host: 127.0.0.1
+  port: 55555
+privacy:
+  excluded_apps:
+  - 1password
+  - keepass
+  - bitwarden
+  - gnome-keyring
+  excluded_titles:
+  - Private Browsing
+  - Incognito
+  - InPrivate
+  blur_screenshots: false
+CONFIGEOF
+        }
+    fi
+    echo -e "  ${GREEN}✓${NC} Created config at $CONFIG_FILE"
+else
+    echo -e "  ${GREEN}✓${NC} Config file already exists at $CONFIG_FILE"
+fi
+
+echo
+
 # Check for required dependencies
 echo "Checking required dependencies..."
 
