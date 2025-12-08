@@ -952,7 +952,6 @@
         }
 
         .summary-prompt-content {
-            display: none;
             background: var(--surface);
             border: 1px solid var(--border);
             border-radius: 4px;
@@ -970,6 +969,29 @@
             display: block;
         }
 
+        .summary-screenshots-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+            gap: 8px;
+            margin-top: 8px;
+        }
+
+        .summary-screenshot-thumb {
+            width: 100%;
+            height: 60px;
+            object-fit: cover;
+            border-radius: 4px;
+            border: 1px solid var(--border);
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .summary-screenshot-thumb:hover {
+            transform: scale(1.05);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+            border-color: var(--accent);
+        }
+
         /* Info icon styles */
         .info-icon {
             display: inline-flex;
@@ -985,12 +1007,14 @@
             cursor: help;
             margin-left: 4px;
             position: relative;
+            z-index: 1;
         }
 
         .info-icon:hover {
             background: var(--accent);
             border-color: var(--accent);
             color: var(--text-inverse);
+            z-index: 99999;
         }
 
         .info-tooltip {
@@ -1007,10 +1031,11 @@
             font-weight: normal;
             color: var(--text);
             width: 250px;
-            z-index: 1000;
+            z-index: 100000;
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
             text-align: left;
             line-height: 1.4;
+            white-space: normal;
         }
 
         .info-tooltip::after {
@@ -1025,6 +1050,11 @@
 
         .info-icon:hover .info-tooltip {
             display: block;
+        }
+
+        /* Ensure session containers don't clip tooltips */
+        .session-card {
+            overflow: visible;
         }
 
         /* Generate button loading state */
@@ -2476,21 +2506,35 @@
                                             <span class="summary-detail-value">${inferenceTimeStr}</span>
                                         </div>
                                         <div class="summary-detail-item">
-                                            <span class="summary-detail-label">Screenshots Sampled</span>
-                                            <span class="summary-detail-value">~${sampledCount} of ${session.screenshot_count}</span>
+                                            <span class="summary-detail-label">Screenshots Used</span>
+                                            <span class="summary-detail-value">${session.screenshot_ids_used ? session.screenshot_ids_used.length : sampledCount} of ${session.screenshot_count}</span>
                                         </div>
                                         <div class="summary-detail-item">
                                             <span class="summary-detail-label">Unique Windows</span>
                                             <span class="summary-detail-value">${session.unique_windows}</span>
                                         </div>
                                     </div>
+                                    ${session.screenshot_ids_used && session.screenshot_ids_used.length > 0 ? `
+                                        <div class="summary-screenshots-used">
+                                            <div class="summary-detail-label" style="margin-top: 12px; margin-bottom: 8px;">Screenshots Used in Summary:</div>
+                                            <div class="summary-screenshots-grid">
+                                                ${session.screenshot_ids_used.map(id => `
+                                                    <img
+                                                        src="/screenshot/${id}"
+                                                        class="summary-screenshot-thumb screenshot-img"
+                                                        data-id="${id}"
+                                                        title="Screenshot #${id}"
+                                                    >
+                                                `).join('')}
+                                            </div>
+                                        </div>
+                                    ` : ''}
                                     ${session.prompt_text ? `
                                         <div class="summary-prompt">
                                             <div class="summary-prompt-header">
-                                                <span class="summary-prompt-label">API Request</span>
-                                                <span class="summary-prompt-toggle" onclick="togglePromptDetails(${session.id})">Show/Hide</span>
+                                                <span class="summary-prompt-label">API Request Details</span>
                                             </div>
-                                            <pre class="summary-prompt-content" id="prompt-details-${session.id}">${escapeHtml(session.prompt_text)}</pre>
+                                            <pre class="summary-prompt-content visible">${escapeHtml(session.prompt_text)}</pre>
                                         </div>
                                     ` : ''}
                                 </div>

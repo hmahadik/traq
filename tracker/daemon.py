@@ -260,7 +260,7 @@ class ActivityDaemon:
 
             # Generate summary
             self.log(f"Generating summary for session {session_id}...")
-            summary, inference_ms, prompt_text = summarizer.summarize_session(
+            summary, inference_ms, prompt_text, screenshot_ids_used = summarizer.summarize_session(
                 screenshots=screenshots,
                 ocr_texts=ocr_texts,
                 previous_summary=previous_summary,
@@ -273,6 +273,7 @@ class ActivityDaemon:
                 model=summarizer.model,
                 inference_ms=inference_ms,
                 prompt_text=prompt_text,
+                screenshot_ids_used=screenshot_ids_used,
             )
 
             self.log(f"Session {session_id}: {summary}")

@@ -229,7 +229,7 @@ class HybridSummarizer:
         screenshots: list[dict],
         ocr_texts: list[dict],
         previous_summary: str = None,
-    ) -> tuple[str, int, str]:
+    ) -> tuple[str, int, str, list]:
         """
         Summarize a session with context continuity.
 
@@ -242,7 +242,7 @@ class HybridSummarizer:
             previous_summary: Optional previous session summary for continuity.
 
         Returns:
-            Tuple of (summary text, inference time in milliseconds, prompt text).
+            Tuple of (summary text, inference time in ms, prompt text, screenshot IDs used).
 
         Raises:
             ValueError: If screenshots is empty.
@@ -256,6 +256,9 @@ class HybridSummarizer:
         # Sample screenshots uniformly
         sampled = self._sample_screenshots(screenshots, self.max_samples)
         logger.info(f"Sampled {len(sampled)} of {len(screenshots)} screenshots")
+
+        # Extract IDs of screenshots actually used
+        screenshot_ids_used = [s["id"] for s in sampled]
 
         # Prepare images for LLM
         images_base64 = []
@@ -324,7 +327,7 @@ class HybridSummarizer:
         response = self._call_ollama_api(prompt, images_base64)
 
         inference_ms = int((time.time() - start_time) * 1000)
-        return response.strip(), inference_ms, api_request_info
+        return response.strip(), inference_ms, api_request_info, screenshot_ids_used
 
     def _sample_screenshots(
         self, screenshots: list[dict], max_n: int

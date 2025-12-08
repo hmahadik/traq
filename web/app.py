@@ -624,6 +624,7 @@ def api_sessions_for_date(date_string):
                 "model_used": session.get("model_used"),
                 "inference_time_ms": session.get("inference_time_ms"),
                 "prompt_text": session.get("prompt_text"),
+                "screenshot_ids_used": session.get("screenshot_ids_used", []),
             })
 
         return jsonify({
@@ -800,7 +801,7 @@ def _run_session_summarization(session_id: int):
         previous_summary = recent_summaries[0] if recent_summaries else None
 
         # Generate summary
-        summary, inference_ms, prompt_text = summarizer.summarize_session(
+        summary, inference_ms, prompt_text, screenshot_ids_used = summarizer.summarize_session(
             screenshots=screenshots,
             ocr_texts=ocr_texts,
             previous_summary=previous_summary,
@@ -813,6 +814,7 @@ def _run_session_summarization(session_id: int):
             model=summarizer.model,
             inference_ms=inference_ms,
             prompt_text=prompt_text,
+            screenshot_ids_used=screenshot_ids_used,
         )
 
     except Exception as e:

@@ -213,6 +213,12 @@ class ActivityStorage:
             except sqlite3.OperationalError:
                 pass  # Column already exists
 
+            # Add screenshot_ids_used column if it doesn't exist
+            try:
+                conn.execute("ALTER TABLE activity_sessions ADD COLUMN screenshot_ids_used TEXT")
+            except sqlite3.OperationalError:
+                pass  # Column already exists
+
             conn.execute("""
                 CREATE INDEX IF NOT EXISTS idx_session_start ON activity_sessions(start_time)
             """)
@@ -726,7 +732,7 @@ class ActivityStorage:
                 """
                 SELECT id, start_time, end_time, duration_seconds, summary,
                        screenshot_count, unique_windows, model_used, inference_time_ms,
-                       prompt_text
+                       prompt_text, screenshot_ids_used
                 FROM activity_sessions
                 WHERE end_time IS NULL
                 ORDER BY start_time DESC
@@ -739,6 +745,10 @@ class ActivityStorage:
 
             result = dict(row)
             session_id = result["id"]
+
+            # Parse screenshot_ids_used JSON if present
+            if result.get("screenshot_ids_used"):
+                result["screenshot_ids_used"] = json.loads(result["screenshot_ids_used"])
 
             # Calculate live counts for active session
             cursor = conn.execute(
@@ -777,7 +787,7 @@ class ActivityStorage:
                 """
                 SELECT id, start_time, end_time, duration_seconds, summary,
                        screenshot_count, unique_windows, model_used, inference_time_ms,
-                       prompt_text
+                       prompt_text, screenshot_ids_used
                 FROM activity_sessions
                 WHERE id = ?
                 """,
@@ -788,6 +798,10 @@ class ActivityStorage:
                 return None
 
             result = dict(row)
+
+            # Parse screenshot_ids_used JSON if present
+            if result.get("screenshot_ids_used"):
+                result["screenshot_ids_used"] = json.loads(result["screenshot_ids_used"])
 
             # For active sessions (no end_time), calculate live counts
             if result["end_time"] is None:
@@ -827,7 +841,7 @@ class ActivityStorage:
                 """
                 SELECT id, start_time, end_time, duration_seconds, summary,
                        screenshot_count, unique_windows, model_used, inference_time_ms,
-                       prompt_text
+                       prompt_text, screenshot_ids_used
                 FROM activity_sessions
                 WHERE date(start_time) = ?
                 ORDER BY start_time
@@ -837,6 +851,10 @@ class ActivityStorage:
             results = []
             for row in cursor.fetchall():
                 result = dict(row)
+
+                # Parse screenshot_ids_used JSON if present
+                if result.get("screenshot_ids_used"):
+                    result["screenshot_ids_used"] = json.loads(result["screenshot_ids_used"])
 
                 # For active sessions (no end_time), calculate live counts
                 if result["end_time"] is None:
@@ -1046,7 +1064,7 @@ class ActivityStorage:
 
     def save_session_summary(
         self, session_id: int, summary: str, model: str, inference_ms: int,
-        prompt_text: str = None
+        prompt_text: str = None, screenshot_ids_used: list = None
     ) -> None:
         """Save a summary for a session.
 
@@ -1056,15 +1074,19 @@ class ActivityStorage:
             model: Name of the model used.
             inference_ms: Inference time in milliseconds.
             prompt_text: The full prompt text sent to the LLM (for debugging).
+            screenshot_ids_used: List of screenshot IDs actually used in summarization.
         """
+        screenshot_ids_json = json.dumps(screenshot_ids_used) if screenshot_ids_used else None
+
         with self.get_connection() as conn:
             conn.execute(
                 """
                 UPDATE activity_sessions
-                SET summary = ?, model_used = ?, inference_time_ms = ?, prompt_text = ?
+                SET summary = ?, model_used = ?, inference_time_ms = ?, prompt_text = ?,
+                    screenshot_ids_used = ?
                 WHERE id = ?
                 """,
-                (summary, model, inference_ms, prompt_text, session_id),
+                (summary, model, inference_ms, prompt_text, screenshot_ids_json, session_id),
             )
             conn.commit()
 
