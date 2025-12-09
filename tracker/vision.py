@@ -609,6 +609,24 @@ class HybridSummarizer:
             logger.warning(f"Ollama check failed: {e}")
             return False
 
+    def generate_text(self, prompt: str) -> str:
+        """
+        Generate text from a prompt using the LLM (no images).
+
+        This is a simple text-only LLM call for generating summaries,
+        reports, or other text based on a prompt.
+
+        Args:
+            prompt: The text prompt to send to the model.
+
+        Returns:
+            The model's response text.
+
+        Raises:
+            RuntimeError: If Ollama is unavailable or the model fails.
+        """
+        return self._call_ollama_api(prompt)
+
     def summarize_day(self, hourly_summaries: list[dict]) -> str:
         """
         Combine hourly summaries into a daily rollup summary.
