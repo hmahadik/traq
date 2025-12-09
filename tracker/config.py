@@ -73,6 +73,7 @@ class SummarizationConfig:
     Attributes:
         enabled: Enable automatic summarization (default: True)
         model: Ollama model to use (default: gemma3:27b-it-qat)
+        ollama_host: Ollama API host URL (default: http://localhost:11434)
         max_samples_per_session: Max screenshots to send to LLM (default: 10)
         auto_summarize_on_afk: Automatically summarize when going AFK (default: True)
         ocr_enabled: Enable OCR text extraction (default: True)
@@ -80,6 +81,7 @@ class SummarizationConfig:
     """
     enabled: bool = True
     model: str = "gemma3:27b-it-qat"
+    ollama_host: str = "http://localhost:11434"
     max_samples_per_session: int = 10
     auto_summarize_on_afk: bool = True
     ocr_enabled: bool = True

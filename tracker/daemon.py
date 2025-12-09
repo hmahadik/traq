@@ -44,12 +44,21 @@ import subprocess
 import argparse
 import threading
 import re
+import logging
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
 import mss
 from PIL import Image
+
+# Configure logging for submodules (afk, vision, etc.)
+logging.basicConfig(
+    level=logging.INFO,
+    format='[%(asctime)s] %(name)s - %(levelname)s - %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S',
+    stream=sys.stderr
+)
 
 from .capture import ScreenCapture
 from .storage import ActivityStorage
@@ -214,11 +223,12 @@ class ActivityDaemon:
         """
         try:
             from .vision import HybridSummarizer
-            from . import config
+            from .config import get_config_manager
 
+            config_mgr = get_config_manager()
             summarizer = HybridSummarizer(
-                model=config.SUMMARIZER_MODEL,
-                ollama_host=config.OLLAMA_HOST,
+                model=config_mgr.config.summarization.model,
+                ollama_host=config_mgr.config.summarization.ollama_host,
             )
 
             if not summarizer.is_available():
@@ -313,11 +323,12 @@ class ActivityDaemon:
         """Run summarization for a specific hour in background thread."""
         try:
             from .vision import HybridSummarizer
-            from . import config
+            from .config import get_config_manager
 
+            config_mgr = get_config_manager()
             summarizer = HybridSummarizer(
-                model=config.SUMMARIZER_MODEL,
-                ollama_host=config.OLLAMA_HOST,
+                model=config_mgr.config.summarization.model,
+                ollama_host=config_mgr.config.summarization.ollama_host,
             )
 
             if not summarizer.is_available():
@@ -336,9 +347,10 @@ class ActivityDaemon:
                 return
 
             # Sample if too many
-            if len(screenshots) > config.SUMMARIZER_SAMPLES_PER_HOUR:
-                step = len(screenshots) / config.SUMMARIZER_SAMPLES_PER_HOUR
-                indices = [int(i * step) for i in range(config.SUMMARIZER_SAMPLES_PER_HOUR)]
+            max_samples = config_mgr.config.summarization.max_samples_per_session
+            if len(screenshots) > max_samples:
+                step = len(screenshots) / max_samples
+                indices = [int(i * step) for i in range(max_samples)]
                 screenshots = [screenshots[i] for i in indices]
 
             # Get paths and IDs
