@@ -268,8 +268,8 @@ def main():
     parser.add_argument(
         "--model",
         type=str,
-        default="gemma3:27b-it-qat",
-        help="Ollama model to use (default: gemma3:27b-it-qat).",
+        default="gemma3:12b-it-qat",
+        help="Ollama model to use (default: gemma3:12b-it-qat).",
     )
     parser.add_argument(
         "--ollama-host",

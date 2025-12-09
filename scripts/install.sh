@@ -45,7 +45,7 @@ afk:
   min_session_minutes: 5
 summarization:
   enabled: true
-  model: gemma3:27b-it-qat
+  model: gemma3:12b-it-qat
   ollama_host: http://localhost:11434
   trigger_threshold: 10
   ocr_enabled: true
@@ -106,12 +106,12 @@ if which docker > /dev/null 2>&1; then
     if docker ps --format '{{.Names}}' 2>/dev/null | grep -q "^ollama$"; then
         echo -e "  ${GREEN}✓${NC} ollama container running"
         # Check if model is available
-        if docker exec ollama ollama list 2>/dev/null | grep -q "gemma3:27b"; then
-            echo -e "  ${GREEN}✓${NC} gemma3:27b model available"
+        if docker exec ollama ollama list 2>/dev/null | grep -q "gemma3:12b"; then
+            echo -e "  ${GREEN}✓${NC} gemma3:12b model available"
         else
-            echo -e "  ${YELLOW}!${NC} gemma3:27b model not found - Run:"
-            echo -e "      docker exec ollama ollama pull gemma3:27b-it-qat"
-            echo -e "      (or gemma3:14b-it-qat for 8GB VRAM cards)"
+            echo -e "  ${YELLOW}!${NC} gemma3:12b model not found - Run:"
+            echo -e "      docker exec ollama ollama pull gemma3:12b-it-qat"
+            echo -e "      (or gemma3:4b-it-qat for lower VRAM cards)"
         fi
     else
         echo -e "  ${YELLOW}!${NC} ollama container not running - Start with:"

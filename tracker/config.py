@@ -72,7 +72,7 @@ class SummarizationConfig:
 
     Attributes:
         enabled: Enable automatic summarization (default: True)
-        model: Ollama model to use (default: gemma3:27b-it-qat)
+        model: Ollama model to use (default: gemma3:12b-it-qat)
         ollama_host: Ollama API host URL (default: http://localhost:11434)
         trigger_threshold: Number of screenshots to trigger summarization (default: 10)
         ocr_enabled: Enable OCR text extraction (default: True)
@@ -80,7 +80,7 @@ class SummarizationConfig:
         include_previous_summary: Include previous summary for context continuity (default: True)
     """
     enabled: bool = True
-    model: str = "gemma3:27b-it-qat"
+    model: str = "gemma3:12b-it-qat"
     ollama_host: str = "http://localhost:11434"
     trigger_threshold: int = 10
     ocr_enabled: bool = True

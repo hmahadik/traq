@@ -221,8 +221,8 @@ journalctl --user -u activity-tracker -f
 The activity tracker can generate AI-powered summaries of your work using a local vision LLM running in Docker. This requires additional setup:
 
 **Hardware Requirements:**
-- **gemma3:27b-it-qat** (recommended): ~18GB VRAM (RTX 3090, 4090, A6000)
-- **gemma3:14b-it-qat** (alternative): ~8GB VRAM (RTX 3080, 4070)
+- **gemma3:12b-it-qat** (recommended): ~8GB VRAM (RTX 3080, 4070, 4080)
+- **gemma3:27b-it-qat** (high-end): ~18GB VRAM (RTX 3090, 4090, A6000)
 - **gemma3:4b-it-qat** (lightweight): ~3GB VRAM (any modern GPU)
 
 **Software Dependencies:**
@@ -239,9 +239,9 @@ docker run -d --gpus=all \
   ollama/ollama
 
 # Pull the vision model (choose based on your VRAM)
-docker exec ollama ollama pull gemma3:27b-it-qat    # ~18GB VRAM
+docker exec ollama ollama pull gemma3:12b-it-qat    # ~8GB VRAM (recommended)
 # OR
-docker exec ollama ollama pull gemma3:14b-it-qat    # ~8GB VRAM
+docker exec ollama ollama pull gemma3:27b-it-qat    # ~18GB VRAM (high-end)
 ```
 
 **Managing the Ollama Container:**

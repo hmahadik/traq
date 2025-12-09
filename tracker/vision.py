@@ -88,7 +88,7 @@ class HybridSummarizer:
 
     def __init__(
         self,
-        model: str = "gemma3:27b-it-qat",
+        model: str = "gemma3:12b-it-qat",
         timeout: int = 120,
         ollama_host: str = None,
         max_samples: int = 10,
@@ -135,6 +135,7 @@ class HybridSummarizer:
             "model": self.model,
             "messages": [message],
             "stream": False,
+            "keep_alive": "1h",  # Keep model loaded for 1 hour for faster responses
         }
 
         start_time = time.time()
