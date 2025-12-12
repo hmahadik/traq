@@ -158,14 +158,6 @@
             height: 14px;
         }
 
-        .project-badge {
-            padding: 3px 10px;
-            border-radius: 12px;
-            font-size: 0.75rem;
-            font-weight: 600;
-            color: var(--text-inverse);
-        }
-
         .summary-text {
             font-size: 1.1rem;
             line-height: 1.7;
@@ -626,16 +618,6 @@
         let data = null;
         let currentScreenshotIndex = 0;
 
-        // Generate consistent color for project names
-        function projectColor(name) {
-            let hash = 0;
-            for (let i = 0; i < name.length; i++) {
-                hash = name.charCodeAt(i) + ((hash << 5) - hash);
-            }
-            const hue = Math.abs(hash % 360);
-            return `hsl(${hue}, 60%, 45%)`;
-        }
-
         // Format duration
         function formatDuration(seconds) {
             if (seconds < 60) return `${Math.round(seconds)}s`;
@@ -701,7 +683,6 @@
                 <!-- Summary Card -->
                 <div class="summary-card">
                     <div class="summary-meta">
-                        <span class="project-badge" style="background: ${projectColor(summary.project || 'unknown')}">${summary.project || 'unknown'}</span>
                         <span class="summary-meta-item">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
                             ${dateStr}

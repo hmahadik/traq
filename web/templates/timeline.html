@@ -1857,44 +1857,6 @@
             border: 1px solid rgba(255, 255, 255, 0.5);
         }
 
-        .project-badge {
-            display: inline-block;
-            padding: 2px 8px;
-            border-radius: 4px;
-            font-size: 0.75rem;
-            font-weight: 600;
-            color: #fff;
-            text-transform: lowercase;
-        }
-
-        .project-filter {
-            display: flex;
-            gap: 8px;
-            margin-bottom: 15px;
-            flex-wrap: wrap;
-        }
-
-        .project-filter-btn {
-            padding: 4px 12px;
-            border: 1px solid var(--border);
-            border-radius: 4px;
-            background: var(--surface);
-            color: var(--text);
-            font-size: 0.85rem;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-
-        .project-filter-btn:hover {
-            border-color: var(--accent);
-        }
-
-        .project-filter-btn.active {
-            background: var(--accent);
-            color: var(--text-inverse);
-            border-color: var(--accent);
-        }
-
         /* History Modal */
         .modal-overlay {
             display: none;
@@ -2250,18 +2212,6 @@
             state.chart.update();
         }
 
-        // Generate consistent color for project badges
-        function projectColor(projectName) {
-            if (!projectName) return '#666';
-            let hash = 0;
-            for (let i = 0; i < projectName.length; i++) {
-                hash = projectName.charCodeAt(i) + ((hash << 5) - hash);
-            }
-            const hue = Math.abs(hash) % 360;
-            // Use HSL with fixed saturation/lightness for readable badges
-            return `hsl(${hue}, 60%, 45%)`;
-        }
-
         // Get local date string in YYYY-MM-DD format (not UTC)
         function getLocalDateString(date) {
             const year = date.getFullYear();
@@ -2536,13 +2486,12 @@
                     el.className = 'lane-event summary';
                     el.style.left = `${x}px`;
                     el.style.width = `${width}px`;
-                    el.style.background = projectColor(summary.project || 'unknown');
+                    el.style.background = 'var(--accent, #58a6ff)';
                     el.style.cursor = 'pointer';
                     el.dataset.summaryId = summary.id;
 
                     if (width > 30) {
-                        const label = summary.project || 'Summary';
-                        el.innerHTML = `<span class="lane-event-label">${label}</span>`;
+                        el.innerHTML = `<span class="lane-event-label">Summary</span>`;
                     }
 
                     el.addEventListener('click', () => {
@@ -2557,7 +2506,7 @@
 
                     el.addEventListener('mouseenter', (e) => {
                         showTimelineTooltip(e, {
-                            app_name: summary.project || 'Summary',
+                            app_name: 'AI Summary',
                             window_title: summary.summary.substring(0, 100) + (summary.summary.length > 100 ? '...' : ''),
                             start_time: summary.start_time,
                             duration_seconds: (new Date(summary.end_time) - new Date(summary.start_time)) / 1000
@@ -4033,7 +3982,6 @@
                                 <th style="width: 40px;"><input type="checkbox" class="summary-checkbox" id="selectAllCheckbox" onclick="toggleSelectAll(event)"></th>
                                 <th>Time</th>
                                 <th>Dur</th>
-                                <th>Project</th>
                                 <th>Summary</th>
                                 <th style="width: 80px;">Screens</th>
                             </tr>
@@ -4052,7 +4000,7 @@
                 // Hour section header row (only for hours with summaries)
                 html += `
                     <tr class="hour-section-header" data-hour="${hour}" id="hour-section-${hour}">
-                        <td colspan="6">
+                        <td colspan="5">
                             <div class="hour-section-label">
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
                                 <span class="hour-time">${hourLabel}</span>
@@ -4070,7 +4018,6 @@
                     const durationMs = endDate - startDate;
                     const durationMins = Math.round(durationMs / 60000);
                     const durationStr = durationMins < 1 ? '<1m' : `${durationMins}m`;
-                    const project = summary.project || 'unknown';
 
                     html += `
                         <tr data-summary-id="${summary.id}" data-hour="${hour}" onclick="handleRowClick(event, ${summary.id})">
@@ -4079,7 +4026,6 @@
                             </td>
                             <td class="summary-time">${startTime}</td>
                             <td class="summary-duration">${durationStr}</td>
-                            <td><span class="project-badge" style="background: ${projectColor(project)}">${project}</span></td>
                             <td class="summary-text-cell" title="${summary.summary}">${summary.summary}</td>
                             <td class="summary-screens">
                                 <span class="screen-count" onclick="event.stopPropagation(); viewSummaryScreenshots(${summary.id})" title="View screenshots">${summary.screenshot_count}</span>
