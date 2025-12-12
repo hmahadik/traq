@@ -1532,7 +1532,7 @@ class ActivityStorage:
             return results
 
     def delete_threshold_summary(self, summary_id: int) -> bool:
-        """Delete a threshold summary.
+        """Delete a threshold summary and its screenshot links.
 
         Args:
             summary_id: The summary ID to delete.
@@ -1541,6 +1541,12 @@ class ActivityStorage:
             True if deleted, False if not found.
         """
         with self.get_connection() as conn:
+            # Delete screenshot links first (makes screenshots "unsummarized" again)
+            conn.execute(
+                "DELETE FROM threshold_summary_screenshots WHERE summary_id = ?",
+                (summary_id,),
+            )
+            # Then delete the summary itself
             cursor = conn.execute(
                 "DELETE FROM threshold_summaries WHERE id = ?",
                 (summary_id,),
