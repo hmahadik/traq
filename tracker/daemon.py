@@ -579,7 +579,11 @@ class ActivityDaemon:
             for line in result.stdout.strip().split('\n'):
                 if '=' in line:
                     key, value = line.split('=', 1)
-                    geo[key] = int(value) if value.isdigit() else value
+                    # Handle negative numbers (isdigit() returns False for "-100")
+                    try:
+                        geo[key] = int(value)
+                    except ValueError:
+                        geo[key] = value
 
             # Validate we have all required fields
             if not all(k in geo for k in ['X', 'Y', 'WIDTH', 'HEIGHT']):
