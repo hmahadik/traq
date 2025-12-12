@@ -1762,7 +1762,10 @@ def api_get_worker_status():
 
 @app.route('/api/threshold-summaries/generate', methods=['POST'])
 def api_force_generate_summaries():
-    """Force immediate summarization of all pending screenshots.
+    """Force immediate summarization of pending screenshots.
+
+    Request body (optional):
+        {"date": "2025-12-12"}  - Limit to specific day
 
     Returns:
         {"status": "queued", "count": 15}
@@ -1775,17 +1778,23 @@ def api_force_generate_summaries():
             "error": "Worker not attached (daemon may not be running)"
         }), 503
 
+    # Get optional date filter from request body
+    date = None
+    if request.is_json and request.json:
+        date = request.json.get('date')
+
     try:
-        count = summarizer_worker.force_summarize_pending()
+        count = summarizer_worker.force_summarize_pending(date=date)
         if count == 0:
             return jsonify({
                 "status": "no_pending",
                 "count": 0,
-                "message": "No unsummarized screenshots"
+                "message": f"No unsummarized screenshots{' for ' + date if date else ''}"
             })
         return jsonify({
             "status": "queued",
-            "count": count
+            "count": count,
+            "date": date
         })
     except Exception as e:
         return jsonify({"error": str(e)}), 500

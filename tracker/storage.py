@@ -1278,13 +1278,17 @@ class ActivityStorage:
 
     # ==================== Threshold-Based Summary Methods ====================
 
-    def get_unsummarized_screenshots(self, require_session: bool = True) -> List[Dict]:
+    def get_unsummarized_screenshots(
+        self, require_session: bool = True, date: str = None
+    ) -> List[Dict]:
         """Get screenshots not covered by any threshold summary.
 
         Args:
             require_session: If True (default), only returns screenshots linked
                 to an active session. Set to False to include ALL unsummarized
                 screenshots (useful for "Generate Missing" backfill).
+            date: Optional date string (YYYY-MM-DD) to filter screenshots to
+                a specific day. If None, returns all unsummarized screenshots.
 
         Returns:
             List of screenshot dicts ordered by timestamp DESC (recent first),
@@ -1295,10 +1299,24 @@ class ActivityStorage:
             the most recent activity is summarized first, providing immediate
             value to users viewing today's timeline.
         """
+        # Build date filter if provided
+        date_filter = ""
+        params = []
+        if date:
+            from datetime import datetime
+            try:
+                date_obj = datetime.strptime(date, '%Y-%m-%d')
+                start_ts = int(date_obj.timestamp())
+                end_ts = start_ts + 86400  # +1 day
+                date_filter = "AND s.timestamp >= ? AND s.timestamp < ?"
+                params = [start_ts, end_ts]
+            except ValueError:
+                pass  # Invalid date, ignore filter
+
         with self.get_connection() as conn:
             if require_session:
                 # Only screenshots linked to sessions (excludes AFK periods)
-                cursor = conn.execute("""
+                cursor = conn.execute(f"""
                     SELECT s.id, s.timestamp, s.filepath, s.window_title, s.app_name,
                            s.window_x, s.window_y, s.window_width, s.window_height
                     FROM screenshots s
@@ -1310,11 +1328,12 @@ class ActivityStorage:
                         SELECT 1 FROM session_screenshots ss
                         WHERE ss.screenshot_id = s.id
                     )
+                    {date_filter}
                     ORDER BY s.timestamp DESC
-                """)
+                """, params)
             else:
                 # All unsummarized screenshots (for backfill)
-                cursor = conn.execute("""
+                cursor = conn.execute(f"""
                     SELECT s.id, s.timestamp, s.filepath, s.window_title, s.app_name,
                            s.window_x, s.window_y, s.window_width, s.window_height
                     FROM screenshots s
@@ -1322,8 +1341,9 @@ class ActivityStorage:
                         SELECT 1 FROM threshold_summary_screenshots tss
                         WHERE tss.screenshot_id = s.id
                     )
+                    {date_filter}
                     ORDER BY s.timestamp DESC
-                """)
+                """, params)
             return [dict(row) for row in cursor.fetchall()]
 
     def get_last_threshold_summary(self) -> Optional[Dict]:

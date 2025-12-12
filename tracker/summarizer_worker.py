@@ -166,8 +166,8 @@ class SummarizerWorker:
         self._pending_queue.put(('regenerate', summary_id))
         logger.info(f"Queued summary {summary_id} for regeneration")
 
-    def force_summarize_pending(self) -> int:
-        """Force immediate summarization of all pending screenshots.
+    def force_summarize_pending(self, date: str = None) -> int:
+        """Force immediate summarization of pending screenshots.
 
         Splits screenshots into time-based batches based on frequency_minutes
         setting, so each summary covers approximately that time period.
@@ -175,11 +175,17 @@ class SummarizerWorker:
         Unlike automatic summarization, this includes ALL unsummarized screenshots
         regardless of session linkage (for backfilling older screenshots).
 
+        Args:
+            date: Optional date string (YYYY-MM-DD) to limit to a specific day.
+                If None, processes all unsummarized screenshots.
+
         Returns:
             Number of screenshots queued for summarization.
         """
         # Include all screenshots, not just those with sessions (for backfill)
-        unsummarized = self.storage.get_unsummarized_screenshots(require_session=False)
+        unsummarized = self.storage.get_unsummarized_screenshots(
+            require_session=False, date=date
+        )
         if not unsummarized:
             logger.info("No unsummarized screenshots to process")
             return 0

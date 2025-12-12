@@ -2332,7 +2332,7 @@
                         <h3>Activity Timeline</h3>
                         <span class="timeline-hint">Drag to pan, scroll to zoom</span>
                         <div class="timeline-controls">
-                            <button class="btn-generate-missing" id="btnGenerateMissing" onclick="triggerSummarization()" title="Generate summaries for all unsummarized screenshots">
+                            <button class="btn-generate-missing" id="btnGenerateMissing" onclick="triggerSummarization()" title="Generate summaries for unsummarized screenshots on this day">
                                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
                                 Generate Missing
                             </button>
@@ -4272,9 +4272,11 @@
             };
 
             try {
+                // Pass the current timeline date to only generate for that day
                 const response = await fetch('/api/threshold-summaries/generate', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' }
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ date: state.selectedDate })
                 });
 
                 const data = await response.json();
@@ -4286,7 +4288,7 @@
                 }
 
                 if (data.status === 'no_pending') {
-                    alert('No unsummarized screenshots to process');
+                    alert(`No unsummarized screenshots for ${state.selectedDate}`);
                     resetButton();
                     return;
                 }
