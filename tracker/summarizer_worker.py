@@ -172,10 +172,14 @@ class SummarizerWorker:
         Splits screenshots into time-based batches based on frequency_minutes
         setting, so each summary covers approximately that time period.
 
+        Unlike automatic summarization, this includes ALL unsummarized screenshots
+        regardless of session linkage (for backfilling older screenshots).
+
         Returns:
             Number of screenshots queued for summarization.
         """
-        unsummarized = self.storage.get_unsummarized_screenshots()
+        # Include all screenshots, not just those with sessions (for backfill)
+        unsummarized = self.storage.get_unsummarized_screenshots(require_session=False)
         if not unsummarized:
             logger.info("No unsummarized screenshots to process")
             return 0

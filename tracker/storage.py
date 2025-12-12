@@ -1278,11 +1278,13 @@ class ActivityStorage:
 
     # ==================== Threshold-Based Summary Methods ====================
 
-    def get_unsummarized_screenshots(self) -> List[Dict]:
+    def get_unsummarized_screenshots(self, require_session: bool = True) -> List[Dict]:
         """Get screenshots not covered by any threshold summary.
 
-        Only returns screenshots that are part of an active (non-AFK) session.
-        This ensures summaries are generated only for periods of real activity.
+        Args:
+            require_session: If True (default), only returns screenshots linked
+                to an active session. Set to False to include ALL unsummarized
+                screenshots (useful for "Generate Missing" backfill).
 
         Returns:
             List of screenshot dicts ordered by timestamp DESC (recent first),
@@ -1294,20 +1296,34 @@ class ActivityStorage:
             value to users viewing today's timeline.
         """
         with self.get_connection() as conn:
-            cursor = conn.execute("""
-                SELECT s.id, s.timestamp, s.filepath, s.window_title, s.app_name,
-                       s.window_x, s.window_y, s.window_width, s.window_height
-                FROM screenshots s
-                WHERE NOT EXISTS (
-                    SELECT 1 FROM threshold_summary_screenshots tss
-                    WHERE tss.screenshot_id = s.id
-                )
-                AND EXISTS (
-                    SELECT 1 FROM session_screenshots ss
-                    WHERE ss.screenshot_id = s.id
-                )
-                ORDER BY s.timestamp DESC
-            """)
+            if require_session:
+                # Only screenshots linked to sessions (excludes AFK periods)
+                cursor = conn.execute("""
+                    SELECT s.id, s.timestamp, s.filepath, s.window_title, s.app_name,
+                           s.window_x, s.window_y, s.window_width, s.window_height
+                    FROM screenshots s
+                    WHERE NOT EXISTS (
+                        SELECT 1 FROM threshold_summary_screenshots tss
+                        WHERE tss.screenshot_id = s.id
+                    )
+                    AND EXISTS (
+                        SELECT 1 FROM session_screenshots ss
+                        WHERE ss.screenshot_id = s.id
+                    )
+                    ORDER BY s.timestamp DESC
+                """)
+            else:
+                # All unsummarized screenshots (for backfill)
+                cursor = conn.execute("""
+                    SELECT s.id, s.timestamp, s.filepath, s.window_title, s.app_name,
+                           s.window_x, s.window_y, s.window_width, s.window_height
+                    FROM screenshots s
+                    WHERE NOT EXISTS (
+                        SELECT 1 FROM threshold_summary_screenshots tss
+                        WHERE tss.screenshot_id = s.id
+                    )
+                    ORDER BY s.timestamp DESC
+                """)
             return [dict(row) for row in cursor.fetchall()]
 
     def get_last_threshold_summary(self) -> Optional[Dict]:
