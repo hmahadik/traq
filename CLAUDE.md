@@ -302,6 +302,33 @@ activity-tracker/
   - Timeline lane events now use consistent accent color and "AI Summary" label
   - Removed project badge from summary_detail.html
 
+### 2025-12-15 - Phase 10: Cron-like Scheduled Summarization
+- **Replaced on-capture triggering with cron-like scheduling**:
+  - Summarization now runs at fixed clock times (e.g., hh:00, hh:15, hh:30, hh:45 for 15-min frequency)
+  - SummarizerWorker has internal timer instead of being triggered by screenshot capture
+  - `check_and_queue()` deprecated (now a no-op) - can be removed from daemon.py call
+- **Time-range based summarization**:
+  - `_do_summarize_time_range(start_time, end_time)` replaces screenshot-batch based approach
+  - Supports summarization even when screenshot capture is disabled (uses focus events only)
+  - Screenshots and focus events gathered for the exact time slot
+- **New scheduling methods**:
+  - `_get_schedule_slot(dt, frequency_minutes)` - rounds down to nearest slot boundary
+  - `_get_next_scheduled_time()` - calculates next run time aligned to clock
+  - `_get_time_range_for_slot(slot_end)` - returns (start, end) for a slot
+- **Updated `force_summarize_pending()`**:
+  - Groups unsummarized screenshots into cron-aligned time slots
+  - Uses `summarize_range` task type instead of screenshot batches
+  - Returns number of time slots queued (not screenshot count)
+- **Enhanced `get_status()`**:
+  - Now includes `next_scheduled_run` datetime
+- **Backward compatibility**:
+  - Legacy `_do_summarize_screenshots()` method kept for any queued tasks
+  - `check_and_queue()` is a no-op but won't break existing daemon code
+- **Summary details UI improvements**:
+  - API request now includes `Screenshot IDs used: [...]` showing which screenshots were sampled
+  - Summary detail page displays used screenshots as thumbnails in API Request section
+  - Clickable thumbnails that open in the same modal viewer as main screenshots grid
+
 ## Future Improvements
 - **Database normalization**: Unify `threshold_summaries` and `daily_summaries` into single `summaries` table with type field (threshold, hourly, daily, weekly, custom), plus separate `prompts` table for API request storage. Supports hierarchical relationships (daily→hourly→threshold).
 

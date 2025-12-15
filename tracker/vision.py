@@ -370,20 +370,19 @@ class HybridSummarizer:
             basis = "the time breakdown and OCR text"
 
         prompt_parts.extend([
-            f"Based on {basis}, write ONE sentence (max 25 words) describing the PRIMARY activity.",
+            f"Based on {basis}, write 1-2 sentences (max 25 words) describing the PRIMARY activities.",
             "",
-            "IMPORTANT: Output ONLY the summary sentence. No explanation, no reasoning, no preamble.",
+            "IMPORTANT: Output ONLY the summary sentence(s). No explanation, no reasoning, no preamble.",
             "",
             "Guidelines:",
             "- Focus on where the most time was spent",
             "- Use specific project names, filenames, or URLs visible in the content",
             '- Format: "[Action verb] [what] in/for [project/context]"',
-            "- If multiple distinct activities, mention the dominant one",
+            "- If multiple distinct activities, mention the dominant ones",
             "- Do NOT assume different apps/windows are related unless clearly the same project",
             "",
             "Good examples (output exactly like this):",
-            "Implementing window focus tracking in activity-tracker daemon.py (45 min)",
-            "Reviewing PR #1234 for authentication service and responding to comments",
+            "Implementing window focus tracking in activity-tracker daemon.py. Reviewing PR #1234 for authentication service and responding to comments",
             "Debugging API endpoint issues in Acusight backend with Docker logs",
             "",
             'Be specific. Avoid generic descriptions like "coding" or "browsing".',
@@ -402,10 +401,14 @@ class HybridSummarizer:
         if self.include_ocr:
             content_mode.append("ocr")
 
+        # Format screenshot IDs used (for UI display)
+        screenshot_ids_str = ", ".join(str(sid) for sid in screenshot_ids_used) if screenshot_ids_used else "none"
+
         api_request_info = (
             f"Model: {self.model}\n"
             f"Content: {', '.join(content_mode)}\n"
             f"Images: {len(images_base64)} base64-encoded JPEG images (max 1024px)\n"
+            f"Screenshot IDs used: [{screenshot_ids_str}]\n"
             f"Endpoint: {self.ollama_host}/api/chat\n\n"
             f"Prompt:\n{prompt}"
         )

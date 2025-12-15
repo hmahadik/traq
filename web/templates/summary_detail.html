@@ -813,6 +813,18 @@
 
             // API Request / Prompt
             if (summary.prompt_text) {
+                // Parse screenshot IDs used from prompt_text
+                const screenshotIdsMatch = summary.prompt_text.match(/Screenshot IDs used: \[([\d, ]+)\]/);
+                let usedScreenshotIds = [];
+                if (screenshotIdsMatch && screenshotIdsMatch[1] && screenshotIdsMatch[1] !== 'none') {
+                    usedScreenshotIds = screenshotIdsMatch[1].split(',').map(id => parseInt(id.trim())).filter(id => !isNaN(id));
+                }
+
+                // Filter screenshots to only those used
+                const usedScreenshots = usedScreenshotIds.length > 0
+                    ? screenshots.filter(s => usedScreenshotIds.includes(s.id))
+                    : [];
+
                 html += `
                     <div class="section">
                         <div class="section-header">
@@ -821,6 +833,24 @@
                                 API Request
                             </h2>
                         </div>
+                        ${usedScreenshots.length > 0 ? `
+                            <div style="margin-bottom: 16px;">
+                                <div style="font-size: 0.85rem; color: var(--muted); margin-bottom: 8px;">
+                                    Screenshots sent to LLM (${usedScreenshots.length} of ${screenshots.length})
+                                </div>
+                                <div class="screenshots-grid" style="grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));">
+                                    ${usedScreenshots.map((s) => {
+                                        const originalIndex = screenshots.findIndex(ss => ss.id === s.id);
+                                        return `
+                                            <div class="screenshot-thumb" onclick="openScreenshot(${originalIndex})" style="aspect-ratio: 16/10;">
+                                                <img src="/thumbnail/${s.id}" alt="Screenshot" loading="lazy">
+                                                <span class="time-badge">${s.formatted_time}</span>
+                                            </div>
+                                        `;
+                                    }).join('')}
+                                </div>
+                            </div>
+                        ` : ''}
                         <div class="prompt-display">${escapeHtml(summary.prompt_text)}</div>
                     </div>
                 `;

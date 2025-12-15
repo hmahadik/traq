@@ -1,11 +1,12 @@
-"""Background summarization worker for threshold-based summaries.
+"""Background summarization worker with cron-like scheduling.
 
-This module implements a background worker that monitors screenshot count
-and triggers summarization when the threshold is reached. Summaries are
-generated asynchronously without blocking the main capture loop.
+This module implements a background worker that triggers summarization at
+fixed time intervals (like cron). For example, with frequency_minutes=15,
+summaries run at hh:00, hh:15, hh:30, hh:45.
 
 The worker supports:
-- Automatic threshold-based summarization
+- Cron-like scheduled summarization (at fixed clock times)
+- Time-range based summarization (not dependent on screenshots)
 - Regeneration of existing summaries with new settings
 - Context continuity via previous summary inclusion
 - OCR extraction for unique window titles
@@ -17,9 +18,9 @@ import logging
 import queue
 import threading
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Dict, List, Optional, TYPE_CHECKING
+from typing import Dict, List, Optional, Tuple, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from .storage import ActivityStorage
@@ -29,10 +30,10 @@ logger = logging.getLogger(__name__)
 
 
 class SummarizerWorker:
-    """Background worker for threshold-based summarization.
+    """Background worker with cron-like scheduled summarization.
 
-    Monitors the screenshot count and triggers summarization when the
-    configured threshold is reached. Runs in a background thread.
+    Triggers summarization at fixed time intervals based on frequency_minutes.
+    For example, with frequency_minutes=15, runs at hh:00, hh:15, hh:30, hh:45.
 
     Attributes:
         storage: ActivityStorage instance for database access
@@ -53,9 +54,10 @@ class SummarizerWorker:
         self._summarizer_model = None  # Track which model the summarizer was created with
         self._running = False
         self._thread: Optional[threading.Thread] = None
-        self._pending_queue: queue.Queue = queue.Queue()
+        self._pending_queue: queue.Queue = queue.Queue()  # For regenerate/force tasks
         self._current_task: Optional[str] = None
-        self._last_check_count = 0
+        self._next_scheduled_run: Optional[datetime] = None
+        self._last_summarized_end: Optional[datetime] = None  # Track last summarized period
 
     @property
     def summarizer(self):
@@ -85,6 +87,84 @@ class SummarizerWorker:
             self._summarizer_model = current_model
         return self._summarizer
 
+    def _get_schedule_slot(self, dt: datetime, frequency_minutes: int) -> datetime:
+        """Get the schedule slot for a given datetime.
+
+        Rounds down to the nearest frequency_minutes boundary.
+        For frequency_minutes=15: returns hh:00, hh:15, hh:30, or hh:45.
+
+        Args:
+            dt: Datetime to get slot for
+            frequency_minutes: Interval in minutes (e.g., 15, 30, 60)
+
+        Returns:
+            Datetime rounded down to the nearest slot boundary
+        """
+        # Calculate minutes since midnight
+        minutes_since_midnight = dt.hour * 60 + dt.minute
+        # Round down to nearest frequency_minutes boundary
+        slot_minutes = (minutes_since_midnight // frequency_minutes) * frequency_minutes
+        slot_hour = slot_minutes // 60
+        slot_minute = slot_minutes % 60
+        return dt.replace(hour=slot_hour, minute=slot_minute, second=0, microsecond=0)
+
+    def _get_next_scheduled_time(self) -> datetime:
+        """Calculate the next scheduled run time based on frequency_minutes.
+
+        Returns a datetime aligned to the clock (e.g., hh:00, hh:15, hh:30, hh:45
+        for frequency_minutes=15).
+
+        Returns:
+            Next scheduled datetime
+        """
+        frequency_minutes = self.config.config.summarization.frequency_minutes
+        now = datetime.now()
+
+        # Get current slot
+        current_slot = self._get_schedule_slot(now, frequency_minutes)
+
+        # Next slot is current_slot + frequency_minutes
+        next_slot = current_slot + timedelta(minutes=frequency_minutes)
+
+        return next_slot
+
+    def _get_time_range_for_slot(self, slot_end: datetime) -> Tuple[datetime, datetime]:
+        """Get the time range to summarize for a given slot.
+
+        The range is from the previous slot to the current slot end time.
+
+        Args:
+            slot_end: End time of the slot (the scheduled run time)
+
+        Returns:
+            Tuple of (start_time, end_time)
+        """
+        frequency_minutes = self.config.config.summarization.frequency_minutes
+        slot_start = slot_end - timedelta(minutes=frequency_minutes)
+        return (slot_start, slot_end)
+
+    def _find_last_summarized_time(self) -> Optional[datetime]:
+        """Find the end time of the last summary to know where to resume from.
+
+        Returns:
+            End time of last summary, or None if no summaries exist
+        """
+        last_summary = self.storage.get_last_threshold_summary()
+        if not last_summary:
+            return None
+
+        end_time_str = last_summary.get('end_time', '')
+        try:
+            if 'T' in end_time_str:
+                end_time = datetime.fromisoformat(end_time_str.replace('Z', '+00:00'))
+                if end_time.tzinfo:
+                    end_time = end_time.replace(tzinfo=None)
+            else:
+                end_time = datetime.strptime(end_time_str, '%Y-%m-%d %H:%M:%S')
+            return end_time
+        except (ValueError, TypeError):
+            return None
+
     def start(self):
         """Start the background worker thread."""
         if self._running:
@@ -92,6 +172,17 @@ class SummarizerWorker:
             return
 
         self._running = True
+
+        # Initialize scheduling
+        self._next_scheduled_run = self._get_next_scheduled_time()
+        self._last_summarized_end = self._find_last_summarized_time()
+
+        frequency_minutes = self.config.config.summarization.frequency_minutes
+        logger.info(
+            f"SummarizerWorker starting with {frequency_minutes}min intervals. "
+            f"Next run at {self._next_scheduled_run.strftime('%H:%M')}"
+        )
+
         self._thread = threading.Thread(target=self._run_loop, daemon=True)
         self._thread.start()
         logger.info("SummarizerWorker started")
@@ -108,54 +199,14 @@ class SummarizerWorker:
         logger.info("SummarizerWorker stopped")
 
     def check_and_queue(self):
-        """Check if enough time has passed and queue summarization.
+        """DEPRECATED: Summarization now uses internal cron-like scheduling.
 
-        Called after each screenshot capture to check if frequency_minutes
-        has elapsed since the last summary. This is duration-based triggering
-        rather than count-based.
+        This method is a no-op and will be removed in a future version.
+        The worker now automatically schedules summarization at fixed clock
+        times based on frequency_minutes (e.g., hh:00, hh:15, hh:30, hh:45).
         """
-        if not self.config.config.summarization.enabled:
-            return
-
-        try:
-            frequency_minutes = self.config.config.summarization.frequency_minutes
-
-            # Get the last summary to check when summarization job last ran
-            last_summary = self.storage.get_last_threshold_summary()
-
-            if last_summary:
-                # Use created_at (when job ran), not end_time (screenshot timestamp)
-                created_at_str = last_summary.get('created_at', '')
-                try:
-                    if 'T' in created_at_str:
-                        last_run = datetime.fromisoformat(created_at_str.replace('Z', '+00:00'))
-                        if last_run.tzinfo:
-                            last_run = last_run.replace(tzinfo=None)
-                    else:
-                        last_run = datetime.strptime(created_at_str, '%Y-%m-%d %H:%M:%S')
-                except (ValueError, TypeError):
-                    last_run = None
-
-                if last_run:
-                    elapsed = datetime.now() - last_run
-                    elapsed_minutes = elapsed.total_seconds() / 60
-
-                    if elapsed_minutes < frequency_minutes:
-                        # Not enough time since last summarization job
-                        return
-
-            # Either no previous summary or enough time has passed
-            unsummarized = self.storage.get_unsummarized_screenshots()
-
-            if len(unsummarized) >= 1:
-                # Queue all unsummarized screenshots
-                self._pending_queue.put(('summarize', unsummarized))
-                logger.info(
-                    f"Queued {len(unsummarized)} screenshots for summarization "
-                    f"(frequency: {frequency_minutes}min)"
-                )
-        except Exception as e:
-            logger.error(f"Error checking summarization trigger: {e}")
+        # No-op: scheduling is now handled internally by _run_loop
+        pass
 
     def queue_regenerate(self, summary_id: int):
         """Queue a summary for regeneration.
@@ -167,22 +218,19 @@ class SummarizerWorker:
         logger.info(f"Queued summary {summary_id} for regeneration")
 
     def force_summarize_pending(self, date: str = None) -> int:
-        """Force immediate summarization of pending screenshots.
+        """Force immediate summarization of unsummarized time slots.
 
-        Splits screenshots into time-based batches based on frequency_minutes
-        setting, so each summary covers approximately that time period.
-
-        Unlike automatic summarization, this includes ALL unsummarized screenshots
-        regardless of session linkage (for backfilling older screenshots).
+        Groups unsummarized screenshots into cron-aligned time slots and queues
+        each slot for summarization. This is useful for backfilling gaps.
 
         Args:
             date: Optional date string (YYYY-MM-DD) to limit to a specific day.
                 If None, processes all unsummarized screenshots.
 
         Returns:
-            Number of screenshots queued for summarization.
+            Number of time slots queued for summarization.
         """
-        # Include all screenshots, not just those with sessions (for backfill)
+        # Get unsummarized screenshots to find which time slots need processing
         unsummarized = self.storage.get_unsummarized_screenshots(
             require_session=False, date=date
         )
@@ -193,87 +241,201 @@ class SummarizerWorker:
         # Sort by timestamp
         unsummarized = sorted(unsummarized, key=lambda s: s['timestamp'])
 
-        # Split into time-based batches using frequency_minutes
+        # Group into cron-aligned time slots
         frequency_minutes = self.config.config.summarization.frequency_minutes
-        frequency_seconds = frequency_minutes * 60
-
-        batches = []
-        current_batch = []
-        batch_start_ts = None
+        slots_to_process = set()
 
         for screenshot in unsummarized:
             ts = screenshot['timestamp']
+            dt = datetime.fromtimestamp(ts)
+            # Get the slot this screenshot belongs to
+            slot_start = self._get_schedule_slot(dt, frequency_minutes)
+            slot_end = slot_start + timedelta(minutes=frequency_minutes)
+            slots_to_process.add((slot_start, slot_end))
 
-            if batch_start_ts is None:
-                batch_start_ts = ts
-                current_batch = [screenshot]
-            elif ts - batch_start_ts < frequency_seconds:
-                # Still within the time window
-                current_batch.append(screenshot)
-            else:
-                # Start a new batch
-                if current_batch:
-                    batches.append(current_batch)
-                batch_start_ts = ts
-                current_batch = [screenshot]
+        # Sort slots chronologically
+        sorted_slots = sorted(slots_to_process, key=lambda x: x[0])
 
-        # Don't forget the last batch
-        if current_batch:
-            batches.append(current_batch)
-
-        # Queue each batch separately
-        for batch in batches:
-            self._pending_queue.put(('summarize', batch))
+        # Queue each time slot for summarization
+        for slot_start, slot_end in sorted_slots:
+            self._pending_queue.put(('summarize_range', (slot_start, slot_end)))
 
         logger.info(
-            f"Force-queued {len(unsummarized)} screenshots in {len(batches)} batches "
-            f"({frequency_minutes}min intervals)"
+            f"Force-queued {len(sorted_slots)} time slots for summarization "
+            f"({frequency_minutes}min intervals, covering {len(unsummarized)} screenshots)"
         )
-        return len(unsummarized)
+        return len(sorted_slots)
 
     def get_status(self) -> Dict:
         """Get current worker status.
 
         Returns:
-            Dict with running state, current task, and queue size.
+            Dict with running state, current task, queue size, and next scheduled run.
         """
         return {
             "running": self._running,
             "current_task": self._current_task,
             "queue_size": self._pending_queue.qsize(),
+            "next_scheduled_run": (
+                self._next_scheduled_run.isoformat()
+                if self._next_scheduled_run else None
+            ),
         }
 
     def _run_loop(self):
-        """Background loop processing summarization queue."""
+        """Background loop with cron-like scheduling.
+
+        Runs summarization at fixed clock times based on frequency_minutes.
+        Also processes manual tasks from the queue (regenerate, force).
+        """
         logger.info("SummarizerWorker run loop started")
 
         while self._running:
+            now = datetime.now()
+
+            # Check if it's time for scheduled summarization
+            if (self._next_scheduled_run and
+                now >= self._next_scheduled_run and
+                self.config.config.summarization.enabled):
+
+                slot_time = self._next_scheduled_run
+                start_time, end_time = self._get_time_range_for_slot(slot_time)
+
+                logger.info(
+                    f"Scheduled summarization triggered at {now.strftime('%H:%M:%S')} "
+                    f"for slot {start_time.strftime('%H:%M')}-{end_time.strftime('%H:%M')}"
+                )
+
+                self._current_task = 'scheduled_summarize'
+                try:
+                    self._do_summarize_time_range(start_time, end_time)
+                except Exception as e:
+                    logger.error(f"Scheduled summarization failed: {e}", exc_info=True)
+                finally:
+                    self._current_task = None
+
+                # Schedule next run
+                self._next_scheduled_run = self._get_next_scheduled_time()
+                logger.info(f"Next scheduled run at {self._next_scheduled_run.strftime('%H:%M')}")
+
+            # Process manual tasks from queue (regenerate, force_summarize)
             try:
                 task = self._pending_queue.get(timeout=1)
+                task_type, payload = task
+                self._current_task = task_type
+
+                try:
+                    if task_type == 'summarize_range':
+                        # Force summarize with time range
+                        start_time, end_time = payload
+                        self._do_summarize_time_range(start_time, end_time)
+                    elif task_type == 'summarize':
+                        # Legacy: summarize screenshots list (for force_summarize_pending)
+                        self._do_summarize_screenshots(payload)
+                    elif task_type == 'regenerate':
+                        self._do_regenerate(payload)
+                except Exception as e:
+                    logger.error(f"Summarization task failed: {e}", exc_info=True)
+                finally:
+                    self._current_task = None
             except queue.Empty:
-                continue
-
-            task_type, payload = task
-            self._current_task = task_type
-
-            try:
-                if task_type == 'summarize':
-                    self._do_summarize(payload)
-                elif task_type == 'regenerate':
-                    self._do_regenerate(payload)
-            except Exception as e:
-                logger.error(f"Summarization task failed: {e}", exc_info=True)
-            finally:
-                self._current_task = None
+                # No manual tasks, continue to next iteration
+                pass
 
         logger.info("SummarizerWorker run loop stopped")
 
-    def _do_summarize(self, screenshots: List[Dict]):
-        """Generate summary for a batch of screenshots.
+    def _do_summarize_time_range(self, start_time: datetime, end_time: datetime):
+        """Generate summary for a time range.
 
-        Sends all screenshots to the LLM along with focus events that show
-        app/window usage breakdown. The LLM interprets the activity based on
-        the actual time spent per app/window.
+        This is the primary summarization method used by scheduled runs.
+        It gathers screenshots and focus events from the time range and
+        sends them to the LLM.
+
+        Args:
+            start_time: Start of the time range
+            end_time: End of the time range
+        """
+        logger.info(
+            f"Summarizing time range: {start_time.strftime('%H:%M')} - "
+            f"{end_time.strftime('%H:%M')}"
+        )
+
+        # Check if summarizer is available
+        if not self.summarizer.is_available():
+            logger.error("Summarizer not available (check Ollama and Tesseract)")
+            return
+
+        # Get screenshots in the time range (may be empty if screenshots disabled)
+        screenshots = self.storage.get_screenshots_in_range(start_time, end_time)
+        screenshots = sorted(screenshots, key=lambda s: s['timestamp'])
+
+        # Get focus events for the time range (always available)
+        focus_events = self.storage.get_focus_events_overlapping_range(start_time, end_time)
+        focus_events = self._clip_focus_event_durations(focus_events, start_time, end_time)
+
+        # Skip if there's nothing to summarize
+        if not screenshots and not focus_events:
+            logger.info("No screenshots or focus events in time range, skipping")
+            return
+
+        logger.info(
+            f"Found {len(screenshots)} screenshots and {len(focus_events)} focus events "
+            f"in time range"
+        )
+
+        # Get OCR texts for unique window titles (if screenshots available)
+        ocr_texts = self._gather_ocr(screenshots) if screenshots else []
+
+        # Get previous summary for context continuity
+        previous_summary = None
+        if self.config.config.summarization.include_previous_summary:
+            last = self.storage.get_last_threshold_summary()
+            if last:
+                previous_summary = last.get('summary')
+
+        # Generate summary
+        try:
+            summary, inference_ms, prompt_text, screenshot_ids_used = self.summarizer.summarize_session(
+                screenshots=screenshots,
+                ocr_texts=ocr_texts,
+                previous_summary=previous_summary,
+                focus_events=focus_events,
+            )
+        except Exception as e:
+            logger.error(f"Summary generation failed: {e}")
+            return
+
+        # Build config snapshot
+        config_snapshot = {
+            'model': self.config.config.summarization.model,
+            'threshold': self.config.config.summarization.trigger_threshold,
+            'summarization_mode': self.config.config.summarization.summarization_mode,
+            'crop_to_window': self.config.config.summarization.crop_to_window,
+            'include_previous_summary': self.config.config.summarization.include_previous_summary,
+            'max_samples': self.config.config.summarization.max_samples,
+            'sample_interval_minutes': self.config.config.summarization.sample_interval_minutes,
+            'focus_weighted_sampling': self.config.config.summarization.focus_weighted_sampling,
+            'frequency_minutes': self.config.config.summarization.frequency_minutes,
+        }
+
+        # Save to database
+        summary_id = self.storage.save_threshold_summary(
+            start_time=start_time.isoformat(),
+            end_time=end_time.isoformat(),
+            summary=summary,
+            screenshot_ids=[s['id'] for s in screenshots],
+            model=self.config.config.summarization.model,
+            config_snapshot=config_snapshot,
+            inference_ms=inference_ms,
+            prompt_text=prompt_text,
+        )
+
+        logger.info(f"Saved summary {summary_id}: {summary[:80]}...")
+
+    def _do_summarize_screenshots(self, screenshots: List[Dict]):
+        """Generate summary for a batch of screenshots (legacy method).
+
+        Used by force_summarize_pending for backward compatibility.
 
         Args:
             screenshots: List of screenshot dicts to summarize
