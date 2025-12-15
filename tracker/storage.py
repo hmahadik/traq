@@ -370,6 +370,12 @@ class ActivityStorage:
             except Exception:
                 pass  # Column already exists
 
+            # Add terminal_context column for terminal introspection
+            try:
+                conn.execute("ALTER TABLE window_focus_events ADD COLUMN terminal_context TEXT")
+            except Exception:
+                pass  # Column already exists
+
             conn.commit()
     
     def save_screenshot(self, filepath: str, dhash: str, window_title: str = None,
@@ -1774,7 +1780,8 @@ class ActivityStorage:
         window_class: str,
         start_time: 'datetime',
         end_time: 'datetime',
-        session_id: int = None
+        session_id: int = None,
+        terminal_context: str = None
     ) -> int:
         """Save a completed focus event.
 
@@ -1785,6 +1792,7 @@ class ActivityStorage:
             start_time: When focus started.
             end_time: When focus ended.
             session_id: Optional session ID to link to.
+            terminal_context: JSON string with terminal introspection data.
 
         Returns:
             ID of the saved focus event.
@@ -1795,12 +1803,12 @@ class ActivityStorage:
             cursor = conn.execute(
                 """
                 INSERT INTO window_focus_events
-                (window_title, app_name, window_class, start_time, end_time, duration_seconds, session_id)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                (window_title, app_name, window_class, start_time, end_time, duration_seconds, session_id, terminal_context)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (window_title, app_name, window_class,
                  start_time.isoformat(), end_time.isoformat(),
-                 duration, session_id)
+                 duration, session_id, terminal_context)
             )
             conn.commit()
             return cursor.lastrowid
@@ -1819,7 +1827,7 @@ class ActivityStorage:
             cursor = conn.execute(
                 """
                 SELECT id, window_title, app_name, window_class,
-                       start_time, end_time, duration_seconds, session_id
+                       start_time, end_time, duration_seconds, session_id, terminal_context
                 FROM window_focus_events
                 WHERE datetime(start_time) >= datetime(?)
                   AND datetime(start_time) <= datetime(?)
@@ -1847,7 +1855,7 @@ class ActivityStorage:
             cursor = conn.execute(
                 """
                 SELECT id, window_title, app_name, window_class,
-                       start_time, end_time, duration_seconds, session_id
+                       start_time, end_time, duration_seconds, session_id, terminal_context
                 FROM window_focus_events
                 WHERE datetime(start_time) < datetime(?)
                   AND (datetime(end_time) > datetime(?) OR end_time IS NULL)

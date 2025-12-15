@@ -47,6 +47,7 @@ activity-tracker/
 │   ├── summarizer_worker.py # Background worker for threshold-based summarization
 │   ├── afk.py               # AFK detection via pynput
 │   ├── sessions.py          # Session management
+│   ├── terminal_introspect.py # Terminal process introspection
 │   ├── timeparser.py        # Natural language time range parser
 │   ├── reports.py           # Report generator with analytics
 │   ├── report_export.py     # Export reports to Markdown/HTML/PDF/JSON
@@ -328,6 +329,30 @@ activity-tracker/
   - API request now includes `Screenshot IDs used: [...]` showing which screenshots were sampled
   - Summary detail page displays used screenshots as thumbnails in API Request section
   - Clickable thumbnails that open in the same modal viewer as main screenshots grid
+
+### 2025-12-15 - Phase 11: Terminal Process Introspection
+- **New module `terminal_introspect.py`** for process tree inspection:
+  - Detects what's running inside terminal emulators (Tilix, gnome-terminal, konsole, etc.)
+  - Walks `/proc` filesystem to find foreground process
+  - Extracts: process name, full command, working directory, shell type
+  - Detects SSH sessions and tmux sessions
+  - `TerminalContext` dataclass with `to_json()` and `format_short()` methods
+  - `is_terminal_app(app_name)` - checks if app is a terminal emulator
+  - `get_terminal_context(window_pid)` - main introspection function
+- **Database schema update**:
+  - Added `terminal_context` TEXT column to `window_focus_events` table
+  - Stores JSON with terminal introspection data
+- **Integration in daemon.py**:
+  - When focus leaves a terminal, introspects process tree
+  - Stores terminal context in focus event
+  - Logs enriched info: "Focus: Tilix [vim daemon.py in activity-tracker] (45.2s) -> Code"
+- **LLM prompt enrichment in vision.py**:
+  - `_build_focus_context()` parses terminal_context JSON
+  - Replaces generic "Tilix" with "Tilix (vim daemon.py in activity-tracker)"
+  - Shows ssh/tmux indicators when relevant
+- **Example output in summarization**:
+  - Before: `- Tilix: 45m 23s [longest: 18m]`
+  - After: `- Tilix (vim daemon.py in activity-tracker): 45m 23s [longest: 18m]`
 
 ## Future Improvements
 - **Database normalization**: Unify `threshold_summaries` and `daily_summaries` into single `summaries` table with type field (threshold, hourly, daily, weekly, custom), plus separate `prompts` table for API request storage. Supports hierarchical relationships (daily→hourly→threshold).

@@ -23,6 +23,7 @@ class WindowFocusEvent:
     window_class: str
     start_time: datetime
     end_time: Optional[datetime] = None
+    window_pid: Optional[int] = None
 
     @property
     def duration_seconds(self) -> float:
@@ -128,6 +129,19 @@ class WindowWatcher:
                 timeout=1
             ).decode().strip()
 
+            # Get window PID
+            window_pid = None
+            try:
+                pid_output = subprocess.check_output(
+                    ['xdotool', 'getwindowpid', window_id],
+                    stderr=subprocess.DEVNULL,
+                    timeout=1
+                ).decode().strip()
+                if pid_output:
+                    window_pid = int(pid_output)
+            except (subprocess.CalledProcessError, ValueError):
+                pass  # Some windows don't have PIDs
+
             # Get window class (app name) via xprop
             xprop_output = subprocess.check_output(
                 ['xprop', '-id', window_id, 'WM_CLASS'],
@@ -151,7 +165,8 @@ class WindowWatcher:
                 'window_id': window_id,
                 'window_title': window_name,
                 'app_name': app_name,
-                'window_class': window_class
+                'window_class': window_class,
+                'window_pid': window_pid
             }
 
         except subprocess.TimeoutExpired:
@@ -182,7 +197,8 @@ class WindowWatcher:
                 window_title=new_window['window_title'],
                 app_name=new_window['app_name'],
                 window_class=new_window['window_class'],
-                start_time=now
+                start_time=now,
+                window_pid=new_window.get('window_pid')
             )
 
         # Fire callback outside lock

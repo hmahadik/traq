@@ -69,6 +69,7 @@ from .monitors import get_monitors, get_monitor_for_window, get_primary_monitor
 from .config import get_config_manager
 from .summarizer_worker import SummarizerWorker
 from .window_watcher import WindowWatcher, WindowFocusEvent
+from .terminal_introspect import is_terminal_app, get_terminal_context
 
 
 class ActivityDaemon:
@@ -237,16 +238,26 @@ class ActivityDaemon:
             old_window: The window that lost focus (with end_time set)
             new_window: The window that gained focus
         """
+        # Get terminal context if this was a terminal window
+        terminal_context_json = None
+        terminal_info = ""
+        if is_terminal_app(old_window.app_name) and old_window.window_pid:
+            context = get_terminal_context(old_window.window_pid)
+            if context:
+                terminal_context_json = context.to_json()
+                terminal_info = f" [{context.format_short()}]"
+
         self.storage.save_focus_event(
             window_title=old_window.window_title,
             app_name=old_window.app_name,
             window_class=old_window.window_class,
             start_time=old_window.start_time,
             end_time=old_window.end_time,
-            session_id=self.current_session_id
+            session_id=self.current_session_id,
+            terminal_context=terminal_context_json
         )
         self.log(
-            f"Focus: {old_window.app_name} ({old_window.duration_seconds:.1f}s) -> {new_window.app_name}"
+            f"Focus: {old_window.app_name}{terminal_info} ({old_window.duration_seconds:.1f}s) -> {new_window.app_name}"
         )
 
     def _summarize_session(self, session: dict):

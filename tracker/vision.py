@@ -425,12 +425,14 @@ class HybridSummarizer:
 
         Aggregates focus events by app and window, showing time spent
         and context switches to help the LLM understand work patterns.
+        For terminals, includes process introspection details (what command
+        was running, working directory).
 
         Example output:
             - VS Code (tracker/daemon.py): 45m 23s [longest: 18m]
+            - Tilix (vim daemon.py in activity-tracker): 30m 12s
             - Firefox (GitHub PR #1234): 12m 5s [3 visits]
-            - Slack: 3m 12s [8 visits]
-            Total: 63m, 14 context switches
+            Total: 87m, 14 context switches
 
         Args:
             focus_events: List of focus event dicts from storage.
@@ -441,11 +443,20 @@ class HybridSummarizer:
         if not focus_events:
             return "No focus data available."
 
-        # Aggregate by app + window
+        # Aggregate by app + enriched title (with terminal context if available)
         aggregated = {}
         for event in focus_events:
+            app_name = event.get('app_name', 'Unknown')
             title = self._truncate_title(event.get('window_title', ''))
-            key = (event.get('app_name', 'Unknown'), title)
+
+            # Enrich with terminal context if available
+            terminal_context = event.get('terminal_context')
+            if terminal_context:
+                enriched_title = self._parse_terminal_context(terminal_context)
+                if enriched_title:
+                    title = enriched_title
+
+            key = (app_name, title)
             if key not in aggregated:
                 aggregated[key] = {
                     'total_seconds': 0,
@@ -490,6 +501,72 @@ class HybridSummarizer:
         lines.append(f"\nTotal tracked: {self._format_duration(total_seconds)}, {context_switches} context switches")
 
         return '\n'.join(lines)
+
+    def _parse_terminal_context(self, context_json: str) -> str:
+        """Parse terminal context JSON and return enriched title.
+
+        Args:
+            context_json: JSON string with terminal introspection data.
+
+        Returns:
+            Enriched title string like "vim daemon.py in activity-tracker"
+            or empty string if parsing fails.
+        """
+        import json
+        try:
+            ctx = json.loads(context_json)
+            parts = []
+
+            # Main process (skip shells for cleaner display)
+            fg_process = ctx.get('foreground_process', '')
+            shell = ctx.get('shell', '')
+            if fg_process and fg_process not in {'bash', 'zsh', 'fish', 'sh', 'dash'}:
+                # Include command args if they add context (e.g., "vim daemon.py")
+                full_cmd = ctx.get('full_command', '')
+                if full_cmd and ' ' in full_cmd:
+                    # Get first meaningful arg (skip flags like -m, --version)
+                    cmd_parts = full_cmd.split()
+                    arg = None
+                    for part in cmd_parts[1:]:
+                        if not part.startswith('-') and len(part) > 1:
+                            arg = part
+                            break
+                    if arg:
+                        # Truncate long paths to just filename
+                        if '/' in arg:
+                            arg = arg.split('/')[-1]
+                        if len(arg) < 30:
+                            parts.append(f"{fg_process} {arg}")
+                        else:
+                            parts.append(fg_process)
+                    else:
+                        parts.append(fg_process)
+                else:
+                    parts.append(fg_process)
+            elif shell:
+                parts.append(f"{shell} (idle)")
+
+            # Working directory (just the project name)
+            cwd = ctx.get('working_directory', '')
+            if cwd:
+                from pathlib import Path
+                dir_name = Path(cwd).name
+                if dir_name and dir_name not in parts:
+                    parts.append(f"in {dir_name}")
+
+            # SSH indicator
+            if ctx.get('is_ssh'):
+                parts.append("[ssh]")
+
+            # Tmux session
+            tmux = ctx.get('tmux_session')
+            if tmux:
+                parts.append(f"[tmux:{tmux}]")
+
+            return ' '.join(parts) if parts else ''
+
+        except (json.JSONDecodeError, TypeError, AttributeError):
+            return ''
 
     def _truncate_title(self, title: str, max_len: int = 50) -> str:
         """Truncate and clean window title for display."""
