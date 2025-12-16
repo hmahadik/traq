@@ -354,6 +354,34 @@ activity-tracker/
   - Before: `- Tilix: 45m 23s [longest: 18m]`
   - After: `- Tilix (vim daemon.py in activity-tracker): 45m 23s [longest: 18m]`
 
+### 2025-12-16 - Phase 12: Explanation and Confidence in Summaries
+- **Structured summary output**:
+  - LLM now returns three sections: SUMMARY, EXPLANATION, CONFIDENCE
+  - SUMMARY: 1-2 sentence activity description (as before)
+  - EXPLANATION: What the model observed that led to the summary
+  - CONFIDENCE: 0.0-1.0 score indicating certainty
+- **Database schema update**:
+  - Added `explanation` TEXT column to `threshold_summaries` table
+  - Added `confidence` REAL column to `threshold_summaries` table
+  - Updated all SELECT queries to include new columns
+- **Response parser in vision.py**:
+  - `_parse_summary_response()` extracts structured fields from LLM output
+  - Falls back gracefully if model doesn't follow format
+  - Clips confidence to 0.0-1.0 range
+- **Timeline UI enhancements**:
+  - Confidence badge with color coding:
+    - Green (≥0.8): High confidence
+    - Yellow (0.5-0.8): Moderate confidence
+    - Red (<0.5): Low confidence
+  - Info icon (ℹ️) next to summary text that shows explanation modal on click
+- **Summary detail page enhancements**:
+  - Confidence badge in metadata section
+  - "Model Explanation" section below summary text
+- **Debugging benefits**:
+  - Helps identify hallucinations by seeing what model actually observed
+  - Low confidence scores indicate when model is guessing
+  - Explanations show specific windows/text/elements that informed the summary
+
 ## Future Improvements
 - **Database normalization**: Unify `threshold_summaries` and `daily_summaries` into single `summaries` table with type field (threshold, hourly, daily, weekly, custom), plus separate `prompts` table for API request storage. Supports hierarchical relationships (daily→hourly→threshold).
 
