@@ -408,6 +408,22 @@ activity-tracker/
   - Only walks full tree for SSH detection, not foreground process detection
   - Fixes incorrect "node mcp-server-playwright" appearing instead of actual foreground app (e.g., "claude")
 
+### 2025-12-24 - Phase 14: Improved Focus-Weighted Screenshot Sampling
+- **Fixed `_sample_screenshots_weighted()` in vision.py**:
+  - **Bug 1**: Removed `max(1, ...)` guarantee that gave every app at least 1 screenshot regardless of focus time
+  - **Bug 2**: Fixed integer truncation by using largest-remainder (Hamilton) allocation method
+  - **Bug 3**: Added 5% minimum focus threshold to exclude low-focus apps from diluting sample pool
+- **New algorithm features**:
+  - Uses largest-remainder allocation for mathematically fair proportional distribution
+  - Filters apps with <5% focus time (configurable via `min_focus_threshold` parameter)
+  - Falls back to top app only if all apps below threshold
+  - Caps allocations by available screenshots per app
+  - Logs allocation breakdown: `"Focus-weighted sampling: 5/5 screenshots from 2 apps [Code:4, Chrome:1]"`
+- **Results improvement** (5 sample case):
+  - Before: Code 78.6% focus → 25% sampled, Chrome 21.3% → 75% sampled (completely wrong)
+  - After: Code 78.6% focus → 80% sampled, Chrome 21.3% → 20% sampled (diff: +1.4%, -1.3%)
+- **Analysis tooling**: Added database analysis queries to compare focus time vs screenshot sampling distribution
+
 ## Future Improvements
 - **Database normalization**: Unify `threshold_summaries` and `daily_summaries` into single `summaries` table with type field (threshold, hourly, daily, weekly, custom), plus separate `prompts` table for API request storage. Supports hierarchical relationships (daily→hourly→threshold).
 
