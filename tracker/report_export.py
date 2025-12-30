@@ -562,7 +562,7 @@ class ReportExporter:
         lines.append("")
 
         # Sections
-        for section in data.get('sections', []):
+        for section in (data.get('sections') or []):
             lines.extend([
                 f"## {section.get('title', '')}",
                 "",
@@ -571,7 +571,7 @@ class ReportExporter:
             ])
 
         # Key screenshots - use URL for viewing
-        screenshots = data.get('key_screenshots', [])
+        screenshots = data.get('key_screenshots') or []
         if screenshots:
             lines.extend(["## Key Screenshots", ""])
             for i, ss in enumerate(screenshots):
@@ -649,7 +649,7 @@ class ReportExporter:
         screenshot_embeds = []
         data_dir = Path.home() / 'activity-tracker-data'
 
-        for ss in data.get('key_screenshots', []):
+        for ss in (data.get('key_screenshots') or []):
             try:
                 ss_id = ss.get('id')
                 if ss_id:
@@ -674,7 +674,7 @@ class ReportExporter:
 
         # Generate sections HTML with markdown conversion
         sections_html = ''
-        for s in data.get('sections', []):
+        for s in (data.get('sections') or []):
             content_html = self._convert_markdown_to_html(s.get('content', ''))
             sections_html += f'''
             <div class="section">
@@ -1133,7 +1133,7 @@ class ReportExporter:
                 <div class="stat-label">Applications</div>
             </div>
             <div class="stat-card">
-                <div class="stat-value">{len(data.get('sections', []))}</div>
+                <div class="stat-value">{len(data.get('sections') or [])}</div>
                 <div class="stat-label">Days Tracked</div>
             </div>
         </div>
