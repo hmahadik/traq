@@ -21,6 +21,7 @@ from datetime import datetime
 import json
 import base64
 import logging
+import re
 from typing import TYPE_CHECKING, Dict, Any, Optional
 
 if TYPE_CHECKING:
@@ -602,8 +603,6 @@ class ReportExporter:
         - Bullet points (- item or * item)
         - Newlines to paragraphs
         """
-        import re
-
         if not text:
             return ''
 

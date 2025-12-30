@@ -49,6 +49,25 @@ def get_db_connection():
     return conn
 
 
+def parse_date_param(date_string: str, param_name: str = 'date') -> date:
+    """Parse and validate a date string from request parameters.
+
+    Args:
+        date_string: Date in YYYY-MM-DD format.
+        param_name: Name of the parameter (for error messages).
+
+    Returns:
+        Parsed date object.
+
+    Raises:
+        400 error if format is invalid.
+    """
+    try:
+        return datetime.strptime(date_string, '%Y-%m-%d').date()
+    except ValueError:
+        abort(400, f"Invalid date format for {param_name}. Use YYYY-MM-DD.")
+
+
 def _parse_terminal_context_for_ui(context_json: str) -> str:
     """Parse terminal context JSON and return enriched title for UI display.
 
@@ -156,10 +175,7 @@ def index():
 @app.route('/day/<date_string>')
 def day_view(date_string):
     """Show screenshots for a specific day (YYYY-MM-DD format)."""
-    try:
-        target_date = datetime.strptime(date_string, '%Y-%m-%d').date()
-    except ValueError:
-        abort(400, "Invalid date format. Use YYYY-MM-DD.")
+    target_date = parse_date_param(date_string)
 
     screenshots = get_screenshots_for_date(target_date)
     today = date.today()

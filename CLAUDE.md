@@ -463,6 +463,38 @@ activity-tracker/
   - Previously waited up to 5s for poll loop, causing race condition with window watcher
   - Ensures new session starts before window watcher creates focus events
 
+### 2025-12-30 - Phase 16: Two-Stage Summarization, Tags & Code Cleanup
+- **Two-stage summarization** for better time accuracy:
+  - Stage 1: Describe each screenshot individually (with images)
+  - Stage 2: Summarize with text-only prompt combining time data + descriptions
+  - Adds PRIMARY/SECONDARY labels to focus breakdown (e.g., `[78% - PRIMARY]`)
+  - New config option: `two_stage_summarization` (default: True)
+- **Tags support**:
+  - LLM now returns TAGS section in structured response
+  - Tags parsed and stored in `tags` JSON column
+  - API endpoint for tag management
+- **Shared CSS/JS extraction**:
+  - Created `web/static/styles/base.css` with CSS variables, reset, nav, buttons, cards, toast notifications, spinners, badges, utility classes
+  - Created `web/static/js/utils.js` with helpers (escapeHtml, formatDuration, showToast, getThemeColors, destroyChart, debounce, throttle, fetch helpers)
+  - Navigation partial (`_nav.html`) with dynamic active state
+  - Replaced 20+ browser `alert()` calls with toast notifications
+  - Fixed modal keyboard handler memory leak
+- **Report export history**:
+  - New `exported_reports` table to track all exports
+  - `save_exported_report()`, `get_exported_reports()`, `delete_exported_report()` in storage.py
+  - `export_from_dict()` for exporting without regenerating reports
+  - Reports UI shows export history with download/delete actions
+- **Enhanced HTML exports**:
+  - Professional light theme with modern styling
+  - Markdown to HTML conversion (`_convert_markdown_to_html`)
+  - Clickable screenshots with lightbox modal
+  - Hourly activity bar chart visualization
+  - App usage progress bars
+- **Code cleanup**:
+  - New `tracker/utils.py` with shared helpers (`parse_timestamp`, `format_timestamp`, `format_duration`)
+  - Moved `import re` to module level in report_export.py
+  - Added `parse_date_param()` helper in app.py for date validation
+
 ## Future Improvements
 - **Database normalization**: Unify `threshold_summaries` and `daily_summaries` into single `summaries` table with type field (threshold, hourly, daily, weekly, custom), plus separate `prompts` table for API request storage. Supports hierarchical relationships (daily→hourly→threshold).
 
