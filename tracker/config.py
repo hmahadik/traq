@@ -198,7 +198,11 @@ class TrackingConfig:
         "notify-osd",
         "xfce4-notifyd",
         "plank",
-        "cairo-dock"
+        "cairo-dock",
+        # GNOME shell overview and desktop icons
+        "gnome-shell",
+        "Gjs",
+        "Desktop Icons",
     ])
 
 

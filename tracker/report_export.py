@@ -305,13 +305,39 @@ class ReportExporter:
             for a in report.analytics.top_apps[:5]
         )
 
-        # Generate hourly activity chart
-        hourly_data = report.analytics.activity_by_hour
-        max_hourly = max(hourly_data) if hourly_data else 1
-        hourly_bars_html = ''
-        for hour, mins in enumerate(hourly_data):
-            height = (mins / max_hourly * 100) if max_hourly > 0 else 0
-            hourly_bars_html += f'''
+        # Generate activity chart - by day for multi-day reports, by hour for single-day
+        activity_by_day = report.analytics.activity_by_day
+        is_multi_day = len(activity_by_day) > 1
+
+        if is_multi_day:
+            activity_chart_title = "Activity by Day"
+            max_daily = max((d.get('minutes', 0) for d in activity_by_day), default=1) or 1
+            hourly_bars_html = ''
+            for day in activity_by_day:
+                mins = day.get('minutes', 0)
+                height = (mins / max_daily * 100) if max_daily > 0 else 0
+                try:
+                    date_obj = datetime.strptime(day.get('date', ''), '%Y-%m-%d')
+                    label = date_obj.strftime('%a %m/%d')
+                except Exception:
+                    label = day.get('date', '')[-5:]
+                hours = mins // 60
+                mins_rem = mins % 60
+                time_str = f"{hours}h {mins_rem}m" if hours > 0 else f"{mins}m"
+                hourly_bars_html += f'''
+            <div class="hour-bar-col">
+                <div class="hour-bar" style="height: {height}%" title="{time_str}"></div>
+                <span class="hour-label">{label}</span>
+            </div>
+            '''
+        else:
+            activity_chart_title = "Activity by Hour"
+            hourly_data = report.analytics.activity_by_hour
+            max_hourly = max(hourly_data) if hourly_data else 1
+            hourly_bars_html = ''
+            for hour, mins in enumerate(hourly_data):
+                height = (mins / max_hourly * 100) if max_hourly > 0 else 0
+                hourly_bars_html += f'''
             <div class="hour-bar-col">
                 <div class="hour-bar" style="height: {height}%" title="{mins}m"></div>
                 <span class="hour-label">{hour}</span>
@@ -405,7 +431,7 @@ class ReportExporter:
     </ul>
 
     <div class="hourly-chart">
-        <h3>Activity by Hour</h3>
+        <h3>{activity_chart_title}</h3>
         <div class="hour-bars">
             {hourly_bars_html}
         </div>
@@ -532,7 +558,7 @@ class ReportExporter:
 
     def _export_markdown_from_dict(self, data: Dict[str, Any], filename: str) -> Path:
         """Export to Markdown from dict data."""
-        analytics = data.get('analytics', {})
+        analytics = data.get('analytics') or {}
         total_mins = analytics.get('total_active_minutes', 0)
 
         lines = [
@@ -642,7 +668,7 @@ class ReportExporter:
 
     def _export_html_from_dict(self, data: Dict[str, Any], filename: str) -> Path:
         """Export to standalone HTML from dict data with professional styling."""
-        analytics = data.get('analytics', {})
+        analytics = data.get('analytics') or {}
         total_mins = analytics.get('total_active_minutes', 0)
 
         # For HTML export, we need to fetch screenshots and embed them
@@ -716,14 +742,42 @@ class ReportExporter:
             </div>
             '''
 
-        # Generate hourly activity chart (simple bar chart)
-        hourly_data = analytics.get('activity_by_hour', [0] * 24)
-        max_hourly = max(hourly_data) if hourly_data else 1
-        hourly_bars_html = ''
-        for hour, mins in enumerate(hourly_data):
-            height = (mins / max_hourly * 100) if max_hourly > 0 else 0
-            label = f'{hour}:00'
-            hourly_bars_html += f'''
+        # Generate activity chart - by day for multi-day reports, by hour for single-day
+        activity_by_day = analytics.get('activity_by_day', [])
+        is_multi_day = len(activity_by_day) > 1
+
+        if is_multi_day:
+            # Multi-day report: show activity by day
+            activity_chart_title = "Activity by Day"
+            max_daily = max((d.get('minutes', 0) for d in activity_by_day), default=1) or 1
+            activity_bars_html = ''
+            for day in activity_by_day:
+                mins = day.get('minutes', 0)
+                height = (mins / max_daily * 100) if max_daily > 0 else 0
+                # Format date label (e.g., "Mon 12/30")
+                try:
+                    date_obj = datetime.strptime(day.get('date', ''), '%Y-%m-%d')
+                    label = date_obj.strftime('%a %m/%d')
+                except Exception:
+                    label = day.get('date', '')[-5:]  # fallback to MM-DD
+                hours = mins // 60
+                mins_rem = mins % 60
+                time_str = f"{hours}h {mins_rem}m" if hours > 0 else f"{mins}m"
+                activity_bars_html += f'''
+            <div class="hour-bar-col">
+                <div class="hour-bar" style="height: {height}%" title="{time_str}"></div>
+                <span class="hour-label">{label}</span>
+            </div>
+            '''
+        else:
+            # Single-day report: show activity by hour
+            activity_chart_title = "Activity by Hour"
+            hourly_data = analytics.get('activity_by_hour', [0] * 24)
+            max_hourly = max(hourly_data) if hourly_data else 1
+            activity_bars_html = ''
+            for hour, mins in enumerate(hourly_data):
+                height = (mins / max_hourly * 100) if max_hourly > 0 else 0
+                activity_bars_html += f'''
             <div class="hour-bar-col">
                 <div class="hour-bar" style="height: {height}%" title="{mins}m"></div>
                 <span class="hour-label">{hour}</span>
@@ -1149,9 +1203,9 @@ class ReportExporter:
         </div>
 
         <div class="hourly-chart">
-            <h2>Activity by Hour</h2>
+            <h2>{activity_chart_title}</h2>
             <div class="hour-bars">
-                {hourly_bars_html}
+                {activity_bars_html}
             </div>
         </div>
 

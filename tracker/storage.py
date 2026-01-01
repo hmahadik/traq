@@ -40,6 +40,7 @@ import json
 import sqlite3
 import os
 from contextlib import contextmanager
+from datetime import datetime
 from typing import List, Dict, Optional
 from pathlib import Path
 
@@ -1850,12 +1851,18 @@ class ActivityStorage:
         results.sort(key=lambda x: x['start_time'])
         return results
 
-    def get_screenshots_in_range(self, start: 'datetime', end: 'datetime') -> List[Dict]:
+    def get_screenshots_in_range(
+        self,
+        start: 'datetime',
+        end: 'datetime',
+        limit: Optional[int] = None
+    ) -> List[Dict]:
         """Get screenshots within a datetime range.
 
         Args:
             start: Start datetime (inclusive).
             end: End datetime (inclusive).
+            limit: Maximum number of screenshots to return (None = no limit).
 
         Returns:
             List of screenshot dicts ordered by timestamp.
@@ -1863,18 +1870,19 @@ class ActivityStorage:
         start_ts = int(start.timestamp())
         end_ts = int(end.timestamp())
 
+        query = """
+            SELECT id, timestamp, filepath, dhash, window_title, app_name,
+                   window_x, window_y, window_width, window_height,
+                   monitor_name, monitor_width, monitor_height
+            FROM screenshots
+            WHERE timestamp BETWEEN ? AND ?
+            ORDER BY timestamp ASC
+        """
+        if limit is not None:
+            query += f" LIMIT {int(limit)}"
+
         with self.get_connection() as conn:
-            cursor = conn.execute(
-                """
-                SELECT id, timestamp, filepath, dhash, window_title, app_name,
-                       window_x, window_y, window_width, window_height,
-                       monitor_name, monitor_width, monitor_height
-                FROM screenshots
-                WHERE timestamp BETWEEN ? AND ?
-                ORDER BY timestamp ASC
-                """,
-                (start_ts, end_ts),
-            )
+            cursor = conn.execute(query, (start_ts, end_ts))
             return [dict(row) for row in cursor.fetchall()]
 
     def get_sessions_in_range(self, start: 'datetime', end: 'datetime') -> List[Dict]:
@@ -2247,6 +2255,330 @@ class ActivityStorage:
                 (start.isoformat(), end.isoformat(), min_duration_minutes * 60, limit)
             )
             return [dict(row) for row in cursor.fetchall()]
+
+    def get_deep_work_percentage(
+        self,
+        start: 'datetime',
+        end: 'datetime',
+        min_focus_minutes: int = 10
+    ) -> float:
+        """Calculate percentage of tracked time spent in deep work (sustained focus).
+
+        Deep work is defined as focus sessions lasting at least min_focus_minutes
+        without switching apps/windows.
+
+        Args:
+            start: Start datetime.
+            end: End datetime.
+            min_focus_minutes: Minimum duration to count as deep work (default 10 min).
+
+        Returns:
+            Percentage (0-100) of total tracked time in deep work sessions.
+        """
+        with self.get_connection() as conn:
+            # Get total tracked time
+            cursor = conn.execute(
+                """
+                SELECT COALESCE(SUM(duration_seconds), 0) as total
+                FROM window_focus_events
+                WHERE datetime(start_time) >= datetime(?)
+                  AND datetime(end_time) <= datetime(?)
+                  AND session_id IS NOT NULL
+                """,
+                (start.isoformat(), end.isoformat())
+            )
+            total_seconds = cursor.fetchone()['total']
+
+            if total_seconds == 0:
+                return 0.0
+
+            # Get time in deep work sessions (>= min_focus_minutes)
+            cursor = conn.execute(
+                """
+                SELECT COALESCE(SUM(duration_seconds), 0) as deep_work
+                FROM window_focus_events
+                WHERE datetime(start_time) >= datetime(?)
+                  AND datetime(end_time) <= datetime(?)
+                  AND session_id IS NOT NULL
+                  AND duration_seconds >= ?
+                """,
+                (start.isoformat(), end.isoformat(), min_focus_minutes * 60)
+            )
+            deep_work_seconds = cursor.fetchone()['deep_work']
+
+            return (deep_work_seconds / total_seconds) * 100
+
+    def get_longest_streak(
+        self,
+        start: 'datetime',
+        end: 'datetime'
+    ) -> Dict:
+        """Get the longest uninterrupted focus streak in the time range.
+
+        Args:
+            start: Start datetime.
+            end: End datetime.
+
+        Returns:
+            Dict with:
+                - duration_seconds: Length of the streak
+                - start_time: When the streak started
+                - end_time: When the streak ended
+                - app_name: Primary app during the streak
+                - window_title: Primary window during the streak
+            Returns empty dict if no focus events.
+        """
+        with self.get_connection() as conn:
+            cursor = conn.execute(
+                """
+                SELECT
+                    app_name,
+                    window_title,
+                    start_time,
+                    end_time,
+                    duration_seconds
+                FROM window_focus_events
+                WHERE datetime(start_time) >= datetime(?)
+                  AND datetime(end_time) <= datetime(?)
+                  AND session_id IS NOT NULL
+                ORDER BY duration_seconds DESC
+                LIMIT 1
+                """,
+                (start.isoformat(), end.isoformat())
+            )
+            row = cursor.fetchone()
+            if row:
+                return dict(row)
+            return {}
+
+    def get_total_tracked_time(
+        self,
+        start: 'datetime',
+        end: 'datetime'
+    ) -> int:
+        """Get total tracked time in seconds for a time range.
+
+        Only includes time during active sessions (excludes AFK periods).
+
+        Args:
+            start: Start datetime.
+            end: End datetime.
+
+        Returns:
+            Total tracked time in seconds.
+        """
+        with self.get_connection() as conn:
+            cursor = conn.execute(
+                """
+                SELECT COALESCE(SUM(duration_seconds), 0) as total
+                FROM window_focus_events
+                WHERE datetime(start_time) >= datetime(?)
+                  AND datetime(end_time) <= datetime(?)
+                  AND session_id IS NOT NULL
+                """,
+                (start.isoformat(), end.isoformat())
+            )
+            return cursor.fetchone()['total']
+
+    def get_work_break_balance(
+        self,
+        start: 'datetime',
+        end: 'datetime'
+    ) -> Dict:
+        """Get work vs break time balance for a time range.
+
+        Calculates active work time (during sessions) vs AFK/break time.
+
+        Args:
+            start: Start datetime.
+            end: End datetime.
+
+        Returns:
+            Dict with active_seconds, break_seconds, total_span_seconds,
+            active_percentage, longest_work_without_break_seconds.
+        """
+        total_span = (end - start).total_seconds()
+
+        with self.get_connection() as conn:
+            # Get active time from focus events with session
+            cursor = conn.execute(
+                """
+                SELECT COALESCE(SUM(duration_seconds), 0) as active_time
+                FROM window_focus_events
+                WHERE datetime(start_time) >= datetime(?)
+                  AND datetime(end_time) <= datetime(?)
+                  AND session_id IS NOT NULL
+                """,
+                (start.isoformat(), end.isoformat())
+            )
+            active_seconds = cursor.fetchone()['active_time']
+
+            # Find longest continuous work period without a break
+            # A "break" is defined as an AFK period (gap between sessions)
+            cursor = conn.execute(
+                """
+                SELECT
+                    start_time,
+                    end_time,
+                    CAST((julianday(end_time) - julianday(start_time)) * 86400 AS INTEGER) as duration
+                FROM activity_sessions
+                WHERE datetime(start_time) >= datetime(?)
+                  AND datetime(start_time) <= datetime(?)
+                  AND end_time IS NOT NULL
+                ORDER BY start_time
+                """,
+                (start.isoformat(), end.isoformat())
+            )
+            sessions = cursor.fetchall()
+
+            longest_continuous = 0
+            current_continuous = 0
+            last_end = None
+            break_count = 0
+            total_break_seconds = 0
+
+            for session in sessions:
+                session_duration = session['duration'] or 0
+
+                if last_end:
+                    # Check gap between sessions (break time)
+                    gap_seconds = (
+                        datetime.fromisoformat(session['start_time']) -
+                        datetime.fromisoformat(last_end)
+                    ).total_seconds()
+
+                    # Only count as a break if gap is 1 min to 2 hours
+                    # (< 1 min is just context switch, > 2 hours is probably AFK/lunch/end of day)
+                    if 60 <= gap_seconds <= 7200:
+                        break_count += 1
+                        total_break_seconds += gap_seconds
+
+                    # If gap > 5 minutes, reset continuous work counter
+                    if gap_seconds > 300:
+                        longest_continuous = max(longest_continuous, current_continuous)
+                        current_continuous = session_duration
+                    else:
+                        current_continuous += session_duration
+                else:
+                    current_continuous = session_duration
+
+                last_end = session['end_time']
+
+            longest_continuous = max(longest_continuous, current_continuous)
+
+        # Active percentage based on first session to last session span (not midnight to midnight)
+        if sessions:
+            first_session_start = datetime.fromisoformat(sessions[0]['start_time'])
+            last_session_end = datetime.fromisoformat(sessions[-1]['end_time'])
+            workday_span = (last_session_end - first_session_start).total_seconds()
+            active_percentage = (active_seconds / workday_span * 100) if workday_span > 0 else 0
+        else:
+            workday_span = 0
+            active_percentage = 0
+
+        return {
+            'active_seconds': int(active_seconds),
+            'break_seconds': int(total_break_seconds),
+            'break_count': break_count,
+            'workday_span_seconds': int(workday_span),
+            'active_percentage': round(active_percentage, 1),
+            'longest_work_without_break_seconds': int(longest_continuous)
+        }
+
+    def get_meetings_time(
+        self,
+        start: 'datetime',
+        end: 'datetime'
+    ) -> Dict:
+        """Get time spent in meetings for a time range.
+
+        Detects meetings via app names (Zoom, Teams, Meet) and window titles.
+
+        Args:
+            start: Start datetime.
+            end: End datetime.
+
+        Returns:
+            Dict with meetings_seconds, meetings_count, meetings list.
+        """
+        # Meeting app patterns
+        meeting_apps = ['zoom', 'teams', 'webex', 'gotomeeting', 'bluejeans']
+        meeting_window_patterns = [
+            '%meet.google%', '%zoom meeting%', '%zoom webinar%',
+            '%teams%call%', '%teams%meeting%', '%webex%',
+            '%huddle%', '%standup%'
+        ]
+
+        with self.get_connection() as conn:
+            # Build query for meeting detection
+            app_conditions = ' OR '.join(
+                f"LOWER(app_name) LIKE '%{app}%'" for app in meeting_apps
+            )
+            window_conditions = ' OR '.join(
+                f"LOWER(window_title) LIKE '{pattern}'" for pattern in meeting_window_patterns
+            )
+
+            cursor = conn.execute(
+                f"""
+                SELECT
+                    app_name,
+                    window_title,
+                    start_time,
+                    end_time,
+                    duration_seconds
+                FROM window_focus_events
+                WHERE datetime(start_time) >= datetime(?)
+                  AND datetime(end_time) <= datetime(?)
+                  AND session_id IS NOT NULL
+                  AND ({app_conditions} OR {window_conditions})
+                ORDER BY start_time
+                """,
+                (start.isoformat(), end.isoformat())
+            )
+            meetings = cursor.fetchall()
+
+            total_seconds = sum(m['duration_seconds'] or 0 for m in meetings)
+
+            # Group into distinct meetings (merge if gap < 2 minutes)
+            distinct_meetings = []
+            current_meeting = None
+
+            for m in meetings:
+                if current_meeting is None:
+                    current_meeting = {
+                        'start': m['start_time'],
+                        'end': m['end_time'],
+                        'duration': m['duration_seconds'] or 0,
+                        'app': m['app_name'],
+                        'title': m['window_title']
+                    }
+                else:
+                    gap = (
+                        datetime.fromisoformat(m['start_time']) -
+                        datetime.fromisoformat(current_meeting['end'])
+                    ).total_seconds()
+
+                    if gap < 120:  # Within 2 minutes, same meeting
+                        current_meeting['end'] = m['end_time']
+                        current_meeting['duration'] += m['duration_seconds'] or 0
+                    else:
+                        distinct_meetings.append(current_meeting)
+                        current_meeting = {
+                            'start': m['start_time'],
+                            'end': m['end_time'],
+                            'duration': m['duration_seconds'] or 0,
+                            'app': m['app_name'],
+                            'title': m['window_title']
+                        }
+
+            if current_meeting:
+                distinct_meetings.append(current_meeting)
+
+        return {
+            'meetings_seconds': int(total_seconds),
+            'meetings_count': len(distinct_meetings),
+            'meetings': distinct_meetings
+        }
 
     # =========================================================================
     # Exported Reports History

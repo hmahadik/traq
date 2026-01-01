@@ -461,23 +461,23 @@ class ReportGenerator:
 
         # Generate executive summary using LLM
         if self.summarizer and self.summarizer.is_available():
-            prompt = f"""Synthesize these activity summaries into a coherent executive summary.
+            prompt = f"""Synthesize these activity summaries into a BRIEF executive summary.
 Time period: {range_description}
 Total active time: {analytics.total_active_minutes} minutes
 Top applications: {', '.join(a['name'] for a in analytics.top_apps[:5])}
 {app_usage_context}
 
-Individual activity summaries (each already contains interpreted activity context):
+Individual activity summaries:
 {chr(10).join(f"- {s}" for s in summary_texts[:20])}
 
-Write a 2-3 paragraph executive summary covering:
-1. Main focus areas and accomplishments
-2. Key projects or tasks worked on
-3. Notable patterns (if any)
+Write 2-4 sentences total covering:
+- Main focus areas and key accomplishments
+- Specific project names (if identifiable)
 
-IMPORTANT: Each summary above may describe work on different, unrelated projects.
-Do NOT assume different apps/windows are related unless clearly the same project.
-Be specific and use actual project names and technical terms from the summaries."""
+RULES:
+- Be extremely concise - no fluff or filler words
+- Use specific project/file names from the summaries
+- Do NOT assume unrelated activities are connected"""
 
             executive_summary = self.summarizer.generate_text(prompt)
         else:
@@ -841,22 +841,18 @@ Brief description."""
         app_usage_context = self._build_focus_context(focus_events) if focus_events else ""
 
         if self.summarizer and self.summarizer.is_available() and summary_texts:
-            prompt = f"""Summarize the day's activities in 2-3 paragraphs.
+            prompt = f"""Summarize the day's activities BRIEFLY.
 Date: {date.strftime('%A, %B %d, %Y')}
 Total active time: {analytics.total_active_minutes} minutes
-Top applications: {', '.join(a['name'] for a in analytics.top_apps[:5])}
+Top apps: {', '.join(a['name'] for a in analytics.top_apps[:5])}
 {app_usage_context}
 
-Activity summaries from throughout the day:
+Activity summaries:
 {chr(10).join(f"- {s}" for s in summary_texts[:15])}
 
-Focus on:
-1. Main accomplishments and tasks completed
-2. Key projects or areas of focus
-3. Any notable patterns
-
-Be specific - use actual project names and technical terms from the summaries.
-Do NOT assume different apps/windows are related unless clearly the same project."""
+Write 2-4 sentences covering main accomplishments and key projects.
+Be extremely concise. Use specific project/file names from the summaries.
+Do NOT assume unrelated activities are connected."""
 
             executive_summary = self.summarizer.generate_text(prompt)
             model_used = self.config.config.summarization.model
@@ -1143,21 +1139,17 @@ Do NOT assume different apps/windows are related unless clearly the same project
 
         # Build prompt for synthesizing daily summaries
         if self.summarizer and self.summarizer.is_available():
-            prompt = f"""Synthesize these daily activity summaries into a cohesive executive summary.
+            prompt = f"""Synthesize these daily summaries into a BRIEF executive summary.
 Time period: {range_description}
 Total active time: {analytics.total_active_minutes} minutes across {len(daily_summaries)} days
-Top applications: {', '.join(a['name'] for a in analytics.top_apps[:5])}
+Top apps: {', '.join(a['name'] for a in analytics.top_apps[:5])}
 
 Daily summaries:
-{chr(10).join(f"**{d['date_str']}**: {d['summary'][:300]}..." if len(d['summary']) > 300 else f"**{d['date_str']}**: {d['summary']}" for d in daily_summaries)}
+{chr(10).join(f"**{d['date_str']}**: {d['summary'][:200]}" for d in daily_summaries)}
 
-Write a 2-3 paragraph executive summary covering:
-1. Main themes and accomplishments across the period
-2. Key projects worked on consistently
-3. Notable patterns or progression
-
-Be specific and use actual project names from the summaries.
-Do NOT assume different days' work is related unless clearly the same project."""
+Write 3-5 sentences covering main themes and key projects.
+Be extremely concise. Use actual project names from summaries.
+Do NOT assume different days are related unless clearly same project."""
 
             executive_summary = self.summarizer.generate_text(prompt)
         else:

@@ -1045,6 +1045,115 @@
             opacity: 0.5;
             cursor: not-allowed;
         }
+
+        /* Tag Cloud & Manual Merge */
+        .tag-search-row {
+            display: flex;
+            gap: 10px;
+            margin: 10px 0;
+        }
+
+        .tag-search-row input {
+            flex: 1;
+        }
+
+        .tag-cloud {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            padding: 12px;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .tag-cloud .loading-text {
+            color: var(--muted);
+            font-size: 0.85rem;
+        }
+
+        .tag-cloud-item {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 10px;
+            font-size: 0.85rem;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            user-select: none;
+        }
+
+        .tag-cloud-item:hover {
+            border-color: var(--accent);
+            background: var(--surface-2);
+        }
+
+        .tag-cloud-item.selected {
+            background: var(--accent);
+            border-color: var(--accent);
+            color: var(--text-inverse);
+        }
+
+        .tag-cloud-item .tag-count {
+            font-size: 0.75rem;
+            opacity: 0.7;
+        }
+
+        .tag-cloud-item.hidden {
+            display: none;
+        }
+
+        .merge-controls {
+            margin-top: 12px;
+            padding: 12px;
+            background: var(--surface-2);
+            border-radius: 8px;
+            border: 1px solid var(--accent);
+        }
+
+        .merge-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+            font-size: 0.9rem;
+            color: var(--text);
+        }
+
+        .text-btn {
+            background: none;
+            border: none;
+            color: var(--accent);
+            cursor: pointer;
+            font-size: 0.85rem;
+            padding: 0;
+        }
+
+        .text-btn:hover {
+            text-decoration: underline;
+        }
+
+        .merge-input-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .merge-input-row label {
+            font-size: 0.85rem;
+            color: var(--muted);
+            white-space: nowrap;
+        }
+
+        .merge-input-row input {
+            flex: 1;
+            max-width: 250px;
+        }
     </style>
 </head>
 <body>
@@ -1423,29 +1532,58 @@
                         <line x1="7" y1="7" x2="7.01" y2="7"></line>
                     </svg>
                     Tag Management
+                    <span class="stat-value" style="margin-left: auto; font-weight: normal; font-size: 0.85rem;">
+                        <span id="uniqueTagCount">-</span> tags
+                    </span>
                 </h2>
 
+                <!-- Manual Tag Merge -->
                 <div class="settings-row column">
                     <div class="settings-label">
-                        <h3>Consolidate Similar Tags</h3>
-                        <p>Use AI to identify and merge duplicate/similar tags (e.g., "debugging", "Debugging", "debug")</p>
+                        <h3>Merge Tags</h3>
+                        <p>Click tags below to select, then merge into a single tag</p>
                     </div>
-                    <div class="tag-actions">
-                        <button type="button" class="secondary" onclick="analyzeTagsForConsolidation()" id="analyzeTagsBtn">
+
+                    <!-- Search/Filter -->
+                    <div class="tag-search-row">
+                        <input type="text" id="tagSearchInput" placeholder="Filter tags..." oninput="filterTagCloud()">
+                        <button type="button" class="secondary small" onclick="analyzeTagsForConsolidation()" id="analyzeTagsBtn" title="Find duplicate tags automatically">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <circle cx="11" cy="11" r="8"></circle>
                                 <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
                             </svg>
-                            Analyze Tags
+                            Find Duplicates
                         </button>
-                        <span id="tagAnalysisStatus" class="analysis-status"></span>
+                    </div>
+
+                    <!-- Tag Cloud (clickable tags) -->
+                    <div id="tagCloud" class="tag-cloud">
+                        <span class="loading-text">Loading tags...</span>
+                    </div>
+
+                    <!-- Merge Controls (shown when tags selected) -->
+                    <div id="mergeControls" class="merge-controls" style="display: none;">
+                        <div class="merge-info">
+                            <span id="selectedTagsCount">0</span> tags selected
+                            <button type="button" class="text-btn" onclick="clearTagSelection()">Clear</button>
+                        </div>
+                        <div class="merge-input-row">
+                            <label for="canonicalTagInput">Merge into:</label>
+                            <input type="text" id="canonicalTagInput" placeholder="canonical-tag-name">
+                            <button type="button" onclick="mergeSelectedTags()" id="mergeTagsBtn">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3"></path>
+                                </svg>
+                                Merge
+                            </button>
+                        </div>
                     </div>
                 </div>
 
-                <!-- Tag Analysis Results (hidden initially) -->
+                <!-- Auto-detected Duplicates (shown after analysis) -->
                 <div id="tagConsolidationResults" class="tag-consolidation-results" style="display: none;">
                     <div class="consolidation-header">
-                        <h4>Suggested Consolidations</h4>
+                        <h4>Suggested Duplicates</h4>
                         <span class="select-all-toggle">
                             <label>
                                 <input type="checkbox" id="selectAllConsolidations" onchange="toggleAllConsolidations()">
@@ -1464,17 +1602,6 @@
                             Apply Selected
                         </button>
                         <button type="button" class="secondary" onclick="cancelConsolidation()">Cancel</button>
-                    </div>
-                </div>
-
-                <!-- Tag Stats -->
-                <div class="settings-row">
-                    <div class="settings-label">
-                        <h3>Tag Statistics</h3>
-                        <p>Current tag counts</p>
-                    </div>
-                    <div class="settings-control">
-                        <span class="stat-value"><span id="uniqueTagCount">-</span> unique tags</span>
                     </div>
                 </div>
             </div>
@@ -2414,29 +2541,139 @@
         // ==================== Tag Management Functions ====================
 
         let tagConsolidationData = [];  // Store suggested consolidations
+        let allTagsData = [];  // Store all tags for cloud
+        let selectedTags = new Set();  // Currently selected tags for manual merge
 
-        // Load tag statistics on page load
-        async function loadTagStats() {
+        // Load tags and render cloud
+        async function loadTagCloud() {
+            const cloud = document.getElementById('tagCloud');
             try {
                 const response = await fetch('/api/tags');
                 const data = await response.json();
-                if (data.total_unique !== undefined) {
-                    document.getElementById('uniqueTagCount').textContent = data.total_unique;
+                allTagsData = data.tags || [];
+
+                document.getElementById('uniqueTagCount').textContent = data.total_unique || allTagsData.length;
+
+                // Render tag cloud
+                cloud.innerHTML = '';
+                if (allTagsData.length === 0) {
+                    cloud.innerHTML = '<span class="loading-text">No tags found</span>';
+                    return;
                 }
+
+                allTagsData.forEach(t => {
+                    const tag = document.createElement('span');
+                    tag.className = 'tag-cloud-item';
+                    tag.dataset.tag = t.tag;
+                    tag.innerHTML = `${escapeHtml(t.tag)} <span class="tag-count">(${t.count})</span>`;
+                    tag.onclick = () => toggleTagSelection(t.tag, tag);
+                    cloud.appendChild(tag);
+                });
             } catch (error) {
-                console.error('Error loading tag stats:', error);
+                console.error('Error loading tags:', error);
+                cloud.innerHTML = '<span class="loading-text">Error loading tags</span>';
             }
         }
 
-        // Analyze tags for consolidation using AI
+        // Toggle tag selection for manual merge
+        function toggleTagSelection(tagName, element) {
+            if (selectedTags.has(tagName)) {
+                selectedTags.delete(tagName);
+                element.classList.remove('selected');
+            } else {
+                selectedTags.add(tagName);
+                element.classList.add('selected');
+            }
+            updateMergeControls();
+        }
+
+        // Update merge controls visibility and state
+        function updateMergeControls() {
+            const controls = document.getElementById('mergeControls');
+            const countEl = document.getElementById('selectedTagsCount');
+            const input = document.getElementById('canonicalTagInput');
+
+            countEl.textContent = selectedTags.size;
+
+            if (selectedTags.size >= 2) {
+                controls.style.display = 'block';
+                // Auto-suggest canonical name (most common tag or first selected)
+                if (!input.value) {
+                    const tags = Array.from(selectedTags);
+                    const mostCommon = tags.reduce((a, b) => {
+                        const countA = allTagsData.find(t => t.tag === a)?.count || 0;
+                        const countB = allTagsData.find(t => t.tag === b)?.count || 0;
+                        return countA >= countB ? a : b;
+                    });
+                    input.value = mostCommon.toLowerCase().replace(/\s+/g, '-');
+                }
+            } else {
+                controls.style.display = 'none';
+            }
+        }
+
+        // Clear tag selection
+        function clearTagSelection() {
+            selectedTags.clear();
+            document.querySelectorAll('.tag-cloud-item.selected').forEach(el => el.classList.remove('selected'));
+            document.getElementById('canonicalTagInput').value = '';
+            updateMergeControls();
+        }
+
+        // Filter tag cloud by search input
+        function filterTagCloud() {
+            const filter = document.getElementById('tagSearchInput').value.toLowerCase();
+            document.querySelectorAll('.tag-cloud-item').forEach(el => {
+                const tag = el.dataset.tag.toLowerCase();
+                el.classList.toggle('hidden', filter && !tag.includes(filter));
+            });
+        }
+
+        // Merge selected tags manually
+        async function mergeSelectedTags() {
+            const canonical = document.getElementById('canonicalTagInput').value.trim();
+            if (!canonical) {
+                showToast('Please enter a canonical tag name', 'error');
+                return;
+            }
+            if (selectedTags.size < 2) {
+                showToast('Select at least 2 tags to merge', 'error');
+                return;
+            }
+
+            const variants = Array.from(selectedTags);
+            const btn = document.getElementById('mergeTagsBtn');
+            btn.disabled = true;
+
+            try {
+                const response = await fetch('/api/tags/consolidate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        consolidations: [{ canonical, variants }]
+                    })
+                });
+
+                const data = await response.json();
+                if (data.error) throw new Error(data.error);
+
+                showToast(`Merged ${variants.length} tags into "${canonical}", updated ${data.updated_summaries} summaries`, 'success');
+                clearTagSelection();
+                loadTagCloud();  // Refresh cloud
+
+            } catch (error) {
+                showToast(`Error: ${error.message}`, 'error');
+            } finally {
+                btn.disabled = false;
+            }
+        }
+
+        // Analyze tags for auto-detected duplicates
         async function analyzeTagsForConsolidation() {
             const btn = document.getElementById('analyzeTagsBtn');
-            const status = document.getElementById('tagAnalysisStatus');
             const resultsDiv = document.getElementById('tagConsolidationResults');
 
             btn.disabled = true;
-            status.textContent = 'Analyzing tags with AI...';
-            status.className = 'analysis-status loading';
             resultsDiv.style.display = 'none';
 
             try {
@@ -2447,30 +2684,20 @@
                 });
 
                 const data = await response.json();
-
-                if (data.error) {
-                    throw new Error(data.error);
-                }
+                if (data.error) throw new Error(data.error);
 
                 tagConsolidationData = data.consolidations || [];
 
                 if (tagConsolidationData.length === 0) {
-                    status.textContent = 'No consolidation suggestions found';
-                    status.className = 'analysis-status';
-                    btn.disabled = false;
+                    showToast('No duplicate tags found', 'success');
                     return;
                 }
 
-                // Render consolidation suggestions
                 renderConsolidationSuggestions(tagConsolidationData);
                 resultsDiv.style.display = 'block';
-                status.textContent = `Found ${tagConsolidationData.length} consolidation groups`;
-                status.className = 'analysis-status success';
 
             } catch (error) {
-                status.textContent = `Error: ${error.message}`;
-                status.className = 'analysis-status error';
-                console.error('Tag analysis error:', error);
+                showToast(`Error: ${error.message}`, 'error');
             } finally {
                 btn.disabled = false;
             }
@@ -2579,9 +2806,9 @@
 
                 showToast(`Consolidated ${data.tags_consolidated} tag groups, updated ${data.updated_summaries} summaries`, 'success');
 
-                // Hide results and refresh stats
+                // Hide results and refresh tag cloud
                 cancelConsolidation();
-                loadTagStats();
+                loadTagCloud();
 
             } catch (error) {
                 showToast(`Error: ${error.message}`, 'error');
@@ -2595,7 +2822,6 @@
         // Cancel consolidation (hide results)
         function cancelConsolidation() {
             document.getElementById('tagConsolidationResults').style.display = 'none';
-            document.getElementById('tagAnalysisStatus').textContent = '';
             document.getElementById('selectAllConsolidations').checked = false;
             tagConsolidationData = [];
         }
@@ -2607,8 +2833,8 @@
             return div.innerHTML;
         }
 
-        // Load tag stats on page load
-        document.addEventListener('DOMContentLoaded', loadTagStats);
+        // Load tag cloud on page load
+        document.addEventListener('DOMContentLoaded', loadTagCloud);
     </script>
 </body>
 </html>

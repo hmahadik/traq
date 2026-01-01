@@ -2188,65 +2188,180 @@ def api_generate_report():
 
     include_screenshots = data.get('include_screenshots', True)
     max_screenshots = data.get('max_screenshots', 10)
+    skip_ai_summary = data.get('skip_ai_summary', False)  # Fast dashboard load
 
     try:
-        generator = get_report_generator()
+        storage = ActivityStorage()
 
-        # Try to use cached daily reports first (much faster)
-        report = generator.generate_from_cached(
-            time_range=time_range,
-            report_type=report_type,
-            include_screenshots=include_screenshots,
-            max_screenshots=max_screenshots
-        )
+        # Parse the time range
+        from tracker.timeparser import TimeParser
+        time_parser = TimeParser()
+        start, end = time_parser.parse(time_range)
+        is_single_day = start.date() == end.date()
 
-        # Fall back to full generation if cache unavailable
-        if report is None:
-            report = generator.generate(
-                time_range=time_range,
-                report_type=report_type,
-                include_screenshots=include_screenshots,
-                max_screenshots=max_screenshots
+        # For fast dashboard loading, skip the slow LLM call
+        if skip_ai_summary:
+            report = None
+        else:
+            generator = get_report_generator()
+
+            # For single-day reports: cache daily report for "Daily Summaries" list,
+            # but use full generate() for better sections from threshold summaries
+            if is_single_day:
+                date_str = start.strftime('%Y-%m-%d')
+                # Cache daily report so it shows in saved reports list
+                generator.generate_daily_report(date_str)
+                # Use full generation for proper sections (from threshold summaries)
+                report = generator.generate(
+                    time_range=time_range,
+                    report_type=report_type,
+                    include_screenshots=include_screenshots,
+                    max_screenshots=max_screenshots
+                )
+            else:
+                # For multi-day reports: try cached synthesis first (much faster)
+                report = generator.generate_from_cached(
+                    time_range=time_range,
+                    report_type=report_type,
+                    include_screenshots=include_screenshots,
+                    max_screenshots=max_screenshots
+                )
+
+                # Fall back to full generation if cache unavailable
+                if report is None:
+                    report = generator.generate(
+                        time_range=time_range,
+                        report_type=report_type,
+                        include_screenshots=include_screenshots,
+                        max_screenshots=max_screenshots
+                    )
+
+        # Get new metrics
+        from tracker.tag_detector import get_tag_breakdown, get_tag_colors
+        focus_events = storage.get_focus_events_in_range(start, end, require_session=True)
+        tag_breakdown = get_tag_breakdown(focus_events)
+        deep_work_percentage = storage.get_deep_work_percentage(start, end)
+        longest_streak = storage.get_longest_streak(start, end)
+        total_tracked_seconds = storage.get_total_tracked_time(start, end)
+
+        # Get health metrics
+        work_break_balance = storage.get_work_break_balance(start, end)
+        meetings_data = storage.get_meetings_time(start, end)
+
+        # Get timeline data for visualization
+        timeline_events = []
+        for event in focus_events:
+            from tracker.tag_detector import detect_tag, get_tag_color
+            tag = detect_tag(event.get('app_name'), event.get('window_title'))
+            timeline_events.append({
+                'start_time': event.get('start_time'),
+                'end_time': event.get('end_time'),
+                'duration_seconds': event.get('duration_seconds'),
+                'app_name': event.get('app_name'),
+                'window_title': event.get('window_title'),
+                'tag': tag,
+                'color': get_tag_color(tag)
+            })
+
+        # Get screenshots - from report if available, otherwise from storage
+        key_screenshots = []
+        if report:
+            screenshots_source = report.key_screenshots
+        else:
+            # Get screenshots directly from storage
+            screenshots_source = storage.get_screenshots_in_range(
+                start, end,
+                limit=max_screenshots
             )
 
-        # Convert to JSON-serializable format
-        key_screenshots = []
-        for s in report.key_screenshots:
+        for s in screenshots_source:
             ts = s.get('timestamp')
             if isinstance(ts, int):
                 ts_str = datetime.fromtimestamp(ts).isoformat()
             elif isinstance(ts, datetime):
                 ts_str = ts.isoformat()
             else:
-                ts_str = str(ts)
+                ts_str = str(ts) if ts else ''
+
+            # Add tag info to screenshots
+            from tracker.tag_detector import detect_tag, get_tag_color
+            tag = detect_tag(s.get('app_name'), s.get('window_title'))
 
             key_screenshots.append({
                 'id': s.get('id'),
                 'url': f"/screenshot/{s.get('id')}",
                 'timestamp': ts_str,
-                'window_title': s.get('window_title', '')
+                'window_title': s.get('window_title', ''),
+                'app_name': s.get('app_name', ''),
+                'tag': tag,
+                'color': get_tag_color(tag)
             })
 
-        return jsonify({
-            'title': report.title,
-            'time_range': report.time_range,
-            'generated_at': report.generated_at.isoformat(),
-            'executive_summary': report.executive_summary,
-            'sections': [
-                {'title': s.title, 'content': s.content}
-                for s in report.sections
-            ],
-            'analytics': {
-                'total_active_minutes': report.analytics.total_active_minutes,
-                'total_sessions': report.analytics.total_sessions,
-                'top_apps': report.analytics.top_apps,
-                'top_windows': report.analytics.top_windows,
-                'activity_by_hour': report.analytics.activity_by_hour,
-                'activity_by_day': report.analytics.activity_by_day,
-                'busiest_period': report.analytics.busiest_period,
+        # Build response
+        response_data = {
+            'time_range': time_range,
+            'start_time': start.isoformat(),
+            'end_time': end.isoformat(),
+            # Dashboard metrics (always available, fast)
+            'dashboard': {
+                'total_tracked_seconds': total_tracked_seconds,
+                'deep_work_percentage': round(deep_work_percentage, 1),
+                'longest_streak': {
+                    'duration_seconds': longest_streak.get('duration_seconds', 0),
+                    'start_time': longest_streak.get('start_time'),
+                    'end_time': longest_streak.get('end_time'),
+                    'app_name': longest_streak.get('app_name'),
+                    'window_title': longest_streak.get('window_title'),
+                },
+                # Health metrics
+                'work_break_balance': work_break_balance,
+                'meetings': meetings_data,
+                'tag_breakdown': [
+                    {
+                        'tag': tb.tag,
+                        'total_seconds': tb.total_seconds,
+                        'percentage': round(tb.percentage, 1),
+                        'color': tb.color,
+                        'windows': tb.windows
+                    }
+                    for tb in tag_breakdown
+                ],
+                'tag_colors': get_tag_colors(),
+                'timeline_events': timeline_events
             },
             'key_screenshots': key_screenshots
-        })
+        }
+
+        # Add report data if available (not when skip_ai_summary=True)
+        if report:
+            response_data.update({
+                'title': report.title,
+                'generated_at': report.generated_at.isoformat(),
+                'executive_summary': report.executive_summary,
+                'sections': [
+                    {'title': s.title, 'content': s.content}
+                    for s in report.sections
+                ],
+                'analytics': {
+                    'total_active_minutes': report.analytics.total_active_minutes,
+                    'total_sessions': report.analytics.total_sessions,
+                    'top_apps': report.analytics.top_apps,
+                    'top_windows': report.analytics.top_windows,
+                    'activity_by_hour': report.analytics.activity_by_hour,
+                    'activity_by_day': report.analytics.activity_by_day,
+                    'busiest_period': report.analytics.busiest_period,
+                },
+            })
+        else:
+            response_data.update({
+                'title': f"Activity Report: {time_range}",
+                'generated_at': datetime.now().isoformat(),
+                'executive_summary': None,  # Not loaded yet
+                'sections': [],
+                'analytics': None,
+            })
+
+        return jsonify(response_data)
     except ValueError as e:
         return jsonify({'error': str(e)}), 400
     except Exception as e:
@@ -2577,9 +2692,21 @@ def api_get_all_tags():
         return jsonify({"error": str(e)}), 500
 
 
+def _normalize_tag(tag: str) -> str:
+    """Normalize a tag to canonical form for comparison.
+
+    Converts to lowercase, replaces spaces/underscores with hyphens,
+    and strips whitespace.
+    """
+    return tag.lower().strip().replace(' ', '-').replace('_', '-')
+
+
 @app.route('/api/tags/suggest-consolidation', methods=['POST'])
 def api_suggest_tag_consolidation():
-    """Use LLM to suggest tag consolidation groups.
+    """Suggest tag consolidation groups using algorithmic matching.
+
+    Uses normalization to find duplicates instantly (no LLM needed).
+    Groups tags that normalize to the same form (case, spaces, hyphens, underscores).
 
     Request body (optional):
         {"min_count": 1}  - Minimum occurrence to include tag
@@ -2589,15 +2716,13 @@ def api_suggest_tag_consolidation():
             "consolidations": [
                 {
                     "canonical": "debugging",
-                    "variants": ["debugging", "Debugging", "debug"],
+                    "variants": ["debugging", "Debugging"],
                     "total_count": 17
                 },
                 ...
             ]
         }
     """
-    import requests as http_requests
-
     data = request.json or {}
     min_count = data.get('min_count', 1)
 
@@ -2614,69 +2739,34 @@ def api_suggest_tag_consolidation():
                 "message": "Not enough tags to analyze"
             })
 
-        # Build the prompt
-        tags_list = [f"{tag} ({count}x)" for tag, count in sorted(filtered_tags.items(), key=lambda x: (-x[1], x[0]))]
+        # Group tags by their normalized form
+        from collections import defaultdict
+        groups = defaultdict(list)
+        for tag in filtered_tags.keys():
+            normalized = _normalize_tag(tag)
+            groups[normalized].append(tag)
 
-        prompt = '''You are a tag consolidation assistant. Given a list of tags with their occurrence counts, identify groups of tags that represent the same concept but have different naming variations (case differences, hyphens vs spaces, singular vs plural, abbreviations, etc.).
+        # Build consolidation suggestions (only groups with 2+ variants)
+        consolidations = []
+        for normalized, variants in sorted(groups.items()):
+            if len(variants) >= 2:
+                # Use the normalized form as canonical
+                canonical = normalized
+                total_count = sum(tag_counts.get(v, 0) for v in variants)
+                consolidations.append({
+                    "canonical": canonical,
+                    "variants": sorted(variants),
+                    "total_count": total_count
+                })
 
-For each group, suggest:
-1. The canonical tag name (use lowercase-hyphenated format, e.g., "code-review" not "Code Review")
-2. All variants that should map to it
+        # Sort by total count descending
+        consolidations.sort(key=lambda x: -x['total_count'])
 
-Only include groups where consolidation makes sense. Skip unique tags that don't have similar variants.
+        return jsonify({
+            "consolidations": consolidations,
+            "method": "algorithmic"
+        })
 
-Tags:
-''' + '\n'.join(tags_list) + '''
-
-Respond in JSON format ONLY (no markdown code blocks):
-{
-  "consolidations": [
-    {
-      "canonical": "the-canonical-tag",
-      "variants": ["variant1", "variant2"],
-      "total_count": 123
-    }
-  ]
-}
-'''
-
-        # Query Ollama
-        cfg = config_manager.config.summarization
-        response = http_requests.post(
-            f"{cfg.ollama_host}/api/generate",
-            json={
-                'model': cfg.model,
-                'prompt': prompt,
-                'stream': False,
-                'options': {'temperature': 0.1}
-            },
-            timeout=120
-        )
-        response.raise_for_status()
-
-        result_text = response.json().get('response', '')
-
-        # Parse JSON from response (handle markdown code blocks)
-        result_text = result_text.strip()
-        if result_text.startswith('```'):
-            # Remove markdown code blocks
-            lines = result_text.split('\n')
-            result_text = '\n'.join(lines[1:-1] if lines[-1] == '```' else lines[1:])
-
-        result = json.loads(result_text)
-
-        # Calculate actual total counts for each group
-        for group in result.get('consolidations', []):
-            variants = group.get('variants', [])
-            actual_count = sum(tag_counts.get(v, 0) for v in variants)
-            group['total_count'] = actual_count
-
-        return jsonify(result)
-
-    except json.JSONDecodeError as e:
-        return jsonify({"error": f"Failed to parse LLM response: {e}", "raw": result_text[:500]}), 500
-    except http_requests.exceptions.RequestException as e:
-        return jsonify({"error": f"Ollama request failed: {e}"}), 503
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -2735,7 +2825,3 @@ def api_consolidate_tags():
         })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-
-
-if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=55555)
