@@ -621,28 +621,23 @@ class SummarizerWorker:
             'focus_weighted_sampling': cfg.focus_weighted_sampling,
         }
 
-        # Find the original root ID (in case this is already a regeneration)
-        root_id = summary_id
-        if old_summary.get('regenerated_from'):
-            root_id = old_summary['regenerated_from']
-
-        # Save as new entry linked to original
-        new_id = self.storage.save_threshold_summary(
-            start_time=old_summary['start_time'],
-            end_time=old_summary['end_time'],
+        # Update existing summary in-place
+        success = self.storage.update_threshold_summary(
+            summary_id=summary_id,
             summary=summary,
-            screenshot_ids=screenshot_ids,
             model=self.config.config.summarization.model,
             config_snapshot=config_snapshot,
             inference_ms=inference_ms,
-            regenerated_from=root_id,
             prompt_text=prompt_text,
             explanation=explanation,
             tags=tags,
             confidence=confidence,
         )
 
-        logger.info(f"Regenerated summary {summary_id} -> {new_id} (conf={confidence:.2f}): {summary[:100]}...")
+        if success:
+            logger.info(f"Regenerated summary {summary_id} (conf={confidence:.2f}): {summary[:100]}...")
+        else:
+            logger.error(f"Failed to update summary {summary_id} - not found")
 
     def _gather_ocr(self, screenshots: List[Dict]) -> List[Dict]:
         """Gather OCR texts for unique window titles.

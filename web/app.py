@@ -1719,42 +1719,6 @@ def api_regenerate_day_summaries(date):
         return jsonify({'error': str(e)}), 500
 
 
-@app.route('/api/threshold-summaries/<int:summary_id>/history')
-def api_get_summary_history(summary_id):
-    """Get all versions of a summary (original + regenerations).
-
-    Returns:
-        {
-            "original_id": 1,
-            "versions": [...],
-            "current_config": {...}
-        }
-    """
-    try:
-        storage = ActivityStorage()
-        original = storage.get_threshold_summary(summary_id)
-
-        if not original:
-            return jsonify({"error": "Summary not found"}), 404
-
-        # Find the root if this is a regeneration
-        root_id = summary_id
-        while original and original.get('regenerated_from'):
-            root_id = original['regenerated_from']
-            original = storage.get_threshold_summary(root_id)
-
-        # Get all versions
-        versions = storage.get_summary_versions(root_id)
-
-        return jsonify({
-            "original_id": root_id,
-            "versions": versions,
-            "current_config": config_manager.to_dict()['summarization']
-        })
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-
 @app.route('/api/threshold-summaries/<int:summary_id>', methods=['DELETE'])
 def api_delete_summary(summary_id):
     """Delete a threshold summary.
@@ -1864,9 +1828,6 @@ def api_get_summary_detail(summary_id):
                 if focus_events[i].get('app_name') != focus_events[i-1].get('app_name'):
                     context_switches += 1
 
-        # Get version history
-        versions = storage.get_summary_versions(summary_id)
-
         return jsonify({
             "summary": summary,
             "screenshots": screenshots,
@@ -1874,7 +1835,6 @@ def api_get_summary_detail(summary_id):
             "window_durations": window_durations_list,
             "focus_event_count": len(focus_events),
             "context_switches": context_switches,
-            "versions": versions,
         })
     except Exception as e:
         return jsonify({"error": str(e)}), 500

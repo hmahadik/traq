@@ -391,46 +391,6 @@
             color: var(--accent-soft);
         }
 
-        /* Version history */
-        .version-list {
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-        }
-
-        .version-item {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 10px 14px;
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: 6px;
-        }
-
-        .version-item.current {
-            border-color: var(--accent);
-            background: var(--surface-2);
-        }
-
-        .version-info {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-
-        .version-badge {
-            font-size: 0.75rem;
-            padding: 2px 8px;
-            border-radius: 4px;
-            background: var(--accent);
-            color: var(--text-inverse);
-        }
-
-        .version-badge.original {
-            background: var(--success);
-        }
-
         /* Loading state */
         .loading {
             display: flex;
@@ -665,7 +625,7 @@
                 Back to Timeline
             </a>
             <div class="header-actions">
-                <button class="btn" onclick="regenerateSummary()">
+                <button class="btn" onclick="regenerateSummary(event)">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M23 4v6h-6M1 20v-6h6"/>
                         <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
@@ -991,33 +951,6 @@
                 `;
             }
 
-            // Version history
-            if (data.versions && data.versions.length > 1) {
-                html += `
-                    <div class="section">
-                        <div class="section-header">
-                            <h2 class="section-title">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                                Version History
-                            </h2>
-                            <span class="section-count">${data.versions.length} versions</span>
-                        </div>
-                        <div class="version-list">
-                            ${data.versions.map((v, i) => `
-                                <div class="version-item ${v.id === summary.id ? 'current' : ''}">
-                                    <div class="version-info">
-                                        <span class="version-badge ${!v.regenerated_from ? 'original' : ''}">${!v.regenerated_from ? 'Original' : 'v' + (i + 1)}</span>
-                                        <span>${new Date(v.created_at).toLocaleString()}</span>
-                                        <span class="mono" style="color: var(--muted); font-size: 0.8rem;">${v.model_used}</span>
-                                    </div>
-                                    ${v.id !== summary.id ? `<a href="/summary/${v.id}" style="color: var(--accent); text-decoration: none;">View</a>` : '<span style="color: var(--muted);">Current</span>'}
-                                </div>
-                            `).join('')}
-                        </div>
-                    </div>
-                `;
-            }
-
             // Screenshots (moved to bottom)
             html += `
                 <div class="section">
@@ -1111,8 +1044,13 @@
         }
 
         // Actions
-        async function regenerateSummary() {
+        async function regenerateSummary(event) {
             if (!confirm('Regenerate this summary with current settings?')) return;
+
+            const btn = event.target.closest('button');
+            const originalHtml = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner"></span> Regenerating...';
 
             try {
                 const response = await fetch(`/api/threshold-summaries/${summaryId}/regenerate`, {
@@ -1121,7 +1059,7 @@
                 const result = await response.json();
 
                 if (result.status === 'queued') {
-                    showToast('Regeneration queued. The page will reload when complete.', 'success');
+                    showToast('Regeneration started. The page will reload when complete.', 'success');
                     // Poll for completion
                     const interval = setInterval(async () => {
                         const statusRes = await fetch('/api/threshold-summaries/worker-status');
@@ -1131,9 +1069,14 @@
                             location.reload();
                         }
                     }, 2000);
+                } else {
+                    btn.disabled = false;
+                    btn.innerHTML = originalHtml;
                 }
             } catch (error) {
                 showToast('Failed to regenerate: ' + error.message, 'error');
+                btn.disabled = false;
+                btn.innerHTML = originalHtml;
             }
         }
 

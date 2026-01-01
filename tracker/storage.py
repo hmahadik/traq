@@ -1511,6 +1511,64 @@ class ActivityStorage:
             conn.commit()
             return summary_id
 
+    def update_threshold_summary(
+        self,
+        summary_id: int,
+        summary: str,
+        model: str,
+        config_snapshot: dict,
+        inference_ms: int,
+        prompt_text: str = None,
+        explanation: str = None,
+        tags: List[str] = None,
+        confidence: float = None
+    ) -> bool:
+        """Update an existing summary in-place (for regeneration).
+
+        Args:
+            summary_id: ID of the summary to update
+            summary: The new generated summary text
+            model: Model used for generation
+            config_snapshot: Dict of config settings used
+            inference_ms: Time taken for inference
+            prompt_text: The full prompt text sent to the LLM
+            explanation: Model's explanation of what it observed
+            tags: List of tags from the LLM
+            confidence: Model's confidence score (0.0-1.0)
+
+        Returns:
+            True if update succeeded, False if summary not found.
+        """
+        with self.get_connection() as conn:
+            cursor = conn.execute(
+                """
+                UPDATE threshold_summaries
+                SET summary = ?,
+                    model_used = ?,
+                    config_snapshot = ?,
+                    inference_time_ms = ?,
+                    prompt_text = ?,
+                    explanation = ?,
+                    tags = ?,
+                    confidence = ?,
+                    regenerated_from = NULL
+                WHERE id = ?
+                """,
+                (
+                    summary,
+                    model,
+                    json.dumps(config_snapshot) if config_snapshot else None,
+                    inference_ms,
+                    prompt_text,
+                    explanation,
+                    json.dumps(tags) if tags else None,
+                    confidence,
+                    summary_id,
+                ),
+            )
+            conn.commit()
+            return cursor.rowcount > 0
+
     def has_summary_for_time_range(self, start_time: str, end_time: str) -> bool:
         """Check if a summary already exists for the given time range.
 
@@ -1533,6 +1591,37 @@ class ActivityStorage:
             )
             count = cursor.fetchone()[0]
             return count > 0
+
+    def cleanup_duplicate_summaries(self) -> int:
+        """Remove duplicate summaries, keeping only the latest per time range.
+
+        For each (start_time, end_time) pair with multiple summaries,
+        keeps the one with the highest ID and deletes the rest.
+        Also clears regenerated_from on all remaining summaries.
+
+        Returns:
+            Number of duplicate summaries deleted.
+        """
+        with self.get_connection() as conn:
+            # Find and delete duplicates (keep highest ID per time range)
+            cursor = conn.execute(
+                """
+                DELETE FROM threshold_summaries
+                WHERE id NOT IN (
+                    SELECT MAX(id)
+                    FROM threshold_summaries
+                    GROUP BY start_time, end_time
+                )
+                """
+            )
+            deleted_count = cursor.rowcount
+
+            # Clear regenerated_from on all remaining summaries
+            conn.execute(
+                "UPDATE threshold_summaries SET regenerated_from = NULL"
+            )
+            conn.commit()
+            return deleted_count
 
     def get_threshold_summary(self, summary_id: int) -> Optional[Dict]:
         """Get a threshold summary by ID.
