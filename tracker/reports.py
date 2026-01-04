@@ -26,8 +26,20 @@ from datetime import datetime, timedelta
 from typing import List, Dict, Optional, TYPE_CHECKING
 import json
 import logging
+import re
 
 from .timeparser import TimeParser
+
+# Regex patterns for project extraction
+# Match workspace name between " - " and " (Workspace) - Visual Studio Code"
+VSCODE_WORKSPACE_PATTERN = re.compile(r' - (.+?) \(Workspace\) - Visual Studio Code$')
+CHROME_LOCALHOST_PATTERN = re.compile(r'localhost:\d+')
+
+# Apps that should be categorized as Communication
+COMMUNICATION_APPS = {'slack', 'thunderbird', 'thunderbird-esr', 'zoom', 'teams', 'discord'}
+
+# Apps that are browsers (for Research categorization)
+BROWSER_APPS = {'google-chrome', 'chrome', 'firefox', 'chromium', 'brave'}
 
 if TYPE_CHECKING:
     from .storage import ActivityStorage
@@ -533,6 +545,305 @@ RULES:
 
         return "\n".join(lines) if len(lines) > 1 else ""
 
+    def _extract_project_from_focus_event(self, event: dict) -> str:
+        """Extract project name from a single focus event.
+
+        Priority:
+        1. VS Code workspace name from window title
+        2. Terminal working directory (last component)
+        3. Communication category for chat/email apps
+        4. Research category for browsers (non-localhost)
+        5. App name as fallback
+
+        Args:
+            event: Focus event dict with app_name, window_title, terminal_context.
+
+        Returns:
+            Project name or category string.
+        """
+        app_name = (event.get('app_name') or 'Unknown').lower()
+        window_title = event.get('window_title') or ''
+
+        # Check for VS Code workspace
+        match = VSCODE_WORKSPACE_PATTERN.search(window_title)
+        if match:
+            return match.group(1).strip()
+
+        # Check for terminal with working directory
+        terminal_context = event.get('terminal_context')
+        if terminal_context:
+            if isinstance(terminal_context, str):
+                try:
+                    terminal_context = json.loads(terminal_context)
+                except (json.JSONDecodeError, TypeError):
+                    terminal_context = None
+
+            if terminal_context and terminal_context.get('working_directory'):
+                cwd = terminal_context['working_directory']
+                # Get last directory component (project name)
+                # Skip if it's just the home directory
+                if cwd.startswith('/home/') and cwd.count('/') <= 2:
+                    pass  # Skip home directories like /home/harshad
+                else:
+                    project = cwd.rstrip('/').split('/')[-1]
+                    if project and project not in ('~', 'home', ''):
+                        return project
+
+        # Check for Communication apps
+        if app_name in COMMUNICATION_APPS:
+            return 'Communication'
+
+        # Check for browsers -> Research (unless localhost or known project in title)
+        if app_name in BROWSER_APPS:
+            # Check for localhost patterns (port numbers suggest local dev)
+            if CHROME_LOCALHOST_PATTERN.search(window_title):
+                return event.get('app_name') or 'Browser'
+            # Check for DevTools (indicates local dev)
+            if 'DevTools' in window_title:
+                return event.get('app_name') or 'Browser'
+            # Check if window title contains a known project name pattern
+            # e.g., "Activity Tracker - 2026-01-03" -> activity-tracker
+            title_lower = window_title.lower()
+            if 'activity tracker' in title_lower or 'activity-tracker' in title_lower:
+                return 'activity-tracker'
+            return 'Research'
+
+        # Fallback to app name
+        return event.get('app_name') or 'Other'
+
+    def _group_focus_events_by_project(
+        self,
+        focus_events: List[dict]
+    ) -> Dict[str, Dict]:
+        """Group focus events by project and compute time per project.
+
+        Args:
+            focus_events: List of focus event dicts.
+
+        Returns:
+            Dict mapping project name to {events: list, total_seconds: int}.
+        """
+        projects = {}
+
+        for event in focus_events:
+            project = self._extract_project_from_focus_event(event)
+            duration = event.get('duration_seconds', 0) or 0
+
+            if project not in projects:
+                projects[project] = {'events': [], 'total_seconds': 0}
+
+            projects[project]['events'].append(event)
+            projects[project]['total_seconds'] += duration
+
+        return projects
+
+    def _group_summaries_by_project(
+        self,
+        summaries: List[dict],
+        focus_events: List[dict]
+    ) -> List[Dict]:
+        """Group summaries by project based on focus events in their time range.
+
+        Args:
+            summaries: List of threshold summary dicts.
+            focus_events: List of focus event dicts for the same time range.
+
+        Returns:
+            List of dicts with {project, summaries, total_seconds}, sorted by time.
+        """
+        # First, group focus events by project
+        project_focus = self._group_focus_events_by_project(focus_events)
+
+        # For each summary, determine its primary project based on overlapping focus events
+        summary_projects = {}
+        for summary in summaries:
+            summary_start = summary.get('start_time')
+            summary_end = summary.get('end_time')
+
+            if not summary_start or not summary_end:
+                continue
+
+            # Parse timestamps if needed
+            if isinstance(summary_start, str):
+                summary_start = datetime.fromisoformat(summary_start)
+            if isinstance(summary_end, str):
+                summary_end = datetime.fromisoformat(summary_end)
+
+            # Find focus events that overlap with this summary's time range
+            project_time = {}
+            for event in focus_events:
+                event_start = event.get('start_time')
+                event_end = event.get('end_time')
+
+                if not event_start or not event_end:
+                    continue
+
+                if isinstance(event_start, str):
+                    event_start = datetime.fromisoformat(event_start)
+                if isinstance(event_end, str):
+                    event_end = datetime.fromisoformat(event_end)
+
+                # Check overlap
+                if event_end <= summary_start or event_start >= summary_end:
+                    continue
+
+                project = self._extract_project_from_focus_event(event)
+                duration = event.get('duration_seconds', 0) or 0
+                project_time[project] = project_time.get(project, 0) + duration
+
+            # Assign summary to project with most time
+            if project_time:
+                primary_project = max(project_time, key=project_time.get)
+            else:
+                primary_project = 'Other'
+
+            if primary_project not in summary_projects:
+                summary_projects[primary_project] = {'summaries': [], 'total_seconds': 0}
+
+            summary_projects[primary_project]['summaries'].append(summary)
+            # Use project focus time for accurate time tracking
+            if primary_project in project_focus:
+                # Only count time from this summary's range
+                summary_projects[primary_project]['total_seconds'] = project_focus[primary_project]['total_seconds']
+
+        # Convert to list and sort by total time
+        result = []
+        for project, data in summary_projects.items():
+            # Recalculate total_seconds from focus events for this project
+            total_seconds = project_focus.get(project, {}).get('total_seconds', 0)
+            result.append({
+                'project': project,
+                'summaries': data['summaries'],
+                'total_seconds': total_seconds
+            })
+
+        result.sort(key=lambda x: -x['total_seconds'])
+
+        # Limit to top 5 + aggregate rest as "Other"
+        if len(result) > 5:
+            top_5 = result[:5]
+            rest = result[5:]
+
+            other_summaries = []
+            other_seconds = 0
+            for item in rest:
+                other_summaries.extend(item['summaries'])
+                other_seconds += item['total_seconds']
+
+            # Check if "Other" already exists in top 5
+            other_exists = any(p['project'] == 'Other' for p in top_5)
+            if other_exists:
+                for p in top_5:
+                    if p['project'] == 'Other':
+                        p['summaries'].extend(other_summaries)
+                        p['total_seconds'] += other_seconds
+                        break
+            else:
+                top_5.append({
+                    'project': 'Other',
+                    'summaries': other_summaries,
+                    'total_seconds': other_seconds
+                })
+
+            result = top_5
+
+        return result
+
+    def _format_duration(self, seconds: float) -> str:
+        """Format duration in seconds to human-readable string.
+
+        Args:
+            seconds: Duration in seconds (can be float).
+
+        Returns:
+            Formatted string like '2h 15m' or '45m'.
+        """
+        seconds = int(seconds)  # Convert to int for clean formatting
+        if seconds < 60:
+            return f"{seconds}s"
+
+        minutes = seconds // 60
+        hours = minutes // 60
+        remaining_mins = minutes % 60
+
+        if hours > 0:
+            if remaining_mins > 0:
+                return f"{hours}h {remaining_mins}m"
+            return f"{hours}h"
+        return f"{minutes}m"
+
+    def _aggregate_project_sections(self, cached_reports: List[dict]) -> List[Dict]:
+        """Aggregate project sections from multiple cached reports.
+
+        Combines project data from daily/weekly reports, summing time and
+        tracking which days/weeks each project was worked on.
+
+        Args:
+            cached_reports: List of cached report dicts with sections_json.
+
+        Returns:
+            List of dicts with {project, total_seconds, days, content}, sorted by time.
+        """
+        project_data = {}
+
+        for report in cached_reports:
+            sections_json = report.get('sections_json', '[]')
+            try:
+                sections = json.loads(sections_json) if sections_json else []
+            except (json.JSONDecodeError, TypeError):
+                sections = []
+
+            period_date = report.get('period_date', '')
+
+            for section in sections:
+                title = section.get('title', '')
+                content = section.get('content', '')
+
+                # Parse project name and duration from title like "activity-tracker (3h 40m)"
+                # Match: "project name (Xh Ym)" or "project name (Xm)"
+                import re
+                match = re.match(r'^(.+?)\s*\((\d+)h\s*(\d+)?m?\)$', title)
+                if not match:
+                    match = re.match(r'^(.+?)\s*\((\d+)m\)$', title)
+                    if match:
+                        project = match.group(1).strip()
+                        minutes = int(match.group(2))
+                        seconds = minutes * 60
+                    else:
+                        project = title
+                        seconds = 0
+                else:
+                    project = match.group(1).strip()
+                    hours = int(match.group(2))
+                    mins = int(match.group(3)) if match.group(3) else 0
+                    seconds = hours * 3600 + mins * 60
+
+                if project not in project_data:
+                    project_data[project] = {
+                        'total_seconds': 0,
+                        'days': [],
+                        'contents': []
+                    }
+
+                project_data[project]['total_seconds'] += seconds
+                if period_date:
+                    project_data[project]['days'].append(period_date)
+                if content:
+                    project_data[project]['contents'].append(content)
+
+        # Convert to list and sort by total time
+        result = []
+        for project, data in project_data.items():
+            result.append({
+                'project': project,
+                'total_seconds': data['total_seconds'],
+                'days': data['days'],
+                'content': ' '.join(data['contents'][:3])[:500]  # Combine first 3 contents
+            })
+
+        result.sort(key=lambda x: -x['total_seconds'])
+        return result[:6]  # Top 6 projects
+
     def _summary_duration_seconds(self, summary: dict) -> int:
         """Calculate duration of a summary in seconds."""
         start = summary.get('start_time')
@@ -842,9 +1153,61 @@ Brief description."""
         # Compute analytics
         analytics = self._compute_analytics(screenshots, sessions, start, end)
 
+        # Group summaries by project for sections
+        project_groups = self._group_summaries_by_project(summaries, focus_events) if focus_events else []
+
+        # Build sections from project groups
+        sections = []
+        for group in project_groups:
+            project = group['project']
+            duration_str = self._format_duration(group['total_seconds'])
+            title = f"{project} ({duration_str})"
+
+            # Build section content from summaries
+            # Take unique first sentences, limit to 3
+            project_summaries = [s.get('summary', '') for s in group['summaries'] if s.get('summary')]
+            seen_snippets = set()
+            content_parts = []
+            for summary in project_summaries:
+                # Take first sentence (up to first period)
+                parts = summary.split('.')
+                first_sentence = parts[0].strip() if parts else summary.strip()
+                # Skip if too short or empty
+                if len(first_sentence) < 10:
+                    continue
+                # Truncate very long sentences at word boundary
+                if len(first_sentence) > 80:
+                    first_sentence = first_sentence[:77].rsplit(' ', 1)[0] + '...'
+                # Dedupe similar content (first 40 chars)
+                snippet_key = first_sentence[:40].lower()
+                if snippet_key not in seen_snippets:
+                    seen_snippets.add(snippet_key)
+                    content_parts.append(first_sentence)
+                if len(content_parts) >= 3:
+                    break
+
+            if content_parts:
+                content = '. '.join(content_parts) + '.'
+            else:
+                content = f"Activity in {project}."
+
+            sections.append({
+                'title': title,
+                'content': content
+            })
+
         # Build prompt for executive summary
         summary_texts = [s['summary'] for s in summaries if s.get('summary')]
         app_usage_context = self._build_focus_context(focus_events) if focus_events else ""
+
+        # Add project breakdown to prompt context
+        project_context = ""
+        if project_groups:
+            project_lines = []
+            for group in project_groups[:5]:
+                duration_str = self._format_duration(group['total_seconds'])
+                project_lines.append(f"  - {group['project']}: {duration_str}")
+            project_context = "\nProject breakdown:\n" + "\n".join(project_lines)
 
         prompt_text = None
         explanation = None
@@ -857,12 +1220,14 @@ Brief description."""
 Date: {date.strftime('%A, %B %d, %Y')}
 Total active time: {analytics.total_active_minutes} minutes
 Top apps: {', '.join(a['name'] for a in analytics.top_apps[:5])}
+{project_context}
 {app_usage_context}
 
 Activity summaries:
 {chr(10).join(f"- {s}" for s in summary_texts[:15])}
 
 Write 2-4 sentences covering main accomplishments and key projects.
+Mention the top projects by name with their time spent.
 Be extremely concise. Use specific project/file names from the summaries.
 Do NOT assume unrelated activities are connected.
 
@@ -906,7 +1271,7 @@ TAGS: Comma-separated activity tags (e.g., coding, research, meetings)"""
             start_time=start,
             end_time=end,
             executive_summary=executive_summary,
-            sections=[],  # Daily reports are just summaries, no sections
+            sections=sections,  # Project-based sections
             analytics=analytics_dict,
             summary_ids=summary_ids,
             model_used=model_used,
@@ -1047,6 +1412,33 @@ TAGS: Comma-separated activity tags (e.g., coding, research, meetings)"""
         # Aggregate analytics from daily reports
         analytics = self._aggregate_cached_analytics(daily_reports)
 
+        # Aggregate project sections from daily reports
+        project_aggregates = self._aggregate_project_sections(daily_reports)
+
+        # Build weekly sections from project aggregates
+        sections = []
+        for proj in project_aggregates:
+            duration_str = self._format_duration(proj['total_seconds'])
+            days_str = ', '.join(d[-5:] for d in proj['days'][:5])  # Show first 5 days as MM-DD
+            title = f"{proj['project']} ({duration_str})"
+            content = proj['content'] if proj['content'] else f"Activity in {proj['project']}"
+            if days_str:
+                content = f"Days: {days_str}. {content}"
+            sections.append({
+                'title': title,
+                'content': content[:500]
+            })
+
+        # Build project context for prompt
+        project_context = ""
+        if project_aggregates:
+            project_lines = []
+            for proj in project_aggregates[:5]:
+                duration_str = self._format_duration(proj['total_seconds'])
+                days_count = len(proj['days'])
+                project_lines.append(f"  - {proj['project']}: {duration_str} ({days_count} days)")
+            project_context = "\nProject breakdown:\n" + "\n".join(project_lines)
+
         # Build prompt for weekly synthesis
         daily_summaries = []
         child_ids = []
@@ -1073,11 +1465,13 @@ TAGS: Comma-separated activity tags (e.g., coding, research, meetings)"""
 Week: {week_start.strftime('%B %d')} to {week_end.strftime('%B %d, %Y')}
 Total active time: {analytics.total_active_minutes // 60} hours across {len(daily_reports)} days
 Top apps: {', '.join(a['name'] for a in analytics.top_apps[:5])}
+{project_context}
 
 Daily summaries:
 {chr(10).join(f"**{d['date_str']}**: {d['summary'][:300]}" for d in daily_summaries)}
 
 Write 4-6 sentences covering main themes, patterns, and key accomplishments.
+Mention the top projects by name with their time spent.
 Identify any recurring work patterns or project focus areas.
 Use specific project names from summaries.
 
@@ -1115,7 +1509,7 @@ TAGS: Comma-separated activity tags (e.g., coding, research, meetings)"""
             start_time=start,
             end_time=end,
             executive_summary=executive_summary,
-            sections=[],
+            sections=sections,  # Project-based sections aggregated from daily reports
             analytics=analytics_dict,
             summary_ids=None,
             model_used=model_used,
@@ -1206,6 +1600,29 @@ TAGS: Comma-separated activity tags (e.g., coding, research, meetings)"""
         # Aggregate analytics from weekly reports
         analytics = self._aggregate_cached_analytics(weekly_reports)
 
+        # Aggregate project sections from weekly reports
+        project_aggregates = self._aggregate_project_sections(weekly_reports)
+
+        # Build monthly sections from project aggregates
+        sections = []
+        for proj in project_aggregates:
+            duration_str = self._format_duration(proj['total_seconds'])
+            title = f"{proj['project']} ({duration_str})"
+            content = proj['content'] if proj['content'] else f"Activity in {proj['project']}"
+            sections.append({
+                'title': title,
+                'content': content[:500]
+            })
+
+        # Build project context for prompt
+        project_context = ""
+        if project_aggregates:
+            project_lines = []
+            for proj in project_aggregates[:5]:
+                duration_str = self._format_duration(proj['total_seconds'])
+                project_lines.append(f"  - {proj['project']}: {duration_str}")
+            project_context = "\nProject breakdown:\n" + "\n".join(project_lines)
+
         # Build prompt for monthly synthesis
         week_summaries = []
         child_ids = []
@@ -1232,6 +1649,7 @@ TAGS: Comma-separated activity tags (e.g., coding, research, meetings)"""
 Month: {month_name}
 Total active time: {analytics.total_active_minutes // 60} hours across {len(weekly_reports)} weeks
 Top apps: {', '.join(a['name'] for a in analytics.top_apps[:5])}
+{project_context}
 
 Weekly summaries:
 {chr(10).join(f"**{w['week']}**: {w['summary'][:400]}" for w in week_summaries)}
@@ -1239,8 +1657,9 @@ Weekly summaries:
 Write 5-8 sentences covering:
 - Major themes and recurring patterns
 - Key accomplishments and milestones
-- Project focus areas across the month
+- Project focus areas with time spent
 
+Mention the top projects by name with their time spent.
 Use specific project names from summaries.
 
 After your summary, provide:
@@ -1277,7 +1696,7 @@ TAGS: Comma-separated activity tags (e.g., coding, research, meetings)"""
             start_time=start,
             end_time=end,
             executive_summary=executive_summary,
-            sections=[],
+            sections=sections,  # Project-based sections aggregated from weekly reports
             analytics=analytics_dict,
             summary_ids=None,
             model_used=model_used,
@@ -1315,6 +1734,29 @@ TAGS: Comma-separated activity tags (e.g., coding, research, meetings)"""
         # Aggregate analytics from daily reports
         analytics = self._aggregate_cached_analytics(daily_reports)
 
+        # Aggregate project sections from daily reports
+        project_aggregates = self._aggregate_project_sections(daily_reports)
+
+        # Build monthly sections from project aggregates
+        sections = []
+        for proj in project_aggregates:
+            duration_str = self._format_duration(proj['total_seconds'])
+            title = f"{proj['project']} ({duration_str})"
+            content = proj['content'] if proj['content'] else f"Activity in {proj['project']}"
+            sections.append({
+                'title': title,
+                'content': content[:500]
+            })
+
+        # Build project context for prompt
+        project_context = ""
+        if project_aggregates:
+            project_lines = []
+            for proj in project_aggregates[:5]:
+                duration_str = self._format_duration(proj['total_seconds'])
+                project_lines.append(f"  - {proj['project']}: {duration_str}")
+            project_context = "\nProject breakdown:\n" + "\n".join(project_lines)
+
         # Build prompt for monthly synthesis
         daily_summaries = []
         child_ids = []
@@ -1348,11 +1790,13 @@ TAGS: Comma-separated activity tags (e.g., coding, research, meetings)"""
 Month: {month_name}
 Total active time: {analytics.total_active_minutes // 60} hours across {len(daily_reports)} days
 Top apps: {', '.join(a['name'] for a in analytics.top_apps[:5])}
+{project_context}
 
 Daily summaries (representative days):
 {chr(10).join(f"**{d['date_str']}**: {d['summary'][:200]}" for d in top_summaries)}
 
 Write 5-8 sentences covering major themes, key accomplishments, and project focus areas.
+Mention the top projects by name with their time spent.
 Use specific project names from summaries.
 
 After your summary, provide:
@@ -1389,7 +1833,7 @@ TAGS: Comma-separated activity tags (e.g., coding, research, meetings)"""
             start_time=start,
             end_time=end,
             executive_summary=executive_summary,
-            sections=[],
+            sections=sections,  # Project-based sections aggregated from daily reports
             analytics=analytics_dict,
             summary_ids=None,
             model_used=model_used,

@@ -197,18 +197,101 @@
 /* Main layout */
 .timeline-layout {
     display: grid;
-    grid-template-columns: 450px 1fr;
+    grid-template-columns: 420px 1fr;
     gap: 20px;
     flex: 1;
     overflow: hidden;
 }
 
-/* Calendar heatmap */
-.calendar-panel {
+/* Sidebar Panel (no card styling) */
+.sidebar-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    overflow-y: auto;
+    padding-right: 8px;
+}
+
+/* Calendar Section */
+.calendar-section {
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: 8px;
-    padding: 20px;
+    overflow: hidden;
+}
+
+.calendar-toggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 12px 16px;
+    background: var(--surface-2);
+    border: none;
+    border-bottom: 1px solid var(--border);
+    color: var(--text);
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    text-align: left;
+    transition: background 0.15s;
+}
+
+.calendar-toggle:hover {
+    background: var(--surface);
+}
+
+.calendar-toggle .toggle-icon {
+    font-size: 0.7rem;
+    transition: transform 0.2s;
+}
+
+.calendar-toggle[aria-expanded="false"] .toggle-icon {
+    transform: rotate(-90deg);
+}
+
+.calendar-content {
+    padding: 16px;
+}
+
+.calendar-content.collapsed {
+    display: none;
+}
+
+.calendar-controls {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.nav-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.nav-controls button {
+    background: var(--surface);
+    color: var(--text);
+    border: 1px solid var(--border);
+    padding: 4px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: all 0.15s;
+}
+
+.nav-controls button:hover {
+    background: var(--border);
+    border-color: var(--accent);
+}
+
+/* Legacy calendar-panel support - now just a wrapper */
+.calendar-panel {
+    background: transparent;
+    border: none;
+    padding: 0;
     display: flex;
     flex-direction: column;
     overflow-y: auto;
@@ -306,10 +389,9 @@
 
 /* Detail panel */
 .detail-panel {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 20px;
+    background: transparent;
+    border: none;
+    padding: 0;
     min-width: 0;
     display: flex;
     flex-direction: column;
@@ -388,12 +470,100 @@
     cursor: pointer;
 }
 
+/* Day Overview Stats */
 .detail-stats {
-    display: flex;
-    gap: 20px;
-    flex-wrap: wrap;
-    font-size: 0.9rem;
+    font-size: 0.85rem;
+}
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+}
+
+.stat-card {
+    /* background: var(--surface); */
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 10px 12px;
+    transition: border-color 0.2s, background 0.2s;
+}
+
+.stat-card:hover {
+    border-color: var(--accent);
+}
+
+.stat-card.clickable {
+    cursor: pointer;
+}
+
+.stat-card.clickable:hover {
+    background: color-mix(in srgb, var(--accent) 10%, var(--surface));
+}
+
+.stat-label {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
     color: var(--muted);
+    margin-bottom: 2px;
+}
+
+.stat-card .stat-value {
+    font-size: 1rem;
+    font-weight: 500;
+    color: var(--text);
+}
+
+.stat-percent {
+    font-size: 0.8rem;
+    color: var(--accent);
+    font-weight: normal;
+}
+
+.stat-secondary {
+    font-size: 0.85rem;
+    color: var(--muted);
+    font-weight: normal;
+}
+
+/* Active time progress bar */
+.stat-progress {
+    height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    margin-top: 6px;
+    overflow: hidden;
+}
+
+.stat-progress-fill {
+    height: 100%;
+    background: var(--accent);
+    border-radius: 2px;
+    transition: width 0.3s ease;
+}
+
+/* Timeline highlight for focus periods */
+.timeline-highlight {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    background: color-mix(in srgb, var(--accent) 30%, transparent);
+    border: 2px solid var(--accent);
+    border-radius: 4px;
+    pointer-events: none;
+    z-index: 10;
+    animation: pulse-highlight 1s ease-in-out 2;
+}
+
+.timeline-highlight.fade-out {
+    opacity: 0;
+    transition: opacity 0.5s ease;
+}
+
+@keyframes pulse-highlight {
+    0%, 100% { opacity: 0.7; }
+    50% { opacity: 1; }
 }
 
 .chart-container {
@@ -1169,12 +1339,16 @@
         grid-template-columns: 1fr;
     }
 
-    .calendar-panel {
+    .sidebar-panel {
         order: 2;
     }
 
     .detail-panel {
         order: 1;
+    }
+
+    .calendar-panel {
+        order: 2;
     }
 
     .hour-content {
@@ -2318,6 +2492,48 @@
     color: #da3633;
 }
 
+/* Preview badge for active session */
+.preview-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    margin-left: 8px;
+    border-radius: 12px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    background: linear-gradient(135deg, rgba(88, 166, 255, 0.3), rgba(139, 92, 246, 0.3));
+    color: var(--accent);
+    border: 1px solid rgba(88, 166, 255, 0.4);
+    animation: preview-pulse 2s ease-in-out infinite;
+}
+
+@keyframes preview-pulse {
+    0%, 100% {
+        opacity: 1;
+        box-shadow: 0 0 0 0 rgba(88, 166, 255, 0.4);
+    }
+    50% {
+        opacity: 0.85;
+        box-shadow: 0 0 8px 2px rgba(88, 166, 255, 0.3);
+    }
+}
+
+/* Preview row styling */
+.preview-row {
+    background: linear-gradient(90deg, rgba(88, 166, 255, 0.08), rgba(139, 92, 246, 0.05)) !important;
+    border-left: 3px solid var(--accent);
+}
+
+.preview-row:hover {
+    background: linear-gradient(90deg, rgba(88, 166, 255, 0.15), rgba(139, 92, 246, 0.1)) !important;
+}
+
+.preview-row .summary-checkbox:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
+
 /* Explanation icon */
 .explanation-icon {
     cursor: pointer;
@@ -2423,4 +2639,270 @@
 }
 .explanation-modal-content button {
     margin-top: 16px;
+}
+
+/* ==================== Daily Summary Panel (Rize-inspired) ==================== */
+
+.daily-summary {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    padding: 16px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+}
+
+.daily-summary-stats {
+    width: 100%;
+}
+
+.daily-summary-breakdown {
+    width: 100%;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+}
+
+/* Primary Stats - Work Hours + Percent */
+.primary-stats {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    margin-bottom: 12px;
+}
+
+.primary-stat {
+    display: flex;
+    flex-direction: column;
+}
+
+.primary-stat.hours-worked .primary-stat-label {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--muted);
+    margin-bottom: 2px;
+}
+
+.primary-stat.hours-worked .primary-stat-value {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--text);
+}
+
+.primary-stat.goal-percent {
+    text-align: right;
+    align-items: flex-end;
+}
+
+.primary-stat.goal-percent .primary-stat-label {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--muted);
+    margin-bottom: 0;
+}
+
+.primary-stat.goal-percent .primary-stat-value {
+    font-size: 0.75rem;
+    font-weight: 400;
+    color: var(--muted);
+}
+
+.primary-stat.goal-percent .primary-stat-value.exceeded {
+    color: var(--success);
+}
+
+.primary-stat.goal-percent .primary-stat-label:has(+ .primary-stat-value.exceeded) {
+    color: var(--success);
+}
+
+/* Goal Progress Bar */
+.goal-progress {
+    height: 6px;
+    background: var(--border);
+    border-radius: 3px;
+    overflow: hidden;
+    margin-bottom: 16px;
+}
+
+.goal-progress-fill {
+    height: 100%;
+    background: var(--accent);
+    border-radius: 3px;
+    transition: width 0.3s ease;
+}
+
+/* Secondary Stats - Vertical List */
+.secondary-stats {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.secondary-stat {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+}
+
+.secondary-stat-label {
+    font-size: 0.75rem;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+
+.secondary-stat-value {
+    font-size: 0.95rem;
+    font-weight: 500;
+    color: var(--text);
+}
+
+.secondary-stat-value.clickable {
+    cursor: pointer;
+    transition: color 0.2s;
+}
+
+.secondary-stat-value.clickable:hover {
+    color: var(--accent);
+}
+
+/* Since Last Break - Color-coded urgency */
+.secondary-stat.since-break {
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid var(--border);
+}
+
+.secondary-stat-value.urgency-low {
+    color: var(--success);
+}
+
+.secondary-stat-value.urgency-medium {
+    color: var(--warning);
+}
+
+.secondary-stat-value.urgency-high {
+    color: var(--danger);
+}
+
+/* Breakdown Panel */
+.breakdown-header {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--muted);
+    margin-bottom: 10px;
+}
+
+/* Stacked Bar Chart */
+.stacked-bar {
+    display: flex;
+    height: 24px;
+    border-radius: 4px;
+    overflow: hidden;
+    background: var(--border);
+    margin-bottom: 12px;
+}
+
+.stacked-bar-segment {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    transition: width 0.3s ease;
+    min-width: 0;
+}
+
+.stacked-bar-segment.focus {
+    background: var(--accent);
+}
+
+.stacked-bar-segment.breaks {
+    background: var(--muted);
+}
+
+.stacked-bar-segment.meetings {
+    background: var(--warning);
+}
+
+.stacked-bar-label {
+    font-size: 0.65rem;
+    font-weight: 500;
+    color: var(--text-inverse);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    padding: 0 4px;
+}
+
+/* Breakdown Legend */
+.breakdown-legend {
+    display: flex;
+    flex-direction: row;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.breakdown-legend .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.85rem;
+    flex-shrink: 0;
+    white-space: nowrap;
+    width: auto;
+    height: auto;
+    border: none;
+    border-radius: 0;
+}
+
+.legend-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.legend-dot.focus {
+    background: var(--accent);
+}
+
+.legend-dot.breaks {
+    background: var(--muted);
+}
+
+.legend-dot.meetings {
+    background: var(--warning);
+}
+
+.legend-label {
+    color: var(--text);
+}
+
+.legend-value {
+    color: var(--muted);
+    margin-left: auto;
+}
+
+/* Weekend / No Goal Mode */
+.daily-summary.no-goal .goal-progress {
+    display: none;
+}
+
+.daily-summary.no-goal .primary-stat.goal-percent {
+    display: none;
+}
+
+/* Responsive adjustments */
+@media (max-width: 400px) {
+    .primary-stats {
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .breakdown-legend {
+        flex-direction: column;
+        gap: 6px;
+    }
 }

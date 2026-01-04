@@ -129,6 +129,12 @@ function renderHorizontalTimeline(dateStr) {
                             <div class="lane-events" id="laneSessions"></div>
                         </div>
                     </div>
+                    <div class="timeline-lane" data-lane="screenshots">
+                        <div class="lane-label">Screenshots</div>
+                        <div class="lane-content">
+                            <div class="lane-events" id="laneScreenshots"></div>
+                        </div>
+                    </div>
                     <div class="timeline-lane" data-lane="activity">
                         <div class="lane-label">Activity</div>
                         <div class="lane-content">
@@ -233,6 +239,47 @@ function updateTimelineView() {
             el.addEventListener('mouseleave', hideTimelineTooltip);
 
             sessionsContainer.appendChild(el);
+        });
+    }
+
+    // Render screenshots lane
+    const screenshotsContainer = document.getElementById('laneScreenshots');
+    if (screenshotsContainer) {
+        screenshotsContainer.innerHTML = '';
+        screenshots.forEach(screenshot => {
+            const timestamp = screenshot.timestamp * 1000; // Convert to ms
+            const screenshotTime = timestamp - dayStart;
+
+            // Skip if outside view
+            if (screenshotTime < viewStart || screenshotTime > viewEnd) return;
+
+            const x = timeToX(screenshotTime);
+
+            const el = document.createElement('div');
+            el.className = 'lane-event screenshot-marker';
+            el.style.left = `${x}px`;
+            el.style.width = '4px';
+            el.style.background = 'var(--text-secondary, #8b949e)';
+            el.style.cursor = 'pointer';
+            el.dataset.screenshotId = screenshot.id;
+
+            // Click to open modal
+            el.addEventListener('click', () => {
+                window.showModalWithScreenshots(screenshot.id, screenshots);
+            });
+
+            // Tooltip on hover
+            el.addEventListener('mouseenter', (e) => {
+                showTimelineTooltip(e, {
+                    app_name: screenshot.app_name || 'Unknown',
+                    window_title: screenshot.window_title || '',
+                    start_time: new Date(timestamp).toISOString(),
+                    duration_seconds: 0
+                }, screenshot.id);
+            });
+            el.addEventListener('mouseleave', hideTimelineTooltip);
+
+            screenshotsContainer.appendChild(el);
         });
     }
 
@@ -725,15 +772,34 @@ function toggleCalendarView(view) {
     const calendarLegend = document.querySelector('.calendar-legend');
     const weekViewPanel = document.getElementById('weekViewPanel');
 
+    // Update navigation button tooltips
+    const prevBtn = document.getElementById('prevMonth');
+    const nextBtn = document.getElementById('nextMonth');
+
     if (view === 'week') {
+        if (prevBtn) prevBtn.title = 'Previous week (H key)';
+        if (nextBtn) nextBtn.title = 'Next week (L key)';
         if (calendarGrid) calendarGrid.style.display = 'none';
         if (calendarLegend) calendarLegend.style.display = 'none';
         if (weekViewPanel) weekViewPanel.style.display = 'block';
         renderWeekView();
     } else {
+        if (prevBtn) prevBtn.title = 'Previous month (H key)';
+        if (nextBtn) nextBtn.title = 'Next month (L key)';
         if (calendarGrid) calendarGrid.style.display = '';
         if (calendarLegend) calendarLegend.style.display = '';
         if (weekViewPanel) weekViewPanel.style.display = 'none';
+        // Restore month header
+        updateMonthDisplay();
+    }
+}
+
+function updateMonthDisplay() {
+    const monthDisplay = document.getElementById('monthDisplay');
+    if (monthDisplay) {
+        const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
+                          'July', 'August', 'September', 'October', 'November', 'December'];
+        monthDisplay.textContent = `${monthNames[state.currentMonth - 1]} ${state.currentYear}`;
     }
 }
 
@@ -758,6 +824,28 @@ async function renderWeekView() {
         const day = new Date(weekStart);
         day.setDate(day.getDate() + i);
         days.push(day);
+    }
+
+    // Update header to show week range
+    const monthDisplay = document.getElementById('monthDisplay');
+    if (monthDisplay) {
+        const weekEnd = days[6];
+        const startMonth = weekStart.toLocaleDateString('en-US', { month: 'short' });
+        const endMonth = weekEnd.toLocaleDateString('en-US', { month: 'short' });
+        const startDay = weekStart.getDate();
+        const endDay = weekEnd.getDate();
+        const startYear = weekStart.getFullYear();
+        const endYear = weekEnd.getFullYear();
+
+        let weekLabel;
+        if (startYear !== endYear) {
+            weekLabel = `${startMonth} ${startDay}, ${startYear} - ${endMonth} ${endDay}, ${endYear}`;
+        } else if (startMonth !== endMonth) {
+            weekLabel = `${startMonth} ${startDay} - ${endMonth} ${endDay}, ${endYear}`;
+        } else {
+            weekLabel = `${startMonth} ${startDay} - ${endDay}, ${startYear}`;
+        }
+        monthDisplay.textContent = weekLabel;
     }
 
     // Show loading state
@@ -942,8 +1030,19 @@ function cleanupPageResources() {
 function setupEventListeners() {
     const prevMonth = document.getElementById('prevMonth');
     const nextMonth = document.getElementById('nextMonth');
-    if (prevMonth) prevMonth.addEventListener('click', () => changeMonth(-1));
-    if (nextMonth) nextMonth.addEventListener('click', () => changeMonth(1));
+    if (prevMonth) prevMonth.addEventListener('click', () => navigateCalendar(-1));
+    if (nextMonth) nextMonth.addEventListener('click', () => navigateCalendar(1));
+
+    // Calendar toggle (collapse/expand)
+    const calendarToggle = document.getElementById('calendarToggle');
+    const calendarContent = document.getElementById('calendarContent');
+    if (calendarToggle && calendarContent) {
+        calendarToggle.addEventListener('click', () => {
+            const isExpanded = calendarToggle.getAttribute('aria-expanded') === 'true';
+            calendarToggle.setAttribute('aria-expanded', !isExpanded);
+            calendarContent.classList.toggle('collapsed', isExpanded);
+        });
+    }
 
     // Day navigation buttons
     const prevDayBtn = document.getElementById('prevDayBtn');
@@ -1009,10 +1108,10 @@ function setupEventListeners() {
                 break;
             // Timeline-specific navigation
             case 'h':
-                changeMonth(-1);
+                navigateCalendar(-1);
                 break;
             case 'l':
-                changeMonth(1);
+                navigateCalendar(1);
                 break;
             case 'arrowleft':
                 navigateDay(-1);
@@ -1109,13 +1208,13 @@ function setupEventListeners() {
 
     // Tag badge hover effects via delegation
     document.addEventListener('mouseenter', function(e) {
-        if (e.target.classList.contains('tag-badge')) {
+        if (e.target.classList && e.target.classList.contains('tag-badge')) {
             highlightTagRows(e.target.dataset.tag);
         }
     }, true);
 
     document.addEventListener('mouseleave', function(e) {
-        if (e.target.classList.contains('tag-badge')) {
+        if (e.target.classList && e.target.classList.contains('tag-badge')) {
             clearTagHighlight();
         }
     }, true);
@@ -1132,6 +1231,33 @@ function changeMonth(delta) {
         state.currentYear--;
     }
     loadCalendar();
+}
+
+// Change week (navigate by 7 days)
+function changeWeek(delta) {
+    const currentDate = state.selectedDate
+        ? new Date(state.selectedDate + 'T12:00:00')
+        : new Date();
+    currentDate.setDate(currentDate.getDate() + (delta * 7));
+
+    const newDateStr = getLocalDateString(currentDate);
+    state.selectedDate = newDateStr;
+
+    // Update month/year state if needed
+    state.currentMonth = currentDate.getMonth() + 1;
+    state.currentYear = currentDate.getFullYear();
+
+    renderWeekView();
+    loadDayData(newDateStr);
+}
+
+// Navigate calendar based on current view
+function navigateCalendar(delta) {
+    if (state.calendarView === 'week') {
+        changeWeek(delta);
+    } else {
+        changeMonth(delta);
+    }
 }
 
 // Navigate between days
@@ -1158,11 +1284,7 @@ function navigateDay(delta) {
 
 // Load calendar data
 async function loadCalendar() {
-    const monthDisplay = document.getElementById('monthDisplay');
-    const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
-                      'July', 'August', 'September', 'October', 'November', 'December'];
-
-    monthDisplay.textContent = `${monthNames[state.currentMonth - 1]} ${state.currentYear}`;
+    updateMonthDisplay();
 
     try {
         const response = await fetch(`/api/calendar/${state.currentYear}/${state.currentMonth}`);
@@ -1314,13 +1436,18 @@ async function loadDayData(dateStr) {
         }
 
         const summary = summaryData.summary;
+        const workLife = summaryData.work_life || {};
+        const goals = summaryData.goals || {};
         const hourly = hourlyData.hourly;
 
         // Store hourly data for use in rendering
         state.hourlyData = hourly;
 
-        // Update stats
-        updateStats(summary);
+        // Update stats with work/life balance data and goals
+        updateStats(summary, workLife, goals, dateStr);
+
+        // Show the Day Overview section
+        document.getElementById('leftChartSection').style.display = 'block';
 
         // Check if there's any data
         if (summary.total_screenshots === 0) {
@@ -1338,9 +1465,6 @@ async function loadDayData(dateStr) {
 
         // Render horizontal timeline (ActivityWatch style)
         renderHorizontalTimeline(dateStr);
-
-        // Render hourly chart
-        renderHourlyChartOnly(hourly);
 
         // Render summaries table with hourly sections
         renderThresholdSummaries();
@@ -1429,35 +1553,285 @@ function renderHourlyChartOnly(hourlyData) {
     });
 }
 
-// Update stats display
-function updateStats(summary) {
+// Format seconds as human-readable duration
+function formatDuration(seconds) {
+    if (!seconds || seconds < 0) return '0m';
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    if (hours > 0) {
+        return `${hours}h ${minutes}m`;
+    }
+    return `${minutes}m`;
+}
+
+// Update stats display with goal-based metrics (Rize-inspired layout)
+function updateStats(summary, workLife, goals, dateStr) {
     const statsEl = document.getElementById('detailStats');
-    const firstTime = summary.first_capture ? new Date(summary.first_capture * 1000).toLocaleTimeString() : 'N/A';
-    const lastTime = summary.last_capture ? new Date(summary.last_capture * 1000).toLocaleTimeString() : 'N/A';
-    const topApp = summary.top_apps.length > 0 ? summary.top_apps[0][0] : 'None';
+
+    // Get goal settings
+    const goalHours = goals.daily_work_hours || 8;
+    const weekdayGoalsOnly = goals.weekday_goals_only !== false;
+
+    // Determine if this is a weekday (Mon=1 to Fri=5)
+    // Parse date as local time to avoid timezone issues (new Date("YYYY-MM-DD") parses as UTC)
+    const [year, month, day] = dateStr.split('-').map(Number);
+    const selectedDate = new Date(year, month - 1, day);
+    const dayOfWeek = selectedDate.getDay();
+    const isWeekday = dayOfWeek >= 1 && dayOfWeek <= 5;
+    const showGoal = !weekdayGoalsOnly || isWeekday;
+
+    // Calculate work hours and goal percentage
+    const activeSeconds = workLife.active_seconds || 0;
+    const activeHours = activeSeconds / 3600;
+    const goalPercent = showGoal ? Math.min((activeHours / goalHours) * 100, 125) : 0;
+    const progressWidth = Math.min(goalPercent, 100);
+
+    // Format work hours (e.g., "6h 30m")
+    const workHours = formatDuration(activeSeconds);
+    const percentDisplay = showGoal ? `${Math.round(goalPercent)}% of ${goalHours}h` : '';
+
+    // Day span times
+    const startTime = workLife.first_session_start
+        ? new Date(workLife.first_session_start).toLocaleTimeString([], {hour: 'numeric', minute: '2-digit'})
+        : (summary.first_capture ? new Date(summary.first_capture * 1000).toLocaleTimeString([], {hour: 'numeric', minute: '2-digit'}) : '--');
+    const endTime = workLife.last_session_end
+        ? new Date(workLife.last_session_end).toLocaleTimeString([], {hour: 'numeric', minute: '2-digit'})
+        : (summary.last_capture ? new Date(summary.last_capture * 1000).toLocaleTimeString([], {hour: 'numeric', minute: '2-digit'}) : '--');
+
+    // Break metrics
+    const breakCount = workLife.break_count || 0;
+    const breakSeconds = workLife.break_seconds || 0;
+    const breakTime = formatDuration(breakSeconds);
+
+    // Longest focus
+    const longestFocusSeconds = workLife.longest_work_without_break_seconds || 0;
+    const longestFocus = formatDuration(longestFocusSeconds);
+    const focusStart = workLife.longest_work_without_break_start || '';
+    const focusEnd = workLife.longest_work_without_break_end || '';
+
+    // Calculate breakdown percentages for stacked bar
+    const totalTime = activeSeconds + breakSeconds;
+    const focusPercent = totalTime > 0 ? (activeSeconds / totalTime) * 100 : 100;
+    const breakPercent = totalTime > 0 ? (breakSeconds / totalTime) * 100 : 0;
+
+    // "Since Last Break" calculation for today
+    const today = new Date().toISOString().slice(0, 10);
+    const isToday = dateStr === today;
+    const isActive = workLife.is_active || false;
+    const lastBreakEnd = workLife.last_break_end;
+    const firstSessionStart = workLife.first_session_start;
+    let sinceLastBreakHtml = '';
+
+    if (isToday && isActive) {
+        // Use last break end if available, otherwise use session start (no breaks yet)
+        const referenceTime = lastBreakEnd || firstSessionStart;
+        if (referenceTime) {
+            const refTime = new Date(referenceTime);
+            const now = new Date();
+            const sinceBreakSeconds = Math.floor((now - refTime) / 1000);
+            const sinceBreakDuration = formatDuration(sinceBreakSeconds);
+
+            // Determine urgency color class
+            const sinceBreakMinutes = sinceBreakSeconds / 60;
+            let urgencyClass = 'urgency-low';
+            if (sinceBreakMinutes >= 120) {
+                urgencyClass = 'urgency-high';
+            } else if (sinceBreakMinutes >= 60) {
+                urgencyClass = 'urgency-medium';
+            }
+
+            const label = lastBreakEnd ? 'Since Last Break' : 'Current Focus';
+            sinceLastBreakHtml = `
+                <div class="secondary-stat since-break" id="sinceBreakStat" data-last-break="${referenceTime}">
+                    <span class="secondary-stat-label">${label}</span>
+                    <span class="secondary-stat-value ${urgencyClass}" id="sinceBreakValue">${sinceBreakDuration}</span>
+                </div>
+            `;
+        }
+    }
+
+    const noGoalClass = showGoal ? '' : 'no-goal';
 
     statsEl.innerHTML = `
-        <div class="stat-item">
-            <span>Total:</span>
-            <span class="stat-value">${summary.total_screenshots}</span>
-        </div>
-        <div class="stat-item">
-            <span>Active hours:</span>
-            <span class="stat-value">${summary.active_hours.length}</span>
-        </div>
-        <div class="stat-item">
-            <span>First:</span>
-            <span class="stat-value">${firstTime}</span>
-        </div>
-        <div class="stat-item">
-            <span>Last:</span>
-            <span class="stat-value">${lastTime}</span>
-        </div>
-        <div class="stat-item">
-            <span>Top app:</span>
-            <span class="stat-value">${topApp}</span>
+        <div class="daily-summary ${noGoalClass}">
+            <div class="daily-summary-stats">
+                <!-- Primary Stats -->
+                <div class="primary-stats">
+                    <div class="primary-stat hours-worked">
+                        <span class="primary-stat-label">Hours Worked</span>
+                        <span class="primary-stat-value">${workHours}</span>
+                    </div>
+                    ${showGoal ? `
+                    <div class="primary-stat goal-percent">
+                        <span class="primary-stat-label">${Math.round(goalPercent)}%</span>
+                        <span class="primary-stat-value${goalPercent > 100 ? ' exceeded' : ''}">${goalHours}h goal</span>
+                    </div>
+                    ` : ''}
+                </div>
+
+                <!-- Goal Progress Bar -->
+                ${showGoal ? `
+                <div class="goal-progress">
+                    <div class="goal-progress-fill" style="width: ${progressWidth}%"></div>
+                </div>
+                ` : ''}
+
+                <!-- Secondary Stats -->
+                <div class="secondary-stats">
+                    <div class="secondary-stat">
+                        <span class="secondary-stat-label">${isToday ? 'Start' : 'Day Span'}</span>
+                        <span class="secondary-stat-value">${isToday ? startTime : `${startTime} – ${endTime}`}</span>
+                    </div>
+                    <div class="secondary-stat">
+                        <span class="secondary-stat-label">Breaks</span>
+                        <span class="secondary-stat-value">${breakCount} (${breakTime})</span>
+                    </div>
+                    <div class="secondary-stat stat-focus-row">
+                        <span class="secondary-stat-label">Longest Focus</span>
+                        <span class="secondary-stat-value clickable"
+                              data-focus-start="${focusStart}"
+                              data-focus-end="${focusEnd}"
+                              title="Click to jump to longest focus period">${longestFocus}</span>
+                    </div>
+                    ${sinceLastBreakHtml}
+                </div>
+            </div>
+
+            <div class="daily-summary-breakdown">
+                <div class="breakdown-header">Breakdown</div>
+                <!-- Stacked Bar Chart -->
+                <div class="stacked-bar">
+                    <div class="stacked-bar-segment focus" style="width: ${focusPercent}%">
+                        <span class="stacked-bar-label">${focusPercent >= 15 ? Math.round(focusPercent) + '%' : ''}</span>
+                    </div>
+                    <div class="stacked-bar-segment breaks" style="width: ${breakPercent}%">
+                        <span class="stacked-bar-label">${breakPercent >= 15 ? Math.round(breakPercent) + '%' : ''}</span>
+                    </div>
+                </div>
+                <!-- Legend -->
+                <div class="breakdown-legend">
+                    <div class="legend-item">
+                        <span class="legend-dot focus"></span>
+                        <span class="legend-label">Focus</span>
+                        <span class="legend-value">${formatDuration(activeSeconds)}</span>
+                    </div>
+                    <div class="legend-item">
+                        <span class="legend-dot breaks"></span>
+                        <span class="legend-label">Breaks</span>
+                        <span class="legend-value">${formatDuration(breakSeconds)}</span>
+                    </div>
+                </div>
+            </div>
         </div>
     `;
+
+    // Add click handler for longest focus
+    const focusValue = statsEl.querySelector('.stat-focus-row .secondary-stat-value.clickable');
+    if (focusValue && focusStart && focusEnd) {
+        focusValue.addEventListener('click', () => {
+            scrollToTimeRange(focusStart, focusEnd);
+        });
+    }
+
+    // Start live timer for "Since Last Break" / "Current Focus" if showing today
+    if (isToday && isActive) {
+        const referenceTime = lastBreakEnd || firstSessionStart;
+        if (referenceTime) {
+            startSinceBreakTimer(referenceTime);
+        }
+    }
+}
+
+// Timer interval for "Since Last Break"
+let sinceBreakTimerInterval = null;
+
+// Start live timer for "Since Last Break"
+function startSinceBreakTimer(lastBreakEnd) {
+    // Clear any existing timer
+    if (sinceBreakTimerInterval) {
+        clearInterval(sinceBreakTimerInterval);
+    }
+
+    const updateTimer = () => {
+        const valueEl = document.getElementById('sinceBreakValue');
+        if (!valueEl) {
+            clearInterval(sinceBreakTimerInterval);
+            return;
+        }
+
+        const lastBreakTime = new Date(lastBreakEnd);
+        const now = new Date();
+        const sinceBreakSeconds = Math.floor((now - lastBreakTime) / 1000);
+        const sinceBreakDuration = formatDuration(sinceBreakSeconds);
+
+        // Update urgency color
+        const sinceBreakMinutes = sinceBreakSeconds / 60;
+        valueEl.classList.remove('urgency-low', 'urgency-medium', 'urgency-high');
+        if (sinceBreakMinutes >= 120) {
+            valueEl.classList.add('urgency-high');
+        } else if (sinceBreakMinutes >= 60) {
+            valueEl.classList.add('urgency-medium');
+        } else {
+            valueEl.classList.add('urgency-low');
+        }
+
+        valueEl.textContent = sinceBreakDuration;
+    };
+
+    // Update every 60 seconds
+    sinceBreakTimerInterval = setInterval(updateTimer, 60000);
+}
+
+// Scroll timeline to a specific time range and highlight it
+function scrollToTimeRange(startTime, endTime) {
+    if (!startTime || !endTime) return;
+
+    const startDate = new Date(startTime);
+    const startHour = startDate.getHours();
+
+    // Highlight the time range on the horizontal timeline
+    highlightTimelineRange(startTime, endTime);
+
+    // Scroll to the hour section in summaries
+    scrollToHourSection(startHour);
+}
+
+// Highlight a time range on the horizontal timeline
+function highlightTimelineRange(startTime, endTime) {
+    const timeline = document.querySelector('.horizontal-timeline');
+    if (!timeline) return;
+
+    // Remove any existing highlights
+    timeline.querySelectorAll('.timeline-highlight').forEach(el => el.remove());
+
+    const startDate = new Date(startTime);
+    const endDate = new Date(endTime);
+
+    // Calculate position as percentage of day
+    const dayStart = new Date(startDate);
+    dayStart.setHours(0, 0, 0, 0);
+
+    const startPercent = ((startDate - dayStart) / (24 * 60 * 60 * 1000)) * 100;
+    const endPercent = ((endDate - dayStart) / (24 * 60 * 60 * 1000)) * 100;
+
+    // Create highlight overlay
+    const highlight = document.createElement('div');
+    highlight.className = 'timeline-highlight';
+    highlight.style.left = `${startPercent}%`;
+    highlight.style.width = `${endPercent - startPercent}%`;
+
+    // Find the activity lane content to append to
+    const laneContent = timeline.querySelector('.timeline-lane[data-lane="activity"] .lane-content');
+    if (laneContent) {
+        laneContent.style.position = 'relative';
+        laneContent.appendChild(highlight);
+
+        // Auto-remove highlight after 3 seconds
+        setTimeout(() => {
+            highlight.classList.add('fade-out');
+            setTimeout(() => highlight.remove(), 500);
+        }, 3000);
+    }
 }
 
 // Render hourly chart and all screenshots
@@ -2351,11 +2725,11 @@ function renderThresholdSummaries() {
             <table class="summaries-table">
                 <thead>
                     <tr>
-                        <th style="width: 40px;"><input type="checkbox" class="summary-checkbox" id="selectAllCheckbox"></th>
+                        <th style="width: 32px;"><input type="checkbox" class="summary-checkbox" id="selectAllCheckbox"></th>
                         <th>Time</th>
-                        <th>Summary</th>
-                        <th style="width: 60px;">Conf</th>
-                        <th style="width: 80px;">Duration</th>
+                        <th>Duration</th>
+                        <th style="width: 100%;">Summary</th>
+                        <th>Conf</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -2375,7 +2749,16 @@ function renderThresholdSummaries() {
             // Calculate active time from sessions overlapping this summary's time range
             const activeMs = getActiveTimeInRange(summary.start_time, summary.end_time);
             const activeMins = Math.round(activeMs / 60000);
-            const durationStr = activeMins < 1 ? '<1m' : `${activeMins}m`;
+            let durationStr;
+            if (activeMins < 1) {
+                durationStr = '<1m';
+            } else if (activeMins < 60) {
+                durationStr = `${activeMins}m`;
+            } else {
+                const hours = Math.floor(activeMins / 60);
+                const mins = activeMins % 60;
+                durationStr = mins > 0 ? `${hours}h${mins}m` : `${hours}h`;
+            }
 
             // Confidence indicator
             const conf = summary.confidence;
@@ -2396,20 +2779,25 @@ function renderThresholdSummaries() {
             // Tags for data attribute (used by tags section for filtering)
             const tags = summary.tags || [];
 
+            // Preview indicator for active session summaries
+            const isPreview = summary.is_preview;
+            const previewBadge = isPreview ? '<span class="preview-badge" title="Live preview of current session - updates periodically">Current Session</span>' : '';
+            const previewClass = isPreview ? ' preview-row' : '';
+
             html += `
-                <tr data-summary-id="${summary.id}" data-hour="${hour}" data-tags="${tags.join(',')}">
+                <tr data-summary-id="${summary.id}" data-hour="${hour}" data-tags="${tags.join(',')}"${isPreview ? ' data-preview="true"' : ''} class="${previewClass}">
                     <td class="checkbox-cell">
-                        <input type="checkbox" class="summary-checkbox" data-id="${summary.id}">
+                        <input type="checkbox" class="summary-checkbox" data-id="${summary.id}"${isPreview ? ' disabled title="Cannot select preview summaries"' : ''}>
                     </td>
-                    <td class="summary-time">${startTime}</td>
+                    <td class="summary-time">${startTime}${previewBadge}</td>
+                    <td class="summary-duration">
+                        <span class="duration-display" title="${activeMins} minutes active">${durationStr}</span>
+                    </td>
                     <td class="summary-text-cell">
                         <span title="${summary.summary}">${summary.summary}</span>
                         ${summary.explanation ? `<span class="explanation-icon" data-explanation="${explanationEscaped}" title="Show explanation">ℹ️</span>` : ''}
                     </td>
                     <td class="summary-confidence">${confDisplay}</td>
-                    <td class="summary-duration">
-                        <span class="duration-display" title="${activeMins} minutes active">${durationStr}</span>
-                    </td>
                 </tr>
             `;
         });

@@ -1476,7 +1476,8 @@ class ActivityStorage:
         prompt_text: str = None,
         explanation: str = None,
         tags: List[str] = None,
-        confidence: float = None
+        confidence: float = None,
+        is_preview: bool = False
     ) -> int:
         """Save a new threshold-based summary.
 
@@ -1494,6 +1495,7 @@ class ActivityStorage:
             explanation: Model's explanation of what it observed
             tags: List of tags from the LLM
             confidence: Model's confidence score (0.0-1.0)
+            is_preview: True if this is a preview summary for active session
 
         Returns:
             ID of the new summary record.
@@ -1504,8 +1506,8 @@ class ActivityStorage:
                 INSERT INTO threshold_summaries
                     (start_time, end_time, summary, screenshot_ids, screenshot_count,
                      model_used, config_snapshot, inference_time_ms, regenerated_from, project, prompt_text,
-                     explanation, tags, confidence)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                     explanation, tags, confidence, is_preview)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     start_time,
@@ -1522,6 +1524,7 @@ class ActivityStorage:
                     explanation,
                     json.dumps(tags) if tags else None,
                     confidence,
+                    1 if is_preview else 0,
                 ),
             )
             summary_id = cursor.lastrowid
@@ -1705,7 +1708,7 @@ class ActivityStorage:
                 SELECT id, start_time, end_time, summary, screenshot_ids,
                        screenshot_count, model_used, config_snapshot,
                        inference_time_ms, created_at, regenerated_from, project,
-                       explanation, tags, confidence
+                       explanation, tags, confidence, is_preview
                 FROM threshold_summaries
                 WHERE date(start_time) = ?
                 ORDER BY start_time ASC
@@ -1722,6 +1725,7 @@ class ActivityStorage:
                     result['tags'] = json.loads(result['tags'])
                 else:
                     result['tags'] = []
+                result['is_preview'] = bool(result.get('is_preview', 0))
                 results.append(result)
             return results
 
@@ -1782,6 +1786,145 @@ class ActivityStorage:
             )
             conn.commit()
             return cursor.rowcount > 0
+
+    def get_current_preview_summary(self) -> Optional[Dict]:
+        """Get the current preview summary if one exists.
+
+        Returns:
+            Preview summary dict or None if no preview exists.
+        """
+        with self.get_connection() as conn:
+            cursor = conn.execute(
+                """
+                SELECT id, start_time, end_time, summary, screenshot_ids,
+                       screenshot_count, model_used, config_snapshot,
+                       inference_time_ms, created_at, project,
+                       explanation, tags, confidence, is_preview
+                FROM threshold_summaries
+                WHERE is_preview = 1
+                ORDER BY created_at DESC
+                LIMIT 1
+                """,
+            )
+            row = cursor.fetchone()
+            if row:
+                result = dict(row)
+                result['screenshot_ids'] = json.loads(result['screenshot_ids'])
+                if result['config_snapshot']:
+                    result['config_snapshot'] = json.loads(result['config_snapshot'])
+                if result.get('tags'):
+                    result['tags'] = json.loads(result['tags'])
+                else:
+                    result['tags'] = []
+                result['is_preview'] = True
+                return result
+            return None
+
+    def delete_preview_summaries(self) -> int:
+        """Delete all preview summaries.
+
+        Called when a session ends to clean up the preview before
+        generating the final summary.
+
+        Returns:
+            Number of preview summaries deleted.
+        """
+        with self.get_connection() as conn:
+            # Get preview IDs first for junction table cleanup
+            cursor = conn.execute(
+                "SELECT id FROM threshold_summaries WHERE is_preview = 1"
+            )
+            preview_ids = [row['id'] for row in cursor.fetchall()]
+
+            if preview_ids:
+                # Delete screenshot links
+                placeholders = ','.join('?' * len(preview_ids))
+                conn.execute(
+                    f"DELETE FROM threshold_summary_screenshots WHERE summary_id IN ({placeholders})",
+                    preview_ids,
+                )
+                # Delete previews
+                cursor = conn.execute(
+                    f"DELETE FROM threshold_summaries WHERE id IN ({placeholders})",
+                    preview_ids,
+                )
+                conn.commit()
+                return cursor.rowcount
+            return 0
+
+    def update_preview_summary(
+        self,
+        summary_id: int,
+        end_time: str,
+        summary: str,
+        screenshot_ids: List[int],
+        model: str,
+        config_snapshot: dict,
+        inference_ms: int,
+        explanation: str = None,
+        tags: List[str] = None,
+        confidence: float = None
+    ) -> bool:
+        """Update an existing preview summary with new data.
+
+        Args:
+            summary_id: ID of the preview to update
+            end_time: New end time (start time stays the same)
+            summary: The new generated summary text
+            screenshot_ids: Updated list of screenshot IDs
+            model: Model used for generation
+            config_snapshot: Dict of config settings used
+            inference_ms: Time taken for inference
+            explanation: Model's explanation of what it observed
+            tags: List of tags from the LLM
+            confidence: Model's confidence score (0.0-1.0)
+
+        Returns:
+            True if update succeeded, False if preview not found.
+        """
+        with self.get_connection() as conn:
+            cursor = conn.execute(
+                """
+                UPDATE threshold_summaries
+                SET end_time = ?,
+                    summary = ?,
+                    screenshot_ids = ?,
+                    screenshot_count = ?,
+                    model_used = ?,
+                    config_snapshot = ?,
+                    inference_time_ms = ?,
+                    explanation = ?,
+                    tags = ?,
+                    confidence = ?
+                WHERE id = ? AND is_preview = 1
+                """,
+                (
+                    end_time,
+                    summary,
+                    json.dumps(screenshot_ids),
+                    len(screenshot_ids),
+                    model,
+                    json.dumps(config_snapshot) if config_snapshot else None,
+                    inference_ms,
+                    explanation,
+                    json.dumps(tags) if tags else None,
+                    confidence,
+                    summary_id,
+                ),
+            )
+            if cursor.rowcount > 0:
+                # Update screenshot links
+                conn.execute(
+                    "DELETE FROM threshold_summary_screenshots WHERE summary_id = ?",
+                    (summary_id,),
+                )
+                conn.executemany(
+                    "INSERT OR IGNORE INTO threshold_summary_screenshots (summary_id, screenshot_id) VALUES (?, ?)",
+                    [(summary_id, sid) for sid in screenshot_ids]
+                )
+                conn.commit()
+                return True
+            return False
 
     def get_screenshot_by_id(self, screenshot_id: int) -> Optional[Dict]:
         """Get a screenshot by its ID.
@@ -2055,6 +2198,82 @@ class ActivityStorage:
                 (end.isoformat(), start.isoformat()),
             )
             return cursor.fetchone() is not None
+
+    def get_recent_sessions(self, limit: int = 20) -> List[Dict]:
+        """Get most recent completed sessions, ordered by end_time DESC.
+
+        Used for session merging in activity-based summarization -
+        need to walk backward through recent sessions to find logical
+        session boundaries after daemon restarts.
+
+        Args:
+            limit: Maximum number of sessions to return (default: 20).
+
+        Returns:
+            List of session dicts ordered by end_time DESC (most recent first).
+        """
+        with self.get_connection() as conn:
+            cursor = conn.execute(
+                """
+                SELECT id, start_time, end_time, duration_seconds, summary,
+                       screenshot_count, unique_windows, model_used, inference_time_ms,
+                       prompt_text, screenshot_ids_used
+                FROM activity_sessions
+                WHERE end_time IS NOT NULL
+                ORDER BY end_time DESC
+                LIMIT ?
+                """,
+                (limit,),
+            )
+            results = []
+            for row in cursor.fetchall():
+                result = dict(row)
+                if result.get("screenshot_ids_used"):
+                    result["screenshot_ids_used"] = json.loads(result["screenshot_ids_used"])
+                results.append(result)
+            return results
+
+    def get_sessions_without_summaries(self, min_duration_seconds: int = 300) -> List[Dict]:
+        """Find completed sessions that have no corresponding summary.
+
+        Used for startup recovery in activity-based summarization -
+        detects sessions that ended without triggering a summary
+        (e.g., daemon was killed before summary was generated).
+
+        A session "has a summary" if any threshold_summary's time range
+        overlaps with the session's time range.
+
+        Args:
+            min_duration_seconds: Minimum session duration to consider (default: 300s = 5min).
+
+        Returns:
+            List of session dicts that need summarization, ordered by start_time ASC.
+        """
+        with self.get_connection() as conn:
+            cursor = conn.execute(
+                """
+                SELECT s.id, s.start_time, s.end_time, s.duration_seconds, s.summary,
+                       s.screenshot_count, s.unique_windows, s.model_used, s.inference_time_ms,
+                       s.prompt_text, s.screenshot_ids_used
+                FROM activity_sessions s
+                WHERE s.end_time IS NOT NULL
+                  AND s.duration_seconds >= ?
+                  AND NOT EXISTS (
+                      SELECT 1 FROM threshold_summaries ts
+                      WHERE datetime(ts.start_time) < datetime(s.end_time)
+                        AND datetime(ts.end_time) > datetime(s.start_time)
+                  )
+                ORDER BY s.start_time ASC
+                """,
+                (min_duration_seconds,),
+            )
+            results = []
+            for row in cursor.fetchall():
+                result = dict(row)
+                if result.get("screenshot_ids_used"):
+                    result["screenshot_ids_used"] = json.loads(result["screenshot_ids_used"])
+                results.append(result)
+            return results
 
     # =========================================================================
     # Project-Aware Summary Methods
@@ -2506,8 +2725,19 @@ class ActivityStorage:
             end: End datetime.
 
         Returns:
-            Dict with active_seconds, break_seconds, total_span_seconds,
-            active_percentage, longest_work_without_break_seconds.
+            Dict with:
+                active_seconds: Total active work time in seconds
+                break_seconds: Total break time in seconds
+                break_count: Number of breaks taken
+                workday_span_seconds: Time from first to last session
+                active_percentage: Active time as % of workday span
+                longest_work_without_break_seconds: Longest focus period
+                longest_work_without_break_start: Start of longest focus
+                longest_work_without_break_end: End of longest focus
+                first_session_start: When first session started
+                last_session_end: When last session ended
+                last_break_end: When the most recent break ended (for live timer)
+                is_active: Whether there's an active session right now
         """
         total_span = (end - start).total_seconds()
 
@@ -2551,6 +2781,7 @@ class ActivityStorage:
             last_end = None
             break_count = 0
             total_break_seconds = 0
+            last_break_end = None  # When the most recent break ended (start of current work period)
 
             for session in sessions:
                 session_duration = session['duration'] or 0
@@ -2576,6 +2807,8 @@ class ActivityStorage:
                             longest_continuous_end = last_end
                         current_continuous = session_duration
                         current_continuous_start = session['start_time']
+                        # This session started after a break
+                        last_break_end = session['start_time']
                     else:
                         current_continuous += session_duration
                 else:
@@ -2583,6 +2816,33 @@ class ActivityStorage:
                     current_continuous_start = session['start_time']
 
                 last_end = session['end_time']
+
+            # Check if there's an active session (end_time IS NULL)
+            cursor = conn.execute(
+                """
+                SELECT id, start_time FROM activity_sessions
+                WHERE datetime(start_time) >= datetime(?)
+                  AND datetime(start_time) <= datetime(?)
+                  AND end_time IS NULL
+                ORDER BY start_time DESC
+                LIMIT 1
+                """,
+                (start.isoformat(), end.isoformat())
+            )
+            active_session = cursor.fetchone()
+            is_active = active_session is not None
+
+            # If there's an active session and we haven't recorded a last_break_end yet,
+            # check if the active session started after a break
+            if is_active and active_session and sessions:
+                last_completed_end = sessions[-1]['end_time']
+                if last_completed_end:
+                    gap_to_active = (
+                        datetime.fromisoformat(active_session['start_time']) -
+                        datetime.fromisoformat(last_completed_end)
+                    ).total_seconds()
+                    if gap_to_active > 300:  # > 5 min gap = break
+                        last_break_end = active_session['start_time']
 
             # Check final period
             if current_continuous > longest_continuous:
@@ -2592,11 +2852,15 @@ class ActivityStorage:
 
         # Active percentage based on first session to last session span (not midnight to midnight)
         if sessions:
-            first_session_start = datetime.fromisoformat(sessions[0]['start_time'])
-            last_session_end = datetime.fromisoformat(sessions[-1]['end_time'])
-            workday_span = (last_session_end - first_session_start).total_seconds()
+            first_session_start = sessions[0]['start_time']
+            last_session_end = sessions[-1]['end_time']
+            first_dt = datetime.fromisoformat(first_session_start)
+            last_dt = datetime.fromisoformat(last_session_end)
+            workday_span = (last_dt - first_dt).total_seconds()
             active_percentage = (active_seconds / workday_span * 100) if workday_span > 0 else 0
         else:
+            first_session_start = None
+            last_session_end = None
             workday_span = 0
             active_percentage = 0
 
@@ -2608,7 +2872,11 @@ class ActivityStorage:
             'active_percentage': round(active_percentage, 1),
             'longest_work_without_break_seconds': int(longest_continuous),
             'longest_work_without_break_start': longest_continuous_start,
-            'longest_work_without_break_end': longest_continuous_end
+            'longest_work_without_break_end': longest_continuous_end,
+            'first_session_start': first_session_start,
+            'last_session_end': last_session_end,
+            'last_break_end': last_break_end,
+            'is_active': is_active
         }
 
     def get_meetings_time(

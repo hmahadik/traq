@@ -386,9 +386,23 @@ def api_day_summary(date_string):
         analytics = ActivityAnalytics()
         summary = analytics.get_daily_summary(target_date)
 
+        # Get work/life balance metrics for the day
+        storage = ActivityStorage()
+        day_start = datetime.combine(target_date, datetime.min.time())
+        day_end = datetime.combine(target_date + timedelta(days=1), datetime.min.time())
+        work_life = storage.get_work_break_balance(day_start, day_end)
+
+        # Get goals config for frontend
+        goals = {
+            'daily_work_hours': config_manager.config.goals.daily_work_hours,
+            'weekday_goals_only': config_manager.config.goals.weekday_goals_only
+        }
+
         return jsonify({
             "date": date_string,
-            "summary": summary
+            "summary": summary,
+            "work_life": work_life,
+            "goals": goals
         })
     except Exception as e:
         return jsonify({"error": f"Failed to get daily summary: {str(e)}"}), 500

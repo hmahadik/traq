@@ -284,9 +284,38 @@ class ReportExporter:
 
         # Generate sections HTML with markdown conversion
         sections_html = ''
-        for s in report.sections:
-            content_html = self._convert_markdown_to_html(s.content)
-            sections_html += f'<div class="section"><h2>{s.title}</h2><div class="section-content">{content_html}</div></div>'
+        if report.sections:
+            sections_html = '<div class="sections-container">'
+            for s in report.sections:
+                content_html = self._convert_markdown_to_html(s.content)
+                title = s.title
+
+                # Parse title to extract project name and duration
+                import re
+                match = re.match(r'^(.+?)\s*\(([^)]+)\)$', title)
+                if match:
+                    project_name = match.group(1).strip()
+                    duration = match.group(2).strip()
+                else:
+                    project_name = title
+                    duration = ''
+
+                # Determine section type for styling
+                project_lower = project_name.lower()
+                if project_lower == 'research':
+                    section_class = 'research'
+                elif project_lower == 'communication':
+                    section_class = 'communication'
+                else:
+                    section_class = 'project'
+
+                if duration:
+                    header_html = f'{project_name}<span class="duration">{duration}</span>'
+                else:
+                    header_html = project_name
+
+                sections_html += f'<div class="section {section_class}"><h3>{header_html}</h3><div class="section-content">{content_html}</div></div>'
+            sections_html += '</div>'
 
         # Generate screenshots HTML with lightbox onclick
         screenshots_html = ''.join(
@@ -700,14 +729,46 @@ class ReportExporter:
 
         # Generate sections HTML with markdown conversion
         sections_html = ''
-        for s in (data.get('sections') or []):
-            content_html = self._convert_markdown_to_html(s.get('content', ''))
-            sections_html += f'''
-            <div class="section">
-                <h3>{s.get("title", "")}</h3>
-                <div class="section-content">{content_html}</div>
-            </div>
-            '''
+        sections_list = data.get('sections') or []
+        if sections_list:
+            sections_html = '<div class="sections-container">'
+            for s in sections_list:
+                content_html = self._convert_markdown_to_html(s.get('content', ''))
+                title = s.get('title', '')
+
+                # Parse title to extract project name and duration
+                # Format: "project-name (Xh Ym)" or "project-name (Xm)"
+                import re
+                match = re.match(r'^(.+?)\s*\(([^)]+)\)$', title)
+                if match:
+                    project_name = match.group(1).strip()
+                    duration = match.group(2).strip()
+                else:
+                    project_name = title
+                    duration = ''
+
+                # Determine section type for styling
+                project_lower = project_name.lower()
+                if project_lower == 'research':
+                    section_class = 'research'
+                elif project_lower == 'communication':
+                    section_class = 'communication'
+                else:
+                    section_class = 'project'
+
+                # Build the header with optional duration badge
+                if duration:
+                    header_html = f'{project_name}<span class="duration">{duration}</span>'
+                else:
+                    header_html = project_name
+
+                sections_html += f'''
+                <div class="section {section_class}">
+                    <h3>{header_html}</h3>
+                    <div class="section-content">{content_html}</div>
+                </div>
+                '''
+            sections_html += '</div>'
 
         # Generate screenshots gallery with clickable lightbox
         screenshots_html = ''
@@ -1017,12 +1078,35 @@ class ReportExporter:
             border-bottom: 2px solid var(--border);
         }}
 
+        .sections-container {{
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }}
+
         .section {{
             background: var(--surface);
             border: 1px solid var(--border);
             border-radius: 8px;
             padding: 1.25rem;
-            margin-bottom: 1rem;
+            transition: box-shadow 0.2s;
+        }}
+
+        .section:hover {{
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }}
+
+        .section.research {{
+            border-left: 3px solid #3b82f6;
+        }}
+
+        .section.communication {{
+            border-left: 3px solid #8b5cf6;
+        }}
+
+        .section.project {{
+            border-left: 3px solid #10b981;
         }}
 
         .section h3 {{
@@ -1030,6 +1114,18 @@ class ReportExporter:
             font-weight: 600;
             color: var(--accent);
             margin-bottom: 0.75rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }}
+
+        .section h3 .duration {{
+            font-size: 0.85rem;
+            font-weight: 500;
+            color: var(--text-muted);
+            background: var(--bg);
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
         }}
 
         .section-content {{

@@ -108,7 +108,199 @@ def is_terminal_app(app_name: Optional[str]) -> bool:
     return app_name.lower() in TERMINAL_APPS
 
 
-def get_terminal_context(window_pid: int) -> Optional[TerminalContext]:
+def _find_shell_descendants(pids: List[int]) -> List[int]:
+    """Find all shell processes in the descendant list.
+
+    Args:
+        pids: List of process IDs to check.
+
+    Returns:
+        List of PIDs that are shell processes.
+    """
+    shells = []
+    for pid in pids:
+        try:
+            comm = Path(f"/proc/{pid}/comm").read_text().strip()
+            if comm in SHELL_NAMES:
+                shells.append(pid)
+        except OSError:
+            continue
+    return shells
+
+
+def _get_process_pts(pid: int) -> Optional[str]:
+    """Get the pts device for a process.
+
+    Args:
+        pid: Process ID.
+
+    Returns:
+        The pts path (e.g., '/dev/pts/0') or None.
+    """
+    try:
+        pts = os.readlink(f"/proc/{pid}/fd/0")
+        if pts.startswith('/dev/pts/'):
+            return pts
+    except OSError:
+        pass
+    return None
+
+
+def _get_unique_pts(shell_pids: List[int]) -> Optional[str]:
+    """Get the pts if all shells share the same one, otherwise None.
+
+    For multi-window terminals (like Tilix) that share a single PID,
+    we can't reliably determine which terminal is focused based on
+    pts mtime alone. This function returns the pts only if all shells
+    use the same one (single terminal case).
+
+    Args:
+        shell_pids: List of shell process PIDs.
+
+    Returns:
+        The pts path if all shells share it, None if multiple pts exist.
+    """
+    if not shell_pids:
+        return None
+
+    pts_set = set()
+    for pid in shell_pids:
+        pts = _get_process_pts(pid)
+        if pts:
+            pts_set.add(pts)
+
+    # Only return pts if all shells share the same one
+    if len(pts_set) == 1:
+        return pts_set.pop()
+
+    return None
+
+
+def _find_tmux_client(pids: List[int]) -> Optional[int]:
+    """Find a tmux client process in the descendants.
+
+    The tmux client ('tmux: client') is the process that connects a
+    terminal to a tmux server. Detecting this is more reliable than
+    checking for TMUX env var, which only exists in shells inside tmux.
+
+    Args:
+        pids: List of process IDs to check.
+
+    Returns:
+        PID of the tmux client, or None if not found.
+    """
+    for pid in pids:
+        try:
+            comm = Path(f"/proc/{pid}/comm").read_text().strip()
+            if comm == 'tmux: client':
+                return pid
+        except OSError:
+            continue
+    return None
+
+
+def _filter_by_pts(pids: List[int], target_pts: str) -> List[int]:
+    """Filter PIDs to only those using a specific pts.
+
+    Args:
+        pids: List of process IDs to filter.
+        target_pts: The pts path to match (e.g., '/dev/pts/0').
+
+    Returns:
+        List of PIDs that use the target pts.
+    """
+    result = []
+    for pid in pids:
+        pts = _get_process_pts(pid)
+        if pts == target_pts:
+            result.append(pid)
+    return result
+
+
+def _get_tmux_client_context(client_pid: int) -> Optional[TerminalContext]:
+    """Get context from a specific tmux client.
+
+    Queries tmux for the active pane that this client is currently viewing.
+    Uses list-clients with pane info to get the correct pane (not just the
+    first pane in the session).
+
+    Args:
+        client_pid: PID of the tmux client process.
+
+    Returns:
+        TerminalContext from the client's active pane, or None if query fails.
+    """
+    try:
+        # Get this client's current pane info in a single query
+        # Format: client_pid|session|pane_command|pane_path|pane_pid
+        result = subprocess.run(
+            ['tmux', 'list-clients', '-F',
+             '#{client_pid}|#{session_name}|#{pane_current_command}|#{pane_current_path}|#{pane_pid}'],
+            capture_output=True,
+            text=True,
+            timeout=1
+        )
+        if result.returncode != 0:
+            return None
+
+        # Find the line for our client
+        client_info = None
+        for line in result.stdout.strip().split('\n'):
+            if line.startswith(f"{client_pid}|"):
+                client_info = line
+                break
+
+        if not client_info:
+            return None
+
+        parts = client_info.split('|')
+        if len(parts) < 5:
+            return None
+
+        session_name = parts[1]
+        pane_command = parts[2]
+        pane_path = parts[3]
+        pane_pid = parts[4]
+
+        foreground_process = pane_command
+        full_command = pane_command
+
+        # For shell processes, check for immediate children (the actual command)
+        if pane_command in SHELL_NAMES and pane_pid.isdigit():
+            pid = int(pane_pid)
+            immediate_children = _get_immediate_children(pid)
+            if immediate_children:
+                for child_pid in immediate_children:
+                    ctx = _get_process_context(child_pid)
+                    if ctx and ctx.foreground_process not in SHELL_NAMES:
+                        foreground_process = ctx.foreground_process
+                        full_command = ctx.full_command
+                        break
+
+        # Get descendants for SSH detection
+        children = []
+        if pane_pid.isdigit():
+            children = _get_descendant_pids(int(pane_pid))
+
+        shell = _find_shell_in_ancestry(int(pane_pid)) if pane_pid.isdigit() else "bash"
+        if not shell:
+            shell = "bash"
+
+        return TerminalContext(
+            foreground_process=foreground_process,
+            full_command=full_command,
+            working_directory=pane_path,
+            shell=shell,
+            is_ssh=_check_ssh_in_tree(children),
+            tmux_session=session_name
+        )
+
+    except (subprocess.TimeoutExpired, FileNotFoundError, OSError, ValueError) as e:
+        logger.debug(f"Failed to get tmux client context for PID {client_pid}: {e}")
+        return None
+
+
+def get_terminal_context(window_pid: int, window_title: Optional[str] = None) -> Optional[TerminalContext]:
     """Get context about what's running in a terminal window.
 
     Walks the process tree from the terminal window PID to find:
@@ -118,13 +310,21 @@ def get_terminal_context(window_pid: int) -> Optional[TerminalContext]:
     - SSH and tmux detection
 
     For terminals with tmux attached, queries tmux directly for accurate
-    active pane information (works correctly with tiling terminals like Tilix).
+    active pane information.
+
+    For multi-window terminals (like Tilix) that share a single PID across
+    all windows, uses the window_title to disambiguate which terminal is
+    focused (if the shell is configured to update the title with the
+    current command).
 
     Args:
         window_pid: PID of the terminal window (from xdotool getwindowpid).
+        window_title: The X window title, used to identify the focused
+            terminal in multi-window scenarios.
 
     Returns:
-        TerminalContext with process details, or None if inspection fails.
+        TerminalContext with process details, or None if inspection fails
+        or cannot be performed reliably (e.g., multi-window terminal).
     """
     try:
         # Get all descendant processes
@@ -133,40 +333,161 @@ def get_terminal_context(window_pid: int) -> Optional[TerminalContext]:
             # Terminal might be empty or just started
             return _get_process_context(window_pid)
 
-        # Check if this terminal's shell is actually running inside tmux
-        # We verify by checking for TMUX env var, not just "tmux" in process names.
-        # This prevents querying tmux for terminals that aren't attached to it.
-        shell_in_tmux = _any_shell_in_tmux(descendants)
+        # Find all shell processes (these represent different terminal tabs/windows)
+        shell_descendants = _find_shell_descendants(descendants)
 
-        if shell_in_tmux:
-            # Use tmux-aware introspection for accurate active pane detection
-            # This queries tmux directly and handles SSH detection internally
-            # Pass window_pid to validate the tmux pane belongs to this window
-            tmux_context = _get_tmux_active_pane_context(window_pid)
-            if tmux_context:
-                return tmux_context
+        # Check if all shells share the same pts (single terminal case)
+        # If multiple pts exist, we can't reliably determine which is focused
+        unique_pts = _get_unique_pts(shell_descendants)
 
-        # Fallback: Find the "interesting" foreground process (deepest non-shell)
-        foreground_pid = _find_foreground_process(descendants)
-        if foreground_pid is None:
-            foreground_pid = descendants[-1] if descendants else window_pid
+        if unique_pts:
+            # Single terminal - safe to introspect
+            # Check for tmux client
+            tmux_client_pid = _find_tmux_client(descendants)
+            if tmux_client_pid:
+                tmux_context = _get_tmux_client_context(tmux_client_pid)
+                if tmux_context:
+                    return tmux_context
 
-        # Get context from the foreground process
-        context = _get_process_context(foreground_pid)
-        if context is None:
-            return None
+            # No tmux - find foreground process
+            foreground_pid = _find_foreground_process(descendants)
+            if foreground_pid is None:
+                foreground_pid = descendants[-1] if descendants else window_pid
 
-        # Check for SSH anywhere in the tree
-        context.is_ssh = _check_ssh_in_tree(descendants)
+            context = _get_process_context(foreground_pid)
+            if context is None:
+                return None
 
-        # Check for tmux
-        context.tmux_session = _get_tmux_session(descendants)
+            context.is_ssh = _check_ssh_in_tree(descendants)
+            context.tmux_session = _get_tmux_session(descendants)
+            return context
 
-        return context
+        # Multiple pts detected - multi-window terminal (like Tilix)
+        # Try to match using window_title if available
+        interesting_contexts = _find_interesting_terminals(shell_descendants, descendants)
+
+        if len(interesting_contexts) == 1:
+            # Only one terminal has activity - safe to use
+            return interesting_contexts[0]
+
+        if len(interesting_contexts) == 0:
+            # All terminals are idle - pick any shell
+            if shell_descendants:
+                context = _get_process_context(shell_descendants[0])
+                if context:
+                    context.is_ssh = _check_ssh_in_tree(descendants)
+                return context
+
+        # Multiple terminals have activity - try to match via window title
+        # If shell is configured to update title with command, we can match it
+        if window_title and len(interesting_contexts) > 1:
+            matched = _match_context_to_title(interesting_contexts, window_title)
+            if matched:
+                logger.debug(f"Matched terminal via window title: {matched.foreground_process}")
+                return matched
+
+        # Cannot determine which is focused - skip to avoid contamination
+        logger.debug(
+            f"Multi-window terminal with {len(interesting_contexts)} active terminals, "
+            "skipping introspection (configure shell to update window title to fix)"
+        )
+        return None
 
     except Exception as e:
         logger.debug(f"Terminal introspection failed for PID {window_pid}: {e}")
         return None
+
+
+def _match_context_to_title(contexts: List[TerminalContext], window_title: str) -> Optional[TerminalContext]:
+    """Match a terminal context to the window title.
+
+    If the shell is configured to update the window title with the current
+    command (e.g., via PROMPT_COMMAND or trap DEBUG), we can use the title
+    to identify which terminal is focused.
+
+    Args:
+        contexts: List of TerminalContext candidates.
+        window_title: The X window title.
+
+    Returns:
+        The matching TerminalContext, or None if no match found.
+    """
+    if not window_title:
+        return None
+
+    title_lower = window_title.lower()
+
+    # Try to match foreground process name or command in title
+    for ctx in contexts:
+        # Check if foreground process appears in title
+        if ctx.foreground_process and ctx.foreground_process.lower() in title_lower:
+            return ctx
+
+        # Check if part of full_command appears in title
+        if ctx.full_command:
+            # Extract first word of command (the binary name)
+            cmd_parts = ctx.full_command.split()
+            if cmd_parts:
+                cmd_name = cmd_parts[0].split('/')[-1]  # Handle paths
+                if cmd_name.lower() in title_lower:
+                    return ctx
+
+        # For tmux contexts: title shows "tmux" but context shows inner process
+        # Match if title contains "tmux" and context has tmux_session
+        if ctx.tmux_session and 'tmux' in title_lower:
+            return ctx
+
+    return None
+
+
+def _find_interesting_terminals(shell_pids: List[int], all_descendants: List[int]) -> List[TerminalContext]:
+    """Find terminals that have non-shell foreground processes.
+
+    Args:
+        shell_pids: List of shell process PIDs.
+        all_descendants: All descendant PIDs of the terminal.
+
+    Returns:
+        List of TerminalContext for terminals with interesting activity.
+    """
+    contexts = []
+
+    for shell_pid in shell_pids:
+        pts = _get_process_pts(shell_pid)
+        if not pts:
+            continue
+
+        # Get descendants on this pts
+        pts_descendants = _filter_by_pts(all_descendants, pts)
+
+        # Check for tmux client on this pts
+        tmux_client = None
+        for pid in pts_descendants:
+            try:
+                comm = Path(f"/proc/{pid}/comm").read_text().strip()
+                if comm == 'tmux: client':
+                    tmux_client = pid
+                    break
+            except OSError:
+                continue
+
+        if tmux_client:
+            # This terminal has tmux - get tmux context
+            ctx = _get_tmux_client_context(tmux_client)
+            if ctx:
+                contexts.append(ctx)
+            continue
+
+        # Find foreground process on this pts
+        foreground_pid = _find_foreground_process(pts_descendants)
+        if foreground_pid:
+            ctx = _get_process_context(foreground_pid)
+            if ctx and ctx.foreground_process not in SHELL_NAMES:
+                # Non-shell foreground - interesting
+                ctx.is_ssh = _check_ssh_in_tree(pts_descendants)
+                contexts.append(ctx)
+
+    return contexts
 
 
 def _get_immediate_children(pid: int) -> List[int]:

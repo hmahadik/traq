@@ -19,6 +19,7 @@ Configuration Sections:
 - storage: Data storage and retention
 - web: Web server configuration
 - privacy: Privacy controls and exclusions
+- goals: Work goals settings
 
 Example:
     >>> from tracker.config import ConfigManager
@@ -81,9 +82,13 @@ class SummarizationConfig:
     User-facing settings:
         enabled: Enable automatic summarization (default: True)
         model: Ollama model to use (default: gemma3:12b-it-qat)
-        frequency_minutes: How often to generate summaries (default: 15)
         quality_preset: Quick/Balanced/Thorough - sets underlying params (default: balanced)
         min_focus_seconds: Skip summarization if focus time below this (default: 60)
+
+    Activity-based summarization settings:
+        session_debounce_seconds: Wait time after AFK before summarizing (default: 30)
+        min_session_duration_seconds: Minimum session length to summarize (default: 300)
+        session_merge_gap_seconds: Gap threshold for merging fragmented sessions (default: 60)
 
     Content mode (multi-select - what to include in LLM request):
         include_focus_context: Include window titles and time spent (default: True)
@@ -93,18 +98,26 @@ class SummarizationConfig:
     Advanced settings:
         ollama_host: Ollama API host URL (default: http://localhost:11434)
         crop_to_window: Use cropped window screenshots (default: True)
-        trigger_threshold: Computed from frequency_minutes (screenshots before summarizing)
         max_samples: Set by quality_preset (max screenshots to LLM)
         include_previous_summary: Set by quality_preset (context continuity)
         focus_weighted_sampling: Set by quality_preset (weight by focus time)
-        sample_interval_minutes: Computed from frequency (target interval between samples)
+
+    Deprecated (kept for backward compatibility):
+        frequency_minutes: Legacy periodic interval (default: 15, deprecated)
+        trigger_threshold: Legacy computed threshold (deprecated)
+        sample_interval_minutes: Legacy computed interval (deprecated)
     """
     # User-facing settings
     enabled: bool = True
     model: str = "gemma3:12b-it-qat"
-    frequency_minutes: int = 15  # 5, 15, 30, 60
     quality_preset: str = "balanced"  # quick, balanced, thorough
     min_focus_seconds: int = 60  # Skip summarization if focus time below this
+
+    # Activity-based summarization settings
+    session_debounce_seconds: int = 30  # Wait after AFK before triggering summary
+    min_session_duration_seconds: int = 300  # Skip sessions shorter than 5 minutes
+    session_merge_gap_seconds: int = 60  # Merge sessions with gaps < this (daemon restarts)
+    preview_interval_minutes: int = 15  # Update preview summary for active session every N minutes
 
     # Content mode (multi-select checkboxes)
     include_focus_context: bool = True  # Window titles + duration
@@ -114,13 +127,14 @@ class SummarizationConfig:
     # Advanced settings
     ollama_host: str = "http://localhost:11434"
     crop_to_window: bool = True
-
-    # Underlying settings (set by quality_preset or computed)
-    trigger_threshold: int = 30          # Computed: frequency_minutes * 60 / capture_interval
     max_samples: int = 10                # Set by preset: quick=5, balanced=10, thorough=15
     include_previous_summary: bool = True  # Set by preset: quick=False, balanced/thorough=True
     focus_weighted_sampling: bool = True   # Set by preset: quick=False, balanced/thorough=True
-    sample_interval_minutes: int = 10      # Computed from frequency
+
+    # Deprecated settings (kept for backward compatibility with force_summarize_pending)
+    frequency_minutes: int = 15  # DEPRECATED: Used only for legacy force_summarize
+    trigger_threshold: int = 30  # DEPRECATED
+    sample_interval_minutes: int = 10  # DEPRECATED
 
 
 @dataclass
@@ -202,6 +216,18 @@ class TrackingConfig:
 
 
 @dataclass
+class GoalsConfig:
+    """Work goals configuration.
+
+    Attributes:
+        daily_work_hours: Target work hours per day (default: 8.0)
+        weekday_goals_only: Only show goal percentage on weekdays (default: True)
+    """
+    daily_work_hours: float = 8.0
+    weekday_goals_only: bool = True
+
+
+@dataclass
 class Config:
     """Top-level configuration container.
 
@@ -213,6 +239,7 @@ class Config:
         web: Web server settings
         privacy: Privacy controls
         tracking: Window focus tracking settings
+        goals: Work goals settings
     """
     capture: CaptureConfig = field(default_factory=CaptureConfig)
     afk: AFKConfig = field(default_factory=AFKConfig)
@@ -221,6 +248,7 @@ class Config:
     web: WebConfig = field(default_factory=WebConfig)
     privacy: PrivacyConfig = field(default_factory=PrivacyConfig)
     tracking: TrackingConfig = field(default_factory=TrackingConfig)
+    goals: GoalsConfig = field(default_factory=GoalsConfig)
 
 
 class ConfigManager:
@@ -310,6 +338,7 @@ class ConfigManager:
         web_data = filter_known_fields(data.get('web', {}), WebConfig)
         privacy_data = filter_known_fields(data.get('privacy', {}), PrivacyConfig)
         tracking_data = filter_known_fields(data.get('tracking', {}), TrackingConfig)
+        goals_data = filter_known_fields(data.get('goals', {}), GoalsConfig)
 
         return Config(
             capture=CaptureConfig(**capture_data),
@@ -319,6 +348,7 @@ class ConfigManager:
             web=WebConfig(**web_data),
             privacy=PrivacyConfig(**privacy_data),
             tracking=TrackingConfig(**tracking_data),
+            goals=GoalsConfig(**goals_data),
         )
 
     def save(self) -> None:

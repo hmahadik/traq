@@ -1,12 +1,14 @@
-"""Background summarization worker with cron-like scheduling.
+"""Background summarization worker with activity-based session triggers.
 
-This module implements a background worker that triggers summarization at
-fixed time intervals (like cron). For example, with frequency_minutes=15,
-summaries run at hh:00, hh:15, hh:30, hh:45.
+This module implements a background worker that triggers summarization when
+a user session ends (goes AFK). Instead of fixed periodic intervals, summaries
+are generated based on natural activity boundaries.
 
 The worker supports:
-- Cron-like scheduled summarization (at fixed clock times)
-- Time-range based summarization (not dependent on screenshots)
+- Activity-based summarization (triggered on session end with debouncing)
+- Session merging for daemon-restart fragmentation (gaps < 60s merged)
+- Startup recovery for unsummarized sessions
+- Time-range based summarization for manual backfilling
 - Regeneration of existing summaries with new settings
 - Context continuity via previous summary inclusion
 - OCR extraction for unique window titles
@@ -30,10 +32,11 @@ logger = logging.getLogger(__name__)
 
 
 class SummarizerWorker:
-    """Background worker with cron-like scheduled summarization.
+    """Background worker with activity-based session summarization.
 
-    Triggers summarization at fixed time intervals based on frequency_minutes.
-    For example, with frequency_minutes=15, runs at hh:00, hh:15, hh:30, hh:45.
+    Triggers summarization when user sessions end (AFK detected), with
+    debouncing to handle brief returns. Merges daemon-restart-fragmented
+    sessions automatically.
 
     Attributes:
         storage: ActivityStorage instance for database access
@@ -54,14 +57,19 @@ class SummarizerWorker:
         self._summarizer_model = None  # Track which model the summarizer was created with
         self._running = False
         self._thread: Optional[threading.Thread] = None
-        self._pending_queue: queue.Queue = queue.Queue()  # For regenerate/force tasks
+        self._pending_queue: queue.Queue = queue.Queue()  # For regenerate/force/session_end tasks
         self._current_task: Optional[str] = None
-        self._next_scheduled_run: Optional[datetime] = None
         self._last_summarized_end: Optional[datetime] = None  # Track last summarized period
         self._last_daily_report_date: Optional[str] = None  # Track date of last daily report
         self._last_weekly_report_week: Optional[str] = None  # Track week of last weekly report
         self._last_monthly_report_month: Optional[str] = None  # Track month of last monthly report
         self._startup_backfill_done: bool = False  # Track if startup backfill is done
+        self._pending_session_end: Optional[Tuple[int, datetime]] = None  # (session_id, scheduled_at)
+        self._last_session_active_time: Optional[datetime] = None  # For debounce check
+        # Preview summary tracking
+        self._current_session_start: Optional[datetime] = None  # When active session started
+        self._current_session_id: Optional[int] = None  # ID of current active session
+        self._last_preview_time: Optional[datetime] = None  # When last preview was generated
 
     @property
     def summarizer(self):
@@ -172,16 +180,9 @@ class SummarizerWorker:
             return
 
         self._running = True
-
-        # Initialize scheduling
-        self._next_scheduled_run = self._get_next_scheduled_time()
         self._last_summarized_end = self._find_last_summarized_time()
 
-        frequency_minutes = self.config.config.summarization.frequency_minutes
-        logger.info(
-            f"SummarizerWorker starting with {frequency_minutes}min intervals. "
-            f"Next run at {self._next_scheduled_run.strftime('%H:%M')}"
-        )
+        logger.info("SummarizerWorker starting with activity-based summarization")
 
         self._thread = threading.Thread(target=self._run_loop, daemon=True)
         self._thread.start()
@@ -216,6 +217,37 @@ class SummarizerWorker:
         """
         self._pending_queue.put(('regenerate', summary_id))
         logger.info(f"Queued summary {summary_id} for regeneration")
+
+    def queue_session_end(self, session_id: int):
+        """Queue a session for summarization after it ends.
+
+        Called by the daemon when a user goes AFK. The worker will
+        apply debouncing before actually summarizing to handle
+        brief returns.
+
+        Args:
+            session_id: ID of the session that just ended
+        """
+        scheduled_at = datetime.now()
+        self._pending_queue.put(('session_end', (session_id, scheduled_at)))
+        logger.info(f"Queued session {session_id} for summarization")
+
+    def notify_session_start(self, session_id: int = None):
+        """Notify the worker that a new session has started.
+
+        Called by the daemon when user becomes active. Used for
+        debounce logic - if a new session starts before debounce
+        period expires, we skip summarizing the previous session.
+
+        Also tracks session info for preview summary generation.
+
+        Args:
+            session_id: ID of the new session (for preview tracking)
+        """
+        self._last_session_active_time = datetime.now()
+        self._current_session_start = datetime.now()
+        self._current_session_id = session_id
+        self._last_preview_time = None  # Reset preview timer for new session
 
     def force_summarize_pending(self, date: str = None) -> int:
         """Force immediate summarization of unsummarized time slots.
@@ -282,22 +314,19 @@ class SummarizerWorker:
         """Get current worker status.
 
         Returns:
-            Dict with running state, current task, queue size, and next scheduled run.
+            Dict with running state, current task, queue size, and mode.
         """
         return {
             "running": self._running,
             "current_task": self._current_task,
             "queue_size": self._pending_queue.qsize(),
-            "next_scheduled_run": (
-                self._next_scheduled_run.isoformat()
-                if self._next_scheduled_run else None
-            ),
+            "mode": "activity-based",
         }
 
     def _run_loop(self):
-        """Background loop with cron-like scheduling.
+        """Background loop with activity-based session summarization.
 
-        Runs summarization at fixed clock times based on frequency_minutes.
+        Processes session_end events from the daemon with debouncing.
         Also processes manual tasks from the queue (regenerate, force).
         Additionally generates daily, weekly, and monthly reports on schedule.
         """
@@ -306,9 +335,10 @@ class SummarizerWorker:
         while self._running:
             now = datetime.now()
 
-            # Run startup backfill once (generates missing historical reports)
+            # Run startup tasks once
             if not self._startup_backfill_done:
                 self._do_startup_backfill()
+                self._check_unsummarized_sessions()
                 self._startup_backfill_done = True
 
             # Check if we should generate daily reports (at/after midnight)
@@ -320,40 +350,22 @@ class SummarizerWorker:
             # Check if we should generate monthly reports (1st of month 00:10)
             self._maybe_generate_monthly_reports(now)
 
-            # Check if it's time for scheduled summarization
-            if (self._next_scheduled_run and
-                now >= self._next_scheduled_run and
-                self.config.config.summarization.enabled):
+            # Check if we should generate/update preview summary for active session
+            self._maybe_generate_preview(now)
 
-                slot_time = self._next_scheduled_run
-                start_time, end_time = self._get_time_range_for_slot(slot_time)
-
-                logger.info(
-                    f"Scheduled summarization triggered at {now.strftime('%H:%M:%S')} "
-                    f"for slot {start_time.strftime('%H:%M')}-{end_time.strftime('%H:%M')}"
-                )
-
-                self._current_task = 'scheduled_summarize'
-                try:
-                    self._do_summarize_time_range(start_time, end_time)
-                except Exception as e:
-                    logger.error(f"Scheduled summarization failed: {e}", exc_info=True)
-                finally:
-                    self._current_task = None
-
-                # Schedule next run
-                self._next_scheduled_run = self._get_next_scheduled_time()
-                logger.info(f"Next scheduled run at {self._next_scheduled_run.strftime('%H:%M')}")
-
-            # Process manual tasks from queue (regenerate, force_summarize)
+            # Process tasks from queue
             try:
                 task = self._pending_queue.get(timeout=1)
                 task_type, payload = task
                 self._current_task = task_type
 
                 try:
-                    if task_type == 'summarize_range':
-                        # Force summarize with time range
+                    if task_type == 'session_end':
+                        # Activity-based: summarize a completed session
+                        session_id, scheduled_at = payload
+                        self._process_session_end(session_id, scheduled_at)
+                    elif task_type == 'summarize_range':
+                        # Force summarize with time range (manual backfill)
                         start_time, end_time = payload
                         self._do_summarize_time_range(start_time, end_time)
                     elif task_type == 'summarize':
@@ -370,10 +382,199 @@ class SummarizerWorker:
                 finally:
                     self._current_task = None
             except queue.Empty:
-                # No manual tasks, continue to next iteration
+                # No tasks, continue to next iteration
                 pass
 
         logger.info("SummarizerWorker run loop stopped")
+
+    def _process_session_end(self, session_id: int, scheduled_at: datetime):
+        """Process a session_end event with debouncing and session merging.
+
+        Applies debounce logic: if user returned to activity after the session
+        ended but before debounce period expired, skip summarization.
+
+        Also merges consecutive sessions with short gaps (daemon restarts).
+
+        Args:
+            session_id: ID of the session that ended
+            scheduled_at: When the session_end was scheduled
+        """
+        if not self.config.config.summarization.enabled:
+            logger.debug("Summarization disabled, skipping session_end")
+            return
+
+        cfg = self.config.config.summarization
+        debounce_seconds = cfg.session_debounce_seconds
+        min_duration = cfg.min_session_duration_seconds
+        merge_gap = cfg.session_merge_gap_seconds
+
+        # Check debounce: did user return since this was scheduled?
+        if self._last_session_active_time and self._last_session_active_time > scheduled_at:
+            logger.info(
+                f"Skipping session {session_id} - user returned within debounce period"
+            )
+            return
+
+        # Wait for debounce period (already partially elapsed since scheduled_at)
+        elapsed = (datetime.now() - scheduled_at).total_seconds()
+        remaining_wait = max(0, debounce_seconds - elapsed)
+        if remaining_wait > 0:
+            time.sleep(remaining_wait)
+
+        # Re-check after sleeping - user might have returned
+        if self._last_session_active_time and self._last_session_active_time > scheduled_at:
+            logger.info(
+                f"Skipping session {session_id} - user returned during debounce"
+            )
+            return
+
+        # Get session from storage
+        session = self.storage.get_session(session_id)
+        if not session or session.get('end_time') is None:
+            logger.warning(f"Session {session_id} not found or not ended")
+            return
+
+        # Check minimum duration
+        duration = session.get('duration_seconds', 0)
+        if duration < min_duration:
+            logger.info(
+                f"Skipping session {session_id} - duration {duration}s < {min_duration}s minimum"
+            )
+            return
+
+        # Get merged session bounds (handles daemon restart fragmentation)
+        logical_start, logical_end = self._get_merged_session_bounds(
+            session_id, merge_gap
+        )
+
+        if logical_start is None or logical_end is None:
+            logger.warning(f"Could not determine bounds for session {session_id}")
+            return
+
+        logger.info(
+            f"Summarizing session {session_id}: "
+            f"{logical_start.strftime('%H:%M')} - {logical_end.strftime('%H:%M')}"
+        )
+
+        # Delete any preview summary before generating final summary
+        deleted = self.storage.delete_preview_summaries()
+        if deleted > 0:
+            logger.info(f"Deleted {deleted} preview summary before final summary")
+
+        # Clear session tracking
+        self._current_session_start = None
+        self._current_session_id = None
+        self._last_preview_time = None
+
+        # Use existing summarization method with merged bounds
+        self._do_summarize_time_range(logical_start, logical_end)
+
+    def _get_merged_session_bounds(
+        self, session_id: int, max_gap_seconds: int
+    ) -> Tuple[Optional[datetime], Optional[datetime]]:
+        """Find logical session boundaries by merging restart-fragmented sessions.
+
+        Walks backward from the given session, merging any sessions that have
+        gaps < max_gap_seconds until a real AFK gap is found.
+
+        Args:
+            session_id: ID of the session to find bounds for
+            max_gap_seconds: Maximum gap to consider as daemon restart (not AFK)
+
+        Returns:
+            Tuple of (logical_start, logical_end) datetimes, or (None, None) if not found
+        """
+        sessions = self.storage.get_recent_sessions(limit=20)
+
+        if not sessions:
+            return (None, None)
+
+        # Find our session in the list
+        target_session = None
+        target_idx = None
+        for i, s in enumerate(sessions):
+            if s['id'] == session_id:
+                target_session = s
+                target_idx = i
+                break
+
+        if target_session is None:
+            # Session not in recent list, try direct lookup
+            target_session = self.storage.get_session(session_id)
+            if target_session is None:
+                return (None, None)
+            # Return its own bounds without merging
+            start = datetime.fromisoformat(target_session['start_time'].replace('Z', ''))
+            end = datetime.fromisoformat(target_session['end_time'].replace('Z', ''))
+            return (start, end)
+
+        # Parse end_time for the target session
+        logical_end = datetime.fromisoformat(
+            target_session['end_time'].replace('Z', '')
+        )
+        logical_start = datetime.fromisoformat(
+            target_session['start_time'].replace('Z', '')
+        )
+
+        # Walk backward through older sessions, merging short gaps
+        # Sessions are ordered by end_time DESC, so older sessions have higher indices
+        current_start = logical_start
+        for prev_session in sessions[target_idx + 1:]:
+            prev_end = datetime.fromisoformat(
+                prev_session['end_time'].replace('Z', '')
+            )
+            prev_start = datetime.fromisoformat(
+                prev_session['start_time'].replace('Z', '')
+            )
+
+            # Calculate gap between previous session end and current session start
+            gap_seconds = (current_start - prev_end).total_seconds()
+
+            if 0 < gap_seconds < max_gap_seconds:
+                # Short gap - merge this session
+                logger.debug(
+                    f"Merging session {prev_session['id']} (gap={gap_seconds:.1f}s)"
+                )
+                logical_start = prev_start
+                current_start = prev_start
+            else:
+                # Real AFK gap found, stop merging
+                break
+
+        return (logical_start, logical_end)
+
+    def _check_unsummarized_sessions(self):
+        """Check for sessions that ended without summaries (startup recovery).
+
+        Called once at startup to catch sessions that ended while the daemon
+        was down or before the summarization could complete.
+        """
+        if not self.config.config.summarization.enabled:
+            return
+
+        min_duration = self.config.config.summarization.min_session_duration_seconds
+        unsummarized = self.storage.get_sessions_without_summaries(min_duration)
+
+        if not unsummarized:
+            logger.info("No unsummarized sessions found at startup")
+            return
+
+        logger.info(f"Found {len(unsummarized)} unsummarized sessions at startup")
+
+        for session in unsummarized:
+            session_id = session['id']
+            start_time = datetime.fromisoformat(session['start_time'].replace('Z', ''))
+            end_time = datetime.fromisoformat(session['end_time'].replace('Z', ''))
+
+            logger.info(
+                f"Recovering session {session_id}: "
+                f"{start_time.strftime('%Y-%m-%d %H:%M')} - {end_time.strftime('%H:%M')}"
+            )
+
+            try:
+                self._do_summarize_time_range(start_time, end_time)
+            except Exception as e:
+                logger.error(f"Failed to recover session {session_id}: {e}")
 
     def _do_summarize_time_range(self, start_time: datetime, end_time: datetime):
         """Generate summary for a time range.
@@ -821,6 +1022,177 @@ class SummarizerWorker:
                 clipped.append(event_copy)
 
         return clipped
+
+    def _maybe_generate_preview(self, now: datetime):
+        """Generate or update preview summary for active session if due.
+
+        Called from the run loop. Checks if enough time has passed since
+        the last preview and generates/updates the preview summary for
+        the current active session.
+
+        Args:
+            now: Current datetime
+        """
+        # Only run if summarization is enabled
+        if not self.config.config.summarization.enabled:
+            return
+
+        # Only if we have an active session
+        if self._current_session_start is None:
+            return
+
+        cfg = self.config.config.summarization
+        preview_interval = cfg.preview_interval_minutes
+        min_duration = cfg.min_session_duration_seconds
+
+        # Check if session has been active long enough to generate a preview
+        session_duration = (now - self._current_session_start).total_seconds()
+        if session_duration < min_duration:
+            return
+
+        # Check if it's time for a preview update
+        if self._last_preview_time is not None:
+            since_last = (now - self._last_preview_time).total_seconds()
+            if since_last < preview_interval * 60:
+                return
+        else:
+            # First preview - wait at least one interval from session start
+            since_start = (now - self._current_session_start).total_seconds()
+            if since_start < preview_interval * 60:
+                return
+
+        # Generate/update preview summary
+        self._generate_preview_summary(now)
+
+    def _generate_preview_summary(self, now: datetime):
+        """Generate or update the preview summary for the current session.
+
+        Creates a new preview summary or updates an existing one with the
+        latest activity data from the current session.
+
+        Args:
+            now: Current datetime
+        """
+        if self._current_session_start is None:
+            return
+
+        self._current_task = 'preview'
+        try:
+            # Check if summarizer is available
+            try:
+                summarizer = self.summarizer
+                if summarizer is None:
+                    logger.error("Summarizer not available for preview")
+                    return
+            except Exception as e:
+                logger.error(f"Failed to initialize summarizer for preview: {e}")
+                return
+
+            start_time = self._current_session_start
+            end_time = now
+
+            logger.info(
+                f"Generating preview summary: "
+                f"{start_time.strftime('%H:%M')} - {end_time.strftime('%H:%M')}"
+            )
+
+            # Get screenshots in the time range
+            screenshots = self.storage.get_screenshots_in_range(
+                start_time.isoformat(),
+                end_time.isoformat()
+            )
+
+            if not screenshots:
+                logger.debug("No screenshots for preview summary")
+                return
+
+            # Get focus events for context
+            focus_events = self.storage.get_focus_events_in_range(
+                start_time.isoformat(),
+                end_time.isoformat()
+            )
+
+            logger.info(
+                f"Preview: Found {len(screenshots)} screenshots and "
+                f"{len(focus_events)} focus events"
+            )
+
+            # Generate summary
+            cfg = self.config.config.summarization
+            result = summarizer.summarize_screenshots(
+                screenshots,
+                self.storage,
+                self.config.config,
+                previous_summary=None,  # No context for previews
+                focus_events=focus_events,
+            )
+
+            if result is None:
+                logger.warning("Preview summarization returned None")
+                return
+
+            summary_text = result.get('summary', '')
+            explanation = result.get('explanation')
+            confidence = result.get('confidence')
+            tags = result.get('tags', [])
+            inference_ms = result.get('inference_ms', 0)
+            screenshot_ids = result.get('screenshot_ids', [s['id'] for s in screenshots])
+
+            # Check for existing preview to update
+            existing_preview = self.storage.get_current_preview_summary()
+
+            config_snapshot = {
+                "model": cfg.model,
+                "max_samples": cfg.max_samples,
+                "include_focus_context": cfg.include_focus_context,
+                "include_screenshots": cfg.include_screenshots,
+                "include_ocr": cfg.include_ocr,
+            }
+
+            if existing_preview:
+                # Update existing preview
+                self.storage.update_preview_summary(
+                    summary_id=existing_preview['id'],
+                    end_time=end_time.isoformat(),
+                    summary=summary_text,
+                    screenshot_ids=screenshot_ids,
+                    model=cfg.model,
+                    config_snapshot=config_snapshot,
+                    inference_ms=inference_ms,
+                    explanation=explanation,
+                    tags=tags,
+                    confidence=confidence,
+                )
+                logger.info(
+                    f"Updated preview summary {existing_preview['id']} "
+                    f"(conf={confidence:.2f}): {summary_text[:60]}..."
+                )
+            else:
+                # Create new preview
+                summary_id = self.storage.save_threshold_summary(
+                    start_time=start_time.isoformat(),
+                    end_time=end_time.isoformat(),
+                    summary=summary_text,
+                    screenshot_ids=screenshot_ids,
+                    model=cfg.model,
+                    config_snapshot=config_snapshot,
+                    inference_ms=inference_ms,
+                    explanation=explanation,
+                    tags=tags,
+                    confidence=confidence,
+                    is_preview=True,
+                )
+                logger.info(
+                    f"Created preview summary {summary_id} "
+                    f"(conf={confidence:.2f}): {summary_text[:60]}..."
+                )
+
+            self._last_preview_time = now
+
+        except Exception as e:
+            logger.error(f"Preview generation failed: {e}", exc_info=True)
+        finally:
+            self._current_task = None
 
     def _maybe_generate_daily_reports(self, now: datetime):
         """Generate daily report for yesterday if not already generated.

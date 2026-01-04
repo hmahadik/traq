@@ -109,6 +109,10 @@ function updateUI(cfg) {
     setValue('timeout_seconds', cfg.afk.timeout_seconds);
     setValue('min_session_minutes', cfg.afk.min_session_minutes);
 
+    // Goals
+    setValue('daily_work_hours', cfg.goals?.daily_work_hours ?? 8);
+    setChecked('weekday_goals_only', cfg.goals?.weekday_goals_only ?? true);
+
     // Summarization - User-facing settings
     setChecked('summarization_enabled', cfg.summarization.enabled);
     setValue('model', cfg.summarization.model);
@@ -651,13 +655,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Range inputs
     ['interval_seconds', 'quality', 'timeout_seconds', 'min_session_minutes',
-     'max_days_retention', 'max_gb_storage', 'max_samples'].forEach(id => {
+     'max_days_retention', 'max_gb_storage', 'max_samples', 'daily_work_hours'].forEach(id => {
         const el = document.getElementById(id);
         if (el) {
             el.addEventListener('input', (e) => {
                 updateSliderValue(id, e.target.value);
                 const { section, key } = getConfigInfo(id);
-                const value = id === 'max_gb_storage'
+                const value = (id === 'max_gb_storage' || id === 'daily_work_hours')
                     ? parseFloat(e.target.value)
                     : parseInt(e.target.value);
                 trackChange(id, section, key, value);
@@ -670,7 +674,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     ['capture_active_monitor_only', 'summarization_enabled', 'include_previous_summary',
      'crop_to_window', 'focus_weighted_sampling',
-     'include_focus_context', 'include_screenshots', 'include_ocr'].forEach(id => {
+     'include_focus_context', 'include_screenshots', 'include_ocr', 'weekday_goals_only'].forEach(id => {
         const el = document.getElementById(id);
         if (el) {
             el.addEventListener('change', (e) => {
@@ -754,6 +758,9 @@ const configMapping = {
     // AFK
     timeout_seconds: { section: 'afk', key: 'timeout_seconds' },
     min_session_minutes: { section: 'afk', key: 'min_session_minutes' },
+    // Goals
+    daily_work_hours: { section: 'goals', key: 'daily_work_hours' },
+    weekday_goals_only: { section: 'goals', key: 'weekday_goals_only' },
     // Summarization - User-facing settings
     summarization_enabled: { section: 'summarization', key: 'enabled' },
     model: { section: 'summarization', key: 'model' },

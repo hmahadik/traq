@@ -208,16 +208,21 @@ class ActivityDaemon:
         """Called when user becomes active after AFK.
 
         Starts a new session to track the upcoming activity period.
+        Also notifies the summarizer worker (for debounce tracking).
         """
         self.current_session_id = self.session_manager.start_session()
         self.log(f"Started session {self.current_session_id}")
+
+        # Notify summarizer worker that user is active (for debounce and preview logic)
+        if self.summarizer_worker:
+            self.summarizer_worker.notify_session_start(self.current_session_id)
 
     def _handle_afk(self):
         """Called when user goes AFK.
 
         Ends the current session and flushes the current focus event so that
-        focus durations don't include AFK time. Summarization is handled by
-        the threshold-based SummarizerWorker, not AFK events.
+        focus durations don't include AFK time. Triggers activity-based
+        summarization for the completed session.
         """
         # Flush current focus event BEFORE ending session (so it has correct session_id)
         flushed_event = self.window_watcher.flush_current_event()
@@ -225,9 +230,16 @@ class ActivityDaemon:
             self._save_focus_event(flushed_event)
 
         if self.current_session_id:
-            session = self.session_manager.end_session(self.current_session_id)
-            if session:  # Was long enough
-                self.log(f"Ended session {self.current_session_id}, duration: {session.get('duration_seconds', 0) // 60}m")
+            session_id = self.current_session_id
+            session = self.session_manager.end_session(session_id)
+            if session:  # Was long enough to keep
+                duration_min = session.get('duration_seconds', 0) // 60
+                self.log(f"Ended session {session_id}, duration: {duration_min}m")
+
+                # Queue session for summarization (with debouncing)
+                if self.summarizer_worker:
+                    self.summarizer_worker.queue_session_end(session_id)
+
             self.current_session_id = None
 
     def _save_focus_event(self, event: WindowFocusEvent, next_app: str = None):
@@ -241,7 +253,7 @@ class ActivityDaemon:
         terminal_context_json = None
         terminal_info = ""
         if is_terminal_app(event.app_name) and event.window_pid:
-            context = get_terminal_context(event.window_pid)
+            context = get_terminal_context(event.window_pid, event.window_title)
             if context:
                 terminal_context_json = context.to_json()
                 terminal_info = f" [{context.format_short()}]"
