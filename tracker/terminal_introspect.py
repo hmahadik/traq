@@ -141,7 +141,8 @@ def get_terminal_context(window_pid: int) -> Optional[TerminalContext]:
         if shell_in_tmux:
             # Use tmux-aware introspection for accurate active pane detection
             # This queries tmux directly and handles SSH detection internally
-            tmux_context = _get_tmux_active_pane_context()
+            # Pass window_pid to validate the tmux pane belongs to this window
+            tmux_context = _get_tmux_active_pane_context(window_pid)
             if tmux_context:
                 return tmux_context
 
@@ -434,7 +435,7 @@ def _get_tmux_session(pids: List[int]) -> Optional[str]:
     return "tmux"  # Generic fallback
 
 
-def _get_tmux_active_pane_context() -> Optional[TerminalContext]:
+def _get_tmux_active_pane_context(window_pid: int) -> Optional[TerminalContext]:
     """Get context from tmux's active pane.
 
     When tmux is running, this queries tmux directly for accurate
@@ -446,8 +447,14 @@ def _get_tmux_active_pane_context() -> Optional[TerminalContext]:
     (like MCP servers spawned by Claude Code) would incorrectly be identified
     as the foreground process.
 
+    Args:
+        window_pid: PID of the terminal window we're introspecting. Used to
+            validate that the tmux pane belongs to this window (prevents
+            cross-contamination when multiple terminal windows have tmux).
+
     Returns:
-        TerminalContext from the active tmux pane, or None if query fails.
+        TerminalContext from the active tmux pane, or None if query fails
+        or the pane doesn't belong to this window.
     """
     try:
         # Query tmux for active pane info in a single call
@@ -470,6 +477,21 @@ def _get_tmux_active_pane_context() -> Optional[TerminalContext]:
         pane_path = parts[1]
         pane_pid = parts[2]
         session_name = parts[3]
+
+        # Validate that this tmux pane belongs to the window we're introspecting.
+        # tmux display-message returns the GLOBALLY active pane, which may be
+        # from a different terminal window. We check if the pane's shell PID
+        # is a descendant of our window_pid.
+        if pane_pid.isdigit():
+            pane_pid_int = int(pane_pid)
+            window_descendants = _get_descendant_pids(window_pid)
+            if pane_pid_int not in window_descendants:
+                # The tmux pane is from a different terminal window
+                logger.debug(
+                    f"Tmux pane PID {pane_pid_int} not in window {window_pid} "
+                    f"descendants, falling back to process tree"
+                )
+                return None
 
         # pane_current_command from tmux is the ACTUAL foreground process
         # This is what the user is interacting with, not background children
