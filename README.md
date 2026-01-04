@@ -10,6 +10,7 @@ A Linux background service that automatically captures desktop screenshots at re
 - **Session-Based Tracking**: Automatically detects AFK periods to group activity into sessions
 - **AFK Detection**: Uses pynput to monitor keyboard/mouse activity (configurable timeout)
 - **Window Focus Tracking**: Real-time tracking of app/window usage with duration metrics
+- **Terminal Introspection**: Detects what's running in terminals (vim, python, npm) with tmux/SSH context
 - **Timeline View**: Interactive calendar heatmap with session-based activity breakdown
 - **Analytics Dashboard**: Comprehensive charts showing activity patterns and trends
 - **Report Generation**: Natural language time ranges ("last week", "past 3 days") with multiple formats
@@ -17,9 +18,12 @@ A Linux background service that automatically captures desktop screenshots at re
 - **Efficient Storage**: WebP compression with thumbnails for fast loading
 - **Systemd Integration**: Runs as user service with automatic restart
 - **X11 Support**: Optimized for X11 display server (Wayland support planned)
-- **AI Activity Summaries**: Vision LLM-powered summaries with app/window usage context
+- **AI Activity Summaries**: Two-stage vision LLM-powered summaries with structured output
+- **Activity-Based Summarization**: Summaries triggered on session end with debouncing
+- **Focus-Weighted Sampling**: Hamilton allocation by (app, window_title) pairs
 - **Smart Session Resume**: Resumes previous session on restart if within AFK timeout
 - **Multi-monitor Support**: Captures only the active monitor, reducing storage needs
+- **Project Grouping**: Groups related activities in timeline view
 
 ## Architecture
 
@@ -70,24 +74,43 @@ A Linux background service that automatically captures desktop screenshots at re
    - Application usage tracking
 
 8. **Vision Summarizer (`tracker/vision.py`)**
-   - Hybrid OCR + vision LLM for activity understanding
-   - Tesseract OCR for text extraction from screenshots
-   - Ollama integration with configurable vision models
+   - Two-stage LLM summarization via Ollama
+   - Focus-weighted screenshot sampling (Hamilton allocation)
+   - Groups by (app_name, window_title) pairs with min 3 samples
+   - Structured output: SUMMARY, EXPLANATION, CONFIDENCE, TAGS
    - App/window usage context passed to LLM for accurate summaries
-   - Focus-weighted screenshot sampling based on time spent per app
    - Returns full API request details for debugging
 
-9. **Window Focus Tracker (`tracker/window_watcher.py`)**
-   - Real-time window focus tracking via xdotool/xprop
-   - Duration tracking per app and window title
-   - Focus events stored in database with session links
-   - Provides time breakdown data for AI summarization
+9. **Summarizer Worker (`tracker/summarizer_worker.py`)**
+   - Activity-based triggers (summarizes on session end)
+   - Debouncing to handle brief returns
+   - Session merging for daemon-restart fragmentation
+   - Startup recovery for unsummarized sessions
+   - Preview summaries during active sessions
 
-10. **Report Generator (`tracker/reports.py`)**
+10. **Window Focus Tracker (`tracker/window_watcher.py`)**
+    - Real-time window focus tracking via xdotool/xprop
+    - Duration tracking per app and window title
+    - Focus events stored in database with session links
+    - Provides time breakdown data for AI summarization
+
+11. **Terminal Introspection (`tracker/terminal_introspect.py`)**
+    - Inspects processes running inside terminal emulators
+    - Walks process tree via /proc filesystem
+    - Detects foreground command (vim, python, npm, etc.)
+    - Identifies SSH sessions and tmux context
+    - Supports multiple terminals: Tilix, gnome-terminal, Alacritty, Kitty, etc.
+
+12. **Report Generator (`tracker/reports.py`, `tracker/report_export.py`)**
     - Natural language time range parsing ("last week", "past 3 days")
     - Three report types: Summary, Detailed, Standup
     - Export to Markdown, HTML, PDF, JSON formats
-    - Analytics computation for app/window usage
+    - Cached reports (daily/weekly/monthly) with LLM synthesis
+    - Export history tracking
+
+13. **Tag Detector (`tracker/tag_detector.py`)**
+    - Extracts activity tags from summaries
+    - Categories: development, communication, research, etc.
 
 ### Data Storage Structure
 
@@ -106,44 +129,58 @@ A Linux background service that automatically captures desktop screenshots at re
 ### Database Schema
 
 ```sql
+-- Screenshots with window geometry and monitor info
 CREATE TABLE screenshots (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    timestamp INTEGER NOT NULL,           -- Unix timestamp
-    filepath TEXT NOT NULL,              -- Relative path to image file
-    dhash TEXT NOT NULL,                 -- Perceptual hash (16-char hex)
-    window_title TEXT,                   -- Active window title
-    app_name TEXT                        -- Application class name
+    timestamp INTEGER NOT NULL,
+    filepath TEXT NOT NULL,
+    dhash TEXT NOT NULL,
+    window_title TEXT,
+    app_name TEXT,
+    window_x INTEGER,
+    window_y INTEGER,
+    window_width INTEGER,
+    window_height INTEGER,
+    monitor_name TEXT,
+    monitor_width INTEGER,
+    monitor_height INTEGER
 );
 
--- Indexes for performance
 CREATE INDEX idx_timestamp ON screenshots(timestamp);
 CREATE INDEX idx_dhash ON screenshots(dhash);
 
--- Activity summaries table (hourly - legacy)
+-- Hourly activity summaries (legacy)
 CREATE TABLE activity_summaries (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    date TEXT NOT NULL,                   -- YYYY-MM-DD
-    hour INTEGER NOT NULL,                -- 0-23
-    summary TEXT NOT NULL,                -- LLM-generated summary
-    screenshot_ids TEXT NOT NULL,         -- JSON array of screenshot IDs
-    model_used TEXT NOT NULL,             -- e.g., "gemma3:27b-it-qat"
-    inference_time_ms INTEGER NOT NULL,   -- Processing time
+    date TEXT NOT NULL,
+    hour INTEGER NOT NULL,
+    summary TEXT NOT NULL,
+    screenshot_ids TEXT NOT NULL,
+    model_used TEXT NOT NULL,
+    inference_time_ms INTEGER NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(date, hour)
 );
 
--- Activity sessions table (continuous periods of user activity)
+-- Daily consolidated summaries
+CREATE TABLE daily_summaries (
+    date TEXT PRIMARY KEY,
+    summary TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Activity sessions (continuous periods of user activity)
 CREATE TABLE activity_sessions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    start_time TIMESTAMP NOT NULL,        -- Session start
-    end_time TIMESTAMP,                   -- NULL if ongoing
-    duration_seconds INTEGER,             -- Calculated on session end
-    summary TEXT,                         -- LLM-generated summary
+    start_time TIMESTAMP NOT NULL,
+    end_time TIMESTAMP,
+    duration_seconds INTEGER,
+    summary TEXT,
     screenshot_count INTEGER DEFAULT 0,
     unique_windows INTEGER DEFAULT 0,
     model_used TEXT,
     inference_time_ms INTEGER,
-    prompt_text TEXT,                     -- Full API request for debugging
+    prompt_text TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -164,18 +201,73 @@ CREATE TABLE session_ocr_cache (
     UNIQUE(session_id, window_title)
 );
 
--- Threshold-based summaries (auto-generated every N screenshots)
+-- Activity-based summaries (triggered on session end)
 CREATE TABLE threshold_summaries (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    start_time TEXT NOT NULL,               -- ISO timestamp of first screenshot
-    end_time TEXT NOT NULL,                 -- ISO timestamp of last screenshot
-    summary TEXT NOT NULL,                  -- LLM-generated summary
-    screenshot_ids TEXT NOT NULL,           -- JSON array of screenshot IDs
-    model_used TEXT NOT NULL,               -- e.g., "gemma3:14b-it-qat"
-    config_snapshot TEXT,                   -- JSON snapshot of summarization config
+    start_time TIMESTAMP NOT NULL,
+    end_time TIMESTAMP NOT NULL,
+    summary TEXT NOT NULL,
+    screenshot_ids TEXT NOT NULL,
+    screenshot_count INTEGER NOT NULL,
+    model_used TEXT NOT NULL,
+    config_snapshot TEXT,
     inference_time_ms INTEGER,
-    regenerated_from INTEGER,               -- Links to original if this is a regeneration
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    regenerated_from INTEGER REFERENCES threshold_summaries(id)
+);
+
+-- Summary to screenshot relationships
+CREATE TABLE threshold_summary_screenshots (
+    summary_id INTEGER NOT NULL REFERENCES threshold_summaries(id) ON DELETE CASCADE,
+    screenshot_id INTEGER NOT NULL REFERENCES screenshots(id) ON DELETE CASCADE,
+    PRIMARY KEY (summary_id, screenshot_id)
+);
+
+-- Window focus tracking
+CREATE TABLE window_focus_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    window_title TEXT NOT NULL,
+    app_name TEXT NOT NULL,
+    window_class TEXT,
+    start_time TIMESTAMP NOT NULL,
+    end_time TIMESTAMP NOT NULL,
+    duration_seconds REAL NOT NULL,
+    session_id INTEGER REFERENCES activity_sessions(id),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Exported reports history
+CREATE TABLE exported_reports (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    time_range TEXT NOT NULL,
+    report_type TEXT NOT NULL,
+    format TEXT NOT NULL,
+    filename TEXT NOT NULL,
+    filepath TEXT NOT NULL,
+    file_size INTEGER,
+    start_time TIMESTAMP,
+    end_time TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Cached periodic reports (daily/weekly/monthly)
+CREATE TABLE cached_reports (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    period_type TEXT NOT NULL,
+    period_date TEXT NOT NULL,
+    start_time TIMESTAMP NOT NULL,
+    end_time TIMESTAMP NOT NULL,
+    executive_summary TEXT,
+    sections_json TEXT,
+    analytics_json TEXT,
+    summary_ids_json TEXT,
+    model_used TEXT,
+    inference_time_ms INTEGER,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    prompt_text TEXT,
+    explanation TEXT,
+    tags TEXT
 );
 ```
 
@@ -219,7 +311,7 @@ pip install -r requirements.txt
 
 # The script automatically enables:
 # - Web interface at http://127.0.0.1:55555
-# - Auto-summarization (triggers every 10 screenshots)
+# - Auto-summarization (triggers on session end)
 ```
 
 3. **Verify installation:**
@@ -244,9 +336,6 @@ The activity tracker can generate AI-powered summaries of your work using a loca
 **Software Dependencies:**
 
 ```bash
-# Install Tesseract OCR
-sudo apt install tesseract-ocr
-
 # Start Ollama Docker container (with GPU support)
 docker run -d --gpus=all \
   -v ollama:/root/.ollama \
@@ -285,14 +374,19 @@ summarization:
   ollama_host: http://gpu-server:11434
 ```
 
-**Threshold-Based Summarization:**
+**Activity-Based Summarization:**
 
-Auto-summarization is enabled by default. Summaries are generated at configurable time intervals. Configure this in the Settings page:
-- **Summary Frequency**: Time between summaries (5/15/30/60 minutes)
+Auto-summarization is enabled by default. Summaries are generated when sessions end (user goes AFK). Configure this in the Settings page:
 - **Model**: Select from available Ollama models (auto-detected)
 - **Quality Preset**: Quick (5 samples), Balanced (10 samples), Thorough (15 samples)
 - **Content to Include**: App/window usage, Screenshots, OCR text (checkboxes)
 - **Advanced Settings**: Ollama host, crop to window, prompt preview
+
+**How Two-Stage Summarization Works:**
+1. Focus-weighted sampling selects screenshots by (app, window_title) time spent
+2. Hamilton allocation ensures fair representation (min 3 samples)
+3. Stage 1: Vision LLM analyzes screenshots with focus context
+4. Stage 2: Text LLM synthesizes structured output (summary, explanation, confidence, tags)
 
 ## Usage
 
@@ -365,25 +459,19 @@ python scripts/summarize_activity.py --dry-run
 python scripts/summarize_activity.py --model gemma3:14b-it-qat
 ```
 
-**How It Works:**
-1. Samples 4-6 screenshots evenly from each hour
-2. Extracts OCR text from the middle screenshot for context
-3. Sends screenshots + OCR to vision LLM with summarization prompt
-4. Stores results in database with timing info
-
 **Web Interface:**
-- Timeline view shows ✨ badges on hours with summaries
-- Click "Generate" on any hour to create a summary
-- "Generate All" processes all unsummarized hours
-- Daily Summary section shows concatenated hourly summaries
+- Timeline view shows activity summaries with explanation and tags
+- Click any summary to view details (screenshots, focus breakdown)
+- "Generate" on any time slot to create a summary
+- Daily Summary section shows consolidated summaries
 - Analytics dashboard displays recent activity summaries
 
 #### Available Views
 
 1. **Timeline View** (`http://localhost:55555/timeline`) - Default homepage
    - Interactive calendar heatmap showing daily activity intensity
-   - Click any day to see hourly breakdown
-   - Click hourly bars to view screenshots from that hour
+   - Click any day to see session-based breakdown
+   - Summaries grouped by project/activity
    - Keyboard navigation: Arrow keys for day navigation, H/L for month navigation
 
 2. **Analytics Dashboard** (`http://localhost:55555/analytics`)
@@ -398,6 +486,18 @@ python scripts/summarize_activity.py --model gemma3:14b-it-qat
    - View all screenshots from a specific date
    - Navigate between days using arrow buttons
    - Shows window title and application for each screenshot
+
+4. **Reports** (`http://localhost:55555/reports`)
+   - Generate reports with natural language time ranges
+   - Export to Markdown, HTML, PDF, or JSON
+   - Report types: Summary, Detailed, Standup
+   - Export history with download links
+
+5. **Settings** (`http://localhost:55555/settings`)
+   - Configure capture interval, AFK timeout
+   - Summarization settings (model, quality, content)
+   - Test Ollama connection
+   - View/edit prompt templates
 
 ### Manual Operation
 
@@ -428,7 +528,6 @@ Configuration is managed via YAML file at `~/.config/activity-tracker/config.yam
 - **Duplicate Threshold**: 3 bits Hamming distance
 - **Storage Location**: `~/activity-tracker-data/`
 - **AFK Timeout**: 180 seconds (3 minutes)
-- **Trigger Threshold**: 10 screenshots before auto-summarization
 
 **Example config.yaml:**
 ```yaml
@@ -443,8 +542,9 @@ summarization:
   enabled: true
   model: gemma3:14b-it-qat
   ollama_host: http://localhost:11434
-  trigger_threshold: 10
-  include_previous_summary: true
+  focus_weighted_sampling: true
+  include_focus_context: true
+  include_screenshots: true
 ```
 
 ## API Reference
@@ -459,7 +559,7 @@ capture = ScreenCapture()
 filepath, dhash = capture.capture_screen()
 similar = capture.are_similar(hash1, hash2, threshold=10)
 
-# Database operations  
+# Database operations
 storage = ActivityStorage()
 screenshot_id = storage.save_screenshot(filepath, dhash, "Firefox", "firefox")
 screenshots = storage.get_screenshots(start_timestamp, end_timestamp)
@@ -510,7 +610,7 @@ curl "http://localhost:55555/api/week/2024-12-03"
 **Get summaries for a date:**
 ```bash
 curl "http://localhost:55555/api/summaries/2024-12-03"
-# Returns: { "date": "...", "summaries": [{"hour": 9, "summary": "...", "screenshot_count": 6}, ...] }
+# Returns: { "date": "...", "summaries": [...] }
 ```
 
 **Get summary coverage stats:**
@@ -523,14 +623,7 @@ curl "http://localhost:55555/api/summaries/coverage"
 ```bash
 curl -X POST "http://localhost:55555/api/summaries/generate" \
   -H "Content-Type: application/json" \
-  -d '{"date": "2024-12-03", "hours": [9, 10, 11]}'
-# Returns: { "status": "started", "hours_queued": 3 }
-```
-
-**Check generation status:**
-```bash
-curl "http://localhost:55555/api/summaries/generate/status"
-# Returns: { "running": true, "current_hour": 10, "completed": 1, "total": 3 }
+  -d '{"date": "2024-12-03"}'
 ```
 
 #### Session Endpoints
@@ -544,7 +637,6 @@ curl "http://localhost:55555/api/sessions/2024-12-03"
 **Get screenshots for a session:**
 ```bash
 curl "http://localhost:55555/api/sessions/42/screenshots?page=1&per_page=50"
-# Returns: { "session_id": 42, "screenshots": [...], "total": 300 }
 ```
 
 **Get current active session:**
@@ -553,10 +645,18 @@ curl "http://localhost:55555/api/sessions/current"
 # Returns: { "session": {...} or null, "is_afk": true/false }
 ```
 
-**Summarize a session:**
+#### Report Endpoints
+
+**Generate a report:**
 ```bash
-curl -X POST "http://localhost:55555/api/sessions/42/summarize"
-# Returns: { "status": "started" }
+curl -X POST "http://localhost:55555/api/reports/generate" \
+  -H "Content-Type: application/json" \
+  -d '{"time_range": "last week", "report_type": "summary", "format": "markdown"}'
+```
+
+**Get export history:**
+```bash
+curl "http://localhost:55555/api/reports/exports"
 ```
 
 See [API_ENDPOINTS.md](API_ENDPOINTS.md) for complete documentation.
@@ -567,41 +667,63 @@ See [API_ENDPOINTS.md](API_ENDPOINTS.md) for complete documentation.
 
 ```
 activity-tracker/
-├── tracker/                    # Core library
-│   ├── __init__.py            # Package exports and metadata
-│   ├── capture.py             # Screenshot capture and dhash
-│   ├── storage.py             # SQLite database interface
-│   ├── daemon.py              # Background service process
-│   ├── analytics.py           # Activity analytics and statistics
-│   ├── vision.py              # AI summarization (OCR + LLM)
-│   ├── summarizer_worker.py   # Background summarization worker
-│   ├── afk.py                 # AFK detection via pynput
-│   ├── sessions.py            # Session management
-│   ├── window_watcher.py      # Real-time window focus tracking
-│   ├── reports.py             # Report generation
-│   ├── timeparser.py          # Natural language time parsing
-│   └── config.py              # Configuration settings
-├── web/                       # Web interface
-│   ├── app.py                 # Flask application with REST API
-│   └── templates/             # HTML templates
-│       ├── base.html          # Base template with navigation
-│       ├── timeline.html      # Calendar heatmap view (with summaries)
-│       ├── analytics.html     # Analytics dashboard
-│       ├── reports.html       # Report generation UI
-│       ├── settings.html      # Configuration UI
-│       └── day.html           # Daily screenshot view
-├── scripts/                   # Installation and utilities
-│   ├── install.sh             # Systemd service setup
-│   ├── uninstall.sh           # Service removal
-│   └── summarize_activity.py  # CLI for generating summaries
-├── tests/                     # Test suite
-│   ├── conftest.py            # Pytest fixtures
-│   ├── test_capture.py        # Capture tests
-│   ├── test_storage.py        # Storage tests
-│   └── test_dhash.py          # Hash comparison tests
-├── requirements.txt           # Python dependencies
-├── CLAUDE.md                  # Project documentation
-└── README.md                  # This file
+├── tracker/                       # Core library
+│   ├── __init__.py               # Package exports and metadata
+│   ├── capture.py                # Screenshot capture and dhash
+│   ├── storage.py                # SQLite database interface
+│   ├── daemon.py                 # Background service process
+│   ├── analytics.py              # Activity analytics and statistics
+│   ├── vision.py                 # Two-stage LLM summarization
+│   ├── summarizer_worker.py      # Activity-based summarization worker
+│   ├── afk.py                    # AFK detection via pynput
+│   ├── sessions.py               # Session management
+│   ├── window_watcher.py         # Real-time window focus tracking
+│   ├── terminal_introspect.py    # Terminal process introspection
+│   ├── reports.py                # Report generation
+│   ├── report_export.py          # Export to MD/HTML/PDF/JSON
+│   ├── timeparser.py             # Natural language time parsing
+│   ├── tag_detector.py           # Activity tag extraction
+│   ├── app_inference.py          # Application context inference
+│   ├── monitors.py               # Multi-monitor support
+│   ├── config.py                 # Configuration settings
+│   └── utils.py                  # Shared utilities
+├── web/                          # Web interface
+│   ├── app.py                    # Flask application with REST API
+│   ├── static/                   # Static assets
+│   │   ├── styles/               # CSS files
+│   │   │   ├── base.css          # Shared styles
+│   │   │   ├── timeline.css
+│   │   │   ├── analytics.css
+│   │   │   ├── day.css
+│   │   │   ├── reports.css
+│   │   │   └── settings.css
+│   │   └── js/                   # JavaScript files
+│   │       ├── utils.js          # Shared utilities
+│   │       ├── timeline.js
+│   │       ├── analytics.js
+│   │       ├── day.js
+│   │       ├── reports.js
+│   │       └── settings.js
+│   └── templates/                # HTML templates
+│       ├── base.html             # Base template with navigation
+│       ├── timeline.html         # Calendar heatmap view
+│       ├── analytics.html        # Analytics dashboard
+│       ├── reports.html          # Report generation UI
+│       ├── settings.html         # Configuration UI
+│       ├── day.html              # Daily screenshot view
+│       └── partials/             # Reusable template partials
+├── scripts/                      # Installation and utilities
+│   ├── install.sh                # Systemd service setup
+│   ├── uninstall.sh              # Service removal
+│   └── summarize_activity.py     # CLI for generating summaries
+├── tests/                        # Test suite
+│   ├── conftest.py               # Pytest fixtures
+│   ├── test_capture.py           # Capture tests
+│   ├── test_storage.py           # Storage tests
+│   └── test_dhash.py             # Hash comparison tests
+├── requirements.txt              # Python dependencies
+├── CLAUDE.md                     # Development documentation
+└── README.md                     # This file
 ```
 
 ### Running Tests
@@ -610,21 +732,14 @@ activity-tracker/
 # Activate virtual environment
 source venv/bin/activate
 
+# Run full test suite
+pytest tests/ --cov=tracker --cov-report=html
+
 # Test screenshot capture
 python -c "from tracker.capture import ScreenCapture; c = ScreenCapture(); print('Screenshot test:', c.capture_screen()[0])"
 
 # Test database operations
 python -c "from tracker.storage import ActivityStorage; s = ActivityStorage(); print('Database test: OK')"
-
-# Test duplicate detection
-python -c "
-from tracker.capture import ScreenCapture
-c = ScreenCapture()
-# Same image should have distance 0
-h1 = c._generate_dhash(c.capture_screen()[0])
-h2 = c._generate_dhash(c.capture_screen()[0]) 
-print('Hash test:', c.compare_hashes(h1, h2) == 0)
-"
 ```
 
 ### Contributing
@@ -645,7 +760,7 @@ journalctl --user -u activity-tracker --no-pager
 
 # Common causes:
 # - X11 not available (check DISPLAY variable)
-# - Permission denied (check data directory permissions)  
+# - Permission denied (check data directory permissions)
 # - Python dependencies missing (reinstall requirements.txt)
 ```
 
@@ -691,13 +806,13 @@ chmod 644 ~/activity-tracker-data/activity.db
 
 ## Roadmap
 
-### Completed ✓
+### Completed
 - [x] **Activity Analytics**: Usage patterns and application time tracking
-- [x] **Timeline View**: Calendar heatmap with hourly breakdown
+- [x] **Timeline View**: Calendar heatmap with session-based breakdown
 - [x] **Charts & Visualization**: Interactive charts using Chart.js
-- [x] **Comprehensive Test Suite**: Pytest-based testing with 85% coverage
-- [x] **AI Summarization**: Vision LLM-powered activity summaries with OCR grounding
-- [x] **Auto-Summarization**: Time-based background summarization with quality presets
+- [x] **Comprehensive Test Suite**: Pytest-based testing
+- [x] **AI Summarization**: Two-stage vision LLM-powered activity summaries
+- [x] **Activity-Based Summarization**: Triggers on session end with debouncing
 - [x] **Session-Based Tracking**: AFK detection with pynput, session management
 - [x] **Smart Session Resume**: Resume previous session on restart if within timeout
 - [x] **Summary Debugging**: View exact API requests sent to Ollama
@@ -705,15 +820,20 @@ chmod 644 ~/activity-tracker-data/activity.db
 - [x] **Multi-monitor Support**: Captures only active monitor, stores monitor metadata
 - [x] **Summary Regeneration**: Regenerate summaries with different models/settings
 - [x] **Window Focus Tracking**: Real-time app/window usage with duration metrics
-- [x] **Report Generation**: Natural language time ranges with multiple export formats
+- [x] **Terminal Introspection**: Detect processes in terminals (vim, python, tmux, SSH)
+- [x] **Report Generation**: Natural language time ranges with MD/HTML/PDF/JSON export
 - [x] **Thumbnails**: Fast-loading timeline with 200px thumbnail previews
-- [x] **Generate Missing**: Backfill summaries for any day in frequency-based batches
+- [x] **Focus-Weighted Sampling**: Hamilton allocation by (app, window_title) pairs
+- [x] **Two-Stage LLM**: Vision + text synthesis for structured output
+- [x] **Structured Output**: Summary, explanation, confidence, and tags
+- [x] **Project Grouping**: Related activities grouped in timeline UI
+- [x] **Extracted CSS/JS**: Modular static assets (90% template size reduction)
 
 ### Planned
 - [ ] **Wayland Support**: Add sway/wlroots integration for window information
 - [ ] **Privacy Filters**: Blur sensitive areas or skip certain applications
 - [ ] **Search & Tagging**: Search screenshots by window title, add custom tags
-- [ ] **Daily Rollup Summaries**: Consolidate threshold summaries into daily digests
+- [ ] **Database Normalization**: Unify summaries tables, separate prompts table
 
 ## License
 
