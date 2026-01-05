@@ -1,73 +1,46 @@
 /**
  * Wails Binding Wrappers
  *
- * TODO: Once Phase 4 (Backend Services & Wails Bindings) is complete,
- * replace these mock implementations with actual Wails bindings:
- *
- * import * as Analytics from '@wailsjs/go/service/AnalyticsService';
- * import * as Timeline from '@wailsjs/go/service/TimelineService';
- * import * as Reports from '@wailsjs/go/service/ReportsService';
- * import * as Config from '@wailsjs/go/service/ConfigService';
- * import * as Screenshots from '@wailsjs/go/service/ScreenshotService';
- * import * as Summaries from '@wailsjs/go/service/SummaryService';
+ * This file wraps the auto-generated Wails bindings for type safety
+ * and consistent API usage across the frontend.
  */
 
+import * as App from '@wailsjs/go/main/App';
+
 import type {
-  DailyStats,
-  WeeklyStats,
-  CalendarData,
-  AppUsage,
-  HourlyActivity,
-  DataSourceStats,
-  SessionSummary,
-  ScreenshotPage,
-  SessionContext,
-  Config,
   InferenceStatus,
   ModelInfo,
-  Report,
-  ReportMeta,
-  TimeRange,
-  Screenshot,
 } from '@/types';
 
-import { mockData } from './mockData';
-
-// Simulate network delay
-const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+// Use 'unknown' for backend types that may differ from frontend definitions
+// Components should handle the actual structure
 
 /**
  * Analytics API
  */
 export const analytics = {
-  getDailyStats: async (date: string): Promise<DailyStats> => {
-    await delay(200);
-    return mockData.getDailyStats(date);
+  getDailyStats: async (date: string) => {
+    return App.GetDailyStats(date);
   },
 
-  getWeeklyStats: async (startDate: string): Promise<WeeklyStats> => {
-    await delay(300);
-    return mockData.getWeeklyStats(startDate);
+  getWeeklyStats: async (startDate: string) => {
+    return App.GetWeeklyStats(startDate);
   },
 
-  getCalendarHeatmap: async (year: number, month: number): Promise<CalendarData> => {
-    await delay(200);
-    return mockData.getCalendarHeatmap(year, month);
+  getCalendarHeatmap: async (year: number, month: number) => {
+    return App.GetCalendarHeatmap(year, month);
   },
 
-  getAppUsage: async (start: number, end: number): Promise<AppUsage[]> => {
-    await delay(200);
-    return mockData.getAppUsage(start, end);
+  getAppUsage: async (start: number, end: number) => {
+    return App.GetAppUsage(start, end);
   },
 
-  getHourlyActivity: async (date: string): Promise<HourlyActivity[]> => {
-    await delay(150);
-    return mockData.getHourlyActivity(date);
+  getHourlyActivity: async (date: string) => {
+    return App.GetHourlyActivity(date);
   },
 
-  getDataSourceStats: async (start: number, end: number): Promise<DataSourceStats> => {
-    await delay(250);
-    return mockData.getDataSourceStats(start, end);
+  getDataSourceStats: async (start: number, end: number) => {
+    return App.GetDataSourceStats(start, end);
   },
 };
 
@@ -75,28 +48,28 @@ export const analytics = {
  * Timeline API
  */
 export const timeline = {
-  getSessionsForDate: async (date: string): Promise<SessionSummary[]> => {
-    await delay(300);
-    return mockData.getSessionsForDate(date);
+  getSessionsForDate: async (date: string) => {
+    return App.GetSessionsForDate(date);
   },
 
   getScreenshotsForSession: async (
     sessionId: number,
     page: number,
     perPage: number
-  ): Promise<ScreenshotPage> => {
-    await delay(200);
-    return mockData.getScreenshotsForSession(sessionId, page, perPage);
+  ) => {
+    return App.GetScreenshotsForSession(sessionId, page, perPage);
   },
 
-  getScreenshotsForHour: async (date: string, hour: number): Promise<Screenshot[]> => {
-    await delay(200);
-    return mockData.getScreenshotsForHour(date, hour);
+  getScreenshotsForHour: async (date: string, hour: number) => {
+    return App.GetScreenshotsForHour(date, hour);
   },
 
-  getSessionContext: async (sessionId: number): Promise<SessionContext> => {
-    await delay(300);
-    return mockData.getSessionContext(sessionId);
+  getSessionContext: async (sessionId: number) => {
+    return App.GetSessionContext(sessionId);
+  },
+
+  getRecentSessions: async (limit: number) => {
+    return App.GetRecentSessions(limit);
   },
 };
 
@@ -104,24 +77,20 @@ export const timeline = {
  * Reports API
  */
 export const reports = {
-  generateReport: async (timeRange: string, reportType: string): Promise<Report> => {
-    await delay(1000); // Reports take longer to generate
-    return mockData.generateReport(timeRange, reportType);
+  generateReport: async (timeRange: string, reportType: string) => {
+    return App.GenerateReport(timeRange, reportType);
   },
 
-  exportReport: async (reportId: number, format: string): Promise<string> => {
-    await delay(500);
-    return `/exports/report-${reportId}.${format}`;
+  exportReport: async (reportId: number, format: string) => {
+    return App.ExportReport(reportId, format);
   },
 
-  getReportHistory: async (): Promise<ReportMeta[]> => {
-    await delay(200);
-    return mockData.getReportHistory();
+  getReportHistory: async () => {
+    return App.GetReportHistory();
   },
 
-  parseTimeRange: async (input: string): Promise<TimeRange> => {
-    await delay(100);
-    return mockData.parseTimeRange(input);
+  parseTimeRange: async (input: string) => {
+    return App.ParseTimeRange(input);
   },
 };
 
@@ -129,41 +98,53 @@ export const reports = {
  * Config API
  */
 export const config = {
-  getConfig: async (): Promise<Config> => {
-    await delay(150);
-    return mockData.getConfig();
+  getConfig: async () => {
+    return App.GetConfig();
   },
 
-  updateConfig: async (updates: Partial<Config>): Promise<void> => {
-    await delay(200);
-    console.log('Config updated:', updates);
-    // In real implementation, this would call the backend
+  updateConfig: async (updates: Record<string, unknown>) => {
+    return App.UpdateConfig(updates);
   },
 
-  restartDaemon: async (): Promise<void> => {
-    await delay(500);
-    console.log('Daemon restarted');
+  restartDaemon: async () => {
+    return App.RestartTracking();
   },
 
+  getDaemonStatus: async () => {
+    return App.GetDaemonStatus();
+  },
+
+  startDaemon: async () => {
+    return App.StartTracking();
+  },
+
+  stopDaemon: async () => {
+    return App.StopTracking();
+  },
+
+  getStorageStats: async () => {
+    return App.GetStorageStats();
+  },
+
+  // These are stubs - inference not implemented yet
   getInferenceStatus: async (): Promise<InferenceStatus> => {
-    await delay(200);
-    return mockData.getInferenceStatus();
+    return {
+      type: 'bundled',
+      available: false,
+      model: '',
+      error: null,
+    };
   },
 
   getAvailableModels: async (): Promise<ModelInfo[]> => {
-    await delay(200);
-    return mockData.getAvailableModels();
+    return [];
   },
 
   downloadModel: async (
     _modelId: string,
-    onProgress: (progress: number) => void
+    _onProgress: (progress: number) => void
   ): Promise<void> => {
-    // Simulate download progress
-    for (let i = 0; i <= 100; i += 10) {
-      await delay(200);
-      onProgress(i);
-    }
+    console.warn('Model download not implemented');
   },
 };
 
@@ -171,40 +152,64 @@ export const config = {
  * Screenshots API
  */
 export const screenshots = {
-  getScreenshot: async (id: number): Promise<Screenshot> => {
-    await delay(100);
-    return mockData.getScreenshot(id);
+  getScreenshot: async (id: number) => {
+    return App.GetScreenshot(id);
   },
 
-  getScreenshotImage: async (id: number): Promise<string> => {
-    await delay(50);
-    // Return a placeholder image URL
-    return mockData.getScreenshotImageUrl(id);
+  getScreenshotImage: async (id: number) => {
+    // Returns the file:// path to the screenshot
+    return App.GetScreenshotPath(id);
   },
 
-  getThumbnail: async (id: number): Promise<string> => {
-    await delay(50);
-    return mockData.getThumbnailUrl(id);
+  getThumbnail: async (id: number) => {
+    // Returns the file:// path to the thumbnail
+    return App.GetThumbnailPath(id);
   },
 
-  deleteScreenshot: async (id: number): Promise<void> => {
-    await delay(200);
-    console.log('Screenshot deleted:', id);
+  deleteScreenshot: async (id: number) => {
+    return App.DeleteScreenshot(id);
   },
 };
 
 /**
- * Summaries API
+ * System API
  */
-export const summaries = {
-  generateSummary: async (sessionId: number): Promise<void> => {
-    await delay(3000); // Summaries take time to generate
-    console.log('Summary generated for session:', sessionId);
+export const system = {
+  getDataDir: async () => {
+    return App.GetDataDir();
   },
 
-  regenerateSummary: async (sessionId: number): Promise<void> => {
-    await delay(3000);
-    console.log('Summary regenerated for session:', sessionId);
+  getVersion: async () => {
+    return App.GetVersion();
+  },
+
+  getSystemInfo: async () => {
+    return App.GetSystemInfo();
+  },
+
+  getCurrentTime: async () => {
+    return App.GetCurrentTime();
+  },
+
+  openDataDir: async () => {
+    return App.OpenDataDir();
+  },
+
+  forceCapture: async () => {
+    return App.ForceCapture();
+  },
+};
+
+/**
+ * Summaries API (stubs - not yet implemented in backend)
+ */
+export const summaries = {
+  generateSummary: async (_sessionId: number): Promise<void> => {
+    console.warn('Summary generation not implemented');
+  },
+
+  regenerateSummary: async (_sessionId: number): Promise<void> => {
+    console.warn('Summary regeneration not implemented');
   },
 };
 
@@ -215,5 +220,6 @@ export const api = {
   reports,
   config,
   screenshots,
+  system,
   summaries,
 };

@@ -22,9 +22,10 @@
       "@/lib/*": ["./src/lib/*"],
       "@/hooks/*": ["./src/hooks/*"],
       "@/api/*": ["./src/api/*"],
-      "@/types/*": ["./src/types/*"]
+      "@/types/*": ["./src/types/*"],
+      "@wailsjs/*": ["./wailsjs/*"]
     }
   },
-  "include": ["src"],
+  "include": ["src", "wailsjs"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }
