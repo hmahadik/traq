@@ -144,6 +144,15 @@ echo -e "${GREEN}✓${NC} Web interface will be enabled on http://127.0.0.1:5555
 echo -e "${GREEN}✓${NC} Auto-summarization enabled (triggers after every 10 screenshots)"
 echo
 
+# Detect current DISPLAY environment variable
+if [ -n "$DISPLAY" ]; then
+    DISPLAY_VALUE="$DISPLAY"
+    echo -e "${GREEN}✓${NC} Detected DISPLAY=$DISPLAY_VALUE"
+else
+    DISPLAY_VALUE=":0"
+    echo -e "${YELLOW}!${NC} DISPLAY not set, defaulting to :0"
+fi
+
 # Create systemd service file
 echo "Creating systemd service file..."
 cat > "$SERVICE_FILE" << EOF
@@ -156,7 +165,7 @@ Type=simple
 ExecStart=$EXEC_START
 WorkingDirectory=$PROJECT_DIR
 Environment=PYTHONPATH=$PROJECT_DIR
-Environment=DISPLAY=:0
+Environment=DISPLAY=$DISPLAY_VALUE
 Environment=XDG_RUNTIME_DIR=/run/user/%U
 Restart=always
 RestartSec=10
