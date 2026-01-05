@@ -92,23 +92,29 @@ class WindowWatcher:
         with self._lock:
             return self._current_window
 
-    def flush_current_event(self) -> Optional[WindowFocusEvent]:
+    def flush_current_event(self, end_time: Optional[datetime] = None) -> Optional[WindowFocusEvent]:
         """End the current focus event and return it (for AFK transitions).
 
         This closes out the current window focus event without requiring a new
         window to take focus. Used when user goes AFK - we want to save the
         focus event with accurate duration (not including AFK time).
 
+        Args:
+            end_time: When the focus event ended. If None, uses current time.
+                      When flushing due to AFK, pass (now - afk_timeout) to
+                      record when activity actually stopped.
+
         Returns:
             The completed focus event if it met min_duration, None otherwise.
             The internal current_window is reset to None.
         """
-        now = datetime.now()
+        if end_time is None:
+            end_time = datetime.now()
         completed_event = None
 
         with self._lock:
             if self._current_window:
-                self._current_window.end_time = now
+                self._current_window.end_time = end_time
 
                 # Only return if duration >= minimum
                 if self._current_window.duration_seconds >= self.min_duration:

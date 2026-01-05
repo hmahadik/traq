@@ -60,7 +60,7 @@ class SessionManager:
         logger.info(f"Started session {session_id} at {start_time.strftime('%H:%M:%S')}")
         return session_id
 
-    def end_session(self, session_id: int) -> Optional[dict]:
+    def end_session(self, session_id: int, end_time: Optional[datetime] = None) -> Optional[dict]:
         """
         End a session and calculate its duration.
 
@@ -69,11 +69,16 @@ class SessionManager:
 
         Args:
             session_id: ID of the session to end.
+            end_time: When the session ended. If None, uses current time.
+                      When ending due to AFK, pass (now - afk_timeout) to
+                      record when activity actually stopped, not when AFK
+                      was detected.
 
         Returns:
             Session dict if valid (long enough), None if deleted.
         """
-        end_time = datetime.now()
+        if end_time is None:
+            end_time = datetime.now()
         session = self.storage.get_session(session_id)
 
         if not session:

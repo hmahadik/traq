@@ -43,7 +43,7 @@ import argparse
 import threading
 import re
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional
 
@@ -207,11 +207,12 @@ class ActivityDaemon:
     def _handle_active(self):
         """Called when user becomes active after AFK.
 
-        Starts a new session to track the upcoming activity period.
+        Starts a new session to track the upcoming activity period (if not already in one).
         Also notifies the summarizer worker (for debounce tracking).
         """
-        self.current_session_id = self.session_manager.start_session()
-        self.log(f"Started session {self.current_session_id}")
+        if self.current_session_id is None:
+            self.current_session_id = self.session_manager.start_session()
+            self.log(f"Started session {self.current_session_id}")
 
         # Notify summarizer worker that user is active (for debounce and preview logic)
         if self.summarizer_worker:
@@ -223,15 +224,23 @@ class ActivityDaemon:
         Ends the current session and flushes the current focus event so that
         focus durations don't include AFK time. Triggers activity-based
         summarization for the completed session.
+
+        The actual end time is (now - afk_timeout) because the AFK callback
+        fires after the timeout expires, but activity actually stopped when
+        the timeout started.
         """
+        # Calculate when activity actually stopped (not when AFK was detected)
+        actual_end_time = datetime.now() - timedelta(seconds=self.afk_watcher.timeout)
+
         # Flush current focus event BEFORE ending session (so it has correct session_id)
-        flushed_event = self.window_watcher.flush_current_event()
+        # Pass the actual end time so focus event duration is accurate
+        flushed_event = self.window_watcher.flush_current_event(end_time=actual_end_time)
         if flushed_event:
             self._save_focus_event(flushed_event)
 
         if self.current_session_id:
             session_id = self.current_session_id
-            session = self.session_manager.end_session(session_id)
+            session = self.session_manager.end_session(session_id, end_time=actual_end_time)
             if session:  # Was long enough to keep
                 duration_min = session.get('duration_seconds', 0) // 60
                 self.log(f"Ended session {session_id}, duration: {duration_min}m")
@@ -627,7 +636,6 @@ class ActivityDaemon:
 
                 # Also check if daemon was down for significant time (> 30s)
                 # If daemon was down, user may have gone AFK while we weren't watching
-                session_start_ts = active_session.get("start_time")
                 daemon_likely_down = seconds_since_last > 30  # No screenshot for 30s suggests daemon was down
 
                 if seconds_since_last < self.afk_watcher.timeout and not daemon_likely_down:
@@ -637,21 +645,32 @@ class ActivityDaemon:
                     self.log(f"Resumed active session {resumed_session} (last activity {seconds_since_last}s ago)")
                 else:
                     # End the old session - was AFK or daemon was down too long
+                    # Use the last activity timestamp as end time (not now)
                     reason = "daemon downtime" if daemon_likely_down else "AFK timeout"
                     self.log(f"Previous session {session_id} stale ({seconds_since_last}s since last activity, {reason})")
-                    self.session_manager.end_session(session_id)
-                    # Start a fresh session
-                    self.current_session_id = self.session_manager.start_session()
-                    self.log(f"Started new session {self.current_session_id}")
+                    last_activity_time = datetime.fromtimestamp(last_ts)
+                    self.session_manager.end_session(session_id, end_time=last_activity_time)
+                    # Don't start a new session yet - wait for user input
+                    # The _handle_active callback will create a session when user becomes active
+                    self.current_session_id = None
+                    self.log("Waiting for user activity to start new session")
             else:
                 # No screenshots in session yet, just resume it
                 resumed_session = self.session_manager.resume_active_session()
                 self.current_session_id = resumed_session
                 self.log(f"Resumed empty session {resumed_session}")
         else:
-            # No active session, start a new one
+            # No active session - don't start one yet, wait for user input
+            # The _handle_active callback will create a session when user becomes active
+            self.current_session_id = None
+            self.log("No active session, waiting for user activity")
+
+        # If we don't have a session but user is currently active, start one now
+        # This handles the startup case where user is already at the computer
+        # (AFK watcher starts with is_afk=False but doesn't fire on_active callback)
+        if self.current_session_id is None and not self.afk_watcher.is_afk:
             self.current_session_id = self.session_manager.start_session()
-            self.log(f"Started initial session {self.current_session_id}")
+            self.log(f"Started session {self.current_session_id} (user is active)")
 
         # Start web server in separate thread if enabled
         if self.enable_web:
