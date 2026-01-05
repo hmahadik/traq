@@ -1,0 +1,96 @@
+export interface DailyStats {
+  date: string;
+  totalScreenshots: number;
+  totalSessions: number;
+  activeMinutes: number;
+  topApps: AppUsage[];
+  shellCommands: number;
+  gitCommits: number;
+  filesModified: number;
+  sitesVisited: number;
+}
+
+export interface WeeklyStats {
+  startDate: string;
+  endDate: string;
+  totalScreenshots: number;
+  totalSessions: number;
+  totalActiveMinutes: number;
+  dailyBreakdown: DailyStats[];
+  topApps: AppUsage[];
+}
+
+export interface AppUsage {
+  appName: string;
+  durationSeconds: number;
+  percentage: number;
+  sessionCount: number;
+}
+
+export interface HourlyActivity {
+  hour: number;
+  screenshotCount: number;
+  activeMinutes: number;
+}
+
+export interface CalendarData {
+  year: number;
+  month: number;
+  days: CalendarDay[];
+}
+
+export interface CalendarDay {
+  date: string;
+  screenshotCount: number;
+  sessionCount: number;
+  activeMinutes: number;
+  intensity: 0 | 1 | 2 | 3 | 4; // 0 = none, 4 = highest
+}
+
+export interface DataSourceStats {
+  shell: ShellStats | null;
+  git: GitStats | null;
+  files: FileStats | null;
+  browser: BrowserStats | null;
+}
+
+export interface ShellStats {
+  totalCommands: number;
+  topCommands: CommandCount[];
+}
+
+export interface CommandCount {
+  command: string;
+  count: number;
+}
+
+export interface GitStats {
+  totalCommits: number;
+  repositories: RepositoryStats[];
+}
+
+export interface RepositoryStats {
+  name: string;
+  commitCount: number;
+  lastCommit: number;
+}
+
+export interface FileStats {
+  totalEvents: number;
+  byCategory: CategoryCount[];
+}
+
+export interface CategoryCount {
+  category: string;
+  count: number;
+}
+
+export interface BrowserStats {
+  totalVisits: number;
+  topDomains: DomainCount[];
+}
+
+export interface DomainCount {
+  domain: string;
+  visits: number;
+}

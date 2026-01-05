@@ -1,0 +1,308 @@
+package tracker
+
+import (
+	"bufio"
+	"database/sql"
+	"encoding/json"
+	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strconv"
+	"strings"
+	"time"
+
+	"traq/internal/storage"
+)
+
+// GitTracker tracks git activity in registered repositories.
+type GitTracker struct {
+	store          *storage.Store
+	checkpointFile string
+	maxCommits     int
+}
+
+// GitCheckpoint stores the last seen commit for each repository.
+type GitCheckpoint struct {
+	LastCommits map[int64]string `json:"last_commits"` // repo_id -> commit hash
+}
+
+// NewGitTracker creates a new GitTracker.
+func NewGitTracker(store *storage.Store, dataDir string) *GitTracker {
+	return &GitTracker{
+		store:          store,
+		checkpointFile: filepath.Join(dataDir, "git_checkpoint.json"),
+		maxCommits:     100, // Max commits to fetch per poll
+	}
+}
+
+// SetMaxCommits sets the maximum number of commits to fetch per poll.
+func (t *GitTracker) SetMaxCommits(max int) {
+	t.maxCommits = max
+}
+
+// RegisterRepository adds a repository to track.
+func (t *GitTracker) RegisterRepository(path string) (*storage.GitRepository, error) {
+	// Resolve to absolute path
+	absPath, err := filepath.Abs(path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve path: %w", err)
+	}
+
+	// Find git root
+	gitRoot, err := t.findGitRoot(absPath)
+	if err != nil {
+		return nil, fmt.Errorf("not a git repository: %w", err)
+	}
+
+	// Get remote URL
+	remoteURL := t.getRemoteURL(gitRoot)
+
+	// Check if already registered
+	existing, err := t.store.GetGitRepositoryByPath(gitRoot)
+	if err == nil && existing != nil {
+		return existing, nil
+	}
+
+	// Create new repository record
+	repo := &storage.GitRepository{
+		Path:        gitRoot,
+		Name:        filepath.Base(gitRoot),
+		RemoteURL:   sql.NullString{String: remoteURL, Valid: remoteURL != ""},
+		LastScanned: sql.NullInt64{Int64: 0, Valid: false},
+	}
+
+	id, err := t.store.SaveGitRepository(repo)
+	if err != nil {
+		return nil, err
+	}
+	repo.ID = id
+
+	return repo, nil
+}
+
+// UnregisterRepository removes a repository from tracking.
+func (t *GitTracker) UnregisterRepository(repoID int64) error {
+	return t.store.SetGitRepositoryActive(repoID, false)
+}
+
+// Poll scans all registered repositories for new commits.
+func (t *GitTracker) Poll(sessionID int64) ([]*storage.GitCommit, error) {
+	repos, err := t.store.GetActiveGitRepositories()
+	if err != nil {
+		return nil, err
+	}
+
+	checkpoint, err := t.loadCheckpoint()
+	if err != nil {
+		checkpoint = &GitCheckpoint{LastCommits: make(map[int64]string)}
+	}
+
+	var allCommits []*storage.GitCommit
+
+	for _, repo := range repos {
+		// Skip if path doesn't exist
+		if _, err := os.Stat(repo.Path); os.IsNotExist(err) {
+			continue
+		}
+
+		lastCommit := checkpoint.LastCommits[repo.ID]
+		commits, err := t.getNewCommits(repo, lastCommit, sessionID)
+		if err != nil {
+			continue // Log but continue with other repos
+		}
+
+		if len(commits) > 0 {
+			// Save commits
+			for _, commit := range commits {
+				id, err := t.store.SaveGitCommit(commit)
+				if err != nil {
+					continue
+				}
+				commit.ID = id
+				allCommits = append(allCommits, commit)
+			}
+
+			// Update checkpoint with newest commit
+			checkpoint.LastCommits[repo.ID] = commits[0].CommitHash
+		}
+
+		// Update last scanned time
+		t.store.UpdateRepositoryLastScanned(repo.ID, time.Now().Unix())
+	}
+
+	t.saveCheckpoint(checkpoint)
+
+	return allCommits, nil
+}
+
+// getNewCommits fetches commits newer than the given hash.
+func (t *GitTracker) getNewCommits(repo *storage.GitRepository, sinceHash string, sessionID int64) ([]*storage.GitCommit, error) {
+	args := []string{"-C", repo.Path, "log", "--format=%H|%an|%ae|%at|%s", "-n", strconv.Itoa(t.maxCommits)}
+
+	if sinceHash != "" {
+		// Check if the hash exists
+		checkCmd := exec.Command("git", "-C", repo.Path, "cat-file", "-t", sinceHash)
+		if err := checkCmd.Run(); err == nil {
+			args = append(args, sinceHash+"..HEAD")
+		}
+	}
+
+	cmd := exec.Command("git", args...)
+	output, err := cmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("git log failed: %w", err)
+	}
+
+	var commits []*storage.GitCommit
+	scanner := bufio.NewScanner(strings.NewReader(string(output)))
+
+	for scanner.Scan() {
+		line := scanner.Text()
+		parts := strings.SplitN(line, "|", 5)
+		if len(parts) != 5 {
+			continue
+		}
+
+		timestamp, _ := strconv.ParseInt(parts[3], 10, 64)
+
+		commit := &storage.GitCommit{
+			RepositoryID: repo.ID,
+			CommitHash:   parts[0],
+			ShortHash:    parts[0][:7],
+			AuthorName:   sql.NullString{String: parts[1], Valid: parts[1] != ""},
+			AuthorEmail:  sql.NullString{String: parts[2], Valid: parts[2] != ""},
+			Timestamp:    timestamp,
+			Message:      parts[4],
+			MessageSubject: parts[4],
+			SessionID:    sql.NullInt64{Int64: sessionID, Valid: sessionID > 0},
+		}
+
+		// Get stats for this commit
+		stats := t.getCommitStats(repo.Path, parts[0])
+		commit.FilesChanged = sql.NullInt64{Int64: int64(stats.files), Valid: true}
+		commit.Insertions = sql.NullInt64{Int64: int64(stats.insertions), Valid: true}
+		commit.Deletions = sql.NullInt64{Int64: int64(stats.deletions), Valid: true}
+		commit.Branch = sql.NullString{String: stats.branch, Valid: stats.branch != ""}
+
+		commits = append(commits, commit)
+	}
+
+	return commits, nil
+}
+
+type commitStats struct {
+	files      int
+	insertions int
+	deletions  int
+	branch     string
+}
+
+// getCommitStats returns file change statistics for a commit.
+func (t *GitTracker) getCommitStats(repoPath, hash string) commitStats {
+	stats := commitStats{}
+
+	// Get current branch
+	branchCmd := exec.Command("git", "-C", repoPath, "rev-parse", "--abbrev-ref", "HEAD")
+	branchOutput, err := branchCmd.Output()
+	if err == nil {
+		stats.branch = strings.TrimSpace(string(branchOutput))
+	}
+
+	// Get diff stats
+	cmd := exec.Command("git", "-C", repoPath, "show", "--stat", "--format=", hash)
+	output, err := cmd.Output()
+	if err != nil {
+		return stats
+	}
+
+	lines := strings.Split(string(output), "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if strings.Contains(line, "files changed") || strings.Contains(line, "file changed") {
+			// Parse summary line: "3 files changed, 50 insertions(+), 10 deletions(-)"
+			parts := strings.Split(line, ", ")
+			for _, part := range parts {
+				part = strings.TrimSpace(part)
+				if strings.Contains(part, "file") {
+					fmt.Sscanf(part, "%d", &stats.files)
+				} else if strings.Contains(part, "insertion") {
+					fmt.Sscanf(part, "%d", &stats.insertions)
+				} else if strings.Contains(part, "deletion") {
+					fmt.Sscanf(part, "%d", &stats.deletions)
+				}
+			}
+		}
+	}
+
+	return stats
+}
+
+// findGitRoot finds the root of a git repository.
+func (t *GitTracker) findGitRoot(path string) (string, error) {
+	cmd := exec.Command("git", "-C", path, "rev-parse", "--show-toplevel")
+	output, err := cmd.Output()
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(string(output)), nil
+}
+
+// getRemoteURL returns the origin remote URL.
+func (t *GitTracker) getRemoteURL(repoPath string) string {
+	cmd := exec.Command("git", "-C", repoPath, "remote", "get-url", "origin")
+	output, err := cmd.Output()
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(output))
+}
+
+func (t *GitTracker) loadCheckpoint() (*GitCheckpoint, error) {
+	data, err := os.ReadFile(t.checkpointFile)
+	if err != nil {
+		return nil, err
+	}
+
+	var checkpoint GitCheckpoint
+	if err := json.Unmarshal(data, &checkpoint); err != nil {
+		return nil, err
+	}
+
+	return &checkpoint, nil
+}
+
+func (t *GitTracker) saveCheckpoint(checkpoint *GitCheckpoint) error {
+	data, err := json.Marshal(checkpoint)
+	if err != nil {
+		return err
+	}
+
+	dir := filepath.Dir(t.checkpointFile)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return err
+	}
+
+	return os.WriteFile(t.checkpointFile, data, 0644)
+}
+
+// Reset clears the checkpoint file.
+func (t *GitTracker) Reset() error {
+	return os.Remove(t.checkpointFile)
+}
+
+// GetRepositories returns all tracked repositories.
+func (t *GitTracker) GetRepositories() ([]*storage.GitRepository, error) {
+	return t.store.GetAllGitRepositories()
+}
+
+// GetCommitsForRepo returns recent commits for a repository.
+func (t *GitTracker) GetCommitsForRepo(repoID int64, limit int) ([]*storage.GitCommit, error) {
+	return t.store.GetGitCommitsByRepository(repoID, limit)
+}
+
+// GetRecentCommits returns recent commits across all repositories.
+func (t *GitTracker) GetRecentCommits(limit int) ([]*storage.GitCommit, error) {
+	// Get commits from all time with a limit
+	return t.store.GetGitCommitsByTimeRange(0, time.Now().Unix())
+}

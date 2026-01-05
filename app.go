@@ -1,0 +1,312 @@
+package main
+
+import (
+	"context"
+	"log"
+	"path/filepath"
+	"time"
+
+	"traq/internal/platform"
+	"traq/internal/service"
+	"traq/internal/storage"
+	"traq/internal/tracker"
+)
+
+// App struct holds the application state and services
+type App struct {
+	ctx context.Context
+
+	// Core components
+	platform platform.Platform
+	store    *storage.Store
+	daemon   *tracker.Daemon
+
+	// Services (exposed to frontend via Wails bindings)
+	Analytics   *service.AnalyticsService
+	Timeline    *service.TimelineService
+	Reports     *service.ReportsService
+	Config      *service.ConfigService
+	Screenshots *service.ScreenshotService
+}
+
+// NewApp creates a new App application struct
+func NewApp() *App {
+	return &App{}
+}
+
+// startup is called when the app starts. The context is saved
+// so we can call the runtime methods
+func (a *App) startup(ctx context.Context) {
+	a.ctx = ctx
+
+	// Initialize platform
+	a.platform = platform.New()
+
+	// Ensure data directory exists
+	dataDir := a.platform.DataDir()
+	dbPath := filepath.Join(dataDir, "data.db")
+
+	// Initialize storage
+	var err error
+	a.store, err = storage.NewStore(dbPath)
+	if err != nil {
+		log.Printf("Failed to initialize storage: %v", err)
+		return
+	}
+
+	// Run migrations
+	if err := a.store.Migrate(); err != nil {
+		log.Printf("Failed to run migrations: %v", err)
+	}
+
+	// Initialize services
+	a.Analytics = service.NewAnalyticsService(a.store)
+	a.Timeline = service.NewTimelineService(a.store)
+	a.Screenshots = service.NewScreenshotService(a.store, dataDir)
+	a.Config = service.NewConfigService(a.store, a.platform, nil) // daemon set later
+
+	// Initialize daemon with default config
+	daemonConfig := tracker.DefaultDaemonConfig(dataDir)
+	a.daemon, err = tracker.NewDaemon(daemonConfig, a.store, a.platform)
+	if err != nil {
+		log.Printf("Failed to initialize daemon: %v", err)
+	} else {
+		// Link daemon to config service
+		a.Config.SetDaemon(a.daemon)
+
+		// Start daemon
+		if err := a.daemon.Start(); err != nil {
+			log.Printf("Failed to start daemon: %v", err)
+		}
+	}
+
+	// Initialize reports service (after timeline service)
+	a.Reports = service.NewReportsService(a.store, a.Timeline)
+}
+
+// shutdown is called when the app is closing
+func (a *App) shutdown(ctx context.Context) {
+	// Stop daemon gracefully
+	if a.daemon != nil {
+		if err := a.daemon.Stop(); err != nil {
+			log.Printf("Error stopping daemon: %v", err)
+		}
+	}
+
+	// Close storage
+	if a.store != nil {
+		if err := a.store.Close(); err != nil {
+			log.Printf("Error closing storage: %v", err)
+		}
+	}
+}
+
+// beforeClose is called when the user tries to close the app
+func (a *App) beforeClose(ctx context.Context) bool {
+	// Return false to allow the app to close
+	// Return true to prevent the app from closing
+	return false
+}
+
+// ============================================================================
+// Daemon Control Methods (exposed to frontend)
+// ============================================================================
+
+// GetDaemonStatus returns the current daemon status.
+func (a *App) GetDaemonStatus() (*service.DaemonStatus, error) {
+	return a.Config.GetDaemonStatus()
+}
+
+// StartTracking starts the tracking daemon.
+func (a *App) StartTracking() error {
+	return a.Config.StartDaemon()
+}
+
+// StopTracking stops the tracking daemon.
+func (a *App) StopTracking() error {
+	return a.Config.StopDaemon()
+}
+
+// RestartTracking restarts the tracking daemon with updated config.
+func (a *App) RestartTracking() error {
+	return a.Config.RestartDaemon()
+}
+
+// ForceCapture forces an immediate screenshot capture.
+func (a *App) ForceCapture() (string, error) {
+	if a.daemon == nil {
+		return "", nil
+	}
+	result, err := a.daemon.ForceCapture()
+	if err != nil {
+		return "", err
+	}
+	return result.Filepath, nil
+}
+
+// ============================================================================
+// Analytics Methods (exposed to frontend)
+// ============================================================================
+
+// GetDailyStats returns statistics for a specific date.
+func (a *App) GetDailyStats(date string) (*service.DailyStats, error) {
+	return a.Analytics.GetDailyStats(date)
+}
+
+// GetWeeklyStats returns statistics for a week.
+func (a *App) GetWeeklyStats(startDate string) (*service.WeeklyStats, error) {
+	return a.Analytics.GetWeeklyStats(startDate)
+}
+
+// GetCalendarHeatmap returns calendar data for a month.
+func (a *App) GetCalendarHeatmap(year, month int) (*service.CalendarData, error) {
+	return a.Analytics.GetCalendarHeatmap(year, month)
+}
+
+// GetAppUsage returns application usage for a time range.
+func (a *App) GetAppUsage(start, end int64) ([]*service.AppUsage, error) {
+	return a.Analytics.GetAppUsage(start, end)
+}
+
+// GetHourlyActivity returns hourly activity for a date.
+func (a *App) GetHourlyActivity(date string) ([]*service.HourlyActivity, error) {
+	return a.Analytics.GetHourlyActivity(date)
+}
+
+// GetDataSourceStats returns statistics from all data sources.
+func (a *App) GetDataSourceStats(start, end int64) (*service.DataSourceStats, error) {
+	return a.Analytics.GetDataSourceStats(start, end)
+}
+
+// ============================================================================
+// Timeline Methods (exposed to frontend)
+// ============================================================================
+
+// GetSessionsForDate returns all sessions for a date.
+func (a *App) GetSessionsForDate(date string) ([]*service.SessionSummary, error) {
+	return a.Timeline.GetSessionsForDate(date)
+}
+
+// GetScreenshotsForSession returns paginated screenshots for a session.
+func (a *App) GetScreenshotsForSession(sessionID int64, page, perPage int) (*service.ScreenshotPage, error) {
+	return a.Timeline.GetScreenshotsForSession(sessionID, page, perPage)
+}
+
+// GetScreenshotsForHour returns screenshots for a specific hour.
+func (a *App) GetScreenshotsForHour(date string, hour int) ([]*storage.Screenshot, error) {
+	return a.Timeline.GetScreenshotsForHour(date, hour)
+}
+
+// GetSessionContext returns all context for a session.
+func (a *App) GetSessionContext(sessionID int64) (*service.SessionContext, error) {
+	return a.Timeline.GetSessionContext(sessionID)
+}
+
+// GetRecentSessions returns the most recent sessions.
+func (a *App) GetRecentSessions(limit int) ([]*storage.Session, error) {
+	return a.Timeline.GetRecentSessions(limit)
+}
+
+// ============================================================================
+// Screenshot Methods (exposed to frontend)
+// ============================================================================
+
+// GetScreenshot returns screenshot metadata by ID.
+func (a *App) GetScreenshot(id int64) (*storage.Screenshot, error) {
+	return a.Screenshots.GetScreenshot(id)
+}
+
+// GetScreenshotInfo returns detailed info about a screenshot.
+func (a *App) GetScreenshotInfo(id int64) (*service.ScreenshotInfo, error) {
+	return a.Screenshots.GetScreenshotInfo(id)
+}
+
+// GetScreenshotPath returns the filesystem path to a screenshot.
+func (a *App) GetScreenshotPath(id int64) (string, error) {
+	return a.Screenshots.GetScreenshotPath(id)
+}
+
+// GetThumbnailPath returns the filesystem path to a thumbnail.
+func (a *App) GetThumbnailPath(id int64) (string, error) {
+	return a.Screenshots.GetThumbnailPath(id)
+}
+
+// DeleteScreenshot deletes a screenshot and its files.
+func (a *App) DeleteScreenshot(id int64) error {
+	return a.Screenshots.DeleteScreenshot(id)
+}
+
+// ============================================================================
+// Reports Methods (exposed to frontend)
+// ============================================================================
+
+// GenerateReport generates a new report for the given time range.
+func (a *App) GenerateReport(timeRange, reportType string) (*storage.Report, error) {
+	return a.Reports.GenerateReport(timeRange, reportType)
+}
+
+// ExportReport exports a report in the specified format.
+func (a *App) ExportReport(reportID int64, format string) (string, error) {
+	return a.Reports.ExportReport(reportID, format)
+}
+
+// GetReportHistory returns past generated reports.
+func (a *App) GetReportHistory() ([]*service.ReportMeta, error) {
+	return a.Reports.GetReportHistory()
+}
+
+// ParseTimeRange parses natural language time input.
+func (a *App) ParseTimeRange(input string) (*service.TimeRange, error) {
+	return a.Reports.ParseTimeRange(input)
+}
+
+// ============================================================================
+// Config Methods (exposed to frontend)
+// ============================================================================
+
+// GetConfig returns the current configuration.
+func (a *App) GetConfig() (*service.Config, error) {
+	return a.Config.GetConfig()
+}
+
+// UpdateConfig updates configuration values.
+func (a *App) UpdateConfig(updates map[string]interface{}) error {
+	return a.Config.UpdateConfig(updates)
+}
+
+// GetStorageStats returns storage statistics.
+func (a *App) GetStorageStats() (*service.StorageStats, error) {
+	return a.Config.GetStorageStats()
+}
+
+// ============================================================================
+// System Methods (exposed to frontend)
+// ============================================================================
+
+// GetDataDir returns the data directory path.
+func (a *App) GetDataDir() string {
+	return a.platform.DataDir()
+}
+
+// GetVersion returns the application version.
+func (a *App) GetVersion() string {
+	return "2.0.0"
+}
+
+// GetSystemInfo returns basic system information.
+func (a *App) GetSystemInfo() map[string]string {
+	return map[string]string{
+		"dataDir": a.platform.DataDir(),
+		"version": "2.0.0",
+	}
+}
+
+// OpenDataDir opens the data directory in the file manager.
+func (a *App) OpenDataDir() error {
+	return a.platform.OpenURL(a.platform.DataDir())
+}
+
+// GetCurrentTime returns the current Unix timestamp.
+func (a *App) GetCurrentTime() int64 {
+	return time.Now().Unix()
+}

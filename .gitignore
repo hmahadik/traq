@@ -55,4 +55,6 @@ Thumbs.db
 .env.production
 
 # Logs
-*.log
+*.logbuild/bin
+node_modules
+frontend/dist
