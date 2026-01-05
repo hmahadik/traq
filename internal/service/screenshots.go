@@ -72,12 +72,21 @@ func (s *ScreenshotService) GetScreenshotPath(id int64) (string, error) {
 }
 
 // GetThumbnailPath returns the filesystem path to a thumbnail.
+// Falls back to the original screenshot path if thumbnail doesn't exist.
 func (s *ScreenshotService) GetThumbnailPath(id int64) (string, error) {
 	screenshot, err := s.store.GetScreenshot(id)
 	if err != nil {
 		return "", fmt.Errorf("screenshot not found: %w", err)
 	}
-	return s.thumbnailPath(screenshot.Filepath), nil
+
+	thumbPath := s.thumbnailPath(screenshot.Filepath)
+
+	// Check if thumbnail exists, fall back to original if not
+	if _, err := os.Stat(thumbPath); os.IsNotExist(err) {
+		return screenshot.Filepath, nil
+	}
+
+	return thumbPath, nil
 }
 
 // DeleteScreenshot deletes a screenshot and its files.

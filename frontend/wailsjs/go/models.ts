@@ -96,6 +96,18 @@ export namespace service {
 		    return a;
 		}
 	}
+	export class BundledInferenceConfig {
+	    model: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new BundledInferenceConfig(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.model = source["model"];
+	    }
+	}
 	export class CalendarDay {
 	    date: string;
 	    dayOfMonth: number;
@@ -171,6 +183,22 @@ export namespace service {
 	        this.intervalSeconds = source["intervalSeconds"];
 	        this.quality = source["quality"];
 	        this.duplicateThreshold = source["duplicateThreshold"];
+	    }
+	}
+	export class CloudConfig {
+	    provider: string;
+	    apiKey: string;
+	    model: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new CloudConfig(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.provider = source["provider"];
+	        this.apiKey = source["apiKey"];
+	        this.model = source["model"];
 	    }
 	}
 	export class CommandUsage {
@@ -333,9 +361,60 @@ export namespace service {
 		    return a;
 		}
 	}
+	export class OllamaConfig {
+	    host: string;
+	    model: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new OllamaConfig(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.host = source["host"];
+	        this.model = source["model"];
+	    }
+	}
+	export class InferenceConfig {
+	    engine: string;
+	    bundled?: BundledInferenceConfig;
+	    ollama?: OllamaConfig;
+	    cloud?: CloudConfig;
+	
+	    static createFrom(source: any = {}) {
+	        return new InferenceConfig(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.engine = source["engine"];
+	        this.bundled = this.convertValues(source["bundled"], BundledInferenceConfig);
+	        this.ollama = this.convertValues(source["ollama"], OllamaConfig);
+	        this.cloud = this.convertValues(source["cloud"], CloudConfig);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class Config {
 	    capture?: CaptureConfig;
 	    afk?: AFKConfig;
+	    inference?: InferenceConfig;
 	    dataSources?: DataSourcesConfig;
 	    ui?: UIConfig;
 	    system?: SystemConfig;
@@ -348,6 +427,7 @@ export namespace service {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.capture = this.convertValues(source["capture"], CaptureConfig);
 	        this.afk = this.convertValues(source["afk"], AFKConfig);
+	        this.inference = this.convertValues(source["inference"], InferenceConfig);
 	        this.dataSources = this.convertValues(source["dataSources"], DataSourcesConfig);
 	        this.ui = this.convertValues(source["ui"], UIConfig);
 	        this.system = this.convertValues(source["system"], SystemConfig);
@@ -602,6 +682,8 @@ export namespace service {
 	    }
 	}
 	
+	
+	
 	export class ReportMeta {
 	    id: number;
 	    title: string;
@@ -739,8 +821,9 @@ export namespace service {
 	export class SessionSummary {
 	    id: number;
 	    startTime: number;
-	    endTime: number;
-	    durationSeconds: number;
+	    endTime?: number;
+	    durationSeconds?: number;
+	    isOngoing: boolean;
 	    screenshotCount: number;
 	    summary: string;
 	    explanation: string;
@@ -762,6 +845,7 @@ export namespace service {
 	        this.startTime = source["startTime"];
 	        this.endTime = source["endTime"];
 	        this.durationSeconds = source["durationSeconds"];
+	        this.isOngoing = source["isOngoing"];
 	        this.screenshotCount = source["screenshotCount"];
 	        this.summary = source["summary"];
 	        this.explanation = source["explanation"];

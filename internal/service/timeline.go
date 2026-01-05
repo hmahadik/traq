@@ -20,8 +20,9 @@ func NewTimelineService(store *storage.Store) *TimelineService {
 type SessionSummary struct {
 	ID              int64    `json:"id"`
 	StartTime       int64    `json:"startTime"`
-	EndTime         int64    `json:"endTime"`
-	DurationSeconds int64    `json:"durationSeconds"`
+	EndTime         *int64   `json:"endTime"`         // nil for ongoing sessions
+	DurationSeconds *int64   `json:"durationSeconds"` // nil for ongoing sessions
+	IsOngoing       bool     `json:"isOngoing"`       // true if session has no end time
 	ScreenshotCount int      `json:"screenshotCount"`
 	Summary         string   `json:"summary"`
 	Explanation     string   `json:"explanation"`
@@ -76,13 +77,16 @@ func (s *TimelineService) GetSessionsForDate(date string) ([]*SessionSummary, er
 			ID:              sess.ID,
 			StartTime:       sess.StartTime,
 			ScreenshotCount: sess.ScreenshotCount,
+			IsOngoing:       !sess.EndTime.Valid,
 		}
 
 		if sess.EndTime.Valid {
-			summary.EndTime = sess.EndTime.Int64
+			endTime := sess.EndTime.Int64
+			summary.EndTime = &endTime
 		}
 		if sess.DurationSeconds.Valid {
-			summary.DurationSeconds = sess.DurationSeconds.Int64
+			duration := sess.DurationSeconds.Int64
+			summary.DurationSeconds = &duration
 		}
 
 		// Get summary if exists

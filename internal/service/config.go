@@ -35,9 +35,36 @@ func (s *ConfigService) SetDaemon(daemon *tracker.Daemon) {
 type Config struct {
 	Capture     *CaptureConfig     `json:"capture"`
 	AFK         *AFKConfig         `json:"afk"`
+	Inference   *InferenceConfig   `json:"inference"`
 	DataSources *DataSourcesConfig `json:"dataSources"`
 	UI          *UIConfig          `json:"ui"`
 	System      *SystemConfig      `json:"system"`
+}
+
+// InferenceConfig contains AI inference settings.
+type InferenceConfig struct {
+	Engine  string                 `json:"engine"` // "bundled", "ollama", "cloud"
+	Bundled *BundledInferenceConfig `json:"bundled"`
+	Ollama  *OllamaConfig          `json:"ollama"`
+	Cloud   *CloudConfig           `json:"cloud"`
+}
+
+// BundledInferenceConfig contains bundled model settings.
+type BundledInferenceConfig struct {
+	Model string `json:"model"`
+}
+
+// OllamaConfig contains Ollama settings.
+type OllamaConfig struct {
+	Host  string `json:"host"`
+	Model string `json:"model"`
+}
+
+// CloudConfig contains cloud API settings.
+type CloudConfig struct {
+	Provider string `json:"provider"` // "anthropic", "openai"
+	APIKey   string `json:"apiKey"`
+	Model    string `json:"model"`
 }
 
 // CaptureConfig contains screenshot capture settings.
@@ -122,6 +149,7 @@ func (s *ConfigService) GetConfig() (*Config, error) {
 	config := &Config{
 		Capture:     s.getDefaultCaptureConfig(),
 		AFK:         s.getDefaultAFKConfig(),
+		Inference:   s.getDefaultInferenceConfig(),
 		DataSources: s.getDefaultDataSourcesConfig(),
 		UI:          s.getDefaultUIConfig(),
 		System:      s.getDefaultSystemConfig(),
@@ -366,5 +394,23 @@ func (s *ConfigService) getDefaultSystemConfig() *SystemConfig {
 		AutoStart:    true,
 		StartOnLogin: true,
 		DataDir:      s.platform.DataDir(),
+	}
+}
+
+func (s *ConfigService) getDefaultInferenceConfig() *InferenceConfig {
+	return &InferenceConfig{
+		Engine: "ollama",
+		Bundled: &BundledInferenceConfig{
+			Model: "gemma3:4b-it-qat",
+		},
+		Ollama: &OllamaConfig{
+			Host:  "http://localhost:11434",
+			Model: "gemma3:12b-it-qat",
+		},
+		Cloud: &CloudConfig{
+			Provider: "anthropic",
+			APIKey:   "",
+			Model:    "claude-sonnet-4-20250514",
+		},
 	}
 }
