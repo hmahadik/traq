@@ -63,7 +63,7 @@ export function ImageGallery({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[95vw] max-h-[95vh] p-0 bg-black/95 border-0">
+      <DialogContent data-testid="image-gallery" className="max-w-[95vw] max-h-[95vh] p-0 bg-black/95 border-0">
         {/* Header */}
         <div className="absolute top-0 left-0 right-0 z-10 flex items-center justify-between p-4 bg-gradient-to-b from-black/80 to-transparent">
           <div className="text-white">
@@ -117,6 +117,7 @@ export function ImageGallery({
 
         {/* Navigation Buttons */}
         <Button
+          data-testid="gallery-prev"
           variant="ghost"
           size="icon"
           className="absolute left-4 top-1/2 -translate-y-1/2 text-white hover:bg-white/20 h-12 w-12"
@@ -125,6 +126,7 @@ export function ImageGallery({
           <ChevronLeft className="h-8 w-8" />
         </Button>
         <Button
+          data-testid="gallery-next"
           variant="ghost"
           size="icon"
           className="absolute right-4 top-1/2 -translate-y-1/2 text-white hover:bg-white/20 h-12 w-12"

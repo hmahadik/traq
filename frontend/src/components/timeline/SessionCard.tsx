@@ -47,6 +47,7 @@ export function SessionCard({
 
   return (
     <Card
+      data-testid="session-card"
       className={cn(
         'transition-all hover:shadow-md',
         isSelected && 'ring-2 ring-primary',

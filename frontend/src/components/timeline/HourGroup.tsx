@@ -27,7 +27,7 @@ export function HourGroup({
   const count = screenshots.length;
 
   return (
-    <Card className={cn('transition-all', !expanded && 'hover:bg-accent/50')}>
+    <Card data-testid="hour-group" className={cn('transition-all', !expanded && 'hover:bg-accent/50')}>
       <CardHeader
         className="py-3 cursor-pointer select-none"
         onClick={() => setExpanded(!expanded)}
@@ -67,6 +67,7 @@ export function HourGroup({
               {screenshots.map((screenshot, index) => (
                 <div
                   key={screenshot.id}
+                  data-testid="screenshot-thumbnail"
                   className="relative aspect-video rounded overflow-hidden bg-muted cursor-pointer group hover:ring-2 ring-primary transition-all"
                   onClick={() => onScreenshotClick?.(screenshot, index)}
                 >

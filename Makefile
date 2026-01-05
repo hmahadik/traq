@@ -1,7 +1,7 @@
 # Traq - Activity Tracker v2
 # Go + Wails + React/TypeScript
 
-.PHONY: build dev clean test install-deps
+.PHONY: build dev clean test install-deps test-e2e test-e2e-ui
 
 # Default target
 all: build
@@ -40,6 +40,14 @@ test-coverage:
 test-frontend:
 	cd frontend && npm test
 
+# Run E2E tests (requires dev server running or will start one)
+test-e2e:
+	cd frontend && npm run test:e2e
+
+# Run E2E tests with UI
+test-e2e-ui:
+	cd frontend && npm run test:e2e:ui
+
 # Install frontend dependencies
 install-frontend:
 	cd frontend && npm install
@@ -73,6 +81,8 @@ help:
 	@echo "  make test           Run Go tests"
 	@echo "  make test-coverage  Run tests with coverage report"
 	@echo "  make test-frontend  Run frontend tests"
+	@echo "  make test-e2e       Run E2E tests with Playwright"
+	@echo "  make test-e2e-ui    Run E2E tests with Playwright UI"
 	@echo "  make install-deps   Install all dependencies"
 	@echo "  make clean          Remove build artifacts"
 	@echo "  make help           Show this help message"

@@ -34,6 +34,9 @@ activity-tracker-data/
 
 # Playwright test artifacts
 .playwright-mcp/
+frontend/playwright-report/
+frontend/test-results/
+frontend/playwright/.cache/
 
 # OS
 .DS_Store

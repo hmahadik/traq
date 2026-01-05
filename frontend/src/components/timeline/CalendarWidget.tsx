@@ -119,7 +119,7 @@ export function CalendarWidget({
   }
 
   return (
-    <Card>
+    <Card data-testid="calendar-widget">
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
           <CardTitle className="text-sm flex items-center gap-2">
