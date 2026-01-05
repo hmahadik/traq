@@ -1,204 +1,142 @@
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Skeleton } from '@/components/ui/skeleton';
-import { useDailyStats, useHourlyActivity } from '@/api/hooks';
-import { formatDuration } from '@/lib/utils';
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Button } from '@/components/ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { DatePicker } from '@/components/common/DatePicker';
 import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
-} from 'recharts';
+  StatsGrid,
+  ActivityChart,
+  AppUsageChart,
+  HeatmapChart,
+  DataSourcesPanel,
+  AppUsageTable,
+} from '@/components/analytics';
+import {
+  useDailyStats,
+  useHourlyActivity,
+  useAppUsage,
+  useDataSourceStats,
+} from '@/api/hooks';
+import { Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
 
-function getTodayString(): string {
-  return new Date().toISOString().split('T')[0];
+function getDateString(date: Date): string {
+  return date.toISOString().split('T')[0];
 }
 
-const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'];
+function addDays(date: Date, days: number): Date {
+  const result = new Date(date);
+  result.setDate(result.getDate() + days);
+  return result;
+}
 
 export function AnalyticsPage() {
-  const today = getTodayString();
-  const { data: stats, isLoading: statsLoading } = useDailyStats(today);
-  const { data: hourlyActivity, isLoading: hourlyLoading } = useHourlyActivity(today);
+  const navigate = useNavigate();
+  const [selectedDate, setSelectedDate] = useState(new Date());
+  const dateStr = getDateString(selectedDate);
+  const isToday = dateStr === getDateString(new Date());
 
-  const pieData = stats?.topApps.map((app) => ({
-    name: app.appName,
-    value: app.durationSeconds,
-  }));
+  const { data: stats, isLoading: statsLoading } = useDailyStats(dateStr);
+  const { data: hourlyActivity, isLoading: hourlyLoading } = useHourlyActivity(dateStr);
+  const { data: appUsage, isLoading: appUsageLoading } = useAppUsage(dateStr);
+  const { data: dataSourceStats, isLoading: dataSourcesLoading } = useDataSourceStats(dateStr);
+
+  const handlePrevDay = () => {
+    setSelectedDate((d) => addDays(d, -1));
+  };
+
+  const handleNextDay = () => {
+    if (!isToday) {
+      setSelectedDate((d) => addDays(d, 1));
+    }
+  };
+
+  const handleAppClick = (appName: string) => {
+    // Navigate to day view filtered by app
+    navigate(`/day/${dateStr}?app=${encodeURIComponent(appName)}`);
+  };
+
+  const formattedDate = selectedDate.toLocaleDateString('en-US', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  });
 
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold tracking-tight">Analytics</h1>
+      {/* Header with date navigation */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Analytics</h1>
+          <p className="text-muted-foreground">{formattedDate}</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="icon" onClick={handlePrevDay}>
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <DatePicker
+            value={selectedDate}
+            onChange={setSelectedDate}
+            trigger={
+              <Button variant="outline" className="gap-2">
+                <Calendar className="h-4 w-4" />
+                {isToday ? 'Today' : selectedDate.toLocaleDateString()}
+              </Button>
+            }
+          />
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={handleNextDay}
+            disabled={isToday}
+          >
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+          {!isToday && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setSelectedDate(new Date())}
+            >
+              Today
+            </Button>
+          )}
+        </div>
+      </div>
 
       {/* Stats Grid */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {statsLoading ? (
-          Array.from({ length: 4 }).map((_, i) => (
-            <Card key={i}>
-              <CardHeader className="pb-2">
-                <Skeleton className="h-4 w-24" />
-              </CardHeader>
-              <CardContent>
-                <Skeleton className="h-8 w-16" />
-              </CardContent>
-            </Card>
-          ))
-        ) : (
-          <>
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Screenshots</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{stats?.totalScreenshots}</div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Active Time</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">
-                  {formatDuration((stats?.activeMinutes ?? 0) * 60)}
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Sessions</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{stats?.totalSessions}</div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Git Commits</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{stats?.gitCommits}</div>
-              </CardContent>
-            </Card>
-          </>
-        )}
-      </div>
+      <StatsGrid stats={stats} isLoading={statsLoading} />
 
-      {/* Charts */}
-      <div className="grid gap-4 md:grid-cols-2">
-        {/* Hourly Activity */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Hourly Activity</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {hourlyLoading ? (
-              <Skeleton className="h-[300px] w-full" />
-            ) : (
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={hourlyActivity}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis
-                    dataKey="hour"
-                    tickFormatter={(h) => `${h}:00`}
-                    fontSize={12}
-                  />
-                  <YAxis fontSize={12} />
-                  <Tooltip
-                    labelFormatter={(h) => `${h}:00 - ${h}:59`}
-                    formatter={(value: number) => [`${value} min`, 'Active']}
-                  />
-                  <Bar dataKey="activeMinutes" fill="#0088FE" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            )}
-          </CardContent>
-        </Card>
+      {/* Main Content Tabs */}
+      <Tabs defaultValue="activity" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="activity">Activity</TabsTrigger>
+          <TabsTrigger value="apps">Applications</TabsTrigger>
+          <TabsTrigger value="sources">Data Sources</TabsTrigger>
+        </TabsList>
 
-        {/* App Usage */}
-        <Card>
-          <CardHeader>
-            <CardTitle>App Usage</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {statsLoading ? (
-              <Skeleton className="h-[300px] w-full" />
-            ) : (
-              <ResponsiveContainer width="100%" height={300}>
-                <PieChart>
-                  <Pie
-                    data={pieData}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={false}
-                    label={({ name, percent }) =>
-                      `${name} ${(percent * 100).toFixed(0)}%`
-                    }
-                    outerRadius={80}
-                    fill="#8884d8"
-                    dataKey="value"
-                  >
-                    {pieData?.map((_, index) => (
-                      <Cell
-                        key={`cell-${index}`}
-                        fill={COLORS[index % COLORS.length]}
-                      />
-                    ))}
-                  </Pie>
-                  <Tooltip
-                    formatter={(value: number) => [formatDuration(value), 'Time']}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+        <TabsContent value="activity" className="space-y-4">
+          <div className="grid gap-4 lg:grid-cols-2">
+            <ActivityChart data={hourlyActivity} isLoading={hourlyLoading} />
+            <HeatmapChart data={undefined} isLoading={hourlyLoading} />
+          </div>
+        </TabsContent>
 
-      {/* Top Apps Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Top Applications</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {statsLoading ? (
-            <div className="space-y-2">
-              {Array.from({ length: 5 }).map((_, i) => (
-                <Skeleton key={i} className="h-10 w-full" />
-              ))}
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {stats?.topApps.map((app) => (
-                <div
-                  key={app.appName}
-                  className="flex items-center justify-between p-2 rounded-lg hover:bg-accent"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded bg-primary/10 flex items-center justify-center text-xs font-medium">
-                      {app.appName.charAt(0)}
-                    </div>
-                    <div>
-                      <p className="font-medium">{app.appName}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {app.sessionCount} sessions
-                      </p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-medium">{formatDuration(app.durationSeconds)}</p>
-                    <p className="text-sm text-muted-foreground">{app.percentage}%</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+        <TabsContent value="apps" className="space-y-4">
+          <div className="grid gap-4 lg:grid-cols-2">
+            <AppUsageChart data={appUsage} isLoading={appUsageLoading} />
+            <AppUsageTable
+              data={appUsage}
+              isLoading={appUsageLoading}
+              onAppClick={handleAppClick}
+            />
+          </div>
+        </TabsContent>
+
+        <TabsContent value="sources" className="space-y-4">
+          <DataSourcesPanel data={dataSourceStats} isLoading={dataSourcesLoading} />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

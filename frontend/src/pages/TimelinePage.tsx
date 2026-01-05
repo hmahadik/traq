@@ -1,82 +1,215 @@
-import { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Skeleton } from '@/components/ui/skeleton';
-import { useSessionsForDate } from '@/api/hooks';
-import { formatDate, formatTimeRange, formatDuration } from '@/lib/utils';
-import { Badge } from '@/components/ui/badge';
+import { useState, useCallback, useMemo } from 'react';
+import { Button } from '@/components/ui/button';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { SessionCard, SessionCardSkeleton, CalendarWidget } from '@/components/timeline';
+import {
+  useSessionsForDate,
+  useCalendarHeatmap,
+  useGenerateSummary,
+} from '@/api/hooks';
+import { useListNav } from '@/hooks/useListNav';
+import { formatDate } from '@/lib/utils';
+import { ChevronLeft, ChevronRight, Calendar, List } from 'lucide-react';
+import type { Screenshot } from '@/types';
 
-function getTodayString(): string {
-  return new Date().toISOString().split('T')[0];
+function getDateString(date: Date): string {
+  return date.toISOString().split('T')[0];
+}
+
+function addDays(date: Date, days: number): Date {
+  const result = new Date(date);
+  result.setDate(result.getDate() + days);
+  return result;
 }
 
 export function TimelinePage() {
-  const [selectedDate] = useState(getTodayString());
-  const { data: sessions, isLoading } = useSessionsForDate(selectedDate);
+  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [selectedSessionId, setSelectedSessionId] = useState<number | null>(null);
+  const [showCalendar, setShowCalendar] = useState(true);
+
+  const dateStr = getDateString(selectedDate);
+  const isToday = dateStr === getDateString(new Date());
+
+  const { data: sessions, isLoading: sessionsLoading } = useSessionsForDate(dateStr);
+  const { data: calendarData, isLoading: calendarLoading } = useCalendarHeatmap(
+    selectedDate.getFullYear(),
+    selectedDate.getMonth() + 1
+  );
+  const generateSummary = useGenerateSummary();
+
+  // Mock thumbnails for sessions (in real app, would be fetched per session)
+  const getMockThumbnails = useCallback((sessionId: number): Screenshot[] => {
+    // Return mock thumbnails based on session ID
+    return Array.from({ length: Math.min(8, sessionId % 10 + 2) }, (_, i) => ({
+      id: sessionId * 100 + i,
+      timestamp: Date.now() / 1000 - i * 60,
+      filepath: `/screenshots/${sessionId}/${i}.webp`,
+      dhash: '',
+      windowTitle: 'Mock Window',
+      appName: 'Mock App',
+      windowX: null,
+      windowY: null,
+      windowWidth: null,
+      windowHeight: null,
+      monitorName: null,
+      monitorWidth: null,
+      monitorHeight: null,
+      sessionId,
+      createdAt: Date.now() / 1000 - i * 60,
+    }));
+  }, []);
+
+  // Navigation handlers
+  const goToPreviousDay = useCallback(() => {
+    setSelectedDate((d) => addDays(d, -1));
+    setSelectedSessionId(null);
+  }, []);
+
+  const goToNextDay = useCallback(() => {
+    if (!isToday) {
+      setSelectedDate((d) => addDays(d, 1));
+      setSelectedSessionId(null);
+    }
+  }, [isToday]);
+
+  // List navigation for sessions
+  const sessionIds = useMemo(() => sessions?.map((s) => s.id) || [], [sessions]);
+  const { selectedIndex, setSelectedIndex } = useListNav({
+    itemCount: sessionIds.length,
+    onSelect: (index: number) => {
+      if (sessions?.[index]) {
+        setSelectedSessionId(sessions[index].id);
+      }
+    },
+  });
+
+  const handleSessionSelect = useCallback((sessionId: number) => {
+    setSelectedSessionId(sessionId);
+    const index = sessionIds.indexOf(sessionId);
+    if (index >= 0) {
+      setSelectedIndex(index);
+    }
+  }, [sessionIds, setSelectedIndex]);
+
+  const handleGenerateSummary = useCallback((sessionId: number) => {
+    generateSummary.mutate(sessionId);
+  }, [generateSummary]);
+
+  const handleDateSelect = useCallback((date: Date) => {
+    setSelectedDate(date);
+    setSelectedSessionId(null);
+  }, []);
+
+  const formattedDate = selectedDate.toLocaleDateString('en-US', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  });
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold tracking-tight">Timeline</h1>
-        <p className="text-muted-foreground">{formatDate(Date.now() / 1000)}</p>
+    <div className="flex gap-6 h-[calc(100vh-8rem)]">
+      {/* Main Content */}
+      <div className="flex-1 flex flex-col min-w-0">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Timeline</h1>
+            <p className="text-muted-foreground">{formattedDate}</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="icon" onClick={goToPreviousDay}>
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={goToNextDay}
+              disabled={isToday}
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+            {!isToday && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => handleDateSelect(new Date())}
+              >
+                Today
+              </Button>
+            )}
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => setShowCalendar(!showCalendar)}
+              className="lg:hidden"
+            >
+              <Calendar className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+
+        {/* Sessions List */}
+        <ScrollArea className="flex-1 -mr-4 pr-4">
+          <div className="space-y-4">
+            {sessionsLoading ? (
+              Array.from({ length: 4 }).map((_, i) => (
+                <SessionCardSkeleton key={i} />
+              ))
+            ) : !sessions || sessions.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
+                <List className="h-12 w-12 mb-4 opacity-50" />
+                <p className="text-lg font-medium">No sessions recorded</p>
+                <p className="text-sm mt-1">
+                  {isToday
+                    ? 'Sessions will appear here as you work'
+                    : `No activity recorded on ${formatDate(selectedDate.getTime() / 1000)}`}
+                </p>
+              </div>
+            ) : (
+              sessions.map((session, index) => (
+                <SessionCard
+                  key={session.id}
+                  session={session}
+                  thumbnails={getMockThumbnails(session.id)}
+                  isSelected={selectedSessionId === session.id || selectedIndex === index}
+                  onSelect={() => handleSessionSelect(session.id)}
+                  onGenerateSummary={() => handleGenerateSummary(session.id)}
+                  isGeneratingSummary={
+                    generateSummary.isPending && generateSummary.variables === session.id
+                  }
+                />
+              ))
+            )}
+          </div>
+        </ScrollArea>
+
+        {/* Keyboard Navigation Hint */}
+        {sessions && sessions.length > 0 && (
+          <div className="mt-4 pt-4 border-t text-xs text-muted-foreground text-center">
+            Use <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono">↑</kbd>{' '}
+            <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono">↓</kbd> or{' '}
+            <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono">j</kbd>{' '}
+            <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono">k</kbd> to navigate,{' '}
+            <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono">Enter</kbd> to expand
+          </div>
+        )}
       </div>
 
-      <div className="grid gap-4">
-        {isLoading ? (
-          Array.from({ length: 3 }).map((_, i) => (
-            <Card key={i}>
-              <CardHeader>
-                <Skeleton className="h-6 w-48" />
-              </CardHeader>
-              <CardContent>
-                <Skeleton className="h-20 w-full" />
-              </CardContent>
-            </Card>
-          ))
-        ) : sessions?.length === 0 ? (
-          <Card>
-            <CardContent className="flex items-center justify-center h-32">
-              <p className="text-muted-foreground">No sessions recorded today</p>
-            </CardContent>
-          </Card>
-        ) : (
-          sessions?.map((session) => (
-            <Card key={session.id} className="hover:bg-accent/50 transition-colors cursor-pointer">
-              <CardHeader className="pb-2">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-lg">
-                    {formatTimeRange(session.startTime, session.endTime ?? session.startTime)}
-                  </CardTitle>
-                  <div className="flex items-center gap-2">
-                    <Badge variant="secondary">
-                      {session.screenshotCount} screenshots
-                    </Badge>
-                    <Badge variant="outline">
-                      {formatDuration(session.durationSeconds ?? 0)}
-                    </Badge>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                {session.summary ? (
-                  <div className="space-y-2">
-                    <p className="text-sm">{session.summary.summary}</p>
-                    <div className="flex gap-2">
-                      {session.summary.tags.map((tag) => (
-                        <Badge key={tag} variant="outline" className="text-xs">
-                          {tag}
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
-                ) : (
-                  <p className="text-sm text-muted-foreground italic">
-                    No summary generated yet
-                  </p>
-                )}
-              </CardContent>
-            </Card>
-          ))
-        )}
+      {/* Calendar Sidebar */}
+      <div
+        className={`${
+          showCalendar ? 'block' : 'hidden'
+        } lg:block w-72 flex-shrink-0`}
+      >
+        <div className="sticky top-0">
+          <CalendarWidget
+            data={calendarData}
+            isLoading={calendarLoading}
+            selectedDate={selectedDate}
+            onSelectDate={handleDateSelect}
+          />
+        </div>
       </div>
     </div>
   );

@@ -9,6 +9,14 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from './client';
 import type { Config } from '@/types';
 
+// Helper to convert date string to timestamp range
+function getDateRange(date: string): { start: number; end: number } {
+  const d = new Date(date);
+  const start = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime() / 1000;
+  const end = start + 24 * 60 * 60 - 1; // End of day
+  return { start, end };
+}
+
 // Query keys for cache management
 export const queryKeys = {
   analytics: {
@@ -71,7 +79,16 @@ export function useCalendarHeatmap(year: number, month: number) {
   });
 }
 
-export function useAppUsage(start: number, end: number) {
+export function useAppUsageRange(start: number, end: number) {
+  return useQuery({
+    queryKey: queryKeys.analytics.appUsage(start, end),
+    queryFn: () => api.analytics.getAppUsage(start, end),
+    staleTime: 60_000,
+  });
+}
+
+export function useAppUsage(date: string) {
+  const { start, end } = getDateRange(date);
   return useQuery({
     queryKey: queryKeys.analytics.appUsage(start, end),
     queryFn: () => api.analytics.getAppUsage(start, end),
@@ -87,7 +104,16 @@ export function useHourlyActivity(date: string) {
   });
 }
 
-export function useDataSourceStats(start: number, end: number) {
+export function useDataSourceStatsRange(start: number, end: number) {
+  return useQuery({
+    queryKey: queryKeys.analytics.dataSources(start, end),
+    queryFn: () => api.analytics.getDataSourceStats(start, end),
+    staleTime: 60_000,
+  });
+}
+
+export function useDataSourceStats(date: string) {
+  const { start, end } = getDateRange(date);
   return useQuery({
     queryKey: queryKeys.analytics.dataSources(start, end),
     queryFn: () => api.analytics.getDataSourceStats(start, end),
