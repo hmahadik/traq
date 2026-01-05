@@ -1,33 +1,23 @@
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
+# Go
+*.exe
+*.exe~
+*.dll
 *.so
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-share/python-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-PIPFILE.lock
+*.dylib
+*.test
+*.out
 
-# Virtual environments
-venv/
-env/
-ENV/
-env.bak/
-venv.bak/
+# Build artifacts
+build/bin/
+coverage.out
+coverage.html
+coverage_tracker.out
+build.log
+
+# Frontend
+node_modules/
+frontend/dist/
+frontend/package.json.md5
 
 # Activity tracker data
 activity-tracker-data/
@@ -55,6 +45,4 @@ Thumbs.db
 .env.production
 
 # Logs
-*.logbuild/bin
-node_modules
-frontend/dist
+*.log
