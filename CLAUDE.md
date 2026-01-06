@@ -103,6 +103,44 @@ Linux background service: captures screenshots at intervals, stores in SQLite, w
 - Permission handling: missing directory/file checks
 - Error resilience: daemon needs better recovery
 
+### WebKit/Go Signal Handler Conflict (v2 branch - Wails)
+
+**Issue**: The Wails v2 desktop app crashes on modern Linux systems due to a signal handler conflict between Go's runtime and WebKit's JavaScript Core garbage collector.
+
+**Error Message**:
+```
+fatal error: non-Go code set up signal handler without SA_ONSTACK flag
+signal 11 received but handler not on signal stack
+```
+
+**Root Cause**:
+- Go's runtime uses SIGSEGV (signal 11) for internal purposes (stack growth, GC)
+- WebKit's JavaScript Core also uses signals 10/11 for its garbage collector
+- When both try to handle the same signal, the conflict causes a crash
+
+**Affected Configurations**:
+- Ubuntu 24.04+ with webkit2gtk-4.1
+- Go 1.22+ with Wails v2.11.0
+- Also occurs in Docker with Ubuntu 22.04 and webkit2gtk-4.0
+
+**Attempted Workarounds (none successful)**:
+- `JSC_SIGNAL_FOR_GC=1` environment variable
+- `GODEBUG=asyncpreemptoff=1`
+- `-tags webkit2_41` build flag
+- Docker with older Ubuntu (22.04)
+- Older Go versions (incompatible with Wails v2.11.0)
+
+**Working Alternatives**:
+1. **macOS/Windows**: No signal conflict on these platforms
+2. **Older Linux distros**: May work with older WebKit versions
+3. **Wails v3**: Major rewrite, may resolve issue (requires significant migration)
+4. **Alternative frameworks**: Tauri (Rust) or Electron don't have this issue
+
+**References**:
+- Wails GitHub issues related to WebKit signal handling
+- Go runtime signal handling documentation
+- WebKit JavaScript Core GC implementation
+
 ## Testing
 ```bash
 pytest tests/ --cov=tracker --cov-report=html
