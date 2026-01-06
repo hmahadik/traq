@@ -2,6 +2,8 @@
 
 A Linux background service that automatically captures desktop screenshots at regular intervals, stores metadata in SQLite, and provides a rich web interface with timeline visualization and analytics for browsing your activity history.
 
+![Activity Tracker Timeline View](docs/images/timeline-hero.png)
+
 ## Features
 
 - **Automated Screenshot Capture**: Captures desktop screenshots every 30 seconds
