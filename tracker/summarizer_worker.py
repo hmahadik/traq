@@ -1098,8 +1098,8 @@ class SummarizerWorker:
 
             # Get screenshots in the time range
             screenshots = self.storage.get_screenshots_in_range(
-                start_time.isoformat(),
-                end_time.isoformat()
+                start_time,
+                end_time
             )
 
             if not screenshots:
@@ -1108,8 +1108,8 @@ class SummarizerWorker:
 
             # Get focus events for context
             focus_events = self.storage.get_focus_events_in_range(
-                start_time.isoformat(),
-                end_time.isoformat()
+                start_time,
+                end_time
             )
 
             logger.info(
