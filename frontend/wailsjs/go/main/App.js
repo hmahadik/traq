@@ -122,6 +122,10 @@ export function GetWeeklyStats(arg1) {
   return window['go']['main']['App']['GetWeeklyStats'](arg1);
 }
 
+export function IsReady() {
+  return window['go']['main']['App']['IsReady']();
+}
+
 export function OpenDataDir() {
   return window['go']['main']['App']['OpenDataDir']();
 }

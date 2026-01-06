@@ -14,7 +14,8 @@ import (
 
 // App struct holds the application state and services
 type App struct {
-	ctx context.Context
+	ctx   context.Context
+	ready bool // Set to true after startup completes
 
 	// Core components
 	platform platform.Platform
@@ -32,6 +33,12 @@ type App struct {
 // NewApp creates a new App application struct
 func NewApp() *App {
 	return &App{}
+}
+
+// IsReady returns true if the app has finished initializing.
+// Frontend can call this to check if the app is ready for API calls.
+func (a *App) IsReady() bool {
+	return a.ready
 }
 
 // startup is called when the app starts. The context is saved
@@ -88,6 +95,9 @@ func (a *App) startup(ctx context.Context) {
 
 	// Initialize reports service (after timeline service)
 	a.Reports = service.NewReportsService(a.store, a.Timeline)
+
+	// Mark as ready
+	a.ready = true
 }
 
 // shutdown is called when the app is closing
@@ -120,21 +130,33 @@ func (a *App) beforeClose(ctx context.Context) bool {
 
 // GetDaemonStatus returns the current daemon status.
 func (a *App) GetDaemonStatus() (*service.DaemonStatus, error) {
+	if a.Config == nil {
+		return nil, nil
+	}
 	return a.Config.GetDaemonStatus()
 }
 
 // StartTracking starts the tracking daemon.
 func (a *App) StartTracking() error {
+	if a.Config == nil {
+		return nil
+	}
 	return a.Config.StartDaemon()
 }
 
 // StopTracking stops the tracking daemon.
 func (a *App) StopTracking() error {
+	if a.Config == nil {
+		return nil
+	}
 	return a.Config.StopDaemon()
 }
 
 // RestartTracking restarts the tracking daemon with updated config.
 func (a *App) RestartTracking() error {
+	if a.Config == nil {
+		return nil
+	}
 	return a.Config.RestartDaemon()
 }
 
@@ -156,31 +178,49 @@ func (a *App) ForceCapture() (string, error) {
 
 // GetDailyStats returns statistics for a specific date.
 func (a *App) GetDailyStats(date string) (*service.DailyStats, error) {
+	if a.Analytics == nil {
+		return nil, nil
+	}
 	return a.Analytics.GetDailyStats(date)
 }
 
 // GetWeeklyStats returns statistics for a week.
 func (a *App) GetWeeklyStats(startDate string) (*service.WeeklyStats, error) {
+	if a.Analytics == nil {
+		return nil, nil
+	}
 	return a.Analytics.GetWeeklyStats(startDate)
 }
 
 // GetCalendarHeatmap returns calendar data for a month.
 func (a *App) GetCalendarHeatmap(year, month int) (*service.CalendarData, error) {
+	if a.Analytics == nil {
+		return nil, nil
+	}
 	return a.Analytics.GetCalendarHeatmap(year, month)
 }
 
 // GetAppUsage returns application usage for a time range.
 func (a *App) GetAppUsage(start, end int64) ([]*service.AppUsage, error) {
+	if a.Analytics == nil {
+		return nil, nil
+	}
 	return a.Analytics.GetAppUsage(start, end)
 }
 
 // GetHourlyActivity returns hourly activity for a date.
 func (a *App) GetHourlyActivity(date string) ([]*service.HourlyActivity, error) {
+	if a.Analytics == nil {
+		return nil, nil
+	}
 	return a.Analytics.GetHourlyActivity(date)
 }
 
 // GetDataSourceStats returns statistics from all data sources.
 func (a *App) GetDataSourceStats(start, end int64) (*service.DataSourceStats, error) {
+	if a.Analytics == nil {
+		return nil, nil
+	}
 	return a.Analytics.GetDataSourceStats(start, end)
 }
 
@@ -190,26 +230,41 @@ func (a *App) GetDataSourceStats(start, end int64) (*service.DataSourceStats, er
 
 // GetSessionsForDate returns all sessions for a date.
 func (a *App) GetSessionsForDate(date string) ([]*service.SessionSummary, error) {
+	if a.Timeline == nil {
+		return nil, nil
+	}
 	return a.Timeline.GetSessionsForDate(date)
 }
 
 // GetScreenshotsForSession returns paginated screenshots for a session.
 func (a *App) GetScreenshotsForSession(sessionID int64, page, perPage int) (*service.ScreenshotPage, error) {
+	if a.Timeline == nil {
+		return nil, nil
+	}
 	return a.Timeline.GetScreenshotsForSession(sessionID, page, perPage)
 }
 
 // GetScreenshotsForHour returns screenshots for a specific hour.
 func (a *App) GetScreenshotsForHour(date string, hour int) ([]*storage.Screenshot, error) {
+	if a.Timeline == nil {
+		return nil, nil
+	}
 	return a.Timeline.GetScreenshotsForHour(date, hour)
 }
 
 // GetSessionContext returns all context for a session.
 func (a *App) GetSessionContext(sessionID int64) (*service.SessionContext, error) {
+	if a.Timeline == nil {
+		return nil, nil
+	}
 	return a.Timeline.GetSessionContext(sessionID)
 }
 
 // GetRecentSessions returns the most recent sessions.
 func (a *App) GetRecentSessions(limit int) ([]*storage.Session, error) {
+	if a.Timeline == nil {
+		return nil, nil
+	}
 	return a.Timeline.GetRecentSessions(limit)
 }
 
@@ -219,26 +274,53 @@ func (a *App) GetRecentSessions(limit int) ([]*storage.Session, error) {
 
 // GetScreenshot returns screenshot metadata by ID.
 func (a *App) GetScreenshot(id int64) (*storage.Screenshot, error) {
+	if a.Screenshots == nil {
+		return nil, nil
+	}
 	return a.Screenshots.GetScreenshot(id)
 }
 
 // GetScreenshotInfo returns detailed info about a screenshot.
 func (a *App) GetScreenshotInfo(id int64) (*service.ScreenshotInfo, error) {
+	if a.Screenshots == nil {
+		return nil, nil
+	}
 	return a.Screenshots.GetScreenshotInfo(id)
 }
 
 // GetScreenshotPath returns the filesystem path to a screenshot.
-func (a *App) GetScreenshotPath(id int64) (string, error) {
+func (a *App) GetScreenshotPath(id int64) (result string, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			result = ""
+			err = nil
+		}
+	}()
+	if a == nil || !a.ready || a.Screenshots == nil {
+		return "", nil
+	}
 	return a.Screenshots.GetScreenshotPath(id)
 }
 
 // GetThumbnailPath returns the filesystem path to a thumbnail.
-func (a *App) GetThumbnailPath(id int64) (string, error) {
+func (a *App) GetThumbnailPath(id int64) (result string, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			result = ""
+			err = nil
+		}
+	}()
+	if a == nil || !a.ready || a.Screenshots == nil {
+		return "", nil
+	}
 	return a.Screenshots.GetThumbnailPath(id)
 }
 
 // DeleteScreenshot deletes a screenshot and its files.
 func (a *App) DeleteScreenshot(id int64) error {
+	if a.Screenshots == nil {
+		return nil
+	}
 	return a.Screenshots.DeleteScreenshot(id)
 }
 
@@ -248,26 +330,41 @@ func (a *App) DeleteScreenshot(id int64) error {
 
 // GenerateReport generates a new report for the given time range.
 func (a *App) GenerateReport(timeRange, reportType string) (*storage.Report, error) {
+	if a.Reports == nil {
+		return nil, nil
+	}
 	return a.Reports.GenerateReport(timeRange, reportType)
 }
 
 // GetReport returns a report by ID with full content.
 func (a *App) GetReport(id int64) (*storage.Report, error) {
+	if a.Reports == nil {
+		return nil, nil
+	}
 	return a.Reports.GetReport(id)
 }
 
 // ExportReport exports a report in the specified format.
 func (a *App) ExportReport(reportID int64, format string) (string, error) {
+	if a.Reports == nil {
+		return "", nil
+	}
 	return a.Reports.ExportReport(reportID, format)
 }
 
 // GetReportHistory returns past generated reports.
 func (a *App) GetReportHistory() ([]*service.ReportMeta, error) {
+	if a.Reports == nil {
+		return nil, nil
+	}
 	return a.Reports.GetReportHistory()
 }
 
 // ParseTimeRange parses natural language time input.
 func (a *App) ParseTimeRange(input string) (*service.TimeRange, error) {
+	if a.Reports == nil {
+		return nil, nil
+	}
 	return a.Reports.ParseTimeRange(input)
 }
 
@@ -277,16 +374,25 @@ func (a *App) ParseTimeRange(input string) (*service.TimeRange, error) {
 
 // GetConfig returns the current configuration.
 func (a *App) GetConfig() (*service.Config, error) {
+	if a.Config == nil {
+		return nil, nil
+	}
 	return a.Config.GetConfig()
 }
 
 // UpdateConfig updates configuration values.
 func (a *App) UpdateConfig(updates map[string]interface{}) error {
+	if a.Config == nil {
+		return nil
+	}
 	return a.Config.UpdateConfig(updates)
 }
 
 // GetStorageStats returns storage statistics.
 func (a *App) GetStorageStats() (*service.StorageStats, error) {
+	if a.Config == nil {
+		return nil, nil
+	}
 	return a.Config.GetStorageStats()
 }
 
@@ -296,6 +402,9 @@ func (a *App) GetStorageStats() (*service.StorageStats, error) {
 
 // GetDataDir returns the data directory path.
 func (a *App) GetDataDir() string {
+	if a.platform == nil {
+		return ""
+	}
 	return a.platform.DataDir()
 }
 
@@ -306,14 +415,21 @@ func (a *App) GetVersion() string {
 
 // GetSystemInfo returns basic system information.
 func (a *App) GetSystemInfo() map[string]string {
+	dataDir := ""
+	if a.platform != nil {
+		dataDir = a.platform.DataDir()
+	}
 	return map[string]string{
-		"dataDir": a.platform.DataDir(),
+		"dataDir": dataDir,
 		"version": "2.0.0",
 	}
 }
 
 // OpenDataDir opens the data directory in the file manager.
 func (a *App) OpenDataDir() error {
+	if a.platform == nil {
+		return nil
+	}
 	return a.platform.OpenURL(a.platform.DataDir())
 }
 

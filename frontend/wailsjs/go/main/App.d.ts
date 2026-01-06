@@ -63,6 +63,8 @@ export function GetWatchedDirectories():Promise<Array<string>>;
 
 export function GetWeeklyStats(arg1:string):Promise<service.WeeklyStats>;
 
+export function IsReady():Promise<boolean>;
+
 export function OpenDataDir():Promise<void>;
 
 export function ParseTimeRange(arg1:string):Promise<service.TimeRange>;

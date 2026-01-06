@@ -65,6 +65,9 @@ func (s *ScreenshotService) GetThumbnail(id int64) ([]byte, error) {
 // GetScreenshotPath returns the URL path to a screenshot.
 // Returns a path like "/screenshots/2026/01/05/123456.webp" that can be loaded via the asset handler.
 func (s *ScreenshotService) GetScreenshotPath(id int64) (string, error) {
+	if s.store == nil {
+		return "", nil
+	}
 	screenshot, err := s.store.GetScreenshot(id)
 	if err != nil {
 		return "", fmt.Errorf("screenshot not found: %w", err)
@@ -76,6 +79,9 @@ func (s *ScreenshotService) GetScreenshotPath(id int64) (string, error) {
 // Falls back to the original screenshot path if thumbnail doesn't exist.
 // Returns a path like "/screenshots/2026/01/05/123456_thumb.webp" that can be loaded via the asset handler.
 func (s *ScreenshotService) GetThumbnailPath(id int64) (string, error) {
+	if s.store == nil {
+		return "", nil
+	}
 	screenshot, err := s.store.GetScreenshot(id)
 	if err != nil {
 		return "", fmt.Errorf("screenshot not found: %w", err)
