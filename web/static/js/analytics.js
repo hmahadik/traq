@@ -21,8 +21,8 @@
         loading: false
     };
 
-    // Day labels for week view
-    const DAY_LABELS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+    // Day labels for week view (full names to avoid T ambiguity)
+    const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
     // Initialize current week/month
     const now = new Date();
@@ -60,6 +60,30 @@
         document.getElementById('month-prev')?.addEventListener('click', () => navigateMonth(-1));
         document.getElementById('month-next')?.addEventListener('click', () => navigateMonth(1));
         document.getElementById('month-today')?.addEventListener('click', goToThisMonth);
+
+        // Regenerate/Export buttons (stub functionality)
+        document.getElementById('day-regenerate')?.addEventListener('click', () => showToast('Regenerate feature coming soon'));
+        document.getElementById('day-export')?.addEventListener('click', () => showToast('Export feature coming soon'));
+        document.getElementById('week-regenerate')?.addEventListener('click', () => showToast('Regenerate feature coming soon'));
+        document.getElementById('week-export')?.addEventListener('click', () => showToast('Export feature coming soon'));
+        document.getElementById('month-regenerate')?.addEventListener('click', () => showToast('Regenerate feature coming soon'));
+        document.getElementById('month-export')?.addEventListener('click', () => showToast('Export feature coming soon'));
+    }
+
+    function showToast(message) {
+        // Use existing toast system if available, otherwise console log
+        if (typeof window.showToast === 'function') {
+            window.showToast(message, 'info');
+        } else {
+            console.log(message);
+            // Simple fallback toast
+            const toast = document.createElement('div');
+            toast.className = 'toast info';
+            toast.textContent = message;
+            toast.style.cssText = 'position:fixed;bottom:20px;right:20px;background:var(--surface-2);color:var(--text);padding:12px 20px;border-radius:8px;z-index:1000;box-shadow:0 2px 8px rgba(0,0,0,0.2);';
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 3000);
+        }
     }
 
     // ==================== View Switching ====================
@@ -238,8 +262,10 @@
         // Render daily activity chart (7 bars)
         renderWeekActivityChart('week-activity-chart', data.daily_activity || [], data.today_index);
 
-        // Render stats
+        // Render stats with comparison
         const stats = data.stats || {};
+        const comparison = data.comparison;
+
         document.getElementById('week-stat-active').textContent = formatDurationHM(stats.active_seconds);
         document.getElementById('week-stat-avg').textContent = formatDurationHM(stats.avg_daily_seconds);
         document.getElementById('week-stat-break').textContent = formatDurationHM(stats.break_seconds);
@@ -248,6 +274,15 @@
         document.getElementById('week-stat-switches').textContent = stats.avg_context_switches || 0;
         document.getElementById('week-stat-focus').textContent = formatDurationHM(stats.longest_focus_seconds);
         document.getElementById('week-stat-days').textContent = `${stats.active_days || 0}/7`;
+
+        // Display time ranges if available
+        renderTimeRange('week-stat-start', stats.start_time_range);
+        renderTimeRange('week-stat-end', stats.end_time_range);
+
+        // Update comparison indicators
+        renderComparison('week-stat-active', comparison?.active_seconds_delta, 'time');
+        renderComparison('week-stat-switches', comparison?.context_switches_delta, 'count');
+        renderComparison('week-stat-days', comparison?.active_days_delta, 'count');
 
         // Goal progress
         const goalPct = Math.min(stats.goal_pct || 0, 100);
@@ -502,9 +537,20 @@
             return;
         }
 
-        container.innerHTML = tags.map(tag =>
-            `<span class="tag-item">${escapeHtml(tag.name)}<span class="tag-count">${tag.count}</span></span>`
-        ).join('');
+        // New format: show time with progress bar
+        container.innerHTML = tags.map(tag => {
+            const timeStr = tag.seconds > 0 ? formatDurationHM(tag.seconds) : `${tag.count}x`;
+            const pct = tag.pct || 0;
+            return `<div class="tag-bar-item">
+                <div class="tag-bar-header">
+                    <span class="tag-name">${escapeHtml(tag.name)}</span>
+                    <span class="tag-time">${timeStr}</span>
+                </div>
+                <div class="tag-bar-container">
+                    <div class="tag-bar-fill" style="width: ${pct}%"></div>
+                </div>
+            </div>`;
+        }).join('');
     }
 
     function renderDonut(chartId, legendId, apps) {
@@ -514,9 +560,14 @@
 
         if (!apps || apps.length === 0) {
             chart.style.background = 'var(--border)';
+            chart.setAttribute('data-total', '');
             legend.innerHTML = '<span class="no-windows">No app data</span>';
             return;
         }
+
+        // Calculate total time for center display
+        const totalSeconds = apps.reduce((sum, app) => sum + (app.seconds || 0), 0);
+        chart.setAttribute('data-total', formatDurationHM(totalSeconds));
 
         // Build conic gradient
         const segments = [];
@@ -540,6 +591,45 @@
         ).join('');
     }
 
+    // App color mapping for badges
+    const APP_BADGE_COLORS = {
+        'code': '#007ACC',
+        'vscode': '#007ACC',
+        'firefox': '#FF7139',
+        'chrome': '#4285F4',
+        'chromium': '#4285F4',
+        'terminal': '#2E3436',
+        'gnome-terminal': '#2E3436',
+        'konsole': '#2E3436',
+        'alacritty': '#F0C674',
+        'kitty': '#9D72FF',
+        'slack': '#4A154B',
+        'discord': '#5865F2',
+        'obsidian': '#7C3AED',
+        'notion': '#000000',
+        'figma': '#F24E1E',
+        'gimp': '#5C5543',
+        'blender': '#E87D0D',
+        'libreoffice': '#18A303',
+        'postman': '#FF6C37',
+        'dbeaver': '#382923',
+    };
+
+    function getAppBadgeColor(appName) {
+        if (!appName) return '#8b949e';
+        const appLower = appName.toLowerCase();
+        for (const [key, color] of Object.entries(APP_BADGE_COLORS)) {
+            if (appLower.includes(key)) return color;
+        }
+        // Generate consistent color from app name hash
+        let hash = 0;
+        for (let i = 0; i < appLower.length; i++) {
+            hash = appLower.charCodeAt(i) + ((hash << 5) - hash);
+        }
+        const hue = Math.abs(hash % 360);
+        return `hsl(${hue}, 50%, 45%)`;
+    }
+
     function renderWindows(containerId, windows) {
         const container = document.getElementById(containerId);
         if (!container) return;
@@ -549,15 +639,18 @@
             return;
         }
 
-        container.innerHTML = windows.slice(0, 6).map(w =>
-            `<div class="window-item">
+        container.innerHTML = windows.slice(0, 6).map(w => {
+            const badgeColor = getAppBadgeColor(w.app);
+            return `<div class="window-item">
                 <div class="window-info">
-                    <div class="window-app">${escapeHtml(w.app)}</div>
+                    <div class="window-app">
+                        <span class="app-badge" style="background: ${badgeColor}">${escapeHtml(w.app)}</span>
+                    </div>
                     <div class="window-title">${escapeHtml(w.title || 'Untitled')}</div>
                 </div>
                 <div class="window-time">${formatDurationHM(w.seconds)}</div>
-            </div>`
-        ).join('');
+            </div>`;
+        }).join('');
     }
 
     function renderProductivityScore(prefix, productivity) {
@@ -574,19 +667,19 @@
         const productivePct = productivity.productive_pct || 0;
         const totalSeconds = productivity.total_seconds || 0;
 
-        // Format score with sign
-        const scoreText = score >= 0 ? `+${score.toFixed(1)}` : score.toFixed(1);
-        scoreValue.textContent = totalSeconds > 0 ? scoreText : '--';
+        // Display score as 0-100 (no +/- sign needed now)
+        scoreValue.textContent = totalSeconds > 0 ? score : '--';
 
-        // Update score class based on value
+        // Update score class based on value (0-100 scale)
+        // Green >= 60, Yellow 40-59, Red < 40
         scoreValue.className = 'score-value';
         if (totalSeconds > 0) {
-            if (score > 20) {
+            if (score >= 60) {
                 scoreValue.classList.add('positive');
-            } else if (score < -20) {
-                scoreValue.classList.add('negative');
-            } else {
+            } else if (score >= 40) {
                 scoreValue.classList.add('neutral');
+            } else {
+                scoreValue.classList.add('negative');
             }
         }
 
@@ -650,6 +743,63 @@
     }
 
     // ==================== Utility Functions ====================
+
+    function renderTimeRange(elementId, range) {
+        // Add range indicator below time value
+        const element = document.getElementById(elementId);
+        if (!element || !range) return;
+
+        const card = element.closest('.stat-card');
+        if (!card) return;
+
+        // Remove existing range indicator
+        const existingRange = card.querySelector('.time-range-indicator');
+        if (existingRange) existingRange.remove();
+
+        // Create range indicator
+        const indicator = document.createElement('div');
+        indicator.className = 'time-range-indicator';
+        indicator.textContent = `Range: ${range.min} – ${range.max}`;
+        card.appendChild(indicator);
+    }
+
+    function renderComparison(elementId, delta, type) {
+        // Find the stat card containing this element and add comparison indicator
+        const element = document.getElementById(elementId);
+        if (!element || delta === undefined || delta === null) return;
+
+        const card = element.closest('.stat-card');
+        if (!card) return;
+
+        // Remove existing comparison indicator
+        const existingComp = card.querySelector('.comparison-indicator');
+        if (existingComp) existingComp.remove();
+
+        // Create comparison indicator
+        const indicator = document.createElement('div');
+        indicator.className = 'comparison-indicator';
+
+        let text = '';
+        if (type === 'time') {
+            const absDelta = Math.abs(delta);
+            text = formatDurationHM(absDelta);
+        } else {
+            text = Math.abs(delta);
+        }
+
+        if (delta > 0) {
+            indicator.classList.add('positive');
+            indicator.innerHTML = `<span class="delta-arrow">▲</span> +${text} vs last week`;
+        } else if (delta < 0) {
+            indicator.classList.add('negative');
+            indicator.innerHTML = `<span class="delta-arrow">▼</span> ${text} vs last week`;
+        } else {
+            indicator.classList.add('neutral');
+            indicator.innerHTML = `<span class="delta-arrow">─</span> same as last week`;
+        }
+
+        card.appendChild(indicator);
+    }
 
     function formatDurationHM(seconds) {
         if (seconds == null || isNaN(seconds) || seconds === 0) return '0m';

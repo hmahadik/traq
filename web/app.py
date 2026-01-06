@@ -981,9 +981,9 @@ def _calculate_productivity_breakdown(apps):
     neutral_pct = int((neutral_seconds / total_seconds) * 100)
     distracting_pct = int((distracting_seconds / total_seconds) * 100)
 
-    # Score: +100 for 100% productive, 0 for 50/50, -100 for 100% distracting
-    # Formula: (productive% - distracting%) * 1.0
-    score = ((productive_pct - distracting_pct) / 100.0) * 100
+    # Score: 0-100 based on productive percentage (simple and intuitive)
+    # This matches the mockup which shows scores like "+92.3"
+    score = productive_pct
 
     return {
         'productive_seconds': productive_seconds,
@@ -993,7 +993,7 @@ def _calculate_productivity_breakdown(apps):
         'productive_pct': productive_pct,
         'neutral_pct': neutral_pct,
         'distracting_pct': distracting_pct,
-        'score': round(score, 1)
+        'score': score
     }
 
 
@@ -1025,18 +1025,55 @@ def _get_bar_class(value, max_value):
 
 
 def _aggregate_tags(summaries):
-    """Aggregate tag counts from summaries."""
-    tag_counts = {}
+    """Aggregate tag durations from summaries.
+
+    Each summary has start_time, end_time, and tags.
+    Duration is distributed evenly across all tags in a summary.
+    Returns tags with total seconds and count.
+    """
+    tag_data = {}  # {tag_name: {'seconds': int, 'count': int}}
+
     for s in summaries:
         tags = s.get('tags', [])
-        if tags:
-            for tag in tags:
-                tag_lower = tag.lower().strip()
-                if tag_lower:
-                    tag_counts[tag_lower] = tag_counts.get(tag_lower, 0) + 1
-    # Sort by count descending
-    sorted_tags = sorted(tag_counts.items(), key=lambda x: -x[1])
-    return [{'name': t[0], 'count': t[1]} for t in sorted_tags[:10]]
+        if not tags:
+            continue
+
+        # Calculate summary duration
+        start_str = s.get('start_time')
+        end_str = s.get('end_time')
+        if not start_str or not end_str:
+            continue
+
+        try:
+            start_dt = datetime.fromisoformat(start_str.replace('Z', '+00:00'))
+            end_dt = datetime.fromisoformat(end_str.replace('Z', '+00:00'))
+            duration_seconds = max(0, int((end_dt - start_dt).total_seconds()))
+        except (ValueError, TypeError):
+            duration_seconds = 0
+
+        # Distribute duration across tags
+        per_tag_seconds = duration_seconds // len(tags) if len(tags) > 0 else 0
+
+        for tag in tags:
+            tag_lower = tag.lower().strip()
+            if tag_lower:
+                if tag_lower not in tag_data:
+                    tag_data[tag_lower] = {'seconds': 0, 'count': 0}
+                tag_data[tag_lower]['seconds'] += per_tag_seconds
+                tag_data[tag_lower]['count'] += 1
+
+    # Sort by seconds descending
+    sorted_tags = sorted(tag_data.items(), key=lambda x: -x[1]['seconds'])
+
+    # Calculate max for percentage bars
+    max_seconds = sorted_tags[0][1]['seconds'] if sorted_tags else 0
+
+    return [{
+        'name': t[0],
+        'seconds': t[1]['seconds'],
+        'count': t[1]['count'],
+        'pct': int((t[1]['seconds'] / max_seconds) * 100) if max_seconds > 0 else 0
+    } for t in sorted_tags[:10]]
 
 
 def _get_day_data(storage, date_str, is_today=False):
@@ -1080,25 +1117,26 @@ def _get_day_data(storage, date_str, is_today=False):
     longest_sessions = storage.get_longest_focus_sessions(start, end, min_duration_minutes=5, limit=1)
     longest_focus_seconds = longest_sessions[0]['duration_seconds'] if longest_sessions else 0
 
-    # Get focus events for start/end times
-    focus_events = storage.get_focus_events_in_range(start, end, require_session=True)
+    # Get work/break balance for accurate break time and start/end times
+    # This uses session gaps (1min-2hr) as breaks instead of a formula
+    work_break = storage.get_work_break_balance(start, end)
+    break_seconds = work_break['break_seconds']
+
+    # Format start/end times from session data
     start_time = None
     end_time = None
-    if focus_events:
-        first_event = focus_events[0]
-        last_event = focus_events[-1]
-        if first_event.get('start_time'):
-            try:
-                st = datetime.fromisoformat(first_event['start_time'].replace('Z', '+00:00'))
-                start_time = st.strftime('%I:%M %p').lstrip('0')
-            except (ValueError, TypeError):
-                pass
-        if last_event.get('end_time'):
-            try:
-                et = datetime.fromisoformat(last_event['end_time'].replace('Z', '+00:00'))
-                end_time = et.strftime('%I:%M %p').lstrip('0')
-            except (ValueError, TypeError):
-                pass
+    if work_break['first_session_start']:
+        try:
+            st = datetime.fromisoformat(work_break['first_session_start'])
+            start_time = st.strftime('%I:%M %p').lstrip('0')
+        except (ValueError, TypeError):
+            pass
+    if work_break['last_session_end']:
+        try:
+            et = datetime.fromisoformat(work_break['last_session_end'])
+            end_time = et.strftime('%I:%M %p').lstrip('0')
+        except (ValueError, TypeError):
+            pass
 
     # Get summaries for tags
     summaries = storage.get_threshold_summaries_for_date(date_str)
@@ -1137,12 +1175,6 @@ def _get_day_data(storage, date_str, is_today=False):
             'title': w['window_title'] or '',
             'seconds': w.get('total_seconds', 0) or 0
         })
-
-    # Calculate break time (rough estimate: total work span - active time)
-    break_seconds = 0
-    if start_time and end_time and total_seconds > 0:
-        # Very rough: assume 8h workday, break = expected - actual
-        break_seconds = max(0, DAILY_GOAL_SECONDS - total_seconds) // 8  # Simplified
 
     goal_pct = int((total_seconds / DAILY_GOAL_SECONDS) * 100) if DAILY_GOAL_SECONDS > 0 else 0
 
@@ -1430,15 +1462,53 @@ def get_analytics_summary_week(year, week):
         sorted_windows = sorted(all_windows.items(), key=lambda x: -x[1])[:6]
         top_windows = [{'app': w[0][0], 'title': w[0][1], 'seconds': w[1]} for w in sorted_windows]
 
-        # Typical start/end (most common)
+        # Typical start/end (median) and range (min/max)
         typical_start = start_times[len(start_times) // 2] if start_times else None
         typical_end = end_times[len(end_times) // 2] if end_times else None
+
+        # Calculate start/end time ranges
+        start_time_range = None
+        end_time_range = None
+        if len(start_times) >= 2:
+            sorted_starts = sorted(start_times)
+            start_time_range = {'min': sorted_starts[0], 'max': sorted_starts[-1]}
+        if len(end_times) >= 2:
+            sorted_ends = sorted(end_times)
+            end_time_range = {'min': sorted_ends[0], 'max': sorted_ends[-1]}
 
         goal_pct = int((total_seconds / WEEKLY_GOAL_SECONDS) * 100) if WEEKLY_GOAL_SECONDS > 0 else 0
 
         # Calculate productivity breakdown from aggregated apps
         apps_for_productivity = [{'app_name': name, 'total_seconds': secs} for name, secs in all_apps.items()]
         productivity = _calculate_productivity_breakdown(apps_for_productivity)
+
+        # Calculate week-over-week comparison
+        comparison = None
+        try:
+            prev_first_day = first_day - timedelta(days=7)
+            prev_total_seconds = 0
+            prev_context_switches = 0
+            prev_active_days = 0
+
+            for day_offset in range(7):
+                prev_day_date = prev_first_day + timedelta(days=day_offset)
+                prev_date_str = prev_day_date.strftime('%Y-%m-%d')
+                prev_day_data = _get_day_data(storage, prev_date_str)
+                if prev_day_data:
+                    prev_total_seconds += prev_day_data.get('active_seconds', 0)
+                    prev_context_switches += prev_day_data.get('context_switches', 0)
+                    if prev_day_data.get('active_seconds', 0) > 0:
+                        prev_active_days += 1
+
+            if prev_total_seconds > 0:
+                comparison = {
+                    'active_seconds_delta': total_seconds - prev_total_seconds,
+                    'context_switches_delta': total_context_switches - prev_context_switches,
+                    'active_days_delta': active_days - prev_active_days,
+                    'prev_active_seconds': prev_total_seconds
+                }
+        except Exception:
+            pass  # Silently fail comparison calculation
 
         return jsonify({
             'year': year,
@@ -1455,6 +1525,8 @@ def get_analytics_summary_week(year, week):
                 'break_seconds': total_breaks,
                 'typical_start': typical_start,
                 'typical_end': typical_end,
+                'start_time_range': start_time_range,
+                'end_time_range': end_time_range,
                 'avg_context_switches': avg_context_switches,
                 'longest_focus_seconds': longest_focus,
                 'active_days': active_days,
@@ -1469,7 +1541,8 @@ def get_analytics_summary_week(year, week):
                 'hours': daily_hours,
                 'breaks': daily_breaks
             },
-            'productivity': productivity
+            'productivity': productivity,
+            'comparison': comparison
         })
 
     except Exception as e:
