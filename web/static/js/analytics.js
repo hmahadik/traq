@@ -177,6 +177,9 @@
 
         // Top windows
         renderWindows('day-windows-list', data.top_windows || []);
+
+        // Productivity score
+        renderProductivityScore('day', data.productivity || {});
     }
 
     // ==================== Week View ====================
@@ -267,6 +270,9 @@
         // Daily breakdown
         renderDailyBreakdown('week-daily-hours', data.daily_breakdown?.hours || [], DAY_LABELS, data.today_index);
         renderDailyBreakdown('week-daily-breaks', data.daily_breakdown?.breaks || [], DAY_LABELS, data.today_index, true);
+
+        // Productivity score
+        renderProductivityScore('week', data.productivity || {});
     }
 
     // ==================== Month View ====================
@@ -370,6 +376,9 @@
         const breakdown = data.weekly_breakdown || {};
         renderWeeklyBreakdown('month-weekly-hours', breakdown.hours || [], breakdown.labels || [], data.current_week_index);
         renderWeeklyBreakdown('month-weekly-breaks', breakdown.breaks || [], breakdown.labels || [], data.current_week_index, true);
+
+        // Productivity score
+        renderProductivityScore('month', data.productivity || {});
     }
 
     // ==================== Render Helpers ====================
@@ -549,6 +558,46 @@
                 <div class="window-time">${formatDurationHM(w.seconds)}</div>
             </div>`
         ).join('');
+    }
+
+    function renderProductivityScore(prefix, productivity) {
+        // Update score value
+        const scoreValue = document.getElementById(`${prefix}-score-value`);
+        const scoreLabel = document.getElementById(`${prefix}-score-label`);
+        const productiveTime = document.getElementById(`${prefix}-productive-time`);
+        const neutralTime = document.getElementById(`${prefix}-neutral-time`);
+        const distractingTime = document.getElementById(`${prefix}-distracting-time`);
+
+        if (!scoreValue || !scoreLabel || !productiveTime || !neutralTime || !distractingTime) return;
+
+        const score = productivity.score || 0;
+        const productivePct = productivity.productive_pct || 0;
+        const totalSeconds = productivity.total_seconds || 0;
+
+        // Format score with sign
+        const scoreText = score >= 0 ? `+${score.toFixed(1)}` : score.toFixed(1);
+        scoreValue.textContent = totalSeconds > 0 ? scoreText : '--';
+
+        // Update score class based on value
+        scoreValue.className = 'score-value';
+        if (totalSeconds > 0) {
+            if (score > 20) {
+                scoreValue.classList.add('positive');
+            } else if (score < -20) {
+                scoreValue.classList.add('negative');
+            } else {
+                scoreValue.classList.add('neutral');
+            }
+        }
+
+        // Update label
+        const labelText = totalSeconds > 0 ? `Productivity Score (${productivePct}% productive)` : 'Productivity Score';
+        scoreLabel.textContent = labelText;
+
+        // Update breakdown times
+        productiveTime.textContent = totalSeconds > 0 ? `${formatDurationHM(productivity.productive_seconds)} productive` : '--';
+        neutralTime.textContent = totalSeconds > 0 ? `${formatDurationHM(productivity.neutral_seconds)} neutral` : '--';
+        distractingTime.textContent = totalSeconds > 0 ? `${formatDurationHM(productivity.distracting_seconds)} distracting` : '--';
     }
 
     function renderDailyBreakdown(containerId, data, labels, todayIndex, isBreak = false) {

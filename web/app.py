@@ -889,6 +889,113 @@ MONTHLY_GOAL_SECONDS = 160 * 3600  # 160 hours
 # App color palette (assign by order, last is "Other")
 APP_COLORS = ['#58a6ff', '#3fb950', '#f0883e', '#a371f7', '#ff7b72', '#79c0ff', '#ffa657', '#8b949e']
 
+# Productivity categorization for apps
+# Categories: productive, neutral, distracting
+PRODUCTIVE_APPS = {
+    'code', 'vim', 'nvim', 'emacs', 'sublime', 'vscode', 'atom', 'intellij', 'pycharm', 'webstorm',
+    'eclipse', 'netbeans', 'terminal', 'konsole', 'gnome-terminal', 'alacritty', 'kitty', 'tmux',
+    'git', 'github', 'gitlab', 'docker', 'kubernetes', 'aws', 'azure', 'gcloud',
+    'jupyter', 'rstudio', 'matlab', 'octave', 'spyder',
+    'blender', 'gimp', 'inkscape', 'figma', 'sketch', 'adobe',
+    'libreoffice', 'writer', 'calc', 'impress', 'excel', 'word', 'powerpoint', 'sheets', 'docs',
+    'obsidian', 'notion', 'evernote', 'onenote', 'roam', 'logseq',
+    'postman', 'insomnia', 'bruno', 'httpie', 'curl',
+    'dbeaver', 'pgadmin', 'mysql', 'mongodb', 'redis', 'postgres', 'sqlite'
+}
+
+DISTRACTING_APPS = {
+    'facebook', 'twitter', 'instagram', 'reddit', 'tiktok', 'snapchat', 'whatsapp', 'telegram',
+    'discord', 'slack', 'teams',  # Communication can be distracting if excessive
+    'youtube', 'netflix', 'hulu', 'prime', 'twitch', 'spotify', 'steam', 'game', 'gaming'
+}
+
+def _categorize_app_productivity(app_name):
+    """
+    Categorize an app as productive, neutral, or distracting.
+    Returns: 'productive', 'neutral', or 'distracting'
+    """
+    if not app_name:
+        return 'neutral'
+
+    app_lower = app_name.lower()
+
+    # Check if app name contains any productive keywords
+    for keyword in PRODUCTIVE_APPS:
+        if keyword in app_lower:
+            return 'productive'
+
+    # Check if app name contains any distracting keywords
+    for keyword in DISTRACTING_APPS:
+        if keyword in app_lower:
+            return 'distracting'
+
+    # Default to neutral for browser and everything else
+    return 'neutral'
+
+
+def _calculate_productivity_breakdown(apps):
+    """
+    Calculate productivity breakdown from app durations.
+    Returns: {
+        'productive_seconds': int,
+        'neutral_seconds': int,
+        'distracting_seconds': int,
+        'total_seconds': int,
+        'productive_pct': int,
+        'neutral_pct': int,
+        'distracting_pct': int,
+        'score': float  # 0-100 based on productive percentage
+    }
+    """
+    productive_seconds = 0
+    neutral_seconds = 0
+    distracting_seconds = 0
+
+    for app in apps:
+        app_name = app.get('app_name', '')
+        seconds = app.get('total_seconds', 0) or 0
+
+        category = _categorize_app_productivity(app_name)
+        if category == 'productive':
+            productive_seconds += seconds
+        elif category == 'distracting':
+            distracting_seconds += seconds
+        else:
+            neutral_seconds += seconds
+
+    total_seconds = productive_seconds + neutral_seconds + distracting_seconds
+
+    if total_seconds == 0:
+        return {
+            'productive_seconds': 0,
+            'neutral_seconds': 0,
+            'distracting_seconds': 0,
+            'total_seconds': 0,
+            'productive_pct': 0,
+            'neutral_pct': 0,
+            'distracting_pct': 0,
+            'score': 0
+        }
+
+    productive_pct = int((productive_seconds / total_seconds) * 100)
+    neutral_pct = int((neutral_seconds / total_seconds) * 100)
+    distracting_pct = int((distracting_seconds / total_seconds) * 100)
+
+    # Score: +100 for 100% productive, 0 for 50/50, -100 for 100% distracting
+    # Formula: (productive% - distracting%) * 1.0
+    score = ((productive_pct - distracting_pct) / 100.0) * 100
+
+    return {
+        'productive_seconds': productive_seconds,
+        'neutral_seconds': neutral_seconds,
+        'distracting_seconds': distracting_seconds,
+        'total_seconds': total_seconds,
+        'productive_pct': productive_pct,
+        'neutral_pct': neutral_pct,
+        'distracting_pct': distracting_pct,
+        'score': round(score, 1)
+    }
+
 
 def _format_duration_hm(seconds):
     """Format seconds as 'Xh Ym' string."""
@@ -1039,6 +1146,9 @@ def _get_day_data(storage, date_str, is_today=False):
 
     goal_pct = int((total_seconds / DAILY_GOAL_SECONDS) * 100) if DAILY_GOAL_SECONDS > 0 else 0
 
+    # Calculate productivity breakdown
+    productivity = _calculate_productivity_breakdown(apps)
+
     return {
         'date': date_str,
         'active_seconds': total_seconds,
@@ -1055,7 +1165,8 @@ def _get_day_data(storage, date_str, is_today=False):
         'app_distribution': app_distribution,
         'top_windows': top_windows,
         'summaries_count': len(summaries),
-        'apps': apps
+        'apps': apps,
+        'productivity': productivity
     }
 
 
@@ -1093,7 +1204,17 @@ def get_analytics_summary_day(date):
             'peak_hours': [0] * 24,
             'tags': [],
             'app_distribution': [],
-            'top_windows': []
+            'top_windows': [],
+            'productivity': {
+                'productive_seconds': 0,
+                'neutral_seconds': 0,
+                'distracting_seconds': 0,
+                'total_seconds': 0,
+                'productive_pct': 0,
+                'neutral_pct': 0,
+                'distracting_pct': 0,
+                'score': 0
+            }
         })
 
     try:
@@ -1128,7 +1249,8 @@ def get_analytics_summary_day(date):
             'app_distribution': day_data['app_distribution'],
             'top_windows': day_data['top_windows'],
             'ai_summary': None,  # MVP: not implemented
-            'summaries_count': day_data['summaries_count']
+            'summaries_count': day_data['summaries_count'],
+            'productivity': day_data['productivity']
         })
 
     except Exception as e:
@@ -1180,7 +1302,17 @@ def get_analytics_summary_week(year, week):
             'tags': [],
             'app_distribution': [],
             'top_windows': [],
-            'daily_breakdown': {'hours': [None] * 7, 'breaks': [None] * 7}
+            'daily_breakdown': {'hours': [None] * 7, 'breaks': [None] * 7},
+            'productivity': {
+                'productive_seconds': 0,
+                'neutral_seconds': 0,
+                'distracting_seconds': 0,
+                'total_seconds': 0,
+                'productive_pct': 0,
+                'neutral_pct': 0,
+                'distracting_pct': 0,
+                'score': 0
+            }
         })
 
     try:
@@ -1304,6 +1436,10 @@ def get_analytics_summary_week(year, week):
 
         goal_pct = int((total_seconds / WEEKLY_GOAL_SECONDS) * 100) if WEEKLY_GOAL_SECONDS > 0 else 0
 
+        # Calculate productivity breakdown from aggregated apps
+        apps_for_productivity = [{'app_name': name, 'total_seconds': secs} for name, secs in all_apps.items()]
+        productivity = _calculate_productivity_breakdown(apps_for_productivity)
+
         return jsonify({
             'year': year,
             'week': week,
@@ -1332,7 +1468,8 @@ def get_analytics_summary_week(year, week):
             'daily_breakdown': {
                 'hours': daily_hours,
                 'breaks': daily_breaks
-            }
+            },
+            'productivity': productivity
         })
 
     except Exception as e:
@@ -1386,7 +1523,17 @@ def get_analytics_summary_month(year, month):
             'tags': [],
             'app_distribution': [],
             'top_windows': [],
-            'weekly_breakdown': {'hours': [], 'breaks': [], 'labels': []}
+            'weekly_breakdown': {'hours': [], 'breaks': [], 'labels': []},
+            'productivity': {
+                'productive_seconds': 0,
+                'neutral_seconds': 0,
+                'distracting_seconds': 0,
+                'total_seconds': 0,
+                'productive_pct': 0,
+                'neutral_pct': 0,
+                'distracting_pct': 0,
+                'score': 0
+            }
         })
 
     try:
@@ -1536,6 +1683,10 @@ def get_analytics_summary_month(year, month):
 
         goal_pct = int((total_seconds / MONTHLY_GOAL_SECONDS) * 100) if MONTHLY_GOAL_SECONDS > 0 else 0
 
+        # Calculate productivity breakdown from aggregated apps
+        apps_for_productivity = [{'app_name': name, 'total_seconds': secs} for name, secs in all_apps.items()]
+        productivity = _calculate_productivity_breakdown(apps_for_productivity)
+
         return jsonify({
             'year': year,
             'month': month,
@@ -1565,7 +1716,8 @@ def get_analytics_summary_month(year, month):
                 'hours': weekly_hours,
                 'breaks': weekly_breaks,
                 'labels': weekly_labels
-            }
+            },
+            'productivity': productivity
         })
 
     except Exception as e:

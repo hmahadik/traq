@@ -21,7 +21,7 @@
       "Step 4: Verify breakdown shows productive/neutral/distracting time with colored dots",
       "Step 5: Verify percentages add up to 100%"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
