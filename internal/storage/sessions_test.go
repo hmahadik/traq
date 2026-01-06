@@ -293,6 +293,82 @@ func TestSetSessionSummary(t *testing.T) {
 	}
 }
 
+// TestEndSession_InvalidEndTime tests that EndSession rejects invalid end times
+// that would result in negative durations.
+func TestEndSession_InvalidEndTime(t *testing.T) {
+	store, cleanup := testStore(t)
+	defer cleanup()
+
+	startTime := time.Now().Unix()
+	id, err := store.CreateSession(startTime)
+	if err != nil {
+		t.Fatalf("failed to create session: %v", err)
+	}
+
+	tests := []struct {
+		name    string
+		endTime int64
+		wantErr bool
+	}{
+		{"zero end time", 0, true},
+		{"end time before start", startTime - 100, true},
+		{"valid end time", startTime + 100, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Reset session state for each test by resuming it
+			store.ResumeSession(id)
+
+			err := store.EndSession(id, tt.endTime)
+			if tt.wantErr && err == nil {
+				t.Errorf("expected error for %s, got nil", tt.name)
+			}
+			if !tt.wantErr && err != nil {
+				t.Errorf("unexpected error for %s: %v", tt.name, err)
+			}
+
+			// If we expect success, verify no negative duration
+			if !tt.wantErr {
+				session, _ := store.GetSession(id)
+				if session.DurationSeconds.Valid && session.DurationSeconds.Int64 < 0 {
+					t.Errorf("got negative duration: %d", session.DurationSeconds.Int64)
+				}
+			}
+		})
+	}
+}
+
+// TestGetTotalActiveTime_IgnoresNegative tests that negative durations are ignored.
+func TestGetTotalActiveTime_IgnoresNegative(t *testing.T) {
+	store, cleanup := testStore(t)
+	defer cleanup()
+
+	now := time.Now().Unix()
+
+	// Create valid session
+	id1, _ := store.CreateSession(now - 3600)
+	store.EndSession(id1, now) // 3600 seconds
+
+	// Manually insert a corrupt session with negative duration (simulating old bug)
+	_, err := store.db.Exec(`
+		INSERT INTO sessions (start_time, end_time, duration_seconds, screenshot_count)
+		VALUES (?, 0, ?, 0)`, now-1000, -1000)
+	if err != nil {
+		t.Fatalf("failed to insert corrupt session: %v", err)
+	}
+
+	total, err := store.GetTotalActiveTime()
+	if err != nil {
+		t.Fatalf("failed to get total active time: %v", err)
+	}
+
+	// Should only count the valid session (3600), not the corrupt one
+	if total != 3600 {
+		t.Errorf("got %d seconds, want 3600 (negative duration should be ignored)", total)
+	}
+}
+
 func TestGetSessionsByTimeRange(t *testing.T) {
 	store, cleanup := testStore(t)
 	defer cleanup()

@@ -81,6 +81,10 @@ export const reports = {
     return App.GenerateReport(timeRange, reportType);
   },
 
+  getReport: async (id: number) => {
+    return App.GetReport(id);
+  },
+
   exportReport: async (reportId: number, format: string) => {
     return App.ExportReport(reportId, format);
   },

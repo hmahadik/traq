@@ -152,7 +152,8 @@ func (s *AnalyticsService) GetDailyStats(date string) (*DailyStats, error) {
 
 	var totalSeconds int64
 	for _, sess := range sessions {
-		if sess.DurationSeconds.Valid {
+		// Only count positive durations (ignore corrupt data)
+		if sess.DurationSeconds.Valid && sess.DurationSeconds.Int64 > 0 {
 			totalSeconds += sess.DurationSeconds.Int64
 		}
 	}

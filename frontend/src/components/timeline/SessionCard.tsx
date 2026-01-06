@@ -7,6 +7,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { TagList } from '@/components/common/TagBadge';
 import { ConfidenceBadge } from '@/components/common/ConfidenceBadge';
 import { formatTimeRange, formatDuration, cn } from '@/lib/utils';
+import { useThumbnail } from '@/api/hooks';
 import {
   ChevronDown,
   ChevronRight,
@@ -17,6 +18,24 @@ import {
   Loader2,
 } from 'lucide-react';
 import type { SessionSummary, Screenshot } from '@/types';
+
+// Small thumbnail component that loads via hook
+function ThumbnailImage({ screenshot }: { screenshot: Screenshot }) {
+  const { data: thumbnailUrl, isLoading } = useThumbnail(screenshot.id);
+
+  if (isLoading) {
+    return <Skeleton className="w-full h-full" />;
+  }
+
+  return (
+    <img
+      src={thumbnailUrl}
+      alt=""
+      className="w-full h-full object-cover"
+      loading="lazy"
+    />
+  );
+}
 
 interface SessionCardProps {
   session: SessionSummary;
@@ -111,12 +130,7 @@ export function SessionCard({
                 key={thumb.id}
                 className="flex-shrink-0 w-20 aspect-video rounded overflow-hidden bg-muted"
               >
-                <img
-                  src={`https://via.placeholder.com/160x90/1a1a2e/16213e?text=${thumb.id}`}
-                  alt=""
-                  className="w-full h-full object-cover"
-                  loading="lazy"
-                />
+                <ThumbnailImage screenshot={thumb} />
               </div>
             ))}
             {remainingCount > 0 && (

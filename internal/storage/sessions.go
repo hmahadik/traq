@@ -23,14 +23,40 @@ func (s *Store) CreateSession(startTime int64) (int64, error) {
 }
 
 // EndSession ends a session by setting its end time and calculating duration.
+// Returns an error if endTime would result in a negative duration.
 func (s *Store) EndSession(id int64, endTime int64) error {
-	_, err := s.db.Exec(`
+	// First, get the session to validate the end time
+	var startTime int64
+	err := s.db.QueryRow("SELECT start_time FROM sessions WHERE id = ?", id).Scan(&startTime)
+	if err != nil {
+		return fmt.Errorf("failed to get session start time: %w", err)
+	}
+
+	// Validate: endTime must be >= startTime to avoid negative duration
+	if endTime <= 0 || endTime < startTime {
+		return fmt.Errorf("invalid end time %d: must be >= start time %d", endTime, startTime)
+	}
+
+	_, err = s.db.Exec(`
 		UPDATE sessions
 		SET end_time = ?,
 		    duration_seconds = ? - start_time
 		WHERE id = ?`, endTime, endTime, id)
 	if err != nil {
 		return fmt.Errorf("failed to end session: %w", err)
+	}
+	return nil
+}
+
+// ResumeSession clears the end time and duration to resume a session.
+func (s *Store) ResumeSession(id int64) error {
+	_, err := s.db.Exec(`
+		UPDATE sessions
+		SET end_time = NULL,
+		    duration_seconds = NULL
+		WHERE id = ?`, id)
+	if err != nil {
+		return fmt.Errorf("failed to resume session: %w", err)
 	}
 	return nil
 }
@@ -176,9 +202,10 @@ func (s *Store) CountSessions() (int64, error) {
 }
 
 // GetTotalActiveTime returns the sum of all session durations in seconds.
+// Only counts positive durations (ignores corrupt data with negative values).
 func (s *Store) GetTotalActiveTime() (int64, error) {
 	var total sql.NullInt64
-	err := s.db.QueryRow("SELECT SUM(duration_seconds) FROM sessions WHERE duration_seconds IS NOT NULL").Scan(&total)
+	err := s.db.QueryRow("SELECT SUM(duration_seconds) FROM sessions WHERE duration_seconds IS NOT NULL AND duration_seconds > 0").Scan(&total)
 	if err != nil {
 		return 0, err
 	}

@@ -74,6 +74,12 @@ func (a *App) startup(ctx context.Context) {
 		// Link daemon to config service
 		a.Config.SetDaemon(a.daemon)
 
+		// Auto-register current working directory as git repo (if applicable)
+		a.daemon.AutoRegisterGitRepo()
+
+		// Auto-watch Downloads folder for file events
+		a.daemon.AutoWatchDownloads()
+
 		// Start daemon
 		if err := a.daemon.Start(); err != nil {
 			log.Printf("Failed to start daemon: %v", err)
@@ -245,6 +251,11 @@ func (a *App) GenerateReport(timeRange, reportType string) (*storage.Report, err
 	return a.Reports.GenerateReport(timeRange, reportType)
 }
 
+// GetReport returns a report by ID with full content.
+func (a *App) GetReport(id int64) (*storage.Report, error) {
+	return a.Reports.GetReport(id)
+}
+
 // ExportReport exports a report in the specified format.
 func (a *App) ExportReport(reportID int64, format string) (string, error) {
 	return a.Reports.ExportReport(reportID, format)
@@ -309,4 +320,60 @@ func (a *App) OpenDataDir() error {
 // GetCurrentTime returns the current Unix timestamp.
 func (a *App) GetCurrentTime() int64 {
 	return time.Now().Unix()
+}
+
+// ============================================================================
+// Git Tracking Methods (exposed to frontend)
+// ============================================================================
+
+// RegisterGitRepository adds a git repository for tracking.
+func (a *App) RegisterGitRepository(path string) (*storage.GitRepository, error) {
+	if a.daemon == nil {
+		return nil, nil
+	}
+	return a.daemon.RegisterGitRepository(path)
+}
+
+// UnregisterGitRepository removes a git repository from tracking.
+func (a *App) UnregisterGitRepository(repoID int64) error {
+	if a.daemon == nil {
+		return nil
+	}
+	return a.daemon.UnregisterGitRepository(repoID)
+}
+
+// GetTrackedRepositories returns all tracked git repositories.
+func (a *App) GetTrackedRepositories() ([]*storage.GitRepository, error) {
+	if a.daemon == nil {
+		return nil, nil
+	}
+	return a.daemon.GetTrackedRepositories()
+}
+
+// ============================================================================
+// File Tracking Methods (exposed to frontend)
+// ============================================================================
+
+// WatchDirectory adds a directory to the file watcher.
+func (a *App) WatchDirectory(path string) error {
+	if a.daemon == nil {
+		return nil
+	}
+	return a.daemon.WatchDirectory(path)
+}
+
+// UnwatchDirectory removes a directory from the file watcher.
+func (a *App) UnwatchDirectory(path string) error {
+	if a.daemon == nil {
+		return nil
+	}
+	return a.daemon.UnwatchDirectory(path)
+}
+
+// GetWatchedDirectories returns the list of watched directories.
+func (a *App) GetWatchedDirectories() []string {
+	if a.daemon == nil {
+		return nil
+	}
+	return a.daemon.GetWatchedDirectories()
 }

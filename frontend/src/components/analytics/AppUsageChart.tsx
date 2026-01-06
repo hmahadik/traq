@@ -52,7 +52,7 @@ export function AppUsageChart({ data, isLoading }: AppUsageChartProps) {
               outerRadius={90}
               paddingAngle={2}
               dataKey="value"
-              label={({ name, percentage }) => `${name} (${percentage}%)`}
+              label={({ name, percentage }) => `${name} (${percentage.toFixed(1)}%)`}
               labelLine={{ stroke: 'hsl(var(--muted-foreground))', strokeWidth: 1 }}
             >
               {chartData?.map((_, index) => (
@@ -73,7 +73,7 @@ export function AppUsageChart({ data, isLoading }: AppUsageChartProps) {
                         {formatDuration(data.value)}
                       </p>
                       <p className="text-sm text-muted-foreground">
-                        {data.percentage}% of total
+                        {data.percentage.toFixed(1)}% of total
                       </p>
                     </div>
                   );

@@ -292,3 +292,64 @@ func TestSessionManager_RefreshCurrentSession(t *testing.T) {
 		t.Errorf("failed to refresh session: %v", err)
 	}
 }
+
+// TestSessionManager_ResumeSession_NoDurationBug verifies that resuming a session
+// does not cause negative duration values in the database.
+func TestSessionManager_ResumeSession_NoDurationBug(t *testing.T) {
+	store, cleanup := testStore(t)
+	defer cleanup()
+
+	mock := NewMockPlatform()
+	afk := NewAFKDetector(mock, 5*time.Minute)
+	manager := NewSessionManager(store, afk)
+
+	// Set a short resume window
+	manager.SetResumeWindow(1 * time.Minute)
+
+	// Start a session
+	session1, err := manager.StartSession()
+	if err != nil {
+		t.Fatalf("failed to start session: %v", err)
+	}
+	sessionID := session1.ID
+
+	// End the session
+	err = manager.EndSession()
+	if err != nil {
+		t.Fatalf("failed to end session: %v", err)
+	}
+
+	// Verify the ended session has valid duration
+	endedSession, err := store.GetSession(sessionID)
+	if err != nil {
+		t.Fatalf("failed to get session: %v", err)
+	}
+	if endedSession.DurationSeconds.Valid && endedSession.DurationSeconds.Int64 < 0 {
+		t.Errorf("ended session has negative duration: %d", endedSession.DurationSeconds.Int64)
+	}
+
+	// Start a new session which should resume the previous one
+	session2, err := manager.StartSession()
+	if err != nil {
+		t.Fatalf("failed to start/resume session: %v", err)
+	}
+
+	// Check if session was resumed (same ID)
+	if session2.ID == sessionID {
+		// Session was resumed - verify no negative duration
+		resumedSession, err := store.GetSession(sessionID)
+		if err != nil {
+			t.Fatalf("failed to get resumed session: %v", err)
+		}
+
+		// After resume, end_time should be NULL
+		if resumedSession.EndTime.Valid && resumedSession.EndTime.Int64 == 0 {
+			t.Error("resumed session has end_time=0, should be NULL")
+		}
+
+		// After resume, duration should be NULL or non-negative
+		if resumedSession.DurationSeconds.Valid && resumedSession.DurationSeconds.Int64 < 0 {
+			t.Errorf("resumed session has negative duration: %d", resumedSession.DurationSeconds.Int64)
+		}
+	}
+}

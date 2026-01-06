@@ -314,6 +314,11 @@ func (s *ReportsService) markdownToHTML(md string) string {
 	return "<html><body><p>" + html + "</p></body></html>"
 }
 
+// GetReport returns a report by ID with full content.
+func (s *ReportsService) GetReport(id int64) (*storage.Report, error) {
+	return s.store.GetReport(id)
+}
+
 // GetReportHistory returns past generated reports.
 func (s *ReportsService) GetReportHistory() ([]*ReportMeta, error) {
 	reports, err := s.store.GetAllReports()

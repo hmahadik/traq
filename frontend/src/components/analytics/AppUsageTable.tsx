@@ -145,11 +145,11 @@ export function AppUsageTable({ data, isLoading, onAppClick }: AppUsageTableProp
                       <div className="w-16 h-2 bg-muted rounded-full overflow-hidden">
                         <div
                           className="h-full bg-primary rounded-full"
-                          style={{ width: `${app.percentage}%` }}
+                          style={{ width: `${Math.min(app.percentage, 100)}%` }}
                         />
                       </div>
                       <span className="text-sm text-muted-foreground w-10 text-right">
-                        {app.percentage}%
+                        {app.percentage.toFixed(1)}%
                       </span>
                     </div>
                   </td>

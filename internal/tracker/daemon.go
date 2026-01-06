@@ -3,6 +3,8 @@ package tracker
 import (
 	"database/sql"
 	"fmt"
+	"os"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -39,6 +41,10 @@ type Daemon struct {
 	window  *WindowTracker
 	afk     *AFKDetector
 	session *SessionManager
+	shell   *ShellTracker
+	git     *GitTracker
+	files   *FileTracker
+	browser *BrowserTracker
 
 	running   bool
 	stopCh    chan struct{}
@@ -54,6 +60,14 @@ func NewDaemon(config *DaemonConfig, store *storage.Store, plat platform.Platfor
 	afk := NewAFKDetector(plat, config.AFKTimeout)
 	session := NewSessionManager(store, afk)
 	window := NewWindowTracker(plat, store)
+	shell := NewShellTracker(plat, store, config.DataDir)
+	git := NewGitTracker(store, config.DataDir)
+
+	// FileTracker is optional - don't fail if it can't be created
+	files, _ := NewFileTracker(store)
+
+	// BrowserTracker for tracking browser history
+	browser := NewBrowserTracker(plat, store, config.DataDir)
 
 	d := &Daemon{
 		config:  config,
@@ -63,6 +77,10 @@ func NewDaemon(config *DaemonConfig, store *storage.Store, plat platform.Platfor
 		window:  window,
 		afk:     afk,
 		session: session,
+		shell:   shell,
+		git:     git,
+		files:   files,
+		browser: browser,
 		stopCh:  make(chan struct{}),
 	}
 
@@ -84,8 +102,15 @@ func (d *Daemon) Start() error {
 	d.mu.Unlock()
 
 	// Start or resume a session
-	if _, err := d.session.StartSession(); err != nil {
+	session, err := d.session.StartSession()
+	if err != nil {
 		return fmt.Errorf("failed to start session: %w", err)
+	}
+
+	// Start file tracker with current session
+	if d.files != nil {
+		d.files.SetSessionID(session.ID)
+		d.files.Start()
 	}
 
 	go d.run()
@@ -102,6 +127,11 @@ func (d *Daemon) Stop() error {
 	d.mu.Unlock()
 
 	close(d.stopCh)
+
+	// Stop file tracker (flushes buffered events)
+	if d.files != nil {
+		d.files.Stop()
+	}
 
 	// Flush current window focus
 	d.window.FlushCurrentFocus()
@@ -228,6 +258,15 @@ func (d *Daemon) tick() {
 	}
 
 	d.store.SaveScreenshot(sc)
+
+	// Poll shell history for new commands
+	d.shell.Poll(session.ID)
+
+	// Poll git repositories for new commits
+	d.git.Poll(session.ID)
+
+	// Poll browser history for new visits
+	d.browser.Poll(session.ID)
 }
 
 func (d *Daemon) onAFK() {
@@ -250,6 +289,11 @@ func (d *Daemon) onReturn() {
 
 	// Update window tracker with new session ID
 	d.window.UpdateSessionID(session.ID)
+
+	// Update file tracker with new session ID
+	if d.files != nil {
+		d.files.SetSessionID(session.ID)
+	}
 }
 
 // UpdateConfig updates the daemon configuration.
@@ -266,4 +310,84 @@ func (d *Daemon) UpdateConfig(config *DaemonConfig) {
 // ForceCapture forces an immediate screenshot capture.
 func (d *Daemon) ForceCapture() (*CaptureResult, error) {
 	return d.capture.Capture()
+}
+
+// RegisterGitRepository adds a git repository for tracking.
+func (d *Daemon) RegisterGitRepository(path string) (*storage.GitRepository, error) {
+	return d.git.RegisterRepository(path)
+}
+
+// UnregisterGitRepository removes a git repository from tracking.
+func (d *Daemon) UnregisterGitRepository(repoID int64) error {
+	return d.git.UnregisterRepository(repoID)
+}
+
+// GetTrackedRepositories returns all tracked git repositories.
+func (d *Daemon) GetTrackedRepositories() ([]*storage.GitRepository, error) {
+	return d.git.GetRepositories()
+}
+
+// AutoRegisterGitRepo attempts to register the current working directory if it's a git repo.
+func (d *Daemon) AutoRegisterGitRepo() {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return
+	}
+	// Silently try to register - will fail if not a git repo
+	d.git.RegisterRepository(cwd)
+}
+
+// WatchDirectory adds a directory to the file watcher.
+func (d *Daemon) WatchDirectory(path string) error {
+	if d.files == nil {
+		return fmt.Errorf("file tracker not initialized")
+	}
+	return d.files.WatchDirectory(path)
+}
+
+// UnwatchDirectory removes a directory from the file watcher.
+func (d *Daemon) UnwatchDirectory(path string) error {
+	if d.files == nil {
+		return fmt.Errorf("file tracker not initialized")
+	}
+	return d.files.UnwatchDirectory(path)
+}
+
+// GetWatchedDirectories returns the list of watched directories.
+func (d *Daemon) GetWatchedDirectories() []string {
+	if d.files == nil {
+		return nil
+	}
+	return d.files.GetWatchedDirectories()
+}
+
+// AutoWatchDownloads attempts to watch the user's Downloads folder.
+func (d *Daemon) AutoWatchDownloads() {
+	if d.files == nil {
+		return
+	}
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return
+	}
+	downloadsDir := filepath.Join(homeDir, "Downloads")
+	if info, err := os.Stat(downloadsDir); err == nil && info.IsDir() {
+		d.files.WatchDirectory(downloadsDir)
+	}
+}
+
+// GetAvailableBrowsers returns browsers that have history files available.
+func (d *Daemon) GetAvailableBrowsers() []string {
+	if d.browser == nil {
+		return nil
+	}
+	return d.browser.GetAvailableBrowsers()
+}
+
+// SetEnabledBrowsers sets which browsers to track.
+func (d *Daemon) SetEnabledBrowsers(browsers []string) {
+	if d.browser == nil {
+		return
+	}
+	d.browser.SetEnabledBrowsers(browsers)
 }

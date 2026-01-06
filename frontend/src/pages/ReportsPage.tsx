@@ -12,6 +12,7 @@ import {
   useExportReport,
   useParseTimeRange,
 } from '@/api/hooks';
+import { api } from '@/api/client';
 import { Loader2, Sparkles } from 'lucide-react';
 import type { Report } from '@/types';
 
@@ -35,22 +36,25 @@ export function ReportsPage() {
     await exportReport.mutateAsync({ reportId: generatedReport.id, format });
   };
 
-  const handleViewReport = (reportId: number) => {
-    const report = history?.find((r) => r.id === reportId);
-    if (report) {
-      // In a real implementation, this would fetch the full report content
-      setGeneratedReport({
-        id: report.id,
-        title: report.title,
-        content: '# Report Content\n\nThis would load the full report content from the backend.',
-        timeRange: report.timeRange,
-        reportType: report.reportType as 'summary' | 'detailed' | 'standup',
-        format: report.format as 'markdown' | 'html' | 'pdf' | 'json',
-        createdAt: report.createdAt,
-        filepath: null,
-        startTime: null,
-        endTime: null,
-      });
+  const handleViewReport = async (reportId: number) => {
+    try {
+      const report = await api.reports.getReport(reportId);
+      if (report) {
+        setGeneratedReport({
+          id: report.id,
+          title: report.title,
+          content: report.content?.String || '',
+          timeRange: report.timeRange,
+          reportType: report.reportType as 'summary' | 'detailed' | 'standup',
+          format: report.format as 'markdown' | 'html' | 'pdf' | 'json',
+          createdAt: report.createdAt,
+          filepath: report.filepath?.String || null,
+          startTime: report.startTime?.Int64 || null,
+          endTime: report.endTime?.Int64 || null,
+        });
+      }
+    } catch (error) {
+      console.error('Failed to load report:', error);
     }
   };
 

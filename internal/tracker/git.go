@@ -70,6 +70,7 @@ func (t *GitTracker) RegisterRepository(path string) (*storage.GitRepository, er
 		Name:        filepath.Base(gitRoot),
 		RemoteURL:   sql.NullString{String: remoteURL, Valid: remoteURL != ""},
 		LastScanned: sql.NullInt64{Int64: 0, Valid: false},
+		IsActive:    true,
 	}
 
 	id, err := t.store.SaveGitRepository(repo)

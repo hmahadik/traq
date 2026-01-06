@@ -119,7 +119,7 @@ export function StatsGrid({ stats, isLoading }: StatsGridProps) {
         title="Top App"
         value={stats.topApps[0]?.appName || 'N/A'}
         icon={<Camera className="h-4 w-4" />}
-        description={stats.topApps[0] ? `${stats.topApps[0].percentage}% of time` : ''}
+        description={stats.topApps[0] ? `${stats.topApps[0].percentage.toFixed(1)}% of time` : ''}
       />
     </div>
   );

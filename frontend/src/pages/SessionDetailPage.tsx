@@ -6,6 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useSessionContext } from '@/api/hooks';
 import { formatTimeRange, formatDuration, formatTimestamp } from '@/lib/utils';
 import { Terminal, GitCommit, FileText, Globe } from 'lucide-react';
+import { Screenshot } from '@/components/common/Screenshot';
 
 export function SessionDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -83,16 +84,12 @@ export function SessionDetailPage() {
         <CardContent>
           <div className="grid grid-cols-5 gap-2">
             {screenshots.slice(0, 10).map((screenshot) => (
-              <div
+              <Screenshot
                 key={screenshot.id}
-                className="relative aspect-video rounded overflow-hidden bg-muted cursor-pointer hover:ring-2 ring-primary transition-all"
-              >
-                <img
-                  src={`https://via.placeholder.com/200x112/1a1a2e/16213e?text=${screenshot.id}`}
-                  alt={screenshot.windowTitle || 'Screenshot'}
-                  className="w-full h-full object-cover"
-                />
-              </div>
+                screenshot={screenshot}
+                size="thumbnail"
+                showOverlay={true}
+              />
             ))}
           </div>
         </CardContent>

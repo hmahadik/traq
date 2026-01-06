@@ -58,6 +58,10 @@ export function GetRecentSessions(arg1) {
   return window['go']['main']['App']['GetRecentSessions'](arg1);
 }
 
+export function GetReport(arg1) {
+  return window['go']['main']['App']['GetReport'](arg1);
+}
+
 export function GetReportHistory() {
   return window['go']['main']['App']['GetReportHistory']();
 }
@@ -102,8 +106,16 @@ export function GetThumbnailPath(arg1) {
   return window['go']['main']['App']['GetThumbnailPath'](arg1);
 }
 
+export function GetTrackedRepositories() {
+  return window['go']['main']['App']['GetTrackedRepositories']();
+}
+
 export function GetVersion() {
   return window['go']['main']['App']['GetVersion']();
+}
+
+export function GetWatchedDirectories() {
+  return window['go']['main']['App']['GetWatchedDirectories']();
 }
 
 export function GetWeeklyStats(arg1) {
@@ -118,6 +130,10 @@ export function ParseTimeRange(arg1) {
   return window['go']['main']['App']['ParseTimeRange'](arg1);
 }
 
+export function RegisterGitRepository(arg1) {
+  return window['go']['main']['App']['RegisterGitRepository'](arg1);
+}
+
 export function RestartTracking() {
   return window['go']['main']['App']['RestartTracking']();
 }
@@ -130,6 +146,18 @@ export function StopTracking() {
   return window['go']['main']['App']['StopTracking']();
 }
 
+export function UnregisterGitRepository(arg1) {
+  return window['go']['main']['App']['UnregisterGitRepository'](arg1);
+}
+
+export function UnwatchDirectory(arg1) {
+  return window['go']['main']['App']['UnwatchDirectory'](arg1);
+}
+
 export function UpdateConfig(arg1) {
   return window['go']['main']['App']['UpdateConfig'](arg1);
+}
+
+export function WatchDirectory(arg1) {
+  return window['go']['main']['App']['WatchDirectory'](arg1);
 }

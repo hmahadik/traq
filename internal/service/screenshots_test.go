@@ -109,6 +109,42 @@ func TestGetThumbnailPath_FallbackBehavior(t *testing.T) {
 	})
 }
 
+// TestToURLPath tests conversion of filesystem paths to URL paths.
+func TestToURLPath(t *testing.T) {
+	svc := &ScreenshotService{dataDir: "/home/user/.local/share/traq"}
+
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "full screenshot path",
+			input:    "/home/user/.local/share/traq/screenshots/2026/01/05/123456.webp",
+			expected: "/screenshots/2026/01/05/123456.webp",
+		},
+		{
+			name:     "thumbnail path",
+			input:    "/home/user/.local/share/traq/screenshots/2026/01/05/123456_thumb.webp",
+			expected: "/screenshots/2026/01/05/123456_thumb.webp",
+		},
+		{
+			name:     "path outside dataDir",
+			input:    "/other/path/screenshot.webp",
+			expected: "/other/path/screenshot.webp", // Fallback returns original
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := svc.toURLPath(tt.input)
+			if result != tt.expected {
+				t.Errorf("toURLPath(%q) = %q, want %q", tt.input, result, tt.expected)
+			}
+		})
+	}
+}
+
 // TestThumbnailPath_EdgeCases tests edge cases in path manipulation.
 func TestThumbnailPath_EdgeCases(t *testing.T) {
 	svc := &ScreenshotService{dataDir: "/tmp"}

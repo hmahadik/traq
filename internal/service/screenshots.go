@@ -62,17 +62,19 @@ func (s *ScreenshotService) GetThumbnail(id int64) ([]byte, error) {
 	return data, nil
 }
 
-// GetScreenshotPath returns the filesystem path to a screenshot.
+// GetScreenshotPath returns the URL path to a screenshot.
+// Returns a path like "/screenshots/2026/01/05/123456.webp" that can be loaded via the asset handler.
 func (s *ScreenshotService) GetScreenshotPath(id int64) (string, error) {
 	screenshot, err := s.store.GetScreenshot(id)
 	if err != nil {
 		return "", fmt.Errorf("screenshot not found: %w", err)
 	}
-	return screenshot.Filepath, nil
+	return s.toURLPath(screenshot.Filepath), nil
 }
 
-// GetThumbnailPath returns the filesystem path to a thumbnail.
+// GetThumbnailPath returns the URL path to a thumbnail.
 // Falls back to the original screenshot path if thumbnail doesn't exist.
+// Returns a path like "/screenshots/2026/01/05/123456_thumb.webp" that can be loaded via the asset handler.
 func (s *ScreenshotService) GetThumbnailPath(id int64) (string, error) {
 	screenshot, err := s.store.GetScreenshot(id)
 	if err != nil {
@@ -83,10 +85,24 @@ func (s *ScreenshotService) GetThumbnailPath(id int64) (string, error) {
 
 	// Check if thumbnail exists, fall back to original if not
 	if _, err := os.Stat(thumbPath); os.IsNotExist(err) {
-		return screenshot.Filepath, nil
+		return s.toURLPath(screenshot.Filepath), nil
 	}
 
-	return thumbPath, nil
+	return s.toURLPath(thumbPath), nil
+}
+
+// toURLPath converts a filesystem path to a URL path for the asset handler.
+// Converts "/home/user/.local/share/traq/screenshots/2026/01/05/file.webp"
+// to "/screenshots/2026/01/05/file.webp"
+func (s *ScreenshotService) toURLPath(fsPath string) string {
+	// Find the screenshots directory in the path
+	screenshotsDir := filepath.Join(s.dataDir, "screenshots")
+	if strings.HasPrefix(fsPath, screenshotsDir) {
+		relPath := strings.TrimPrefix(fsPath, screenshotsDir)
+		return "/screenshots" + relPath
+	}
+	// Fallback: try to extract just the filename and date parts
+	return fsPath
 }
 
 // DeleteScreenshot deletes a screenshot and its files.

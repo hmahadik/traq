@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import type { Screenshot } from '@/types';
+import { Screenshot as ScreenshotComponent } from '@/components/common/Screenshot';
 
 interface HourGroupProps {
   hour: number;
@@ -68,26 +69,14 @@ export function HourGroup({
                 <div
                   key={screenshot.id}
                   data-testid="screenshot-thumbnail"
-                  className="relative aspect-video rounded overflow-hidden bg-muted cursor-pointer group hover:ring-2 ring-primary transition-all"
                   onClick={() => onScreenshotClick?.(screenshot, index)}
                 >
-                  <img
-                    src={`https://via.placeholder.com/200x112/1a1a2e/16213e?text=${screenshot.id}`}
-                    alt={screenshot.windowTitle || 'Screenshot'}
-                    className="w-full h-full object-cover"
-                    loading="lazy"
+                  <ScreenshotComponent
+                    screenshot={screenshot}
+                    size="thumbnail"
+                    showOverlay={true}
+                    className="w-full"
                   />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
-                    <div className="absolute bottom-1 left-1 right-1">
-                      <p className="text-[10px] text-white truncate">
-                        {new Date(screenshot.timestamp * 1000).toLocaleTimeString([], {
-                          hour: '2-digit',
-                          minute: '2-digit',
-                          second: '2-digit',
-                        })}
-                      </p>
-                    </div>
-                  </div>
                 </div>
               ))}
             </div>

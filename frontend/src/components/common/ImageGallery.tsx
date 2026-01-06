@@ -2,11 +2,28 @@ import { useState, useCallback, useEffect } from 'react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { ChevronLeft, ChevronRight, X, ZoomIn, ZoomOut } from 'lucide-react';
-import { useScreenshotImage } from '@/api/hooks';
+import { useScreenshotImage, useThumbnail } from '@/api/hooks';
 import { formatTimestamp, formatDate } from '@/lib/utils';
 import { useKeyboardNav } from '@/hooks/useKeyboardNav';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { Screenshot } from '@/types';
+
+// Small thumbnail for the strip
+function GalleryThumbnail({ screenshot }: { screenshot: Screenshot }) {
+  const { data: thumbnailUrl, isLoading } = useThumbnail(screenshot.id);
+
+  if (isLoading) {
+    return <Skeleton className="w-full h-full" />;
+  }
+
+  return (
+    <img
+      src={thumbnailUrl}
+      alt=""
+      className="w-full h-full object-cover"
+    />
+  );
+}
 
 interface ImageGalleryProps {
   screenshots: Screenshot[];
@@ -156,11 +173,7 @@ export function ImageGallery({
                     setZoom(1);
                   }}
                 >
-                  <img
-                    src={`https://via.placeholder.com/64x36/1a1a2e/16213e?text=${screenshot.id}`}
-                    alt=""
-                    className="w-full h-full object-cover"
-                  />
+                  <GalleryThumbnail screenshot={screenshot} />
                 </div>
               );
             })}

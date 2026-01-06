@@ -48,8 +48,8 @@ func (m *SessionManager) StartSession() (*storage.Session, error) {
 	if lastSession != nil && lastSession.EndTime.Valid {
 		timeSinceEnd := time.Duration(now-lastSession.EndTime.Int64) * time.Second
 		if timeSinceEnd <= m.resumeWindow {
-			// Resume the session by clearing end time
-			err := m.store.EndSession(lastSession.ID, 0) // Clear end time
+			// Resume the session by clearing end time and duration
+			err := m.store.ResumeSession(lastSession.ID)
 			if err != nil {
 				// If we can't resume, just start a new session
 			} else {

@@ -31,6 +31,8 @@ export function GetHourlyActivity(arg1:string):Promise<Array<service.HourlyActiv
 
 export function GetRecentSessions(arg1:number):Promise<Array<storage.Session>>;
 
+export function GetReport(arg1:number):Promise<storage.Report>;
+
 export function GetReportHistory():Promise<Array<service.ReportMeta>>;
 
 export function GetScreenshot(arg1:number):Promise<storage.Screenshot>;
@@ -53,7 +55,11 @@ export function GetSystemInfo():Promise<Record<string, string>>;
 
 export function GetThumbnailPath(arg1:number):Promise<string>;
 
+export function GetTrackedRepositories():Promise<Array<storage.GitRepository>>;
+
 export function GetVersion():Promise<string>;
+
+export function GetWatchedDirectories():Promise<Array<string>>;
 
 export function GetWeeklyStats(arg1:string):Promise<service.WeeklyStats>;
 
@@ -61,10 +67,18 @@ export function OpenDataDir():Promise<void>;
 
 export function ParseTimeRange(arg1:string):Promise<service.TimeRange>;
 
+export function RegisterGitRepository(arg1:string):Promise<storage.GitRepository>;
+
 export function RestartTracking():Promise<void>;
 
 export function StartTracking():Promise<void>;
 
 export function StopTracking():Promise<void>;
 
+export function UnregisterGitRepository(arg1:number):Promise<void>;
+
+export function UnwatchDirectory(arg1:string):Promise<void>;
+
 export function UpdateConfig(arg1:Record<string, any>):Promise<void>;
+
+export function WatchDirectory(arg1:string):Promise<void>;
