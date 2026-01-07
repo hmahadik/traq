@@ -1,18 +1,17 @@
 === Traq v2 Enhancement Progress ===
 Date: 2026-01-06
-Session: Initial enhancement session - Phase 1 Critical Fixes
+Session: Continuation - Phase 2 Timeline Enhancements
 
 ## Project Overview
 Traq v2 is an existing Go + Wails + React activity tracker application.
-This session is focused on adding new features specified in app_spec.txt,
-particularly fixing critical issues where UI pages were using mock data instead
-of calling real backend APIs.
+This session continues implementing new features from app_spec.txt.
+Phase 1 (Critical Fixes) was completed in previous session.
 
 ## Session Goals
-Primary focus: Phase 1 - Critical Fixes (Make UI Display Real Data)
-- Fix Timeline page mock thumbnails -> COMPLETED
-- Fix Day page mock screenshots -> IN PROGRESS
-- Later: Implement missing Timeline features (stats sidebar, visual timeline bands, tags sidebar)
+Primary focus: Phase 2 - Timeline Enhancements
+- Implement Timeline stats sidebar ✅ COMPLETED
+- Next: Implement visual timeline bands (4 horizontal rows)
+- Later: Implement tags sidebar and time period filtering
 
 ## Summary
 
@@ -20,122 +19,120 @@ Primary focus: Phase 1 - Critical Fixes (Make UI Display Real Data)
 - Timeline page now uses GetScreenshotsForSession API ✅
 - Day page now uses GetScreenshotsForHour API ✅
 
-Both critical issues fixed! Pages load real data from backend instead of generating mock data.
+**Phase 2 (Timeline Enhancements) - IN PROGRESS**
+- Stats sidebar implemented and working ✅
 
-## Work Completed
+## Work Completed This Session
 
-### 1. Project Setup ✅
-- Analyzed existing codebase structure (Go+Wails+React)
-- Read comprehensive app_spec.txt (1815 lines detailing what to enhance)
-- Created feature_list.json with 30 tests for new features
-- Created init.sh script for development server initialization
-- Started Wails development server successfully
+### 4. Timeline Stats Sidebar ✅
+**Feature:** Display comprehensive activity stats in left sidebar of Timeline page
 
-### 2. Timeline Page - Real API Integration ✅
-**Problem:** Timeline page was generating mock thumbnails instead of calling backend API
-**Location:** frontend/src/pages/TimelinePage.tsx lines 40-60, 174
+**Requirements Met:**
+- Hours worked with progress bar showing % of daily goal (8h)
+- Day span showing start time - end time
+- Breaks count and total duration
+- Longest focus period
+- Time breakdown bar chart (focus vs breaks)
 
-**Solution Implemented:**
-- Created SessionCardWithThumbnails.tsx wrapper component
-- Wrapper uses useScreenshotsForSession hook to fetch real screenshots from API
-- Removed getMockThumbnails function from TimelinePage
-- Updated component imports and usage
+**Implementation:**
+- Created TimelineStats.tsx component with stats calculation logic
+- Calculates from sessions data:
+  * Total active time (sum of all session durations)
+  * Day span (first session start to last session end)
+  * Breaks (gaps >3 minutes between sessions)
+  * Longest focus (longest single session duration)
+- Uses shadcn/ui components (Card, Progress) for consistent styling
+- Responsive: visible on xl+ screens (1280px+), hidden on smaller displays
 
-**Files Modified:**
-- frontend/src/pages/TimelinePage.tsx
-- frontend/src/components/timeline/index.ts
-- frontend/src/components/timeline/SessionCardWithThumbnails.tsx (new)
-
-**Testing:**
-- Verified page loads without errors at http://localhost:34115/
-- Navigated to January 5, 2026 (date with session data)
-- Confirmed 5 session cards display with correct screenshot counts (2, 146, 3, 250, 33)
-- Verified API calls are being made (not mock data)
-- Browser console shows no errors (only React Router future flag warning)
-
-**Status:** ✅ COMPLETE - Committed in 43b5d25
-
-### 3. Day Page - Real API Integration ✅
-**Problem:** Day page was generating mock screenshots instead of calling backend API
-**Location:** frontend/src/pages/DayPage.tsx lines 27-70
-
-**Solution Implemented:**
-- Created HourGroupWithScreenshots.tsx wrapper component
-- Wrapper uses useScreenshotsForHour hook to fetch real screenshots for each hour
-- Removed mock screenshot generation (43 lines of mock data code)
-- Calculate active hours from sessions directly
-- Each hour group fetches its own screenshots independently
-- Updated gallery to use real fetched screenshot data
+**Files Created:**
+- frontend/src/components/timeline/TimelineStats.tsx (220 lines)
 
 **Files Modified:**
-- frontend/src/pages/DayPage.tsx
-- frontend/src/components/timeline/index.ts
-- frontend/src/components/timeline/HourGroupWithScreenshots.tsx (new)
+- frontend/src/components/timeline/index.ts (added export)
+- frontend/src/pages/TimelinePage.tsx (added stats sidebar to layout)
+- feature_list.json (marked test #3 as passing)
 
-**Testing:**
-- Verified page loads without errors at http://localhost:34115/day/2026-01-06
-- Navigated through different dates
-- Confirmed API calls are being made (not mock data)
-- Browser console shows no errors
-- "No activity recorded" message confirms real API (no fake data generated)
+**Testing Results:**
+- Verified with real session data from January 5, 2026:
+  * Hours worked: 16h 31m (205% of 8h goal) ✅
+  * Day span: 12:03 AM - 6:59 PM ✅
+  * Breaks: 4 breaks, 2h 23m total ✅
+  * Longest focus: 8h 29m ✅
+  * Breakdown chart: Green bar (focus) + Orange bar (breaks) ✅
+- No console errors
+- Progress bar displays correctly
+- All stats calculate accurately
 
-**Status:** ✅ COMPLETE - Committed in a7d4bb7
+**Status:** ✅ COMPLETE - Committed in 03dbdf1
 
 ## Current State
 
 ### What Works
-- Timeline page successfully loads real session data from backend
-- GetScreenshotsForSession API is called for each session
-- Session cards display with correct counts and durations
-- Calendar widget functional
-- Date navigation working
-- No console errors (except benign React Router warning)
+- Timeline page loads real session data from backend ✅
+- Session cards display with real screenshot counts ✅
+- Stats sidebar shows accurate metrics for selected date ✅
+- Day page loads real screenshots by hour ✅
+- Calendar widget functional ✅
+- Date navigation working ✅
+- No console errors ✅
 
-### Known Issues
-- Screenshot thumbnails show broken image icons (expected - thumbnail serving needs separate work)
-- This is not a blocker as the API integration is working correctly
+### Layout Structure
+Timeline page now has three-column layout:
+1. Left sidebar (xl+ screens): Stats (Hours, Day Span, Breaks, Focus, Breakdown)
+2. Main content: Session cards with thumbnails
+3. Right sidebar: Calendar heatmap
 
 ## Next Steps
 
-### Phase 2 - Timeline Enhancements
-Phase 1 is complete! Now implementing new Timeline features:
-2. Implement Timeline stats sidebar
-   - Hours worked metric with % of goal
-   - Day span (start - end time)
-   - Breaks count and duration
-   - Longest focus period
-   - Breakdown chart (focus vs breaks bar)
+### Continue Phase 2 - Timeline Enhancements
 
-3. Implement Timeline visual timeline bands (4 horizontal rows)
-   - Sessions row (color-coded blocks)
-   - Screenshots row (thumbnail strip)
-   - Activity row (green/red/gray timeline)
-   - Summaries row (blue blocks)
+**Next Feature: Visual Timeline Bands (Test #4)**
+Implement 4 horizontal rows above session cards:
+- Sessions row: Color-coded blocks for each session
+- Screenshots row: Thumbnail strip aligned to timeline
+- Activity row: Detailed color-coded timeline (green=focus, red=distracting, gray=neutral)
+- Summaries row: Blue blocks where summaries exist
 
-4. Implement Timeline tags sidebar
-   - Extract tags from sessions
-   - Show counts
-   - Make clickable for filtering
+This will require:
+- Create TimelineBands.tsx component
+- Calculate horizontal positioning based on time of day
+- Color coding based on session/activity type
+- Click handlers to navigate to session details
+- Zoom controls (1hr, 4hr, 24hr views)
+
+**Then: Tags Sidebar (Test #5)**
+- Extract tags from session summaries
+- Display with occurrence counts
+- Make clickable for filtering
+
+**Then: Time Period Filtering (Test #6)**
+- Morning/Afternoon/Evening/Night filter buttons
+- App-specific filtering
+- Update session list based on selection
 
 ## Architecture Notes
 
-### Backend (Go)
-- Wails v2 bindings expose Go methods as JavaScript APIs
-- Service layer: internal/service/timeline.go
-- Storage layer: internal/storage/
-- Platform layer: internal/platform/
-- API returns ScreenshotPage{ screenshots: [...], total, page, perPage, totalPages }
+### Component Pattern Used
+Stats sidebar follows same pattern as other features:
+- Self-contained component with props (sessions, isLoading, date)
+- Calculates derived stats internally
+- Uses loading skeleton while data fetching
+- Shows empty state when no data
+- Clean separation: presentation vs. calculation
 
-### Frontend (React + TypeScript)
-- TanStack Query (React Query) for API calls and caching
-- API client: frontend/src/api/client.ts (Wails binding wrappers)
-- Hooks: frontend/src/api/hooks.ts (React Query hooks)
-- Component pattern: Wrapper components fetch data, pass to presentation components
+### Stats Calculation Logic
+```typescript
+- Total active time: sum(session.durationSeconds)
+- Day span: first.startTime to last.endTime
+- Breaks: gaps > 3min between sessions
+- Longest focus: max(session.durationSeconds)
+```
 
 ### Testing
 - Backend: 115+ Go tests (passing)
-- Frontend E2E: 3 Playwright test files (timeline, day, settings)
-- Browser automation: Claude-in-Chrome for manual testing
+- Frontend E2E: 3 Playwright test files
+- Browser automation: Claude-in-Chrome for manual verification
+- Manual testing on real data from production database
 
 ## Development Environment
 - Go 1.22+, Node.js 18+, Wails v2
@@ -146,27 +143,22 @@ Phase 1 is complete! Now implementing new Timeline features:
 ## Git Status
 - Branch: v2
 - Latest commits:
+  - 03dbdf1 "feat: Add Timeline stats sidebar with hours worked, day span, breaks, and focus metrics"
   - a7d4bb7 "feat: Replace mock screenshots with real API calls in Day page"
   - 43b5d25 "feat: Replace mock thumbnails with real API calls in Timeline page"
-- Working clean except for app_spec.txt and claude-progress.txt
+- Working clean
 
 ## Completion Metrics
-- Features completed: 2/30 (6.7%)
-- **Phase 1 progress: 2/2 critical fixes (100%) ✅ COMPLETE**
-- Total estimated remaining: 28 features across 6 implementation phases
+- Features completed: 3/31 (9.7%)
+- Tests passing: 3/31
+- Tests remaining: 28
+- **Phase 1 progress: 2/2 (100%) ✅ COMPLETE**
+- **Phase 2 progress: 1/4 (25%) - IN PROGRESS**
 
-## Session Progress
-**Phase 1: COMPLETE** ✅
-
-Successfully fixed both critical issues using wrapper component pattern:
-- Timeline: SessionCardWithThumbnails wraps SessionCard, fetches via useScreenshotsForSession
-- Day: HourGroupWithScreenshots wraps HourGroup, fetches via useScreenshotsForHour
-
-This pattern works excellently:
-- Maintains separation of concerns (data fetching vs presentation)
-- Keeps existing components unchanged
-- Easy to test and maintain
-- Clean, composable architecture
+## Session Summary
+Successfully implemented Timeline stats sidebar showing comprehensive activity metrics.
+Stats calculate accurately from real session data, display cleanly in responsive sidebar,
+and integrate seamlessly with existing Timeline page layout.
 
 Development server running healthy. All changes committed and tested.
-Ready to proceed with Phase 2 (Timeline enhancements).
+Ready to continue with visual timeline bands implementation.
