@@ -142,7 +142,7 @@ export function SessionDetailPage() {
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-5 gap-2">
-            {screenshots.slice(0, 10).map((screenshot) => (
+            {screenshots.map((screenshot) => (
               <Screenshot
                 key={screenshot.id}
                 screenshot={screenshot}
