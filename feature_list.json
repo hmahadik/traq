@@ -1,0 +1,419 @@
+[
+  {
+    "category": "functional",
+    "description": "NEW: Timeline page loads real session thumbnails via API instead of mock data",
+    "steps": [
+      "Step 1: Navigate to http://localhost:34115/timeline",
+      "Step 2: Verify timeline page loads without errors",
+      "Step 3: Select a date with existing sessions",
+      "Step 4: Verify session cards display real screenshots from GetScreenshotsForSession API",
+      "Step 5: Check browser console has no errors",
+      "Step 6: Verify thumbnails match actual screenshots in database"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "NEW: Day page loads real hour-by-hour screenshots via API instead of mock data",
+    "steps": [
+      "Step 1: Navigate to http://localhost:34115/day",
+      "Step 2: Verify day page loads without errors",
+      "Step 3: Select a date with existing screenshots",
+      "Step 4: Verify hour groups display real screenshots from GetScreenshotsForHour API",
+      "Step 5: Expand each hour group and verify screenshot grid displays correctly",
+      "Step 6: Check browser console has no errors"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "NEW: Timeline page displays stats sidebar with hours worked, day span, breaks, and longest focus",
+    "steps": [
+      "Step 1: Navigate to http://localhost:34115/timeline",
+      "Step 2: Select a date with session data",
+      "Step 3: Verify stats sidebar appears with hours worked metric",
+      "Step 4: Verify day span shows start time - end time",
+      "Step 5: Verify breaks count and duration display",
+      "Step 6: Verify longest focus period displays",
+      "Step 7: Verify breakdown bar chart shows focus vs breaks"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "NEW: Timeline page displays visual timeline with 4 horizontal bands (sessions, screenshots, activity, summaries)",
+    "steps": [
+      "Step 1: Navigate to http://localhost:34115/timeline",
+      "Step 2: Select a date with session data",
+      "Step 3: Verify timeline bands component appears above session cards",
+      "Step 4: Verify sessions row shows color-coded blocks for each session",
+      "Step 5: Verify screenshots row shows thumbnail strip aligned to timeline",
+      "Step 6: Verify activity row shows color-coded timeline (green=focus, red=distracting, gray=neutral)",
+      "Step 7: Verify summaries row shows blue blocks where summaries exist"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "NEW: Timeline page displays tags sidebar with session tags and counts",
+    "steps": [
+      "Step 1: Navigate to http://localhost:34115/timeline",
+      "Step 2: Select a date with sessions that have summaries/tags",
+      "Step 3: Verify tags sidebar appears",
+      "Step 4: Verify tags list shows all tags from the day's sessions",
+      "Step 5: Verify each tag shows its occurrence count",
+      "Step 6: Click a tag and verify sessions filter to show only sessions with that tag"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "NEW: Timeline page supports time period filtering (morning, afternoon, evening, specific apps)",
+    "steps": [
+      "Step 1: Navigate to http://localhost:34115/timeline",
+      "Step 2: Select a date with sessions across different times of day",
+      "Step 3: Click 'Morning' filter button",
+      "Step 4: Verify only morning sessions (before 12pm) are displayed",
+      "Step 5: Click 'Afternoon' filter button",
+      "Step 6: Verify only afternoon sessions (12pm-5pm) are displayed",
+      "Step 7: Click 'Evening' filter button",
+      "Step 8: Verify only evening sessions (after 5pm) are displayed",
+      "Step 9: Select an app filter and verify only sessions using that app display"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "NEW: Analytics page displays productivity score with 1-5 rating and breakdown",
+    "steps": [
+      "Step 1: Navigate to http://localhost:34115/analytics",
+      "Step 2: Select Day view for a date with activity",
+      "Step 3: Verify productivity score card displays",
+      "Step 4: Verify score shows 1-5 rating with visual indicator",
+      "Step 5: Verify breakdown shows Xm productive, Xh Xm neutral, Xm distracting",
+      "Step 6: Verify score is based on app categorization (productive/neutral/distracting)"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "NEW: Analytics page displays focus distribution chart showing hourly focus patterns",
+    "steps": [
+      "Step 1: Navigate to http://localhost:34115/analytics",
+      "Step 2: Select Day view",
+      "Step 3: Verify focus distribution chart appears",
+      "Step 4: Verify chart shows horizontal bars for hourly focus quality",
+      "Step 5: Verify chart data is based on context switches and app usage",
+      "Step 6: Hover over bars to see tooltips with details"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "NEW: Analytics page displays activity tags horizontal bar chart",
+    "steps": [
+      "Step 1: Navigate to http://localhost:34115/analytics",
+      "Step 2: Select Day view for a date with tagged sessions",
+      "Step 3: Verify activity tags chart appears",
+      "Step 4: Verify chart shows top tags with durations as horizontal bars",
+      "Step 5: Click a tag bar and verify it filters the view to that tag"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "NEW: Analytics page displays time distribution pie chart showing app usage percentages",
+    "steps": [
+      "Step 1: Navigate to http://localhost:34115/analytics",
+      "Step 2: Select Day view",
+      "Step 3: Verify time distribution pie chart appears",
+      "Step 4: Verify pie chart shows app usage as percentages",
+      "Step 5: Verify percentage labels are visible",
+      "Step 6: Click a pie slice and verify it filters to that app"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "NEW: Analytics page displays top windows list with app badges and time spent",
+    "steps": [
+      "Step 1: Navigate to http://localhost:34115/analytics",
+      "Step 2: Select Day view",
+      "Step 3: Verify top windows list appears",
+      "Step 4: Verify each window shows app badge (colored), window title, time spent",
+      "Step 5: Click a window entry and verify it navigates to Day view filtered to that window"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "NEW: Analytics page supports Week view with weekly statistics and daily activity chart",
+    "steps": [
+      "Step 1: Navigate to http://localhost:34115/analytics",
+      "Step 2: Click 'Week' view toggle",
+      "Step 3: Verify page switches to weekly view",
+      "Step 4: Verify weekly metrics display (Total Active Time, Avg Daily Hours, Total Break Time, etc.)",
+      "Step 5: Verify daily activity chart shows 7 days",
+      "Step 6: Verify typical start/end times with ranges display",
+      "Step 7: Verify avg context switches and active days (X/7) display"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "NEW: Analytics page supports Month view with monthly trends and statistics",
+    "steps": [
+      "Step 1: Navigate to http://localhost:34115/analytics",
+      "Step 2: Click 'Month' view toggle",
+      "Step 3: Verify page switches to monthly view",
+      "Step 4: Verify monthly metrics display",
+      "Step 5: Verify monthly trends chart appears",
+      "Step 6: Verify week-over-week comparisons are shown"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "NEW: Analytics page can export analytics as PDF or CSV",
+    "steps": [
+      "Step 1: Navigate to http://localhost:34115/analytics",
+      "Step 2: Select Day view with data",
+      "Step 3: Click Export button",
+      "Step 4: Select PDF format",
+      "Step 5: Verify PDF file is generated with all charts and stats",
+      "Step 6: Click Export button again",
+      "Step 7: Select CSV format",
+      "Step 8: Verify CSV file is generated with tabular data"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "NEW: Analytics page has regenerate button to force recalculation",
+    "steps": [
+      "Step 1: Navigate to http://localhost:34115/analytics",
+      "Step 2: Select Day view",
+      "Step 3: Click Regenerate Analytics button",
+      "Step 4: Verify loading state appears during recalculation",
+      "Step 5: Verify analytics data refreshes after recalculation"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "NEW: Reports page displays quick report preset buttons for one-click generation",
+    "steps": [
+      "Step 1: Navigate to http://localhost:34115/reports",
+      "Step 2: Verify quick preset buttons appear (Today, Yesterday, This Week, Last Week, Standup (Today), Standup (Yesterday))",
+      "Step 3: Click 'Today' preset button",
+      "Step 4: Verify report generates with correct time range (today)",
+      "Step 5: Click 'Standup (Yesterday)' preset button",
+      "Step 6: Verify standup-format report generates for yesterday"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "NEW: Reports page supports 'Include key screenshots' option in report generation",
+    "steps": [
+      "Step 1: Navigate to http://localhost:34115/reports",
+      "Step 2: Enter a time range",
+      "Step 3: Check 'Include key screenshots' checkbox",
+      "Step 4: Click Generate Report",
+      "Step 5: Verify report preview includes representative screenshots",
+      "Step 6: Export report and verify screenshots are embedded or attached"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "NEW: Reports page displays daily summaries auto-list showing auto-generated summaries for each day",
+    "steps": [
+      "Step 1: Navigate to http://localhost:34115/reports",
+      "Step 2: Verify Daily Summaries section appears",
+      "Step 3: Verify chronological list of auto-generated daily summaries displays",
+      "Step 4: Verify each summary shows date, summary preview, total time",
+      "Step 5: Click a summary to view full report",
+      "Step 6: Verify full report opens with complete details"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "NEW: Session detail page has Back to Timeline link in header",
+    "steps": [
+      "Step 1: Navigate to http://localhost:34115/timeline",
+      "Step 2: Click on a session card to open session detail",
+      "Step 3: Verify session detail page opens",
+      "Step 4: Verify 'Back to Timeline' link appears in header",
+      "Step 5: Click the link",
+      "Step 6: Verify navigation returns to timeline page",
+      "Step 7: Verify scroll position is preserved"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "NEW: Session detail page has Regenerate Summary button that creates new summary",
+    "steps": [
+      "Step 1: Navigate to session detail page for a session with an existing summary",
+      "Step 2: Verify Regenerate Summary button appears in header",
+      "Step 3: Click the button",
+      "Step 4: Verify loading state appears during regeneration",
+      "Step 5: Verify new summary is generated and displayed",
+      "Step 6: Verify summary content has updated"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "NEW: Session detail page has Delete Session button with confirmation",
+    "steps": [
+      "Step 1: Navigate to session detail page",
+      "Step 2: Verify Delete Session button appears in header",
+      "Step 3: Click the button",
+      "Step 4: Verify confirmation dialog appears",
+      "Step 5: Click Confirm in dialog",
+      "Step 6: Verify session is deleted",
+      "Step 7: Verify navigation returns to timeline",
+      "Step 8: Verify timeline no longer shows deleted session"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "NEW: Session detail page displays model explanation section showing AI reasoning",
+    "steps": [
+      "Step 1: Navigate to session detail page for a session with summary",
+      "Step 2: Scroll to model explanation section",
+      "Step 3: Verify section is collapsible",
+      "Step 4: Expand section",
+      "Step 5: Verify model's reasoning/explanation text displays",
+      "Step 6: Verify explanation is formatted for readability"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "NEW: Session detail page displays API request details section for transparency",
+    "steps": [
+      "Step 1: Navigate to session detail page for a session with summary",
+      "Step 2: Scroll to API Request Details section",
+      "Step 3: Verify section is collapsible",
+      "Step 4: Expand section",
+      "Step 5: Verify screenshot thumbnails used in API call are shown",
+      "Step 6: Verify full request JSON payload is displayed (pretty-printed)",
+      "Step 7: Verify model name, endpoint, and prompt details are shown"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "NEW: Session detail page displays generation details (model, inference time, timestamp)",
+    "steps": [
+      "Step 1: Navigate to session detail page for a session with summary",
+      "Step 2: Locate generation details section",
+      "Step 3: Verify model name is displayed",
+      "Step 4: Verify inference time (in milliseconds) is shown",
+      "Step 5: Verify generated timestamp is displayed",
+      "Step 6: Verify summary ID is shown"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "NEW: Session detail page displays config snapshot showing settings used during summary generation",
+    "steps": [
+      "Step 1: Navigate to session detail page for a session with summary",
+      "Step 2: Scroll to Config Snapshot section",
+      "Step 3: Verify section is collapsible",
+      "Step 4: Expand section",
+      "Step 5: Verify all configuration values at time of generation are shown",
+      "Step 6: Verify config includes capture settings, sampling settings, etc."
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "NEW: Session detail page shows ALL screenshots from session, not just first 10",
+    "steps": [
+      "Step 1: Navigate to session detail page for a session with 20+ screenshots",
+      "Step 2: Scroll to screenshots section",
+      "Step 3: Count screenshots displayed",
+      "Step 4: Verify ALL screenshots from session are shown (not limited to 10)",
+      "Step 5: If pagination is implemented, verify Load More button loads additional screenshots",
+      "Step 6: Verify grid layout is maintained"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "NEW: Session detail page displays enhanced activity log with all app/window switches",
+    "steps": [
+      "Step 1: Navigate to session detail page",
+      "Step 2: Scroll to activity log section",
+      "Step 3: Verify table shows EVERY app/window switch in session",
+      "Step 4: Verify columns include: Time, App, Window, Duration",
+      "Step 5: Verify visual duration bars display next to durations",
+      "Step 6: Click column header to sort",
+      "Step 7: Verify sorting works correctly",
+      "Step 8: Use filter if implemented and verify filtering works"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "NEW: App categorization system allows users to categorize apps as productive/neutral/distracting",
+    "steps": [
+      "Step 1: Open Settings",
+      "Step 2: Navigate to app categorization section (may be in Goals or new tab)",
+      "Step 3: Verify list of detected apps appears",
+      "Step 4: Select an app and change its category to 'Productive'",
+      "Step 5: Select another app and change to 'Distracting'",
+      "Step 6: Save settings",
+      "Step 7: Navigate to Analytics page",
+      "Step 8: Verify productivity score reflects the categorizations"
+    ],
+    "passes": false
+  },
+  {
+    "category": "style",
+    "description": "NEW: Timeline page visual timeline matches v1 reference design with 4 distinct bands",
+    "steps": [
+      "Step 1: Navigate to http://localhost:34115/timeline",
+      "Step 2: Take screenshot of timeline page",
+      "Step 3: Compare with v1 reference at http://localhost:55555",
+      "Step 4: Verify 4 horizontal bands are clearly visible and distinct",
+      "Step 5: Verify color coding matches v1 (sessions colored, activity green/red/gray, summaries blue)",
+      "Step 6: Verify timeline is horizontally scrollable",
+      "Step 7: Verify zoom controls work and maintain visual clarity"
+    ],
+    "passes": false
+  },
+  {
+    "category": "style",
+    "description": "NEW: Analytics page charts match v1 visual design and layout",
+    "steps": [
+      "Step 1: Navigate to http://localhost:34115/analytics",
+      "Step 2: Take screenshot of analytics page",
+      "Step 3: Compare with v1 reference at http://localhost:55555",
+      "Step 4: Verify all 5 new charts (productivity score, focus distribution, tags, time distribution pie, top windows) have consistent styling",
+      "Step 5: Verify chart colors match app categorization theme (green/gray/red)",
+      "Step 6: Verify chart spacing and layout matches v1 polish"
+    ],
+    "passes": false
+  },
+  {
+    "category": "style",
+    "description": "NEW: Session detail page transparency sections have consistent collapsible design",
+    "steps": [
+      "Step 1: Navigate to session detail page",
+      "Step 2: Take screenshot of page",
+      "Step 3: Verify all collapsible sections (model explanation, API request, config snapshot) have consistent styling",
+      "Step 4: Verify expand/collapse animations are smooth",
+      "Step 5: Verify section headers are clearly distinguishable",
+      "Step 6: Verify content within sections is well-formatted and readable"
+    ],
+    "passes": false
+  }
+]

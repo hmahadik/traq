@@ -1,7 +1,7 @@
 import { useState, useCallback, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { SessionCard, SessionCardSkeleton, CalendarWidget } from '@/components/timeline';
+import { SessionCardWithThumbnails, SessionCardSkeleton, CalendarWidget } from '@/components/timeline';
 import {
   useSessionsForDate,
   useCalendarHeatmap,
@@ -10,7 +10,6 @@ import {
 import { useListNav } from '@/hooks/useListNav';
 import { formatDate } from '@/lib/utils';
 import { ChevronLeft, ChevronRight, Calendar, List } from 'lucide-react';
-import type { Screenshot } from '@/types';
 
 function getDateString(date: Date): string {
   return date.toISOString().split('T')[0];
@@ -36,28 +35,6 @@ export function TimelinePage() {
     selectedDate.getMonth() + 1
   );
   const generateSummary = useGenerateSummary();
-
-  // Mock thumbnails for sessions (in real app, would be fetched per session)
-  const getMockThumbnails = useCallback((sessionId: number): Screenshot[] => {
-    // Return mock thumbnails based on session ID
-    return Array.from({ length: Math.min(8, sessionId % 10 + 2) }, (_, i) => ({
-      id: sessionId * 100 + i,
-      timestamp: Date.now() / 1000 - i * 60,
-      filepath: `/screenshots/${sessionId}/${i}.webp`,
-      dhash: '',
-      windowTitle: 'Mock Window',
-      appName: 'Mock App',
-      windowX: null,
-      windowY: null,
-      windowWidth: null,
-      windowHeight: null,
-      monitorName: null,
-      monitorWidth: null,
-      monitorHeight: null,
-      sessionId,
-      createdAt: Date.now() / 1000 - i * 60,
-    }));
-  }, []);
 
   // Navigation handlers
   const goToPreviousDay = useCallback(() => {
@@ -168,10 +145,9 @@ export function TimelinePage() {
               </div>
             ) : (
               sessions.map((session, index) => (
-                <SessionCard
+                <SessionCardWithThumbnails
                   key={session.id}
                   session={session}
-                  thumbnails={getMockThumbnails(session.id)}
                   isSelected={selectedSessionId === session.id || selectedIndex === index}
                   onSelect={() => handleSessionSelect(session.id)}
                   onGenerateSummary={() => handleGenerateSummary(session.id)}
