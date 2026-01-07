@@ -10,7 +10,7 @@
       "Step 5: Check browser console has no errors",
       "Step 6: Verify thumbnails match actual screenshots in database"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -23,7 +23,7 @@
       "Step 5: Expand each hour group and verify screenshot grid displays correctly",
       "Step 6: Check browser console has no errors"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",

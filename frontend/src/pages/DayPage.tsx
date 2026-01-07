@@ -2,11 +2,11 @@ import { useState, useMemo, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { useSessionsForDate } from '@/api/hooks';
-import { formatDate, addDays, toDateString, groupBy } from '@/lib/utils';
+import { useSessionsForDate, useScreenshotsForHour } from '@/api/hooks';
+import { formatDate, addDays, toDateString } from '@/lib/utils';
 import { useKeyboardNav } from '@/hooks/useKeyboardNav';
 import { DatePicker } from '@/components/common/DatePicker';
-import { HourGroup, HourGroupSkeleton } from '@/components/timeline/HourGroup';
+import { HourGroupWithScreenshots, HourGroupSkeleton } from '@/components/timeline';
 import { ImageGallery } from '@/components/common/ImageGallery';
 import type { Screenshot } from '@/types';
 
@@ -21,53 +21,27 @@ export function DayPage() {
 
   // Gallery state
   const [galleryOpen, setGalleryOpen] = useState(false);
-  const [galleryScreenshots, setGalleryScreenshots] = useState<Screenshot[]>([]);
   const [galleryIndex, setGalleryIndex] = useState(0);
+  const [galleryHour, setGalleryHour] = useState<number>(0);
 
-  // Flatten all screenshots from sessions and group by hour
-  const screenshotsByHour = useMemo(() => {
-    if (!sessions) return {};
+  // Calculate active hours from sessions (hours when there was activity)
+  const activeHours = useMemo(() => {
+    if (!sessions || sessions.length === 0) return [];
 
-    // For the mock data, we'll generate screenshots per hour
-    // In real implementation, screenshots would come from sessions
-    const allScreenshots: Screenshot[] = [];
-
-    // Generate mock screenshots for each hour based on sessions
+    const hoursSet = new Set<number>();
     sessions.forEach((session) => {
       const startHour = new Date(session.startTime * 1000).getHours();
       const endHour = session.endTime
         ? new Date(session.endTime * 1000).getHours()
-        : startHour + 1;
+        : startHour;
 
       for (let h = startHour; h <= endHour; h++) {
-        const count = Math.floor(Math.random() * 20) + 5;
-        for (let i = 0; i < count; i++) {
-          const timestamp = session.startTime + (h - startHour) * 3600 + i * 30;
-          allScreenshots.push({
-            id: session.id * 1000 + h * 100 + i,
-            timestamp,
-            filepath: `/screenshots/${dateString}/screenshot_${h}_${i}.webp`,
-            dhash: `hash_${h}_${i}`,
-            windowTitle: ['VS Code - main.go', 'Firefox - GitHub', 'Terminal - ~/projects'][i % 3],
-            appName: ['VS Code', 'Firefox', 'Terminal'][i % 3],
-            windowX: 0,
-            windowY: 0,
-            windowWidth: 1920,
-            windowHeight: 1080,
-            monitorName: 'Primary',
-            monitorWidth: 1920,
-            monitorHeight: 1080,
-            sessionId: session.id,
-            createdAt: timestamp,
-          });
-        }
+        hoursSet.add(h);
       }
     });
 
-    return groupBy(allScreenshots, (s) =>
-      new Date(s.timestamp * 1000).getHours().toString()
-    );
-  }, [sessions, dateString]);
+    return Array.from(hoursSet).sort((a, b) => a - b);
+  }, [sessions]);
 
   const goToPreviousDay = useCallback(() => {
     const newDate = addDays(currentDate, -1);
@@ -87,31 +61,23 @@ export function DayPage() {
   );
 
   const handleScreenshotClick = useCallback(
-    (hour: number, _screenshot: Screenshot, index: number) => {
-      const hourScreenshots = screenshotsByHour[hour.toString()] || [];
-      setGalleryScreenshots(hourScreenshots);
+    (hour: number, screenshot: Screenshot, index: number) => {
+      // Gallery will need to fetch screenshots for this hour
+      setGalleryHour(hour);
       setGalleryIndex(index);
       setGalleryOpen(true);
     },
-    [screenshotsByHour]
+    []
   );
+
+  // Fetch screenshots for the gallery hour
+  const { data: galleryHourData } = useScreenshotsForHour(dateString, galleryHour);
 
   // Keyboard navigation
   useKeyboardNav({
     onLeft: goToPreviousDay,
     onRight: goToNextDay,
   });
-
-  // Get active hours (hours with screenshots)
-  const activeHours = useMemo(() => {
-    const hours: number[] = [];
-    for (let h = 0; h < 24; h++) {
-      if (screenshotsByHour[h.toString()]?.length > 0) {
-        hours.push(h);
-      }
-    }
-    return hours.length > 0 ? hours : Array.from({ length: 10 }, (_, i) => i + 8);
-  }, [screenshotsByHour]);
 
   return (
     <div className="space-y-6">
@@ -144,9 +110,6 @@ export function DayPage() {
 
       {/* Stats Summary */}
       <div className="flex items-center gap-6 text-sm text-muted-foreground">
-        <span>
-          {Object.values(screenshotsByHour).reduce((sum, arr) => sum + arr.length, 0)} screenshots
-        </span>
         <span>{sessions?.length || 0} sessions</span>
         <span>{activeHours.length} active hours</span>
       </div>
@@ -154,13 +117,18 @@ export function DayPage() {
       {/* Hour Groups */}
       {isLoading ? (
         <HourGroupSkeleton count={5} />
+      ) : activeHours.length === 0 ? (
+        <div className="text-center py-16 text-muted-foreground">
+          <p className="text-lg font-medium">No activity recorded</p>
+          <p className="text-sm mt-1">No screenshots captured on this day</p>
+        </div>
       ) : (
         <div className="space-y-3">
           {activeHours.map((hour) => (
-            <HourGroup
+            <HourGroupWithScreenshots
               key={hour}
+              date={dateString}
               hour={hour}
-              screenshots={screenshotsByHour[hour.toString()] || []}
               onScreenshotClick={(screenshot, index) =>
                 handleScreenshotClick(hour, screenshot, index)
               }
@@ -172,7 +140,7 @@ export function DayPage() {
 
       {/* Image Gallery */}
       <ImageGallery
-        screenshots={galleryScreenshots}
+        screenshots={galleryHourData || []}
         initialIndex={galleryIndex}
         open={galleryOpen}
         onOpenChange={setGalleryOpen}
