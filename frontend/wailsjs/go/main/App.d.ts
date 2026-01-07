@@ -11,7 +11,7 @@ export function ExportReport(arg1:number,arg2:string):Promise<string>;
 
 export function ForceCapture():Promise<string>;
 
-export function GenerateReport(arg1:string,arg2:string):Promise<storage.Report>;
+export function GenerateReport(arg1:string,arg2:string,arg3:boolean):Promise<storage.Report>;
 
 export function GetActivityTags(arg1:string):Promise<Array<service.TagUsage>>;
 

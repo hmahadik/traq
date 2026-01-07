@@ -223,7 +223,7 @@
       "Step 5: Verify report preview includes representative screenshots",
       "Step 6: Export report and verify screenshots are embedded or attached"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",

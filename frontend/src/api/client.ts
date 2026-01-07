@@ -101,8 +101,8 @@ export const timeline = {
  * Reports API
  */
 export const reports = {
-  generateReport: async (timeRange: string, reportType: string) => {
-    return App.GenerateReport(timeRange, reportType);
+  generateReport: async (timeRange: string, reportType: string, includeScreenshots: boolean) => {
+    return App.GenerateReport(timeRange, reportType, includeScreenshots);
   },
 
   getReport: async (id: number) => {

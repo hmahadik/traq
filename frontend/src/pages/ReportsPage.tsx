@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   QuickPresets,
   TimeRangeSelector,
@@ -14,12 +16,13 @@ import {
   useParseTimeRange,
 } from '@/api/hooks';
 import { api } from '@/api/client';
-import { Loader2, Sparkles } from 'lucide-react';
+import { Loader2, Sparkles, ImageIcon } from 'lucide-react';
 import type { Report } from '@/types';
 
 export function ReportsPage() {
   const [timeRange, setTimeRange] = useState('today');
   const [reportType, setReportType] = useState('summary');
+  const [includeScreenshots, setIncludeScreenshots] = useState(false);
   const [generatedReport, setGeneratedReport] = useState<Report | undefined>();
 
   const { data: history, isLoading: historyLoading } = useReportHistory();
@@ -28,7 +31,7 @@ export function ReportsPage() {
   const exportReport = useExportReport();
 
   const handleGenerate = async () => {
-    const result = await generateReport.mutateAsync({ timeRange, reportType });
+    const result = await generateReport.mutateAsync({ timeRange, reportType, includeScreenshots });
     setGeneratedReport(result);
   };
 
@@ -43,6 +46,7 @@ export function ReportsPage() {
     const result = await generateReport.mutateAsync({
       timeRange: quickTimeRange,
       reportType: quickReportType,
+      includeScreenshots,
     });
     setGeneratedReport(result);
   };
@@ -109,6 +113,32 @@ export function ReportsPage() {
           />
 
           <ReportTypeSelector value={reportType} onChange={setReportType} />
+
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <ImageIcon className="h-4 w-4" />
+                Options
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <div className="text-sm font-medium">
+                    Include key screenshots
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    Adds representative screenshots to the report
+                  </div>
+                </div>
+                <Switch
+                  id="includeScreenshots"
+                  checked={includeScreenshots}
+                  onCheckedChange={setIncludeScreenshots}
+                />
+              </div>
+            </CardContent>
+          </Card>
 
           <Button
             onClick={handleGenerate}

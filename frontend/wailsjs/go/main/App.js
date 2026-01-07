@@ -18,8 +18,8 @@ export function ForceCapture() {
   return window['go']['main']['App']['ForceCapture']();
 }
 
-export function GenerateReport(arg1, arg2) {
-  return window['go']['main']['App']['GenerateReport'](arg1, arg2);
+export function GenerateReport(arg1, arg2, arg3) {
+  return window['go']['main']['App']['GenerateReport'](arg1, arg2, arg3);
 }
 
 export function GetActivityTags(arg1) {

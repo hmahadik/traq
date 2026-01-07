@@ -389,11 +389,11 @@ func (a *App) DeleteScreenshot(id int64) error {
 // ============================================================================
 
 // GenerateReport generates a new report for the given time range.
-func (a *App) GenerateReport(timeRange, reportType string) (*storage.Report, error) {
+func (a *App) GenerateReport(timeRange, reportType string, includeScreenshots bool) (*storage.Report, error) {
 	if a.Reports == nil {
 		return nil, nil
 	}
-	return a.Reports.GenerateReport(timeRange, reportType)
+	return a.Reports.GenerateReport(timeRange, reportType, includeScreenshots)
 }
 
 // GetReport returns a report by ID with full content.

@@ -231,8 +231,8 @@ export function useGenerateReport() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ timeRange, reportType }: { timeRange: string; reportType: string }) =>
-      api.reports.generateReport(timeRange, reportType),
+    mutationFn: ({ timeRange, reportType, includeScreenshots }: { timeRange: string; reportType: string; includeScreenshots: boolean }) =>
+      api.reports.generateReport(timeRange, reportType, includeScreenshots),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.reports.history() });
     },
