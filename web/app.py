@@ -1131,7 +1131,10 @@ def _get_day_data(storage, date_str, is_today=False):
             start_time = st.strftime('%I:%M %p').lstrip('0')
         except (ValueError, TypeError):
             pass
-    if work_break['last_session_end']:
+    # Use current time as end_time if there's an active session (for today)
+    if work_break['is_active'] and is_today:
+        end_time = datetime.now().strftime('%I:%M %p').lstrip('0')
+    elif work_break['last_session_end']:
         try:
             et = datetime.fromisoformat(work_break['last_session_end'])
             end_time = et.strftime('%I:%M %p').lstrip('0')
@@ -1405,10 +1408,13 @@ def get_analytics_summary_week(year, week):
                 for i, secs in enumerate(day_data.get('hourly_seconds', [])):
                     all_hourly[i] += secs
 
-                # Aggregate tags
+                # Aggregate tags (track both seconds and count)
                 for tag in day_data.get('tags', []):
                     name = tag['name']
-                    all_tags[name] = all_tags.get(name, 0) + tag['count']
+                    if name not in all_tags:
+                        all_tags[name] = {'seconds': 0, 'count': 0}
+                    all_tags[name]['seconds'] += tag.get('seconds', 0)
+                    all_tags[name]['count'] += tag.get('count', 0)
 
                 # Aggregate apps
                 for app in day_data.get('app_distribution', []):
@@ -1429,9 +1435,15 @@ def get_analytics_summary_week(year, week):
         max_hourly = max(all_hourly) if all_hourly else 1
         peak_hours_avg = [int((s / max_hourly) * 100) if max_hourly > 0 else 0 for s in all_hourly]
 
-        # Sort and format tags
-        sorted_tags = sorted(all_tags.items(), key=lambda x: -x[1])[:10]
-        tags = [{'name': t[0], 'count': t[1]} for t in sorted_tags]
+        # Sort and format tags (by seconds for more meaningful results)
+        sorted_tags = sorted(all_tags.items(), key=lambda x: -x[1]['seconds'])[:10]
+        max_tag_seconds = sorted_tags[0][1]['seconds'] if sorted_tags else 0
+        tags = [{
+            'name': t[0],
+            'seconds': t[1]['seconds'],
+            'count': t[1]['count'],
+            'pct': int((t[1]['seconds'] / max_tag_seconds) * 100) if max_tag_seconds > 0 else 0
+        } for t in sorted_tags]
 
         # Sort and format apps with colors
         sorted_apps = sorted(all_apps.items(), key=lambda x: -x[1])
@@ -1686,10 +1698,13 @@ def get_analytics_summary_month(year, month):
                         for i, secs in enumerate(day_data.get('hourly_seconds', [])):
                             all_hourly[i] += secs
 
-                        # Aggregate tags
+                        # Aggregate tags (track both seconds and count)
                         for tag in day_data.get('tags', []):
                             name = tag['name']
-                            all_tags[name] = all_tags.get(name, 0) + tag['count']
+                            if name not in all_tags:
+                                all_tags[name] = {'seconds': 0, 'count': 0}
+                            all_tags[name]['seconds'] += tag.get('seconds', 0)
+                            all_tags[name]['count'] += tag.get('count', 0)
 
                         # Aggregate apps
                         for app in day_data.get('app_distribution', []):
@@ -1717,9 +1732,15 @@ def get_analytics_summary_month(year, month):
         max_hourly = max(all_hourly) if all_hourly else 1
         peak_hours_avg = [int((s / max_hourly) * 100) if max_hourly > 0 else 0 for s in all_hourly]
 
-        # Sort and format tags
-        sorted_tags = sorted(all_tags.items(), key=lambda x: -x[1])[:10]
-        tags = [{'name': t[0], 'count': t[1]} for t in sorted_tags]
+        # Sort and format tags (by seconds for more meaningful results)
+        sorted_tags = sorted(all_tags.items(), key=lambda x: -x[1]['seconds'])[:10]
+        max_tag_seconds = sorted_tags[0][1]['seconds'] if sorted_tags else 0
+        tags = [{
+            'name': t[0],
+            'seconds': t[1]['seconds'],
+            'count': t[1]['count'],
+            'pct': int((t[1]['seconds'] / max_tag_seconds) * 100) if max_tag_seconds > 0 else 0
+        } for t in sorted_tags]
 
         # Sort and format apps with colors
         sorted_apps = sorted(all_apps.items(), key=lambda x: -x[1])

@@ -2507,6 +2507,9 @@ class ActivityStorage:
     def get_app_durations_in_range(self, start: 'datetime', end: 'datetime') -> List[Dict]:
         """Aggregate duration by app, sorted by total time descending.
 
+        Only includes focus events that fall within their session's time range,
+        filtering out invalid/orphaned events.
+
         Args:
             start: Start datetime.
             end: End datetime.
@@ -2518,13 +2521,16 @@ class ActivityStorage:
             cursor = conn.execute(
                 """
                 SELECT
-                    app_name,
-                    SUM(duration_seconds) as total_seconds,
+                    wfe.app_name,
+                    SUM(wfe.duration_seconds) as total_seconds,
                     COUNT(*) as event_count
-                FROM window_focus_events
-                WHERE datetime(start_time) >= datetime(?)
-                  AND datetime(end_time) <= datetime(?)
-                GROUP BY app_name
+                FROM window_focus_events wfe
+                JOIN activity_sessions s ON wfe.session_id = s.id
+                WHERE datetime(wfe.start_time) >= datetime(?)
+                  AND datetime(wfe.end_time) <= datetime(?)
+                  AND datetime(wfe.start_time) >= datetime(s.start_time)
+                  AND (s.end_time IS NULL OR datetime(wfe.end_time) <= datetime(s.end_time))
+                GROUP BY wfe.app_name
                 ORDER BY total_seconds DESC
                 """,
                 (start.isoformat(), end.isoformat())
@@ -2539,6 +2545,9 @@ class ActivityStorage:
     ) -> List[Dict]:
         """Aggregate duration by app + window title.
 
+        Only includes focus events that fall within their session's time range,
+        filtering out invalid/orphaned events.
+
         Args:
             start: Start datetime.
             end: End datetime.
@@ -2551,14 +2560,17 @@ class ActivityStorage:
             cursor = conn.execute(
                 """
                 SELECT
-                    app_name,
-                    window_title,
-                    SUM(duration_seconds) as total_seconds,
+                    wfe.app_name,
+                    wfe.window_title,
+                    SUM(wfe.duration_seconds) as total_seconds,
                     COUNT(*) as event_count
-                FROM window_focus_events
-                WHERE datetime(start_time) >= datetime(?)
-                  AND datetime(end_time) <= datetime(?)
-                GROUP BY app_name, window_title
+                FROM window_focus_events wfe
+                JOIN activity_sessions s ON wfe.session_id = s.id
+                WHERE datetime(wfe.start_time) >= datetime(?)
+                  AND datetime(wfe.end_time) <= datetime(?)
+                  AND datetime(wfe.start_time) >= datetime(s.start_time)
+                  AND (s.end_time IS NULL OR datetime(wfe.end_time) <= datetime(s.end_time))
+                GROUP BY wfe.app_name, wfe.window_title
                 ORDER BY total_seconds DESC
                 LIMIT ?
                 """,
@@ -2568,6 +2580,9 @@ class ActivityStorage:
 
     def get_hourly_app_breakdown(self, date: str) -> List[Dict]:
         """Get app usage breakdown by hour for a specific day.
+
+        Only includes focus events that fall within their session's time range,
+        filtering out invalid/orphaned events.
 
         Args:
             date: Date string in YYYY-MM-DD format.
@@ -2579,12 +2594,15 @@ class ActivityStorage:
             cursor = conn.execute(
                 """
                 SELECT
-                    CAST(strftime('%H', start_time) AS INTEGER) as hour,
-                    app_name,
-                    SUM(duration_seconds) as seconds
-                FROM window_focus_events
-                WHERE date(start_time) = ?
-                GROUP BY hour, app_name
+                    CAST(strftime('%H', wfe.start_time) AS INTEGER) as hour,
+                    wfe.app_name,
+                    SUM(wfe.duration_seconds) as seconds
+                FROM window_focus_events wfe
+                JOIN activity_sessions s ON wfe.session_id = s.id
+                WHERE date(wfe.start_time) = ?
+                  AND datetime(wfe.start_time) >= datetime(s.start_time)
+                  AND (s.end_time IS NULL OR datetime(wfe.end_time) <= datetime(s.end_time))
+                GROUP BY hour, wfe.app_name
                 ORDER BY hour, seconds DESC
                 """,
                 (date,)
@@ -2803,13 +2821,18 @@ class ActivityStorage:
 
         with self.get_connection() as conn:
             # Get active time from focus events with session
+            # Join with activity_sessions to validate that focus events
+            # actually fall within their session's time range (filters out
+            # invalid data where session_id doesn't match the actual session)
             cursor = conn.execute(
                 """
-                SELECT COALESCE(SUM(duration_seconds), 0) as active_time
-                FROM window_focus_events
-                WHERE datetime(start_time) >= datetime(?)
-                  AND datetime(end_time) <= datetime(?)
-                  AND session_id IS NOT NULL
+                SELECT COALESCE(SUM(wfe.duration_seconds), 0) as active_time
+                FROM window_focus_events wfe
+                JOIN activity_sessions s ON wfe.session_id = s.id
+                WHERE datetime(wfe.start_time) >= datetime(?)
+                  AND datetime(wfe.end_time) <= datetime(?)
+                  AND datetime(wfe.start_time) >= datetime(s.start_time)
+                  AND (s.end_time IS NULL OR datetime(wfe.end_time) <= datetime(s.end_time))
                 """,
                 (start.isoformat(), end.isoformat())
             )
@@ -2902,6 +2925,11 @@ class ActivityStorage:
                     # Check gap between last completed session and active session
                     gap_to_active = (active_start - datetime.fromisoformat(last_end)).total_seconds()
 
+                    # Count gap as break time if in 1min-2hr range
+                    if 60 <= gap_to_active <= 7200:
+                        break_count += 1
+                        total_break_seconds += gap_to_active
+
                     if gap_to_active > 300:  # > 5 min gap = break
                         # Check if previous continuous period was longest
                         if current_continuous > longest_continuous:
@@ -2929,20 +2957,31 @@ class ActivityStorage:
                 longest_continuous_start = current_continuous_start
                 longest_continuous_end = last_end
 
-        # Active percentage based on first session to last session span (not midnight to midnight)
-        if sessions:
-            first_session_start = sessions[0]['start_time']
-            last_session_end = sessions[-1]['end_time']
+        # Active percentage based on first session to last activity span
+        # (not midnight to midnight)
+        if sessions or (is_active and active_session):
+            # Determine first session start (use earliest of completed or active)
+            if sessions:
+                first_session_start = sessions[0]['start_time']
+                if is_active and active_session:
+                    # Use whichever started earlier
+                    if active_session['start_time'] < first_session_start:
+                        first_session_start = active_session['start_time']
+            else:
+                first_session_start = active_session['start_time']
+
+            # Determine end time - use 'now' if there's an active session
+            if is_active:
+                now = datetime.now()
+                last_session_end = None  # Still None since no "ended" time yet
+                end_dt = now
+            else:
+                last_session_end = sessions[-1]['end_time']
+                end_dt = datetime.fromisoformat(last_session_end)
+
             first_dt = datetime.fromisoformat(first_session_start)
-            last_dt = datetime.fromisoformat(last_session_end)
-            workday_span = (last_dt - first_dt).total_seconds()
+            workday_span = (end_dt - first_dt).total_seconds()
             active_percentage = (active_seconds / workday_span * 100) if workday_span > 0 else 0
-        elif is_active and active_session:
-            # Only an active session exists (no completed sessions yet)
-            first_session_start = active_session['start_time']
-            last_session_end = None
-            workday_span = 0
-            active_percentage = 0
         else:
             first_session_start = None
             last_session_end = None

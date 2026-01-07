@@ -858,7 +858,8 @@
         } else {
             isoWeekStart.setUTCDate(simple.getUTCDate() + 8 - simple.getUTCDay());
         }
-        return isoWeekStart;
+        // Return local date (not UTC) to avoid timezone issues with getDate/getMonth/getFullYear
+        return new Date(isoWeekStart.getUTCFullYear(), isoWeekStart.getUTCMonth(), isoWeekStart.getUTCDate());
     }
 
 })();
