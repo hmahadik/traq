@@ -10,6 +10,10 @@ export function DeleteScreenshot(arg1) {
   return window['go']['main']['App']['DeleteScreenshot'](arg1);
 }
 
+export function DeleteSession(arg1) {
+  return window['go']['main']['App']['DeleteSession'](arg1);
+}
+
 export function ExportAnalytics(arg1, arg2, arg3) {
   return window['go']['main']['App']['ExportAnalytics'](arg1, arg2, arg3);
 }

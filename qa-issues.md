@@ -1,12 +1,21 @@
-# QA Issues - 2026-01-07 Session
+# QA Issues - 2026-01-07 Session (Updated)
 
 ## Critical Issues (Must Fix)
 
-None identified.
+### 1. Navigation Links Not Clickable
+**Location:** Header navigation (Timeline, Analytics, Reports links)
+**Issue:** The navigation links in the header are not functioning when clicked. Direct URL navigation is required.
+**Steps to Reproduce:**
+1. Load http://localhost:5173/
+2. Click on "Reports" link in header
+3. Page does not navigate
+**Expected:** Clicking navigation links should navigate to the respective pages
+**Actual:** Links appear non-functional, require manual URL navigation
+**Impact:** Core navigation is broken - this is a critical UX issue
 
 ## Major Issues (Should Fix)
 
-### 1. React Router Future Flag Warning in Console
+### 2. React Router Future Flag Warning in Console
 **Location:** All pages
 **Description:** Console shows a React Router warning about `v7_startTransition` future flag. While this is a warning (not an error), it pollutes the console and should be addressed.
 **Details:**
@@ -15,13 +24,13 @@ React Router Future Flag Warning: React Router will begin wrapping state updates
 ```
 **Fix:** Add the `v7_startTransition` future flag to the router configuration or upgrade React Router to v7.
 
-### 2. Settings Gear Icon Non-Functional
+### 3. Settings Gear Icon Non-Functional
 **Location:** Top-right corner of all pages (Analytics, Reports, Timeline)
 **Description:** Clicking the settings/gear icon in the top-right corner does nothing. There's no visual feedback (no modal, no menu, no page navigation).
 **Expected Behavior:** Should either open a settings modal, navigate to a settings page, or show a dropdown menu.
 **Current Behavior:** No response to click.
 
-### 3. Inconsistent Empty State Messaging
+### 4. Inconsistent Empty State Messaging
 **Location:** Multiple pages
 **Description:** Empty state messages are inconsistent in tone and punctuation:
 - Timeline: "No sessions recorded" / "Screenlify will appear here as you work"
@@ -42,75 +51,104 @@ Primary message: "No [items] yet"
 Secondary message: "[Action needed to populate]"
 ```
 
-### 4. Quick Reports Button Layout Inconsistency
+### 5. Quick Reports Button Layout Inconsistency
 **Location:** Reports page > Quick Reports section
 **Description:** The "Quick Reports" preset buttons have inconsistent spacing and alignment:
 - "Today" and "Yesterday" are on the same row
 - "This Week" and "Last Week" are on the same row
 - "Standup (Today)" and "Standup (Yesterday)" are on the same row
-- However, the vertical spacing between rows appears uneven (gap between rows varies)
+- However, the vertical spacing between rows appears uneven (gap between rows varies: approximately 8px between some rows, 12px between others)
 - The buttons within each row have different widths based on content length, making the grid look unbalanced
 
 **Recommendation:** Either make all buttons equal width, or ensure consistent grid spacing with better vertical rhythm.
 
+### 6. Navigation Active State Not Visible
+**Location:** Top navigation bar (Timeline, Analytics, Reports)
+**Description:** When on the Analytics page or Reports page, there's no strong visual indicator in the top navigation showing which page you're currently on. The active page doesn't have an underline, different color, or bold text.
+**Current Behavior:** All navigation items look the same regardless of active page.
+**Expected Behavior:** Active navigation item should be visually distinct (e.g., underline, bold, or different color).
+**Impact:** Users lose context about which page they're on, especially problematic with broken navigation (Issue #1)
+
 ## Minor Issues (Nice to Fix)
 
-### 5. Tab Navigation Styling Could Be More Obvious
+### 7. Tab Navigation Styling Could Be More Obvious
 **Location:** Analytics page tabs (Activity, Applications, Data Sources)
 **Description:** The active tab styling is subtle - just a slightly darker background. The inactive tabs don't have strong visual differentiation.
 **Current State:** Active tab has light blue background, inactive tabs are very light gray.
 **Suggestion:** Consider adding a bottom border to the active tab or making the active state more prominent with better contrast.
 
-### 6. Time Range Buttons Styling
+### 8. Time Range Buttons Lack Hover State
 **Location:** Reports page > Time Range section
 **Description:** The selected button ("Today") has a dark background, but the hover state and inactive state aren't immediately distinguishable. When hovering over inactive buttons, there's minimal visual feedback.
 **Suggestion:** Add a subtle hover state (light background change or border) to inactive buttons to improve interactivity feedback.
 
-### 7. Productivity Score Card Alignment
+### 9. Productivity Score Card Info Icon Unclear
 **Location:** Analytics page, top card
 **Description:** The "Productivity Score" card shows "N/A" with "No activity tracked" message. The info icon (ⓘ) at the top-right of this card appears to be clickable but it's unclear if it has any interaction.
 **Test Status:** Did not test clicking the info icon.
 **Suggestion:** If the info icon is interactive, ensure it has a hover state. If not, consider removing it or making it visually distinct as a non-interactive element.
 
-### 8. Calendar Widget Has No Data Indicators
+### 10. Calendar Widget Has No Data Indicators
 **Location:** Timeline page, right sidebar calendar
 **Description:** The calendar shows dates but there's no visual indication of which dates have activity data and which don't. Users must click dates to discover if there's data.
 **Current State:** All dates look the same except for "Today" which is highlighted.
 **Suggestion:** Add subtle dots, background colors, or other indicators to dates that contain activity data.
 
-### 9. Heatmap Legend Positioning
+### 11. Heatmap Legend Positioning
 **Location:** Analytics page > Activity Heatmap
-**Description:** The heatmap legend ("Less" to "More" with color squares) is positioned at the bottom-right of the heatmap. The alignment and spacing feel slightly cramped.
-**Observation:** This is a very minor visual polish issue - the legend is functional but could have slightly more breathing room.
+**Description:** The heatmap legend ("Less" to "More" with color squares) is positioned at the bottom-right of the heatmap. The alignment and spacing feel slightly cramped (approximately 4px spacing between legend items).
+**Observation:** This is a very minor visual polish issue - the legend is functional but could have slightly more breathing room (suggest 8px spacing).
 
-### 10. Navigation Active State Not Visible
-**Location:** Top navigation bar (Timeline, Analytics, Reports)
-**Description:** When on the Analytics page or Reports page, there's no strong visual indicator in the top navigation showing which page you're currently on. The active page doesn't have an underline, different color, or bold text.
-**Current Behavior:** All navigation items look the same regardless of active page.
-**Expected Behavior:** Active navigation item should be visually distinct (e.g., underline, bold, or different color).
-
-### 11. Report Type Radio Button Visual Feedback
+### 12. Report Type Radio Button Visual Feedback
 **Location:** Reports page > Report Type section
 **Description:** The selected report type (Summary) has a border and icon, but when clicking between options, the visual transition could be smoother. The selection state is clear, but there's no hover state on unselected options.
 **Suggestion:** Add subtle hover effects to unselected report type cards.
 
-### 12. "Generate Report" Button Could Be More Prominent
+### 13. "Generate Report" Button Could Be More Prominent
 **Location:** Reports page
 **Description:** The "Generate Report" button has a dark background (good), but given it's the primary action on the page, it could benefit from a slightly more prominent treatment - perhaps a hover state with a brightness increase or subtle shadow.
 **Current State:** Button exists and is styled appropriately, but lacks a strong hover state.
 
+### 14. Settings Button Lacks Visual Affordance
+**Location:** Top right corner of header
+**Issue:** The settings button (gear icon) has minimal styling - appears as just a gray icon with no border, background, or clear indication it's interactive
+**Expected:** Clear hover state, potentially a subtle background or border to indicate it's clickable
+
+### 15. Application Usage Table Headers Low Contrast
+**Location:** Analytics > Applications tab > Application Usage section
+**Issue:** The table column headers "Application", "Duration", "Sessions", "Share" have very low contrast and appear small
+**Expected:** More prominent table headers with better contrast for readability
+
+### 16. Calendar Action Buttons Need Better Styling
+**Location:** Timeline page > Calendar section
+**Issue:** Below the calendar grid are "Today" and "Yesterday" buttons. Their styling appears to be plain text buttons with no clear visual distinction from regular text
+**Expected:** These action buttons should have more prominent styling (background, border, or button-like appearance)
+
+### 17. Time Range Chip "Today" Selected State Too Subtle
+**Location:** Reports page > Time Range section
+**Issue:** The "Today" chip is selected (appears with darker background) but the visual difference between selected and unselected states is subtle - approximately 20% difference in background color
+**Expected:** More pronounced selected state - perhaps with an accent color, checkmark icon, or higher contrast (suggest 40%+ difference)
+
+## Testing Blockers
+
+1. **No test data available** - Cannot test session detail features, summaries, or data visualization
+2. **Navigation links not functional** - Makes it difficult to test user flows end-to-end (Critical Issue #1)
+3. **Unable to reach session detail pages** - Cannot verify Tests #21, #22, #23 (Back to Timeline, Regenerate Summary, Delete Session)
+
 ## Screenshots Reference
 
-All screenshots were captured at 1570x783 resolution. Key issues can be seen in:
-- Landing page (Timeline): Empty state messaging
-- Analytics page: Tab styling, productivity score card, heatmap
-- Reports page: Quick reports layout, button styling
-- Data Sources tab: Empty state
+All screenshots were captured at 1570x783 resolution (viewport: 3200x1595). Key issues can be seen in:
+- `ss_1390e66k1` - Timeline page (empty state, January 7, 2026)
+- `ss_2177cd7xp` - Reports page (quick reports layout, time range buttons)
+- `ss_06383wbcv` - Analytics page (Day view with Activity tab, heatmap)
+- `ss_5777cryhu` - Analytics page (Applications tab, table headers)
+- `ss_8382wlzax` - Timeline page (calendar widget)
+- `ss_0305xmjfj` - Timeline page (January 6, 2026 - after date change)
 
 ## Console Errors
 
 **Total Errors:** 0 (zero JavaScript errors)
-**Total Warnings:** 1 (React Router future flag warning - see Major Issue #1)
+**Total Warnings:** 1 (React Router future flag warning - see Major Issue #2)
 
 ## Test Coverage Notes
 
@@ -121,33 +159,65 @@ All screenshots were captured at 1570x783 resolution. Key issues can be seen in:
 - Console message review
 - Interactive element hover states (partial)
 - Settings icon functionality
+- Date navigation on calendar
 
 **What Was NOT Fully Tested:**
 - Session detail pages (no data available to test)
 - Report generation flow (no data available to generate reports)
 - Day page with actual session data (timezone fix was recent work, but no data present)
-- Form interactions (time range selection, report type selection)
+- Form interactions (time range selection, report type selection changes)
 - Responsive behavior at different viewport sizes
 - Accessibility (keyboard navigation, screen reader support)
+- Actual clicking through of session detail features (Regenerate Summary, Delete Session, Back to Timeline)
+
+## Features Requiring Retesting Once Data Available
+
+These features are marked as passing in feature_list.json but could not be visually verified:
+
+- Test #19: Reports page displays daily summaries auto-list (marked passing)
+- Test #21: Session detail page has Back to Timeline link (marked passing)
+- Test #22: Session detail page has Regenerate Summary button (marked passing)
+- Test #23: Session detail page has Delete Session button (marked passing)
+
+**Risk:** These features show as passing but have not been visually QA'd due to lack of test data.
 
 ## Overall Assessment
 
 **Visual Quality:** Good - The application has a clean, modern design with consistent spacing and typography overall.
 
-**UX Quality:** Good - Navigation is intuitive, empty states are helpful (though messaging could be more consistent).
+**UX Quality:** Fair - Navigation is broken (Critical Issue #1), but when manually navigating, the flow is intuitive. Empty states are helpful though inconsistent.
 
 **Polish Level:** Medium - Most UI elements are well-executed, but there are several small polish issues around hover states, active states, and visual feedback that would improve the professional feel.
 
-**Severity:** Low - No critical bugs or major UX blockers. All issues are polish-related or minor inconsistencies.
+**Severity of Issues:**
+- **Critical:** 1 (navigation broken)
+- **Major:** 5 (console warning, settings icon, empty states, button layouts, nav active state)
+- **Minor:** 11 (various polish and visual feedback issues)
+
+**JavaScript Errors:** 0 (PASS ✓)
 
 ---
 
 ## Recommendations for Next Session
 
-1. Fix the React Router warning (quick win)
-2. Add functionality to the settings gear icon OR remove it
-3. Standardize empty state messaging across the app
-4. Improve navigation active state visibility
-5. Add hover states to interactive elements consistently
-6. Test with actual session data to verify Day page timezone fix
-7. Test session detail page features once data is available
+**Immediate Priority:**
+1. ⚠️ **Fix navigation link functionality (Critical Issue #1)** - This is blocking normal user flow
+2. Fix the React Router warning (quick win, Major Issue #2)
+3. Add functionality to the settings gear icon OR remove it (Major Issue #3)
+
+**High Priority:**
+4. Improve navigation active state visibility (Major Issue #6)
+5. Standardize empty state messaging across the app (Major Issue #4)
+6. Fix Quick Reports layout inconsistency (Major Issue #5)
+
+**Medium Priority:**
+7. Add hover states to interactive elements consistently (Minor Issues #8, #12, #13)
+8. Improve tab styling in Analytics (Minor Issue #7)
+9. Add data indicators to calendar (Minor Issue #10)
+
+**Testing Priority:**
+10. Add test/seed data to enable proper feature testing
+11. Test session detail page features once data is available (Tests #21, #22, #23)
+12. Verify Day page timezone fix with actual data
+13. Conduct responsive design testing at various breakpoints
+14. Perform accessibility audit (keyboard navigation, screen readers)

@@ -359,7 +359,7 @@
       "Step 7: Verify sorting works correctly",
       "Step 8: Use filter if implemented and verify filtering works"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -374,7 +374,7 @@
       "Step 7: Navigate to Analytics page",
       "Step 8: Verify productivity score reflects the categorizations"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "style",

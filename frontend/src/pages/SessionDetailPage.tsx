@@ -10,6 +10,7 @@ import { useSessionContext, useRegenerateSummary, useDeleteSession } from '@/api
 import { formatTimeRange, formatDuration, formatTimestamp } from '@/lib/utils';
 import { Terminal, GitCommit, FileText, Globe, ArrowLeft, RefreshCw, Trash2 } from 'lucide-react';
 import { Screenshot } from '@/components/common/Screenshot';
+import { ActivityLogTable } from '@/components/session/ActivityLogTable';
 import { toast } from 'sonner';
 
 export function SessionDetailPage() {
@@ -169,18 +170,8 @@ export function SessionDetailPage() {
               <TabsTrigger value="browser">Browser ({browserVisits.length})</TabsTrigger>
             </TabsList>
 
-            <TabsContent value="focus" className="mt-4 space-y-2">
-              {focusEvents.map((event) => (
-                <div key={event.id} className="flex items-center gap-3 p-2 rounded-lg border">
-                  <div className="flex-1">
-                    <p className="font-medium">{event.appName}</p>
-                    <p className="text-sm text-muted-foreground truncate">{event.windowTitle}</p>
-                  </div>
-                  <p className="text-sm text-muted-foreground">
-                    {formatDuration(event.durationSeconds)}
-                  </p>
-                </div>
-              ))}
+            <TabsContent value="focus" className="mt-4">
+              <ActivityLogTable focusEvents={focusEvents} />
             </TabsContent>
 
             <TabsContent value="shell" className="mt-4 space-y-2">
