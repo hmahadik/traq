@@ -210,7 +210,7 @@
       "Step 5: Click 'Standup (Yesterday)' preset button",
       "Step 6: Verify standup-format report generates for yesterday"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",

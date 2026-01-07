@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import {
+  QuickPresets,
   TimeRangeSelector,
   ReportTypeSelector,
   ReportPreview,
@@ -28,6 +29,21 @@ export function ReportsPage() {
 
   const handleGenerate = async () => {
     const result = await generateReport.mutateAsync({ timeRange, reportType });
+    setGeneratedReport(result);
+  };
+
+  const handleQuickGenerate = async (
+    quickTimeRange: string,
+    quickReportType: 'summary' | 'detailed' | 'standup'
+  ) => {
+    // Update the form state to reflect what's being generated
+    setTimeRange(quickTimeRange);
+    setReportType(quickReportType);
+    // Generate the report
+    const result = await generateReport.mutateAsync({
+      timeRange: quickTimeRange,
+      reportType: quickReportType,
+    });
     setGeneratedReport(result);
   };
 
@@ -81,6 +97,11 @@ export function ReportsPage() {
       <div className="grid gap-6 lg:grid-cols-[400px_1fr]">
         {/* Left Column - Report Configuration */}
         <div className="space-y-4">
+          <QuickPresets
+            onGenerate={handleQuickGenerate}
+            isGenerating={generateReport.isPending}
+          />
+
           <TimeRangeSelector
             value={timeRange}
             onChange={setTimeRange}
