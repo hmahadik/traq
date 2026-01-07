@@ -1,11 +1,12 @@
-import { useParams } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Button } from '@/components/ui/button';
 import { useSessionContext } from '@/api/hooks';
 import { formatTimeRange, formatDuration, formatTimestamp } from '@/lib/utils';
-import { Terminal, GitCommit, FileText, Globe } from 'lucide-react';
+import { Terminal, GitCommit, FileText, Globe, ArrowLeft } from 'lucide-react';
 import { Screenshot } from '@/components/common/Screenshot';
 
 export function SessionDetailPage() {
@@ -34,21 +35,29 @@ export function SessionDetailPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">
-            Session {session.id}
-          </h1>
-          <p className="text-muted-foreground">
-            {formatTimeRange(session.startTime, session.endTime ?? session.startTime)} ({formatDuration(session.durationSeconds ?? 0)})
-          </p>
-        </div>
-        <div className="flex gap-2">
-          {summary?.confidence && (
-            <Badge variant={summary.confidence === 'high' ? 'default' : 'secondary'}>
-              {summary.confidence} confidence
-            </Badge>
-          )}
+      <div>
+        <Button variant="ghost" size="sm" asChild className="mb-4">
+          <Link to="/timeline" className="flex items-center gap-2">
+            <ArrowLeft className="h-4 w-4" />
+            Back to Timeline
+          </Link>
+        </Button>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">
+              Session {session.id}
+            </h1>
+            <p className="text-muted-foreground">
+              {formatTimeRange(session.startTime, session.endTime ?? session.startTime)} ({formatDuration(session.durationSeconds ?? 0)})
+            </p>
+          </div>
+          <div className="flex gap-2">
+            {summary?.confidence && (
+              <Badge variant={summary.confidence === 'high' ? 'default' : 'secondary'}>
+                {summary.confidence} confidence
+              </Badge>
+            )}
+          </div>
         </div>
       </div>
 
