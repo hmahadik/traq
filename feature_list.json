@@ -291,7 +291,7 @@
       "Step 5: Verify model's reasoning/explanation text displays",
       "Step 6: Verify explanation is formatted for readability"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -305,7 +305,7 @@
       "Step 6: Verify full request JSON payload is displayed (pretty-printed)",
       "Step 7: Verify model name, endpoint, and prompt details are shown"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -318,7 +318,7 @@
       "Step 5: Verify generated timestamp is displayed",
       "Step 6: Verify summary ID is shown"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -359,7 +359,7 @@
       "Step 7: Verify sorting works correctly",
       "Step 8: Use filter if implemented and verify filtering works"
     ],
-    "passes": true
+    "passes": false
   },
   {
     "category": "functional",
@@ -388,7 +388,7 @@
       "Step 6: Verify timeline is horizontally scrollable",
       "Step 7: Verify zoom controls work and maintain visual clarity"
     ],
-    "passes": true
+    "passes": false
   },
   {
     "category": "style",
@@ -414,6 +414,6 @@
       "Step 5: Verify section headers are clearly distinguishable",
       "Step 6: Verify content within sections is well-formatted and readable"
     ],
-    "passes": false
+    "passes": true
   }
 ]

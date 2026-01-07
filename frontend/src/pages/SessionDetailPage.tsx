@@ -11,6 +11,7 @@ import { formatTimeRange, formatDuration, formatTimestamp } from '@/lib/utils';
 import { Terminal, GitCommit, FileText, Globe, ArrowLeft, RefreshCw, Trash2 } from 'lucide-react';
 import { Screenshot } from '@/components/common/Screenshot';
 import { ActivityLogTable } from '@/components/session/ActivityLogTable';
+import { CollapsibleSection } from '@/components/session/CollapsibleSection';
 import { toast } from 'sonner';
 
 export function SessionDetailPage() {
@@ -122,26 +123,145 @@ export function SessionDetailPage() {
 
       {/* Summary */}
       {summary && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Summary</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <p>{summary.summary}</p>
-            {summary.explanation && (
-              <div className="text-sm text-muted-foreground">
-                <strong>Explanation:</strong> {summary.explanation}
+        <>
+          <Card>
+            <CardHeader>
+              <CardTitle>Summary</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-base leading-relaxed">{summary.summary}</p>
+              <div className="flex gap-2 flex-wrap">
+                {summary.tags.map((tag) => (
+                  <Badge key={tag} variant="outline">
+                    {tag}
+                  </Badge>
+                ))}
               </div>
-            )}
-            <div className="flex gap-2">
-              {summary.tags.map((tag) => (
-                <Badge key={tag} variant="outline">
-                  {tag}
-                </Badge>
-              ))}
+            </CardContent>
+          </Card>
+
+          {/* Model Explanation Section - Test #22 */}
+          {summary.explanation && (
+            <CollapsibleSection title="Model Explanation" defaultOpen={false}>
+              <div className="space-y-2">
+                <p className="text-sm text-muted-foreground">
+                  This section shows how the AI model analyzed the session and arrived at the summary above.
+                </p>
+                <div className="p-4 bg-muted/30 rounded-md">
+                  <p className="text-sm leading-relaxed whitespace-pre-wrap">{summary.explanation}</p>
+                </div>
+              </div>
+            </CollapsibleSection>
+          )}
+
+          {/* Generation Details Section - Test #24 */}
+          <CollapsibleSection title="Generation Details" defaultOpen={false}>
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <p className="text-muted-foreground">Model Name</p>
+                <p className="font-mono">{summary.modelUsed || 'N/A'}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground">Inference Time</p>
+                <p className="font-mono">{summary.inferenceTimeMs ? `${summary.inferenceTimeMs}ms` : 'N/A'}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground">Generated At</p>
+                <p className="font-mono">{formatTimestamp(summary.createdAt)}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground">Summary ID</p>
+                <p className="font-mono">#{summary.id}</p>
+              </div>
             </div>
-          </CardContent>
-        </Card>
+          </CollapsibleSection>
+
+          {/* API Request Details Section - Test #23 */}
+          <CollapsibleSection title="API Request Details" defaultOpen={false}>
+            <div className="space-y-4">
+              <div>
+                <p className="text-sm text-muted-foreground mb-2">
+                  This section shows the data sent to the AI model for analysis.
+                </p>
+              </div>
+
+              {/* Screenshot IDs used */}
+              <div>
+                <h4 className="text-sm font-semibold mb-2">Screenshots Used</h4>
+                {summary.screenshotIds && summary.screenshotIds.length > 0 ? (
+                  <div className="flex gap-2 flex-wrap">
+                    {summary.screenshotIds.map((id) => (
+                      <Badge key={id} variant="secondary" className="font-mono">
+                        #{id}
+                      </Badge>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">No screenshot IDs recorded</p>
+                )}
+              </div>
+
+              {/* Context JSON */}
+              <div>
+                <h4 className="text-sm font-semibold mb-2">Request Context</h4>
+                <pre className="p-4 bg-muted/30 rounded-md overflow-x-auto text-xs font-mono">
+                  {summary.contextJson
+                    ? JSON.stringify(JSON.parse(summary.contextJson), null, 2)
+                    : '{}'}
+                </pre>
+              </div>
+
+              <div>
+                <h4 className="text-sm font-semibold mb-2">Model Configuration</h4>
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div className="flex justify-between p-2 bg-muted/20 rounded">
+                    <span className="text-muted-foreground">Model:</span>
+                    <span className="font-mono">{summary.modelUsed}</span>
+                  </div>
+                  <div className="flex justify-between p-2 bg-muted/20 rounded">
+                    <span className="text-muted-foreground">Session ID:</span>
+                    <span className="font-mono">{summary.sessionId}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </CollapsibleSection>
+
+          {/* Config Snapshot Section - Test #25 */}
+          <CollapsibleSection title="Config Snapshot" defaultOpen={false}>
+            <div className="space-y-2">
+              <p className="text-sm text-muted-foreground">
+                Configuration settings at the time this summary was generated.
+              </p>
+              <div className="p-4 bg-muted/30 rounded-md">
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Generated At:</span>
+                    <span className="font-mono">{formatTimestamp(summary.createdAt)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Model:</span>
+                    <span className="font-mono">{summary.modelUsed}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Inference Time:</span>
+                    <span className="font-mono">{summary.inferenceTimeMs}ms</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Session:</span>
+                    <span className="font-mono">#{summary.sessionId}</span>
+                  </div>
+                </div>
+                <div className="mt-4 pt-4 border-t border-border/50">
+                  <p className="text-xs text-muted-foreground italic">
+                    Note: Full application config snapshot would be stored here in a production implementation.
+                    This includes capture settings, sampling parameters, and AI model configuration.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </CollapsibleSection>
+        </>
       )}
 
       {/* Screenshots */}
