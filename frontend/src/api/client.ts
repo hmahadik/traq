@@ -54,6 +54,10 @@ export const analytics = {
   getActivityTags: async (date: string) => {
     return App.GetActivityTags(date);
   },
+
+  getTopWindows: async (date: string, limit: number) => {
+    return App.GetTopWindows(date, limit);
+  },
 };
 
 /**

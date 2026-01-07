@@ -248,6 +248,24 @@ func (a *App) GetActivityTags(date string) ([]*service.TagUsage, error) {
 	return a.Analytics.GetActivityTags(date)
 }
 
+// GetTopWindows returns the most used windows for a date, grouped by window title.
+func (a *App) GetTopWindows(date string, limit int) ([]*service.WindowUsage, error) {
+	if a.Analytics == nil {
+		return nil, nil
+	}
+
+	// Parse date to get start/end timestamps
+	t, err := time.Parse("2006-01-02", date)
+	if err != nil {
+		return nil, err
+	}
+
+	start := t.Unix()
+	end := t.Add(24 * time.Hour).Unix() - 1
+
+	return a.Analytics.GetTopWindows(start, end, limit)
+}
+
 // ============================================================================
 // Timeline Methods (exposed to frontend)
 // ============================================================================

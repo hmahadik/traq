@@ -8,3 +8,4 @@ export { ProductivityScoreCard } from './ProductivityScoreCard';
 export { FocusDistributionChart } from './FocusDistributionChart';
 export { ActivityTagsChart } from './ActivityTagsChart';
 export { TimeDistributionChart } from './TimeDistributionChart';
+export { TopWindowsList } from './TopWindowsList';

@@ -27,6 +27,14 @@ export interface AppUsage {
   sessionCount: number;
 }
 
+export interface WindowUsage {
+  windowTitle: string;
+  appName: string;
+  durationSeconds: number;
+  percentage: number;
+  focusCount: number;
+}
+
 export interface HourlyActivity {
   hour: number;
   screenshotCount: number;

@@ -14,6 +14,7 @@ import {
   FocusDistributionChart,
   ActivityTagsChart,
   TimeDistributionChart,
+  TopWindowsList,
 } from '@/components/analytics';
 import {
   useDailyStats,
@@ -23,6 +24,7 @@ import {
   useProductivityScore,
   useFocusDistribution,
   useActivityTags,
+  useTopWindows,
 } from '@/api/hooks';
 import { Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
 
@@ -49,6 +51,7 @@ export function AnalyticsPage() {
   const { data: productivityScore, isLoading: productivityLoading } = useProductivityScore(dateStr);
   const { data: focusDistribution, isLoading: focusLoading } = useFocusDistribution(dateStr);
   const { data: activityTags, isLoading: tagsLoading } = useActivityTags(dateStr);
+  const { data: topWindows, isLoading: windowsLoading } = useTopWindows(dateStr, 10);
 
   const handlePrevDay = () => {
     setSelectedDate((d) => addDays(d, -1));
@@ -63,6 +66,11 @@ export function AnalyticsPage() {
   const handleAppClick = (appName: string) => {
     // Navigate to day view filtered by app
     navigate(`/day/${dateStr}?app=${encodeURIComponent(appName)}`);
+  };
+
+  const handleWindowClick = (windowTitle: string, appName: string) => {
+    // Navigate to day view filtered by window
+    navigate(`/day/${dateStr}?window=${encodeURIComponent(windowTitle)}&app=${encodeURIComponent(appName)}`);
   };
 
   const formattedDate = selectedDate.toLocaleDateString('en-US', {
@@ -150,11 +158,16 @@ export function AnalyticsPage() {
               onAppClick={handleAppClick}
             />
           </div>
-          <div className="grid gap-4">
+          <div className="grid gap-4 lg:grid-cols-2">
             <AppUsageTable
               data={appUsage}
               isLoading={appUsageLoading}
               onAppClick={handleAppClick}
+            />
+            <TopWindowsList
+              data={topWindows}
+              isLoading={windowsLoading}
+              onWindowClick={handleWindowClick}
             />
           </div>
         </TabsContent>

@@ -1007,6 +1007,26 @@ export namespace service {
 		    return a;
 		}
 	}
+	export class WindowUsage {
+	    windowTitle: string;
+	    appName: string;
+	    durationSeconds: number;
+	    percentage: number;
+	    focusCount: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new WindowUsage(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.windowTitle = source["windowTitle"];
+	        this.appName = source["appName"];
+	        this.durationSeconds = source["durationSeconds"];
+	        this.percentage = source["percentage"];
+	        this.focusCount = source["focusCount"];
+	    }
+	}
 
 }
 

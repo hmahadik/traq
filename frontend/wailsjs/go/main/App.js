@@ -118,6 +118,10 @@ export function GetThumbnailPath(arg1) {
   return window['go']['main']['App']['GetThumbnailPath'](arg1);
 }
 
+export function GetTopWindows(arg1, arg2) {
+  return window['go']['main']['App']['GetTopWindows'](arg1, arg2);
+}
+
 export function GetTrackedRepositories() {
   return window['go']['main']['App']['GetTrackedRepositories']();
 }

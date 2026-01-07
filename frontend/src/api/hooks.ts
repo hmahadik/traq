@@ -29,6 +29,7 @@ export const queryKeys = {
     productivityScore: (date: string) => ['analytics', 'productivityScore', date] as const,
     focusDistribution: (date: string) => ['analytics', 'focusDistribution', date] as const,
     activityTags: (date: string) => ['analytics', 'activityTags', date] as const,
+    topWindows: (date: string, limit: number) => ['analytics', 'topWindows', date, limit] as const,
   },
   timeline: {
     sessions: (date: string) => ['timeline', 'sessions', date] as const,
@@ -144,6 +145,14 @@ export function useActivityTags(date: string) {
   return useQuery({
     queryKey: queryKeys.analytics.activityTags(date),
     queryFn: () => api.analytics.getActivityTags(date),
+    staleTime: 60_000,
+  });
+}
+
+export function useTopWindows(date: string, limit: number = 10) {
+  return useQuery({
+    queryKey: queryKeys.analytics.topWindows(date, limit),
+    queryFn: () => api.analytics.getTopWindows(date, limit),
     staleTime: 60_000,
   });
 }

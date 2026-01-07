@@ -165,6 +165,15 @@ type TagUsage struct {
 	Percentage   float64 `json:"percentage"`   // Percentage of total tagged time
 }
 
+// WindowUsage represents usage statistics for a specific window.
+type WindowUsage struct {
+	WindowTitle     string  `json:"windowTitle"`
+	AppName         string  `json:"appName"`
+	DurationSeconds float64 `json:"durationSeconds"`
+	Percentage      float64 `json:"percentage"`
+	FocusCount      int64   `json:"focusCount"`
+}
+
 // GetDailyStats returns statistics for a specific date.
 func (s *AnalyticsService) GetDailyStats(date string) (*DailyStats, error) {
 	// Parse date to get start/end timestamps
@@ -724,4 +733,65 @@ func (s *AnalyticsService) GetActivityTags(date string) ([]*TagUsage, error) {
 	}
 
 	return tags, nil
+}
+
+// GetTopWindows returns the most used windows for a time range, grouped by window title.
+// Windows are ranked by total duration and include the app name, total time, and occurrence count.
+func (s *AnalyticsService) GetTopWindows(start, end int64, limit int) ([]*WindowUsage, error) {
+	// Get all window focus events for the time range
+	focusEvents, err := s.store.GetWindowFocusEventsByTimeRange(start, end)
+	if err != nil {
+		return nil, err
+	}
+
+	// Aggregate durations and counts by window title
+	windowDurations := make(map[string]float64)
+	windowCounts := make(map[string]int64)
+	windowApps := make(map[string]string) // window title -> app name (most recent)
+
+	for _, evt := range focusEvents {
+		// Use window title as key (windows can have different apps theoretically)
+		key := evt.WindowTitle
+		windowDurations[key] += evt.DurationSeconds
+		windowCounts[key]++
+		windowApps[key] = evt.AppName // Keep track of the app (use last seen)
+	}
+
+	// Calculate total duration for percentage calculation
+	var totalDuration float64
+	for _, dur := range windowDurations {
+		totalDuration += dur
+	}
+
+	// Convert to slice
+	var windows []*WindowUsage
+	for windowTitle, duration := range windowDurations {
+		percentage := 0.0
+		if totalDuration > 0 {
+			percentage = (duration / totalDuration) * 100
+		}
+
+		windows = append(windows, &WindowUsage{
+			WindowTitle:     windowTitle,
+			AppName:         windowApps[windowTitle],
+			DurationSeconds: duration,
+			Percentage:      percentage,
+			FocusCount:      windowCounts[windowTitle],
+		})
+	}
+
+	// Sort by duration descending
+	for i := 0; i < len(windows); i++ {
+		for j := i + 1; j < len(windows); j++ {
+			if windows[j].DurationSeconds > windows[i].DurationSeconds {
+				windows[i], windows[j] = windows[j], windows[i]
+			}
+		}
+	}
+
+	// Return top N
+	if limit > 0 && len(windows) > limit {
+		return windows[:limit], nil
+	}
+	return windows, nil
 }
