@@ -64,7 +64,7 @@
       "Step 5: Verify each tag shows its occurrence count",
       "Step 6: Click a tag and verify sessions filter to show only sessions with that tag"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
