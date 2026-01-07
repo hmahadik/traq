@@ -26,6 +26,7 @@ const router = createBrowserRouter([
     element: <AppLayout />,
     children: [
       { index: true, element: <TimelinePage /> },
+      { path: 'timeline', element: <TimelinePage /> },
       { path: 'analytics', element: <AnalyticsPage /> },
       { path: 'reports', element: <ReportsPage /> },
       { path: 'day/:date', element: <DayPage /> },
