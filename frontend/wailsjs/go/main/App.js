@@ -62,6 +62,10 @@ export function GetHourlyActivity(arg1) {
   return window['go']['main']['App']['GetHourlyActivity'](arg1);
 }
 
+export function GetMonthlyStats(arg1, arg2) {
+  return window['go']['main']['App']['GetMonthlyStats'](arg1, arg2);
+}
+
 export function GetProductivityScore(arg1) {
   return window['go']['main']['App']['GetProductivityScore'](arg1);
 }

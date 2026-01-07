@@ -22,6 +22,7 @@ export const queryKeys = {
   analytics: {
     daily: (date: string) => ['analytics', 'daily', date] as const,
     weekly: (startDate: string) => ['analytics', 'weekly', startDate] as const,
+    monthly: (year: number, month: number) => ['analytics', 'monthly', year, month] as const,
     calendar: (year: number, month: number) => ['analytics', 'calendar', year, month] as const,
     appUsage: (start: number, end: number) => ['analytics', 'appUsage', start, end] as const,
     hourly: (date: string) => ['analytics', 'hourly', date] as const,
@@ -71,6 +72,14 @@ export function useWeeklyStats(startDate: string) {
   return useQuery({
     queryKey: queryKeys.analytics.weekly(startDate),
     queryFn: () => api.analytics.getWeeklyStats(startDate),
+    staleTime: 60_000,
+  });
+}
+
+export function useMonthlyStats(year: number, month: number) {
+  return useQuery({
+    queryKey: queryKeys.analytics.monthly(year, month),
+    queryFn: () => api.analytics.getMonthlyStats(year, month),
     staleTime: 60_000,
   });
 }

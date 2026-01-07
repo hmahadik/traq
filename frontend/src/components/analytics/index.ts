@@ -10,3 +10,4 @@ export { ActivityTagsChart } from './ActivityTagsChart';
 export { TimeDistributionChart } from './TimeDistributionChart';
 export { TopWindowsList } from './TopWindowsList';
 export { WeeklyAnalytics } from './WeeklyAnalytics';
+export { MonthlyAnalytics } from './MonthlyAnalytics';

@@ -33,6 +33,8 @@ export function GetFocusDistribution(arg1:string):Promise<Array<service.HourlyFo
 
 export function GetHourlyActivity(arg1:string):Promise<Array<service.HourlyActivity>>;
 
+export function GetMonthlyStats(arg1:number,arg2:number):Promise<service.MonthlyStats>;
+
 export function GetProductivityScore(arg1:string):Promise<service.ProductivityScore>;
 
 export function GetRecentSessions(arg1:number):Promise<Array<storage.Session>>;

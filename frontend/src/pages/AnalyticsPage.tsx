@@ -16,6 +16,7 @@ import {
   TimeDistributionChart,
   TopWindowsList,
   WeeklyAnalytics,
+  MonthlyAnalytics,
 } from '@/components/analytics';
 import {
   useDailyStats,
@@ -27,6 +28,7 @@ import {
   useActivityTags,
   useTopWindows,
   useWeeklyStats,
+  useMonthlyStats,
 } from '@/api/hooks';
 import { Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
 
@@ -69,6 +71,11 @@ export function AnalyticsPage() {
 
   // Week view data
   const { data: weeklyStats, isLoading: weeklyStatsLoading } = useWeeklyStats(weekStartStr);
+
+  // Month view data
+  const year = selectedDate.getFullYear();
+  const month = selectedDate.getMonth() + 1; // JavaScript months are 0-indexed
+  const { data: monthlyStats, isLoading: monthlyStatsLoading } = useMonthlyStats(year, month);
 
   const handlePrevDay = () => {
     setSelectedDate((d) => addDays(d, -1));
@@ -214,9 +221,7 @@ export function AnalyticsPage() {
       )}
 
       {viewMode === 'month' && (
-        <div className="flex items-center justify-center h-64 text-muted-foreground">
-          Month view coming soon
-        </div>
+        <MonthlyAnalytics data={monthlyStats} isLoading={monthlyStatsLoading} />
       )}
     </div>
   );

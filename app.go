@@ -192,6 +192,14 @@ func (a *App) GetWeeklyStats(startDate string) (*service.WeeklyStats, error) {
 	return a.Analytics.GetWeeklyStats(startDate)
 }
 
+// GetMonthlyStats returns statistics for a month.
+func (a *App) GetMonthlyStats(year, month int) (*service.MonthlyStats, error) {
+	if a.Analytics == nil {
+		return nil, nil
+	}
+	return a.Analytics.GetMonthlyStats(year, month)
+}
+
 // GetCalendarHeatmap returns calendar data for a month.
 func (a *App) GetCalendarHeatmap(year, month int) (*service.CalendarData, error) {
 	if a.Analytics == nil {

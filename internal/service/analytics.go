@@ -38,6 +38,27 @@ type WeeklyStats struct {
 	Averages    *DailyStats   `json:"averages"`
 }
 
+// MonthlyStats contains statistics for a month.
+type MonthlyStats struct {
+	Year        int           `json:"year"`
+	Month       int           `json:"month"`
+	StartDate   string        `json:"startDate"`
+	EndDate     string        `json:"endDate"`
+	DailyStats  []*DailyStats `json:"dailyStats"`
+	WeeklyStats []*WeekStats  `json:"weeklyStats"`
+	TotalActive int64         `json:"totalActive"`
+	Averages    *DailyStats   `json:"averages"`
+}
+
+// WeekStats represents summary stats for a single week within a month.
+type WeekStats struct {
+	WeekNumber  int   `json:"weekNumber"`  // 1-5 within the month
+	StartDate   string `json:"startDate"`
+	EndDate     string `json:"endDate"`
+	TotalActive int64  `json:"totalActive"` // Total active minutes for the week
+	ActiveDays  int    `json:"activeDays"`  // Number of days with activity
+}
+
 // AppUsage represents usage statistics for an application.
 type AppUsage struct {
 	AppName         string  `json:"appName"`
@@ -247,6 +268,101 @@ func (s *AnalyticsService) GetWeeklyStats(startDate string) (*WeeklyStats, error
 	stats.TotalActive = totalActive
 
 	return stats, nil
+}
+
+// GetMonthlyStats returns statistics for a month (year and month number).
+func (s *AnalyticsService) GetMonthlyStats(year, month int) (*MonthlyStats, error) {
+	// Get first and last day of month
+	firstDay := time.Date(year, time.Month(month), 1, 0, 0, 0, 0, time.Local)
+	lastDay := firstDay.AddDate(0, 1, -1)
+	daysInMonth := lastDay.Day()
+
+	stats := &MonthlyStats{
+		Year:      year,
+		Month:     month,
+		StartDate: firstDay.Format("2006-01-02"),
+		EndDate:   lastDay.Format("2006-01-02"),
+	}
+
+	// Get daily stats for each day in the month
+	var totalActive int64
+	var totalScreenshots int64
+	var totalSessions int64
+	var activeDays int
+
+	for day := 1; day <= daysInMonth; day++ {
+		date := time.Date(year, time.Month(month), day, 0, 0, 0, 0, time.Local)
+		dayStats, err := s.GetDailyStats(date.Format("2006-01-02"))
+		if err != nil {
+			continue
+		}
+		stats.DailyStats = append(stats.DailyStats, dayStats)
+		totalActive += dayStats.ActiveMinutes
+
+		// Track active days
+		if dayStats.ActiveMinutes > 0 {
+			activeDays++
+		}
+
+		// Aggregate for averages
+		totalScreenshots += dayStats.TotalScreenshots
+		totalSessions += dayStats.TotalSessions
+	}
+
+	stats.TotalActive = totalActive
+
+	// Calculate averages (only for active days)
+	if activeDays > 0 {
+		stats.Averages = &DailyStats{
+			Date:             "average",
+			TotalScreenshots: totalScreenshots / int64(activeDays),
+			TotalSessions:    totalSessions / int64(activeDays),
+			ActiveMinutes:    totalActive / int64(activeDays),
+		}
+	}
+
+	// Calculate weekly breakdown
+	stats.WeeklyStats = s.calculateWeeklyBreakdown(stats.DailyStats, firstDay)
+
+	return stats, nil
+}
+
+// calculateWeeklyBreakdown groups daily stats into weeks within the month.
+func (s *AnalyticsService) calculateWeeklyBreakdown(dailyStats []*DailyStats, monthStart time.Time) []*WeekStats {
+	var weeks []*WeekStats
+	weekNumber := 1
+	var currentWeek *WeekStats
+
+	for i, dayStat := range dailyStats {
+		dayDate, _ := time.Parse("2006-01-02", dayStat.Date)
+		dayOfWeek := int(dayDate.Weekday())
+
+		// Start new week on Sunday or first day of month
+		if currentWeek == nil || (dayOfWeek == 0 && i > 0) {
+			if currentWeek != nil {
+				weeks = append(weeks, currentWeek)
+				weekNumber++
+			}
+			currentWeek = &WeekStats{
+				WeekNumber: weekNumber,
+				StartDate:  dayStat.Date,
+			}
+		}
+
+		// Add to current week
+		currentWeek.EndDate = dayStat.Date
+		currentWeek.TotalActive += dayStat.ActiveMinutes
+		if dayStat.ActiveMinutes > 0 {
+			currentWeek.ActiveDays++
+		}
+	}
+
+	// Add final week
+	if currentWeek != nil {
+		weeks = append(weeks, currentWeek)
+	}
+
+	return weeks
 }
 
 // GetCalendarHeatmap returns calendar data for a month.

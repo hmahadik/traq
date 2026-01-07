@@ -170,7 +170,7 @@
       "Step 5: Verify monthly trends chart appears",
       "Step 6: Verify week-over-week comparisons are shown"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",

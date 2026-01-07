@@ -27,6 +27,10 @@ export const analytics = {
     return App.GetWeeklyStats(startDate);
   },
 
+  getMonthlyStats: async (year: number, month: number) => {
+    return App.GetMonthlyStats(year, month);
+  },
+
   getCalendarHeatmap: async (year: number, month: number) => {
     return App.GetCalendarHeatmap(year, month);
   },

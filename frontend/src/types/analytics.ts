@@ -18,6 +18,25 @@ export interface WeeklyStats {
   averages: DailyStats | null;
 }
 
+export interface MonthlyStats {
+  year: number;
+  month: number;
+  startDate: string;
+  endDate: string;
+  dailyStats: DailyStats[];
+  weeklyStats: WeekStats[];
+  totalActive: number;
+  averages: DailyStats | null;
+}
+
+export interface WeekStats {
+  weekNumber: number;
+  startDate: string;
+  endDate: string;
+  totalActive: number;
+  activeDays: number;
+}
+
 export interface AppUsage {
   appName: string;
   durationSeconds: number;
