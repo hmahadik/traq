@@ -46,6 +46,8 @@ export function ActivityChart({ data, isLoading }: ActivityChartProps) {
     label: `${d.hour.toString().padStart(2, '0')}:00`,
   }));
 
+  const hasData = chartData && chartData.some(d => d.activeMinutes > 0);
+
   return (
     <Card>
       <CardHeader>
@@ -60,6 +62,12 @@ export function ActivityChart({ data, isLoading }: ActivityChartProps) {
         </div>
       </CardHeader>
       <CardContent>
+        {!hasData ? (
+          <div className="flex flex-col items-center justify-center h-[300px] text-muted-foreground">
+            <p className="text-sm">No activity data for this period</p>
+            <p className="text-xs mt-1">Activity will appear here as you work</p>
+          </div>
+        ) : (
         <ResponsiveContainer width="100%" height={300}>
           {chartType === 'bar' ? (
             <BarChart data={chartData}>
@@ -142,6 +150,7 @@ export function ActivityChart({ data, isLoading }: ActivityChartProps) {
             </AreaChart>
           )}
         </ResponsiveContainer>
+        )}
       </CardContent>
     </Card>
   );
