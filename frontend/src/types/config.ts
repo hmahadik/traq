@@ -76,7 +76,7 @@ export interface BrowserConfig {
 }
 
 export interface UIConfig {
-  theme: 'light' | 'dark' | 'system';
+  theme: 'dark' | 'light' | 'system';
   startMinimized: boolean;
   showNotifications: boolean;
 }
