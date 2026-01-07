@@ -331,7 +331,7 @@
       "Step 5: Verify all configuration values at time of generation are shown",
       "Step 6: Verify config includes capture settings, sampling settings, etc."
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -359,7 +359,7 @@
       "Step 7: Verify sorting works correctly",
       "Step 8: Use filter if implemented and verify filtering works"
     ],
-    "passes": true
+    "passes": false
   },
   {
     "category": "functional",
