@@ -3,7 +3,7 @@
     "category": "functional",
     "description": "NEW: Timeline page loads real session thumbnails via API instead of mock data",
     "steps": [
-      "Step 1: Navigate to http://localhost:34115/timeline",
+      "Step 1: Navigate to http://localhost:34115/",
       "Step 2: Verify timeline page loads without errors",
       "Step 3: Select a date with existing sessions",
       "Step 4: Verify session cards display real screenshots from GetScreenshotsForSession API",
@@ -16,7 +16,7 @@
     "category": "functional",
     "description": "NEW: Day page loads real hour-by-hour screenshots via API instead of mock data",
     "steps": [
-      "Step 1: Navigate to http://localhost:34115/day",
+      "Step 1: Navigate to http://localhost:34115",
       "Step 2: Verify day page loads without errors",
       "Step 3: Select a date with existing screenshots",
       "Step 4: Verify hour groups display real screenshots from GetScreenshotsForHour API",
@@ -29,7 +29,7 @@
     "category": "functional",
     "description": "NEW: Timeline page displays stats sidebar with hours worked, day span, breaks, and longest focus",
     "steps": [
-      "Step 1: Navigate to http://localhost:34115/timeline",
+      "Step 1: Navigate to http://localhost:34115",
       "Step 2: Select a date with session data",
       "Step 3: Verify stats sidebar appears with hours worked metric",
       "Step 4: Verify day span shows start time - end time",
@@ -43,7 +43,7 @@
     "category": "functional",
     "description": "NEW: Timeline page displays visual timeline with 4 horizontal bands (sessions, screenshots, activity, summaries)",
     "steps": [
-      "Step 1: Navigate to http://localhost:34115/timeline",
+      "Step 1: Navigate to http://localhost:34115",
       "Step 2: Select a date with session data",
       "Step 3: Verify timeline bands component appears above session cards",
       "Step 4: Verify sessions row shows color-coded blocks for each session",
@@ -57,7 +57,7 @@
     "category": "functional",
     "description": "NEW: Timeline page displays tags sidebar with session tags and counts",
     "steps": [
-      "Step 1: Navigate to http://localhost:34115/timeline",
+      "Step 1: Navigate to http://localhost:34115",
       "Step 2: Select a date with sessions that have summaries/tags",
       "Step 3: Verify tags sidebar appears",
       "Step 4: Verify tags list shows all tags from the day's sessions",
@@ -70,7 +70,7 @@
     "category": "functional",
     "description": "NEW: Timeline page supports time period filtering (morning, afternoon, evening, specific apps)",
     "steps": [
-      "Step 1: Navigate to http://localhost:34115/timeline",
+      "Step 1: Navigate to http://localhost:34115",
       "Step 2: Select a date with sessions across different times of day",
       "Step 3: Click 'Morning' filter button",
       "Step 4: Verify only morning sessions (before 12pm) are displayed",
@@ -86,7 +86,7 @@
     "category": "functional",
     "description": "NEW: Analytics page displays productivity score with 1-5 rating and breakdown",
     "steps": [
-      "Step 1: Navigate to http://localhost:34115/analytics",
+      "Step 1: Navigate to http://localhost:34115 then go to the analytics page",
       "Step 2: Select Day view for a date with activity",
       "Step 3: Verify productivity score card displays",
       "Step 4: Verify score shows 1-5 rating with visual indicator",
@@ -99,7 +99,7 @@
     "category": "functional",
     "description": "NEW: Analytics page displays focus distribution chart showing hourly focus patterns",
     "steps": [
-      "Step 1: Navigate to http://localhost:34115/analytics",
+      "Step 1: Navigate to http://localhost:34115 then go to the analytics page",
       "Step 2: Select Day view",
       "Step 3: Verify focus distribution chart appears",
       "Step 4: Verify chart shows horizontal bars for hourly focus quality",
@@ -112,7 +112,7 @@
     "category": "functional",
     "description": "NEW: Analytics page displays activity tags horizontal bar chart",
     "steps": [
-      "Step 1: Navigate to http://localhost:34115/analytics",
+      "Step 1: Navigate to http://localhost:34115 then go to the analytics page",
       "Step 2: Select Day view for a date with tagged sessions",
       "Step 3: Verify activity tags chart appears",
       "Step 4: Verify chart shows top tags with durations as horizontal bars",
@@ -124,7 +124,7 @@
     "category": "functional",
     "description": "NEW: Analytics page displays time distribution pie chart showing app usage percentages",
     "steps": [
-      "Step 1: Navigate to http://localhost:34115/analytics",
+      "Step 1: Navigate to http://localhost:34115 then go to the analytics page",
       "Step 2: Select Day view",
       "Step 3: Verify time distribution pie chart appears",
       "Step 4: Verify pie chart shows app usage as percentages",
@@ -137,7 +137,7 @@
     "category": "functional",
     "description": "NEW: Analytics page displays top windows list with app badges and time spent",
     "steps": [
-      "Step 1: Navigate to http://localhost:34115/analytics",
+      "Step 1: Navigate to http://localhost:34115 then go to the analytics page",
       "Step 2: Select Day view",
       "Step 3: Verify top windows list appears",
       "Step 4: Verify each window shows app badge (colored), window title, time spent",
@@ -149,7 +149,7 @@
     "category": "functional",
     "description": "NEW: Analytics page supports Week view with weekly statistics and daily activity chart",
     "steps": [
-      "Step 1: Navigate to http://localhost:34115/analytics",
+      "Step 1: Navigate to http://localhost:34115 then go to the analytics page",
       "Step 2: Click 'Week' view toggle",
       "Step 3: Verify page switches to weekly view",
       "Step 4: Verify weekly metrics display (Total Active Time, Avg Daily Hours, Total Break Time, etc.)",
@@ -163,7 +163,7 @@
     "category": "functional",
     "description": "NEW: Analytics page supports Month view with monthly trends and statistics",
     "steps": [
-      "Step 1: Navigate to http://localhost:34115/analytics",
+      "Step 1: Navigate to http://localhost:34115 then go to the analytics page",
       "Step 2: Click 'Month' view toggle",
       "Step 3: Verify page switches to monthly view",
       "Step 4: Verify monthly metrics display",
@@ -176,7 +176,7 @@
     "category": "functional",
     "description": "NEW: Analytics page can export analytics as PDF or CSV",
     "steps": [
-      "Step 1: Navigate to http://localhost:34115/analytics",
+      "Step 1: Navigate to http://localhost:34115 then go to the analytics page",
       "Step 2: Select Day view with data",
       "Step 3: Click Export button",
       "Step 4: Select PDF format",
@@ -191,7 +191,7 @@
     "category": "functional",
     "description": "NEW: Analytics page has regenerate button to force recalculation",
     "steps": [
-      "Step 1: Navigate to http://localhost:34115/analytics",
+      "Step 1: Navigate to http://localhost:34115 then go to the analytics page",
       "Step 2: Select Day view",
       "Step 3: Click Regenerate Analytics button",
       "Step 4: Verify loading state appears during recalculation",
@@ -229,7 +229,7 @@
     "category": "functional",
     "description": "NEW: Reports page displays daily summaries auto-list showing auto-generated summaries for each day",
     "steps": [
-      "Step 1: Navigate to http://localhost:34115/reports",
+      "Step 1: Navigate to http://localhost:34115 then go to the reports page",
       "Step 2: Verify Daily Summaries section appears",
       "Step 3: Verify chronological list of auto-generated daily summaries displays",
       "Step 4: Verify each summary shows date, summary preview, total time",
@@ -242,7 +242,7 @@
     "category": "functional",
     "description": "NEW: Session detail page has Back to Timeline link in header",
     "steps": [
-      "Step 1: Navigate to http://localhost:34115/timeline",
+      "Step 1: Navigate to http://localhost:34115",
       "Step 2: Click on a session card to open session detail",
       "Step 3: Verify session detail page opens",
       "Step 4: Verify 'Back to Timeline' link appears in header",
@@ -380,7 +380,7 @@
     "category": "style",
     "description": "NEW: Timeline page visual timeline matches v1 reference design with 4 distinct bands",
     "steps": [
-      "Step 1: Navigate to http://localhost:34115/timeline",
+      "Step 1: Navigate to http://localhost:34115",
       "Step 2: Take screenshot of timeline page",
       "Step 3: Compare with v1 reference at http://localhost:55555",
       "Step 4: Verify 4 horizontal bands are clearly visible and distinct",
@@ -394,7 +394,7 @@
     "category": "style",
     "description": "NEW: Analytics page charts match v1 visual design and layout",
     "steps": [
-      "Step 1: Navigate to http://localhost:34115/analytics",
+      "Step 1: Navigate to http://localhost:34115 then go to the analytics page",
       "Step 2: Take screenshot of analytics page",
       "Step 3: Compare with v1 reference at http://localhost:55555",
       "Step 4: Verify all 5 new charts (productivity score, focus distribution, tags, time distribution pie, top windows) have consistent styling",

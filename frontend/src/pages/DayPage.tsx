@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useSessionsForDate, useScreenshotsForHour } from '@/api/hooks';
-import { formatDate, addDays, toDateString } from '@/lib/utils';
+import { formatDate, addDays, toDateString, parseDateString } from '@/lib/utils';
 import { useKeyboardNav } from '@/hooks/useKeyboardNav';
 import { DatePicker } from '@/components/common/DatePicker';
 import { HourGroupWithScreenshots, HourGroupSkeleton } from '@/components/timeline';
@@ -14,7 +14,7 @@ export function DayPage() {
   const { date } = useParams<{ date: string }>();
   const navigate = useNavigate();
 
-  const currentDate = date ? new Date(date) : new Date();
+  const currentDate = date ? parseDateString(date) : new Date();
   const dateString = toDateString(currentDate);
 
   const { data: sessions, isLoading } = useSessionsForDate(dateString);
