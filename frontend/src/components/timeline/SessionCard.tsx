@@ -134,8 +134,8 @@ export function SessionCard({
               </div>
             ))}
             {remainingCount > 0 && (
-              <div className="flex-shrink-0 w-20 h-[45px] rounded bg-muted flex items-center justify-center">
-                <span className="text-sm text-muted-foreground">+{remainingCount}</span>
+              <div className="flex-shrink-0 w-20 h-[45px] rounded bg-primary/10 flex items-center justify-center border border-primary/20">
+                <span className="text-sm font-medium text-primary">+{remainingCount}</span>
               </div>
             )}
           </div>
