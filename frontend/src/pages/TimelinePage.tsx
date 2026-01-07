@@ -1,7 +1,7 @@
 import { useState, useCallback, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { SessionCardWithThumbnails, SessionCardSkeleton, CalendarWidget, TimelineStats, TimelineBands } from '@/components/timeline';
+import { SessionCardWithThumbnails, SessionCardSkeleton, CalendarWidget, TimelineStats, TimelineBands, TimelineTags } from '@/components/timeline';
 import {
   useSessionsForDate,
   useCalendarHeatmap,
@@ -25,6 +25,7 @@ export function TimelinePage() {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [selectedSessionId, setSelectedSessionId] = useState<number | null>(null);
   const [showCalendar, setShowCalendar] = useState(true);
+  const [selectedTag, setSelectedTag] = useState<string | null>(null);
 
   const dateStr = getDateString(selectedDate);
   const isToday = dateStr === getDateString(new Date());
@@ -35,6 +36,14 @@ export function TimelinePage() {
     selectedDate.getMonth() + 1
   );
   const generateSummary = useGenerateSummary();
+
+  // Filter sessions by selected tag
+  const filteredSessions = useMemo(() => {
+    if (!sessions || !selectedTag) return sessions;
+    return sessions.filter(session =>
+      session.tags?.includes(selectedTag)
+    );
+  }, [sessions, selectedTag]);
 
   // Navigation handlers
   const goToPreviousDay = useCallback(() => {
@@ -49,13 +58,13 @@ export function TimelinePage() {
     }
   }, [isToday]);
 
-  // List navigation for sessions
-  const sessionIds = useMemo(() => sessions?.map((s) => s.id) || [], [sessions]);
+  // List navigation for filtered sessions
+  const sessionIds = useMemo(() => filteredSessions?.map((s) => s.id) || [], [filteredSessions]);
   const { selectedIndex, setSelectedIndex } = useListNav({
     itemCount: sessionIds.length,
     onSelect: (index: number) => {
-      if (sessions?.[index]) {
-        setSelectedSessionId(sessions[index].id);
+      if (filteredSessions?.[index]) {
+        setSelectedSessionId(filteredSessions[index].id);
       }
     },
   });
@@ -75,6 +84,13 @@ export function TimelinePage() {
   const handleDateSelect = useCallback((date: Date) => {
     setSelectedDate(date);
     setSelectedSessionId(null);
+    setSelectedTag(null); // Clear tag filter on date change
+  }, []);
+
+  const handleTagClick = useCallback((tag: string) => {
+    // Toggle tag selection
+    setSelectedTag(currentTag => currentTag === tag ? null : tag);
+    setSelectedSessionId(null); // Clear session selection
   }, []);
 
   const formattedDate = selectedDate.toLocaleDateString('en-US', {
@@ -88,11 +104,17 @@ export function TimelinePage() {
     <div className="flex gap-6 h-[calc(100vh-8rem)]">
       {/* Stats Sidebar */}
       <div className="hidden xl:block w-72 flex-shrink-0">
-        <div className="sticky top-0">
+        <div className="sticky top-0 space-y-4">
           <TimelineStats
             sessions={sessions}
             isLoading={sessionsLoading}
             date={selectedDate}
+          />
+          <TimelineTags
+            sessions={sessions}
+            isLoading={sessionsLoading}
+            selectedTag={selectedTag}
+            onTagClick={handleTagClick}
           />
         </div>
       </div>
@@ -146,6 +168,22 @@ export function TimelinePage() {
           />
         )}
 
+        {/* Tag Filter Indicator */}
+        {selectedTag && (
+          <div className="mb-4 flex items-center gap-2 text-sm">
+            <span className="text-muted-foreground">Filtering by tag:</span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setSelectedTag(null)}
+              className="h-7"
+            >
+              {selectedTag}
+              <span className="ml-2">×</span>
+            </Button>
+          </div>
+        )}
+
         {/* Sessions List */}
         <ScrollArea className="flex-1 -mr-4 pr-4">
           <div className="space-y-4">
@@ -153,18 +191,24 @@ export function TimelinePage() {
               Array.from({ length: 4 }).map((_, i) => (
                 <SessionCardSkeleton key={i} />
               ))
-            ) : !sessions || sessions.length === 0 ? (
+            ) : !filteredSessions || filteredSessions.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
                 <List className="h-12 w-12 mb-4 opacity-50" />
-                <p className="text-lg font-medium">No sessions recorded</p>
+                <p className="text-lg font-medium">
+                  {selectedTag ? 'No sessions with this tag' : 'No sessions recorded'}
+                </p>
                 <p className="text-sm mt-1">
-                  {isToday
-                    ? 'Sessions will appear here as you work'
-                    : `No activity recorded on ${formatDate(selectedDate.getTime() / 1000)}`}
+                  {selectedTag ? (
+                    <>Click the tag filter above to see all sessions</>
+                  ) : isToday ? (
+                    'Sessions will appear here as you work'
+                  ) : (
+                    `No activity recorded on ${formatDate(selectedDate.getTime() / 1000)}`
+                  )}
                 </p>
               </div>
             ) : (
-              sessions.map((session, index) => (
+              filteredSessions.map((session, index) => (
                 <SessionCardWithThumbnails
                   key={session.id}
                   session={session}
@@ -181,7 +225,7 @@ export function TimelinePage() {
         </ScrollArea>
 
         {/* Keyboard Navigation Hint */}
-        {sessions && sessions.length > 0 && (
+        {filteredSessions && filteredSessions.length > 0 && (
           <div className="mt-4 pt-4 border-t text-xs text-muted-foreground text-center">
             Use <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono">↑</kbd>{' '}
             <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono">↓</kbd> or{' '}

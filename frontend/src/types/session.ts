@@ -11,7 +11,16 @@ export interface Session {
 }
 
 export interface SessionSummary extends Session {
-  summary: Summary | null;
+  isOngoing: boolean;
+  summary: string;
+  explanation: string;
+  confidence: string;
+  tags: string[];
+  topApps: string[];
+  hasShell: boolean;
+  hasGit: boolean;
+  hasFiles: boolean;
+  hasBrowser: boolean;
 }
 
 export interface WindowFocusEvent {

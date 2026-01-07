@@ -5,3 +5,4 @@ export { SessionCardWithThumbnails } from './SessionCardWithThumbnails';
 export { CalendarWidget } from './CalendarWidget';
 export { TimelineStats } from './TimelineStats';
 export { TimelineBands } from './TimelineBands';
+export { TimelineTags } from './TimelineTags';
