@@ -197,7 +197,7 @@
       "Step 4: Verify loading state appears during recalculation",
       "Step 5: Verify analytics data refreshes after recalculation"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { DatePicker } from '@/components/common/DatePicker';
@@ -29,8 +30,9 @@ import {
   useTopWindows,
   useWeeklyStats,
   useMonthlyStats,
+  queryKeys,
 } from '@/api/hooks';
-import { Calendar, ChevronLeft, ChevronRight, Download } from 'lucide-react';
+import { Calendar, ChevronLeft, ChevronRight, Download, RefreshCw } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -61,8 +63,10 @@ function getWeekStart(date: Date): Date {
 
 export function AnalyticsPage() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [viewMode, setViewMode] = useState<ViewMode>('day');
   const [selectedDate, setSelectedDate] = useState(new Date());
+  const [isRegenerating, setIsRegenerating] = useState(false);
   const dateStr = getDateString(selectedDate);
   const weekStartStr = getDateString(getWeekStart(selectedDate));
   const isToday = dateStr === getDateString(new Date());
@@ -129,6 +133,34 @@ export function AnalyticsPage() {
     }
   };
 
+  const handleRegenerate = async () => {
+    setIsRegenerating(true);
+    try {
+      // Invalidate all analytics queries for the current view
+      if (viewMode === 'day') {
+        await queryClient.invalidateQueries({ queryKey: queryKeys.analytics.daily(dateStr) });
+        await queryClient.invalidateQueries({ queryKey: queryKeys.analytics.hourly(dateStr) });
+        await queryClient.invalidateQueries({ queryKey: queryKeys.analytics.appUsage(0, 0) });
+        await queryClient.invalidateQueries({ queryKey: queryKeys.analytics.productivityScore(dateStr) });
+        await queryClient.invalidateQueries({ queryKey: queryKeys.analytics.focusDistribution(dateStr) });
+        await queryClient.invalidateQueries({ queryKey: queryKeys.analytics.activityTags(dateStr) });
+        await queryClient.invalidateQueries({ queryKey: queryKeys.analytics.topWindows(dateStr, 10) });
+        await queryClient.invalidateQueries({ queryKey: queryKeys.analytics.dataSources(0, 0) });
+      } else if (viewMode === 'week') {
+        await queryClient.invalidateQueries({ queryKey: queryKeys.analytics.weekly(weekStartStr) });
+      } else if (viewMode === 'month') {
+        await queryClient.invalidateQueries({ queryKey: queryKeys.analytics.monthly(year, month) });
+      }
+
+      toast.success('Analytics regenerated successfully');
+    } catch (error) {
+      console.error('Regenerate failed:', error);
+      toast.error('Failed to regenerate analytics');
+    } finally {
+      setIsRegenerating(false);
+    }
+  };
+
   const formattedDate = selectedDate.toLocaleDateString('en-US', {
     weekday: 'long',
     year: 'numeric',
@@ -185,6 +217,18 @@ export function AnalyticsPage() {
               Today
             </Button>
           )}
+
+          {/* Regenerate Button */}
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-2"
+            onClick={handleRegenerate}
+            disabled={isRegenerating}
+          >
+            <RefreshCw className={`h-4 w-4 ${isRegenerating ? 'animate-spin' : ''}`} />
+            {isRegenerating ? 'Regenerating...' : 'Regenerate'}
+          </Button>
 
           {/* Export Button */}
           <DropdownMenu>
