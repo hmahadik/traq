@@ -15,6 +15,7 @@ import {
   ActivityTagsChart,
   TimeDistributionChart,
   TopWindowsList,
+  WeeklyAnalytics,
 } from '@/components/analytics';
 import {
   useDailyStats,
@@ -25,8 +26,11 @@ import {
   useFocusDistribution,
   useActivityTags,
   useTopWindows,
+  useWeeklyStats,
 } from '@/api/hooks';
 import { Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
+
+type ViewMode = 'day' | 'week' | 'month';
 
 function getDateString(date: Date): string {
   return date.toISOString().split('T')[0];
@@ -38,12 +42,22 @@ function addDays(date: Date, days: number): Date {
   return result;
 }
 
+function getWeekStart(date: Date): Date {
+  const result = new Date(date);
+  const day = result.getDay();
+  const diff = result.getDate() - day; // Sunday is 0
+  return new Date(result.setDate(diff));
+}
+
 export function AnalyticsPage() {
   const navigate = useNavigate();
+  const [viewMode, setViewMode] = useState<ViewMode>('day');
   const [selectedDate, setSelectedDate] = useState(new Date());
   const dateStr = getDateString(selectedDate);
+  const weekStartStr = getDateString(getWeekStart(selectedDate));
   const isToday = dateStr === getDateString(new Date());
 
+  // Day view data
   const { data: stats, isLoading: statsLoading } = useDailyStats(dateStr);
   const { data: hourlyActivity, isLoading: hourlyLoading } = useHourlyActivity(dateStr);
   const { data: appUsage, isLoading: appUsageLoading } = useAppUsage(dateStr);
@@ -52,6 +66,9 @@ export function AnalyticsPage() {
   const { data: focusDistribution, isLoading: focusLoading } = useFocusDistribution(dateStr);
   const { data: activityTags, isLoading: tagsLoading } = useActivityTags(dateStr);
   const { data: topWindows, isLoading: windowsLoading } = useTopWindows(dateStr, 10);
+
+  // Week view data
+  const { data: weeklyStats, isLoading: weeklyStatsLoading } = useWeeklyStats(weekStartStr);
 
   const handlePrevDay = () => {
     setSelectedDate((d) => addDays(d, -1));
@@ -82,13 +99,23 @@ export function AnalyticsPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header with date navigation */}
+      {/* Header with view toggle and date navigation */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Analytics</h1>
           <p className="text-muted-foreground">{formattedDate}</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* View Mode Toggle */}
+          <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as ViewMode)}>
+            <TabsList className="h-9">
+              <TabsTrigger value="day" className="text-xs px-3">Day</TabsTrigger>
+              <TabsTrigger value="week" className="text-xs px-3">Week</TabsTrigger>
+              <TabsTrigger value="month" className="text-xs px-3">Month</TabsTrigger>
+            </TabsList>
+          </Tabs>
+
+          {/* Date Navigation */}
           <Button variant="outline" size="icon" onClick={handlePrevDay}>
             <ChevronLeft className="h-4 w-4" />
           </Button>
@@ -122,60 +149,75 @@ export function AnalyticsPage() {
         </div>
       </div>
 
-      {/* Stats Grid */}
-      <StatsGrid stats={stats} isLoading={statsLoading} />
+      {/* Conditional content based on view mode */}
+      {viewMode === 'day' && (
+        <>
+          {/* Stats Grid */}
+          <StatsGrid stats={stats} isLoading={statsLoading} />
 
-      {/* Productivity Score */}
-      <div className="grid gap-4 md:grid-cols-2">
-        <ProductivityScoreCard score={productivityScore} isLoading={productivityLoading} />
-      </div>
-
-      {/* Main Content Tabs */}
-      <Tabs defaultValue="activity" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="activity">Activity</TabsTrigger>
-          <TabsTrigger value="apps">Applications</TabsTrigger>
-          <TabsTrigger value="sources">Data Sources</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="activity" className="space-y-4">
-          <div className="grid gap-4 lg:grid-cols-2">
-            <ActivityChart data={hourlyActivity} isLoading={hourlyLoading} />
-            <HeatmapChart data={undefined} isLoading={hourlyLoading} />
+          {/* Productivity Score */}
+          <div className="grid gap-4 md:grid-cols-2">
+            <ProductivityScoreCard score={productivityScore} isLoading={productivityLoading} />
           </div>
-          <div className="grid gap-4 lg:grid-cols-2">
-            <FocusDistributionChart data={focusDistribution} isLoading={focusLoading} />
-            <ActivityTagsChart data={activityTags} isLoading={tagsLoading} />
-          </div>
-        </TabsContent>
 
-        <TabsContent value="apps" className="space-y-4">
-          <div className="grid gap-4 lg:grid-cols-2">
-            <AppUsageChart data={appUsage} isLoading={appUsageLoading} />
-            <TimeDistributionChart
-              data={appUsage}
-              isLoading={appUsageLoading}
-              onAppClick={handleAppClick}
-            />
-          </div>
-          <div className="grid gap-4 lg:grid-cols-2">
-            <AppUsageTable
-              data={appUsage}
-              isLoading={appUsageLoading}
-              onAppClick={handleAppClick}
-            />
-            <TopWindowsList
-              data={topWindows}
-              isLoading={windowsLoading}
-              onWindowClick={handleWindowClick}
-            />
-          </div>
-        </TabsContent>
+          {/* Main Content Tabs */}
+          <Tabs defaultValue="activity" className="space-y-4">
+            <TabsList>
+              <TabsTrigger value="activity">Activity</TabsTrigger>
+              <TabsTrigger value="apps">Applications</TabsTrigger>
+              <TabsTrigger value="sources">Data Sources</TabsTrigger>
+            </TabsList>
 
-        <TabsContent value="sources" className="space-y-4">
-          <DataSourcesPanel data={dataSourceStats} isLoading={dataSourcesLoading} />
-        </TabsContent>
-      </Tabs>
+            <TabsContent value="activity" className="space-y-4">
+              <div className="grid gap-4 lg:grid-cols-2">
+                <ActivityChart data={hourlyActivity} isLoading={hourlyLoading} />
+                <HeatmapChart data={undefined} isLoading={hourlyLoading} />
+              </div>
+              <div className="grid gap-4 lg:grid-cols-2">
+                <FocusDistributionChart data={focusDistribution} isLoading={focusLoading} />
+                <ActivityTagsChart data={activityTags} isLoading={tagsLoading} />
+              </div>
+            </TabsContent>
+
+            <TabsContent value="apps" className="space-y-4">
+              <div className="grid gap-4 lg:grid-cols-2">
+                <AppUsageChart data={appUsage} isLoading={appUsageLoading} />
+                <TimeDistributionChart
+                  data={appUsage}
+                  isLoading={appUsageLoading}
+                  onAppClick={handleAppClick}
+                />
+              </div>
+              <div className="grid gap-4 lg:grid-cols-2">
+                <AppUsageTable
+                  data={appUsage}
+                  isLoading={appUsageLoading}
+                  onAppClick={handleAppClick}
+                />
+                <TopWindowsList
+                  data={topWindows}
+                  isLoading={windowsLoading}
+                  onWindowClick={handleWindowClick}
+                />
+              </div>
+            </TabsContent>
+
+            <TabsContent value="sources" className="space-y-4">
+              <DataSourcesPanel data={dataSourceStats} isLoading={dataSourcesLoading} />
+            </TabsContent>
+          </Tabs>
+        </>
+      )}
+
+      {viewMode === 'week' && (
+        <WeeklyAnalytics data={weeklyStats} isLoading={weeklyStatsLoading} />
+      )}
+
+      {viewMode === 'month' && (
+        <div className="flex items-center justify-center h-64 text-muted-foreground">
+          Month view coming soon
+        </div>
+      )}
     </div>
   );
 }

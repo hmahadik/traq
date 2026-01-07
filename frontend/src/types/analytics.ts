@@ -13,11 +13,9 @@ export interface DailyStats {
 export interface WeeklyStats {
   startDate: string;
   endDate: string;
-  totalScreenshots: number;
-  totalSessions: number;
-  totalActiveMinutes: number;
-  dailyBreakdown: DailyStats[];
-  topApps: AppUsage[];
+  dailyStats: DailyStats[];
+  totalActive: number;
+  averages: DailyStats | null;
 }
 
 export interface AppUsage {
