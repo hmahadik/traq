@@ -1,7 +1,7 @@
 import { useState, useCallback, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { SessionCardWithThumbnails, SessionCardSkeleton, CalendarWidget, TimelineStats } from '@/components/timeline';
+import { SessionCardWithThumbnails, SessionCardSkeleton, CalendarWidget, TimelineStats, TimelineBands } from '@/components/timeline';
 import {
   useSessionsForDate,
   useCalendarHeatmap,
@@ -136,6 +136,15 @@ export function TimelinePage() {
             </Button>
           </div>
         </div>
+
+        {/* Timeline Bands Visualization */}
+        {sessions && sessions.length > 0 && (
+          <TimelineBands
+            sessions={sessions}
+            date={selectedDate}
+            onSessionClick={handleSessionSelect}
+          />
+        )}
 
         {/* Sessions List */}
         <ScrollArea className="flex-1 -mr-4 pr-4">

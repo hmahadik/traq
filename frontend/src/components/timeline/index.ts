@@ -4,3 +4,4 @@ export { SessionCard, SessionCardSkeleton } from './SessionCard';
 export { SessionCardWithThumbnails } from './SessionCardWithThumbnails';
 export { CalendarWidget } from './CalendarWidget';
 export { TimelineStats } from './TimelineStats';
+export { TimelineBands } from './TimelineBands';
