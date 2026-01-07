@@ -14,7 +14,7 @@ interface TimelineBandsProps {
 }
 
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
-const BAND_HEIGHT = 40;
+const BAND_HEIGHT = 50; // Increased from 40 for better visibility (matches v1)
 const HOUR_WIDTH = 60; // pixels per hour
 
 function getTimePosition(timestamp: number, dayStart: number): number {
@@ -31,13 +31,14 @@ function getSessionWidth(session: Session, dayStart: number): number {
 }
 
 function getSessionColor(index: number): string {
+  // More vibrant colors to match v1 design
   const colors = [
-    'bg-green-500',
-    'bg-blue-500',
-    'bg-purple-500',
-    'bg-pink-500',
-    'bg-yellow-500',
-    'bg-orange-500',
+    'bg-green-600',
+    'bg-blue-600',
+    'bg-purple-600',
+    'bg-pink-600',
+    'bg-yellow-500', // Keep yellow at 500 for visibility
+    'bg-orange-600',
   ];
   return colors[index % colors.length];
 }
@@ -85,7 +86,7 @@ export function TimelineBands({
 
   return (
     <Card className="p-6 mb-6">
-      <div className="space-y-2 overflow-hidden">
+      <div className="space-y-3 overflow-hidden">{/* Increased spacing from 2 to 3 */}
         {/* Time axis labels */}
         <div className="flex">
           <div style={{ width: LABEL_WIDTH }} className="flex-shrink-0" />
@@ -109,7 +110,7 @@ export function TimelineBands({
             Sessions
           </div>
           <div className="flex-1 relative overflow-hidden" style={{ height: BAND_HEIGHT }}>
-            <div className="absolute inset-0 bg-muted/20 rounded overflow-hidden">
+            <div className="absolute inset-0 bg-muted/30 rounded border border-border/30 overflow-hidden">{/* Enhanced background and added border */}
               <TimeRangeOverlay />
               <TooltipProvider>
                 {sessions.map((session, index) => {
@@ -162,7 +163,7 @@ export function TimelineBands({
             Screenshots
           </div>
           <div className="flex-1 relative" style={{ height: BAND_HEIGHT }}>
-            <div className="absolute inset-0 bg-muted/20 rounded overflow-hidden">
+            <div className="absolute inset-0 bg-muted/30 rounded border border-border/30 overflow-hidden">{/* Enhanced background and added border */}
               <TimeRangeOverlay />
               {dayScreenshots.map((screenshot) => {
                 const left = getTimePosition(screenshot.timestamp, dayStart);
@@ -171,7 +172,7 @@ export function TimelineBands({
                 return (
                   <div
                     key={screenshot.id}
-                    className="absolute bg-slate-400 hover:bg-slate-300 cursor-pointer transition-colors"
+                    className="absolute bg-slate-500 hover:bg-slate-400 cursor-pointer transition-colors"
                     style={{
                       left: `${left}%`,
                       width: `${width}%`,
@@ -196,7 +197,7 @@ export function TimelineBands({
             Activity
           </div>
           <div className="flex-1 relative overflow-hidden" style={{ height: BAND_HEIGHT }}>
-            <div className="absolute inset-0 bg-muted/20 rounded overflow-hidden">
+            <div className="absolute inset-0 bg-muted/30 rounded border border-border/30 overflow-hidden">{/* Enhanced background and added border */}
               <TimeRangeOverlay />
               {/* For now, we'll show sessions with different colors to represent activity */}
               {sessions.map((session, index) => {
@@ -204,10 +205,11 @@ export function TimelineBands({
                 const width = getSessionWidth(session, dayStart);
 
                 // Alternate between productive (green), neutral (gray), and distracting (red)
+                // More vibrant colors to match v1
                 const activityColors = [
-                  'bg-green-400', // Productive/focus
-                  'bg-gray-400',  // Neutral
-                  'bg-red-400',   // Distracting
+                  'bg-green-500', // Productive/focus
+                  'bg-gray-500',  // Neutral
+                  'bg-red-500',   // Distracting
                 ];
                 const color = activityColors[index % 3];
 
@@ -237,7 +239,7 @@ export function TimelineBands({
             Summaries
           </div>
           <div className="flex-1 relative overflow-hidden" style={{ height: BAND_HEIGHT }}>
-            <div className="absolute inset-0 bg-muted/20 rounded overflow-hidden">
+            <div className="absolute inset-0 bg-muted/30 rounded border border-border/30 overflow-hidden">{/* Enhanced background and added border */}
               <TimeRangeOverlay />
               <TooltipProvider>
                 {sessionsWithSummaries.map((session) => {
@@ -289,22 +291,22 @@ export function TimelineBands({
             <div className="flex items-center gap-4">
               <span className="font-medium">Activity:</span>
               <span className="flex items-center gap-1.5">
-                <span className="w-3 h-3 rounded bg-green-400" />
+                <span className="w-3 h-3 rounded bg-green-500" />
                 Productive
               </span>
               <span className="flex items-center gap-1.5">
-                <span className="w-3 h-3 rounded bg-gray-400" />
+                <span className="w-3 h-3 rounded bg-gray-500" />
                 Neutral
               </span>
               <span className="flex items-center gap-1.5">
-                <span className="w-3 h-3 rounded bg-red-400" />
+                <span className="w-3 h-3 rounded bg-red-500" />
                 Distracting
               </span>
             </div>
             <div className="flex items-center gap-4">
               <span className="font-medium">Screenshots:</span>
               <span className="flex items-center gap-1.5">
-                <span className="w-3 h-3 rounded bg-slate-400" />
+                <span className="w-3 h-3 rounded bg-slate-500" />
                 Captured
               </span>
             </div>
