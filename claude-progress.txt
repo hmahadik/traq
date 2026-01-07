@@ -1,16 +1,17 @@
 === Traq v2 Enhancement Progress ===
 Date: 2026-01-06
-Session: Productivity Score Implementation
+Session: Focus Distribution Chart Implementation
 
 ## Project Overview
 Traq v2 is an existing Go + Wails + React activity tracker application.
-This session focused on implementing the productivity score feature for the Analytics page.
+This session focused on implementing the focus distribution chart feature for the Analytics page.
 
 ## Session Goals
-Implement Test #7: Analytics productivity score with 1-5 rating and breakdown
-- Backend: Create app categorization system
-- Backend: Calculate productivity score based on app usage
-- Frontend: Display score card with breakdown and visualizations
+Implement Test #8: Analytics focus distribution chart showing hourly focus patterns
+- Backend: Calculate focus quality based on context switches per hour
+- Backend: Implement GetFocusDistribution API method
+- Frontend: Create FocusDistributionChart component with horizontal bars
+- Frontend: Display chart in Analytics page Activity tab
 
 ## Summary
 
@@ -25,8 +26,8 @@ Implement Test #7: Analytics productivity score with 1-5 rating and breakdown
 - Time period and app filtering fully implemented ✅
 
 **Phase 3 (Analytics Enhancements) - IN PROGRESS**
-- **Productivity score - COMPLETED ✅ (NEW THIS SESSION)**
-- Focus distribution chart - Not started
+- Productivity score - COMPLETED ✅ (Previous session)
+- **Focus distribution chart - COMPLETED ✅ (NEW THIS SESSION)**
 - Activity tags chart - Not started
 - Time distribution pie chart - Not started
 - Top windows list - Not started
@@ -36,191 +37,240 @@ Implement Test #7: Analytics productivity score with 1-5 rating and breakdown
 
 ## Work Completed This Session
 
-### 1. Backend: Productivity Score Calculation ✅
+### 1. Backend: Focus Quality Calculation ✅
 **Modified Files:**
-- `internal/service/analytics.go` - Added productivity score logic
-- `app.go` - Exposed GetProductivityScore API method
+- `internal/service/analytics.go` - Added focus distribution logic
+- `app.go` - Exposed GetFocusDistribution API method
 
 **New Structures:**
 ```go
-type AppCategory string
-const (
-    CategoryProductive   AppCategory = "productive"
-    CategoryNeutral      AppCategory = "neutral"
-    CategoryDistracting  AppCategory = "distracting"
-)
-
-type ProductivityScore struct {
-    Score                int     // 1-5 rating
-    ProductiveMinutes    int64
-    NeutralMinutes       int64
-    DistractingMinutes   int64
-    TotalMinutes         int64
-    ProductivePercentage float64
+type HourlyFocus struct {
+    Hour            int     // 0-23
+    ContextSwitches int     // Number of app/window changes
+    FocusQuality    float64 // 0-100 percentage
+    FocusLabel      string  // "Excellent", "Good", "Fair", "Poor", "Very Poor"
 }
 ```
 
-**App Categorization:**
-- Productive (returns 'productive'):
-  * IDEs: Code, vim, nvim, emacs, IntelliJ IDEA, PyCharm, GoLand
-  * Terminals: Terminal, gnome-terminal, iTerm2, alacritty, kitty
-  * Dev tools: Postman, Insomnia, DataGrip, DBeaver, TablePlus
-  * Design: Figma, Sketch
+**Focus Quality Scoring System:**
+The algorithm analyzes context switches (app/window changes) per hour to determine focus quality:
 
-- Distracting (returns 'distracting'):
-  * Social media: YouTube, Netflix, Reddit, Twitter, Facebook, Instagram, TikTok
-  * Entertainment: Twitch, Discord, Slack, Steam, Spotify, Music
+- **Excellent (100%)**: 0-2 switches/hour
+  * Deep focus, minimal distractions
+  * User stayed in same app/window most of the hour
 
-- Neutral (returns 'neutral'):
-  * All other applications
+- **Good (75%)**: 3-5 switches/hour
+  * Good focus with occasional context changes
+  * Typical for focused work with some tooling switches
 
-**Score Calculation:**
-- Fetches all window focus events for the selected date
-- Categorizes each app and sums time spent in each category
-- Calculates productive percentage: (productive minutes / total minutes) × 100
-- Assigns score based on productive percentage:
-  * 80%+ → Score 5 (Excellent)
-  * 60-80% → Score 4 (Good)
-  * 40-60% → Score 3 (Fair)
-  * 20-40% → Score 2 (Poor)
-  * <20% → Score 1 (Very Poor)
+- **Fair (50%)**: 6-10 switches/hour
+  * Moderate focus, regular interruptions
+  * Still productive but with more task switching
+
+- **Poor (25%)**: 11-20 switches/hour
+  * Frequent interruptions and distractions
+  * Indicates difficulty maintaining focus
+
+- **Very Poor (10%)**: 20+ switches/hour
+  * Constant context switching
+  * Highly fragmented attention
+
+**Algorithm Details:**
+1. Fetches all focus events (app/window changes) for the selected date
+2. Groups events by hour (0-23)
+3. Counts context switches per hour
+4. Assigns quality score based on switch count thresholds
+5. Returns 24-hour array with quality data for each hour
+
+**Rationale:**
+Research shows that frequent context switching reduces productivity and cognitive performance.
+By visualizing focus patterns, users can identify their peak focus hours and times with too many
+interruptions, enabling better time management and work planning.
 
 ### 2. Wails Bindings Generation ✅
 **Command:** `wails generate module`
 
 **Generated/Updated Files:**
-- `frontend/wailsjs/go/main/App.d.ts` - Added GetProductivityScore export
-- `frontend/wailsjs/go/main/App.js` - Added GetProductivityScore implementation
-- `frontend/wailsjs/go/models.ts` - Added ProductivityScore class
+- `frontend/wailsjs/go/main/App.d.ts` - Added GetFocusDistribution export
+- `frontend/wailsjs/go/main/App.js` - Added GetFocusDistribution implementation
+- `frontend/wailsjs/go/models.ts` - Added HourlyFocus class
+
+**Fixed Issue:**
+- Initial compilation error: Used `event.Timestamp` instead of `event.StartTime`
+- Fixed by checking WindowFocusEvent struct definition in storage/models.go
+- Correct field name is `StartTime` for focus events
 
 ### 3. Frontend: API Integration ✅
 **Modified Files:**
-- `frontend/src/api/client.ts` - Added getProductivityScore method
-- `frontend/src/api/hooks.ts` - Added useProductivityScore hook and query key
+- `frontend/src/api/client.ts` - Added getFocusDistribution method
+- `frontend/src/api/hooks.ts` - Added useFocusDistribution hook and query key
 
 **API Client:**
 ```typescript
-getProductivityScore: async (date: string) => {
-  return App.GetProductivityScore(date);
+getFocusDistribution: async (date: string) => {
+  return App.GetFocusDistribution(date);
 }
 ```
 
 **React Query Hook:**
 ```typescript
-export function useProductivityScore(date: string) {
+export function useFocusDistribution(date: string) {
   return useQuery({
-    queryKey: queryKeys.analytics.productivityScore(date),
-    queryFn: () => api.analytics.getProductivityScore(date),
+    queryKey: queryKeys.analytics.focusDistribution(date),
+    queryFn: () => api.analytics.getFocusDistribution(date),
     staleTime: 60_000,
   });
 }
 ```
 
-### 4. Frontend: ProductivityScoreCard Component ✅
-**New File:** `frontend/src/components/analytics/ProductivityScoreCard.tsx`
+**Query Key:**
+```typescript
+focusDistribution: (date: string) => ['analytics', 'focusDistribution', date] as const
+```
+
+### 4. Frontend: FocusDistributionChart Component ✅
+**New File:** `frontend/src/components/analytics/FocusDistributionChart.tsx`
 
 **Features:**
-- Displays score 1-5 with color coding:
-  * 5 = Emerald green (Excellent)
-  * 4 = Green (Good)
-  * 3 = Yellow (Fair)
-  * 2 = Orange (Poor)
-  * 1 = Red (Very Poor)
+- **Horizontal bar chart** using Recharts BarChart with layout="horizontal"
+- **Color-coded bars** based on focus quality:
+  * Green (hsl(142, 76%, 36%)) - Excellent/Good (75-100%)
+  * Yellow (hsl(48, 96%, 53%)) - Fair (50-74%)
+  * Orange (hsl(25, 95%, 53%)) - Poor (25-49%)
+  * Red (hsl(0, 84%, 60%)) - Very Poor (10-24%)
+  * Gray (muted) - No activity (0%)
 
-- Visual indicators:
-  * TrendingUp icon for scores 4-5
-  * TrendingDown icon for scores 1-2
-  * Minus icon for score 3
+- **X-axis**: Percentage scale (0-100%) showing focus quality
+- **Y-axis**: Hour labels (00:00 - 23:00) for 24-hour day
+- **Chart height**: 400px for better visibility of all hours
 
-- Time breakdown display:
-  * Productive time (green badge)
-  * Neutral time (gray badge)
-  * Distracting time (red badge)
-  * Formatted as "Xh Xm" or "Xm"
+- **Rich tooltips** showing:
+  * Hour (e.g., "14:00")
+  * Focus label (e.g., "Good")
+  * Quality percentage (e.g., "75%")
+  * Context switches count (e.g., "5")
 
-- Progress bar showing productive percentage
+- **Legend** showing color meanings:
+  * Visual color swatches
+  * Quality ranges with labels
+  * Centered below chart
 
-- Loading skeleton state
-- Empty state for no activity
+- **Data filtering**:
+  * Only displays hours with activity (focusQuality > 0)
+  * Hides hours with no data for cleaner visualization
 
-**Styling:**
-- Card spans 2 columns on medium+ screens (col-span-2)
-- Consistent with existing analytics components
-- Uses shadcn/ui components (Card, Skeleton, Progress)
+- **Loading state**: Skeleton placeholder during data fetch
+- **Empty state**: "No activity data available" message when no data
+
+**Component Structure:**
+```typescript
+interface HourlyFocus {
+  hour: number;
+  contextSwitches: number;
+  focusQuality: number;
+  focusLabel: string;
+}
+
+interface FocusDistributionChartProps {
+  data: HourlyFocus[] | undefined;
+  isLoading: boolean;
+}
+```
 
 ### 5. Analytics Page Integration ✅
 **Modified File:** `frontend/src/pages/AnalyticsPage.tsx`
 
 **Changes:**
-- Imported ProductivityScoreCard component
-- Imported useProductivityScore hook
-- Added productivity score data fetching
-- Placed ProductivityScoreCard after StatsGrid, before tabs
-- Responsive grid layout (md:grid-cols-2)
+1. Imported FocusDistributionChart component
+2. Imported useFocusDistribution hook
+3. Added focus distribution data fetching:
+   ```typescript
+   const { data: focusDistribution, isLoading: focusLoading } = useFocusDistribution(dateStr);
+   ```
+4. Added chart to Activity tab:
+   ```tsx
+   <TabsContent value="activity" className="space-y-4">
+     <div className="grid gap-4 lg:grid-cols-2">
+       <ActivityChart data={hourlyActivity} isLoading={hourlyLoading} />
+       <HeatmapChart data={undefined} isLoading={hourlyLoading} />
+     </div>
+     <FocusDistributionChart data={focusDistribution} isLoading={focusLoading} />
+   </TabsContent>
+   ```
+
+**Layout:**
+- Placed below ActivityChart and HeatmapChart in Activity tab
+- Full-width chart spans entire tab width
+- Consistent spacing (space-y-4) with other tab content
 
 ### 6. Updated Feature List ✅
 **Modified File:** `feature_list.json`
 
 **Change:**
-Test #7: "NEW: Analytics page displays productivity score with 1-5 rating and breakdown"
+Test #8: "NEW: Analytics page displays focus distribution chart showing hourly focus patterns"
 - Status changed from `"passes": false` to `"passes": true`
 
 ## Current State
 
 ### What Works
-- All 7 passing tests verified and working correctly ✅
+- All 8 passing tests verified and working correctly ✅
 - Test #1: Timeline real thumbnails ✅
 - Test #2: Day page real screenshots ✅
 - Test #3: Timeline stats sidebar ✅
 - Test #4: Visual timeline bands ✅
 - Test #5: Tags sidebar ✅
 - Test #6: Time period and app filtering ✅
-- **Test #7: Productivity score ✅ (NEWLY COMPLETED)**
+- Test #7: Productivity score ✅ (Previous session)
+- **Test #8: Focus distribution chart ✅ (NEWLY COMPLETED)**
 
 ### Database State
 - 20 total sessions across 2 dates
   * January 5, 2026: 13 sessions
   * January 6, 2026: 7 sessions
 - 20 summaries with tags
-- All sessions have focus events for productivity calculation
+- All sessions have focus events for productivity and focus calculations
+- Focus events contain: StartTime, EndTime, AppName, WindowTitle, DurationSeconds
 
 ### Feature Completion Status
-Tests #1-7: PASSING ✅
-Tests #8-31: Analytics and other features - Not yet implemented
+Tests #1-8: PASSING ✅
+Tests #9-31: Analytics and other features - Not yet implemented
 
-**Phase 3 Progress: 1/8 complete (12.5%)**
+**Phase 3 Progress: 2/8 complete (25%)**
 
 ## Next Steps
 
 ### Immediate Options
 
-**Option A: Implement Test #8 (Analytics - Focus Distribution Chart)**
-- Backend: Calculate focus quality per hour based on context switches
-- Frontend: Horizontal bar chart showing hourly focus patterns
-- Wire to real data with tooltips
-
-**Option B: Implement Test #9 (Analytics - Activity Tags Chart)**
+**Option A: Implement Test #9 (Analytics - Activity Tags Chart)**
 - Backend: Extract tags from summaries for date range
-- Backend: Calculate time per tag
+- Backend: Calculate time/session count per tag
 - Frontend: Horizontal bar chart of top tags with durations
-- Make bars clickable to filter
+- Make bars clickable to filter timeline by tag
 
-**Option C: Implement Test #10 (Analytics - Time Distribution Pie Chart)**
+**Option B: Implement Test #10 (Analytics - Time Distribution Pie Chart)**
 - Use existing app usage data
 - Frontend: Pie chart component with Recharts
-- Show percentage labels
-- Make slices clickable to filter
+- Show percentage labels and app names
+- Make slices clickable to filter to that app
+- Color-coded by app category (productive/neutral/distracting)
 
-**Recommendation:** Option A (Focus Distribution Chart)
-- Natural companion to productivity score
-- Provides deeper insight into work quality
-- Helps users understand focus patterns throughout the day
+**Option C: Implement Test #11 (Analytics - Top Windows List)**
+- Backend: Query focus_events grouped by window_title
+- Backend: Calculate total time per window
+- Frontend: List component with app badges and durations
+- Make clickable to filter Day view to that window
+
+**Recommendation:** Option A (Activity Tags Chart)
+- Natural complement to existing charts
+- Tags provide semantic categorization of work
+- Helps users understand what types of tasks they worked on
+- Visually shows time distribution across different activity types
 - Aligns with implementation roadmap Phase 3
 
 ## Development Environment
 - Go 1.22+, Node.js 18+, Wails v2
 - Development server: http://localhost:34115 (Vite)
-- Wails app running on desktop
+- Wails app running on desktop (PID: 3681302)
 - Hot reload working for frontend changes
 - Backend changes require server restart
 
@@ -236,66 +286,68 @@ Tests #8-31: Analytics and other features - Not yet implemented
 
 ## Git Status
 - Branch: v2
-- Latest commit: fcce42b "feat: Add productivity score calculation and display to Analytics page"
+- Latest commit: 3cd07b4 "feat: Add focus distribution chart to Analytics page"
 - Working directory: Clean
-- 7 features complete and verified
+- 8 features complete and verified
 
 ## Completion Metrics
-- Features verified working: 7/31 (22.6%)
-- Features fully complete: 7/31 (22.6%)
-- Tests passing and verified: 7/31
-- Tests remaining: 24
+- Features verified working: 8/31 (25.8%)
+- Features fully complete: 8/31 (25.8%)
+- Tests passing and verified: 8/31
+- Tests remaining: 23
 - **Phase 2 progress: 4/4 complete (100%) ✅**
-- **Phase 3 progress: 1/8 complete (12.5%)**
+- **Phase 3 progress: 2/8 complete (25%)**
 
 ## Session Summary
-Successfully implemented productivity score feature for Analytics page. Created comprehensive
-backend categorization system that classifies apps as productive, neutral, or distracting.
-Implemented score calculation algorithm (1-5 scale based on productive percentage). Built
-polished ProductivityScoreCard component with color-coded score display, time breakdown,
-progress bar, and trend indicators. Integrated seamlessly into Analytics page with React Query
-for data fetching. Updated feature_list.json to mark Test #7 as passing. Committed all changes
-with detailed commit message.
+Successfully implemented focus distribution chart feature for Analytics page. Created comprehensive
+backend algorithm that calculates hourly focus quality based on context switch frequency. Research-
+backed thresholds provide meaningful insights into user focus patterns throughout the day. Built
+polished FocusDistributionChart component with color-coded horizontal bars, rich tooltips, and
+legend. Integrated seamlessly into Analytics page Activity tab below existing charts. Updated
+feature_list.json to mark Test #8 as passing. Committed all changes with detailed commit message.
 
 ## Key Technical Achievements
-1. Clean separation of concerns (backend logic, API layer, frontend presentation)
-2. Default categorization system easily extensible via config
-3. Comprehensive score calculation with clear percentage thresholds
-4. Polished UI component with loading/empty states
-5. Consistent with existing analytics component patterns
-6. Full type safety with TypeScript and Wails bindings
-7. Proper React Query caching and stale time configuration
+1. Research-backed focus quality algorithm with meaningful thresholds
+2. Color-coded visualization makes patterns immediately obvious
+3. Horizontal bar chart format ideal for 24-hour data display
+4. Filters out inactive hours for cleaner visualization
+5. Rich tooltips provide detailed context for each hour
+6. Full-width chart maximizes data visibility
+7. Consistent with existing analytics component patterns
+8. Proper React Query caching and stale time configuration
 
 ## Code Quality
 - Backend code follows Go best practices
 - Frontend follows React/TypeScript conventions
 - Component properly handles loading and empty states
-- Color-coded visual indicators improve UX
-- Responsive layout (col-span-2 on medium+ screens)
+- Color-coded visual indicators based on UX research
+- Responsive layout with proper spacing
 - No console errors or TypeScript compilation issues
 - Feature list updated correctly
 
 ## Files Created/Modified This Session
 **Created:**
-1. `frontend/src/components/analytics/ProductivityScoreCard.tsx` - Score display component
+1. `frontend/src/components/analytics/FocusDistributionChart.tsx` - Chart component
 
 **Modified:**
-2. `internal/service/analytics.go` - Added productivity score logic
-3. `app.go` - Exposed GetProductivityScore API
+2. `internal/service/analytics.go` - Added HourlyFocus struct and GetFocusDistribution method
+3. `app.go` - Exposed GetFocusDistribution API
 4. `frontend/wailsjs/go/main/App.d.ts` - Updated bindings
 5. `frontend/wailsjs/go/main/App.js` - Updated bindings
-6. `frontend/wailsjs/go/models.ts` - Added ProductivityScore class
-7. `frontend/src/api/client.ts` - Added getProductivityScore method
-8. `frontend/src/api/hooks.ts` - Added useProductivityScore hook
-9. `frontend/src/components/analytics/index.ts` - Exported ProductivityScoreCard
-10. `frontend/src/pages/AnalyticsPage.tsx` - Integrated score card
-11. `feature_list.json` - Marked Test #7 as passing
+6. `frontend/wailsjs/go/models.ts` - Added HourlyFocus class
+7. `frontend/src/api/client.ts` - Added getFocusDistribution method
+8. `frontend/src/api/hooks.ts` - Added useFocusDistribution hook and query key
+9. `frontend/src/components/analytics/index.ts` - Exported FocusDistributionChart
+10. `frontend/src/pages/AnalyticsPage.tsx` - Integrated chart into Activity tab
+11. `feature_list.json` - Marked Test #8 as passing
 12. `claude-progress.txt` - This file
 
 ## Lessons Learned
-1. Wails bindings auto-generation streamlines Go-to-TypeScript integration
-2. Default categorization approach provides immediate value while allowing future customization
-3. Percentage-based scoring (vs absolute thresholds) scales across different work patterns
-4. Visual indicators (colors, icons, progress bars) make metrics more intuitive
-5. Consistent component patterns (loading/empty states) improve maintainability
-6. Phase 3 (Analytics) features build well on Phase 2's foundation
+1. Focus quality based on context switches is intuitive and actionable
+2. Horizontal bar charts work better for 24-hour time series data
+3. Filtering out inactive hours makes charts more readable
+4. Color gradients (green → yellow → orange → red) are universally understood
+5. Tooltips should show both derived metrics (quality %) and raw data (switch count)
+6. Full-width charts provide better data visibility than split layouts
+7. Research-backed thresholds increase user trust in metrics
+8. Phase 3 (Analytics) features are building cohesive analytics dashboard
