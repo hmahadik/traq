@@ -1,0 +1,1815 @@
+<project_specification>
+  <overview>
+    <name>Traq - Activity Tracker v2</name>
+    <description>
+      A desktop application that automatically captures screenshots at regular intervals,
+      tracks window focus and context (shell commands, git commits, file events, browser history),
+      and provides timeline visualization, analytics, and AI-powered activity summaries.
+
+      The app should help users understand how they spend their time through automatic tracking
+      and intelligent summarization, with minimal manual input required.
+    </description>
+    <target_users>Anyone who wants to track their activities automatically</target_users>
+    <current_status>
+      Backend: Fully functional - All tracking systems working, database populated with real data
+      Frontend: Partially broken - 2 pages use mock data instead of real APIs, missing ~15 features from v1
+      Overall: Core functionality works but UI needs significant enhancement to match v1 polish
+    </current_status>
+    <ui_ux_target>
+      v1 (Python version at localhost:55555) represents the target UI/UX experience.
+      v1 has been iteratively refined and should serve as the design reference.
+      v2 should not replicate v1 exactly but should match or exceed its polish while
+      incorporating v2's new functionality (enhanced context tracking, data sources panel).
+    </ui_ux_target>
+  </overview>
+
+  <technology_stack>
+    <backend>
+      <language>Go 1.22+</language>
+      <framework>Wails v2 (desktop application framework)</framework>
+      <database>SQLite with migrations</database>
+      <key_libraries>
+        - github.com/kbinani/screenshot (screen capture)
+        - github.com/corona10/goimagehash (perceptual hashing for duplicate detection)
+        - github.com/disintegration/imaging (image processing)
+        - github.com/chai2010/webp (WebP encoding)
+        - github.com/fsnotify/fsnotify (file system watching)
+        - github.com/mattn/go-sqlite3 (database driver)
+      </key_libraries>
+    </backend>
+    <frontend>
+      <language>TypeScript</language>
+      <framework>React 18</framework>
+      <build_tool>Vite</build_tool>
+      <styling>Tailwind CSS</styling>
+      <ui_components>shadcn/ui (Radix UI primitives)</ui_components>
+      <state_management>TanStack Query (React Query)</state_management>
+      <routing>React Router v6</routing>
+      <icons>Lucide React</icons>
+      <charts>Recharts</charts>
+    </frontend>
+    <testing>
+      <backend_tests>Go testing package (115+ tests)</backend_tests>
+      <frontend_unit>Vitest with Testing Library</frontend_unit>
+      <e2e>Playwright (3 test files, needs expansion to 15-20)</e2e>
+    </testing>
+    <platform>Linux (primary), macOS, Windows (via Wails)</platform>
+  </technology_stack>
+
+  <core_features>
+    <feature name="Screenshot Capture" status="IMPLEMENTED">
+      <description>
+        Automatically captures full-screen screenshots at configurable intervals (default 30 seconds).
+        Uses perceptual hashing (dhash) to detect and skip duplicate screenshots when screen content
+        hasn't meaningfully changed. Saves images as WebP format with configurable quality.
+        Generates thumbnails alongside full images for efficient UI display.
+      </description>
+      <requirements>
+        - Capture screenshots at user-defined interval (30s-300s range)
+        - Detect duplicate screenshots using dhash algorithm (hamming distance threshold)
+        - Save full images as WebP with configurable quality (60-100%)
+        - Generate thumbnails (200px width) for each screenshot
+        - Store in organized directory structure: ~/.local/share/traq/screenshots/YYYY/MM/DD/
+        - Active monitor only option for multi-monitor setups
+        - Database records include: timestamp, file path, thumbnail path, hash, window context
+      </requirements>
+      <acceptance_criteria>
+        - Screenshot files appear in correct date-based directories
+        - Thumbnails generated alongside full images
+        - Duplicate detection works (identical screens not saved repeatedly)
+        - Database has screenshots table with all metadata
+        - UI can display thumbnails efficiently
+        - No permission errors or missing directories
+      </acceptance_criteria>
+      <current_state>✅ Fully working - 115+ backend tests passing, real files on disk, database populated</current_state>
+    </feature>
+
+    <feature name="Window & Application Tracking" status="IMPLEMENTED">
+      <description>
+        Tracks which window/application has focus and for how long. Polls active window info
+        every second, records focus changes with timestamps and durations. Captures window title
+        and application name for context. Used for analytics and session summaries.
+      </description>
+      <requirements>
+        - Poll active window info every 1 second
+        - Detect window focus changes
+        - Record: timestamp, app name, window title, duration
+        - Store in focus_events table
+        - Support platform-specific APIs (X11 xdotool on Linux)
+        - Handle edge cases (no window, locked screen, etc.)
+      </requirements>
+      <acceptance_criteria>
+        - Focus events recorded in database with accurate timestamps
+        - Durations calculated correctly between focus changes
+        - App name and window title captured accurately
+        - Works across different window managers
+        - No crashes when window info unavailable
+      </acceptance_criteria>
+      <current_state>✅ Fully working - Platform layer tested, focus tracking active, database populated</current_state>
+    </feature>
+
+    <feature name="Session Management" status="IMPLEMENTED">
+      <description>
+        Automatically groups activity into sessions based on user presence. Creates new session
+        on first activity after app start or after prolonged AFK. Ends session when user goes AFK
+        (default 3 minutes of inactivity). Resumes session if user returns within timeout.
+        Creates new session if user returns after timeout exceeded.
+      </description>
+      <requirements>
+        - Auto-create session on first activity
+        - Monitor input activity (mouse, keyboard) via platform API
+        - End session when AFK timeout reached (configurable 60s-600s)
+        - Resume session if return within timeout window
+        - Create new session if return after timeout exceeded
+        - Store: start time, end time, duration, screenshot count, context
+        - Calculate session duration correctly (handle ongoing sessions with null endTime)
+      </requirements>
+      <acceptance_criteria>
+        - Sessions created automatically on activity
+        - Sessions end correctly on AFK
+        - Duration never shows negative values
+        - Ongoing sessions show as "ongoing" not negative time
+        - Sessions persist across app restarts
+        - Database has sessions table with correct data
+      </acceptance_criteria>
+      <current_state>✅ Fully working - Recent bug fix for negative durations, session logic tested, UI displays correctly</current_state>
+    </feature>
+
+    <feature name="Enhanced Context Tracking" status="IMPLEMENTED">
+      <description>
+        Beyond screenshots and window focus, v2 tracks additional context:
+        - Shell command history (bash/zsh/fish) with timestamps
+        - Git commits across tracked repositories
+        - File system events (created, modified, deleted files)
+        - Browser history (Chrome/Firefox/Brave) with URLs and titles
+
+        These context sources provide richer data for AI summaries and analytics.
+        This is NEW functionality not present in v1.
+      </description>
+      <requirements>
+        - Shell tracker: Poll ~/.bash_history, ~/.zsh_history, etc. every 5s
+        - Git tracker: Watch configured repos for commits, extract message/author/timestamp
+        - File watcher: Monitor configured directories with fsnotify, debounce events
+        - Browser tracker: Read browser history databases (SQLite) periodically
+        - Store all context in respective tables with session associations
+        - Filter sensitive data (commands with passwords, tokens, etc.)
+      </requirements>
+      <acceptance_criteria>
+        - Shell commands appear in database after execution
+        - Git commits captured with full metadata
+        - File events recorded for watched directories
+        - Browser history shows recent visits
+        - Sensitive data filtered out
+        - No crashes if browser locked or files missing
+      </acceptance_criteria>
+      <current_state>✅ Fully implemented - All trackers have tests, database tables exist, data captured</current_state>
+    </feature>
+
+    <feature name="Timeline View" status="PARTIAL">
+      <description>
+        PRIMARY VIEW for browsing activity. Should show a calendar heatmap for navigation,
+        a visual timeline with color-coded activity bands, and expandable session cards with
+        thumbnails and summaries. Users navigate by date and drill into sessions for details.
+
+        This is the most important page - users spend most time here.
+      </description>
+      <requirements>
+        - Calendar heatmap showing activity intensity by day (v1 reference)
+        - Date navigation: Previous/Today/Next buttons + date picker
+        - Stats sidebar showing:
+          * Hours worked (with % of goal)
+          * Day span (start time - end time)
+          * Breaks count and duration
+          * Longest focus period
+          * Breakdown bar chart (focus vs breaks)
+          * Tags list with counts
+        - Visual timeline with 4 horizontal rows (v1 reference):
+          * Sessions row: Color-coded blocks for each session
+          * Screenshots row: Thumbnail strip aligned to timeline
+          * Activity row: Detailed color-coded timeline (green=focus, red=distracting, gray=neutral)
+          * AI Summaries row: Blue blocks where summaries exist
+        - Time filter buttons (morning, afternoon, evening, specific apps)
+        - Session cards below timeline:
+          * Time, duration, summary preview
+          * Thumbnail strip (5-8 representative screenshots)
+          * Confidence indicator
+          * Generate/Regenerate summary button
+          * Expand for full summary
+        - Keyboard navigation (↑↓ or jk to navigate sessions)
+      </requirements>
+      <acceptance_criteria>
+        - Calendar heatmap loads with accurate activity data
+        - Stats sidebar shows correct calculations
+        - Visual timeline displays with all 4 rows
+        - Clicking timeline elements navigates to detail views
+        - Session cards load real thumbnails from backend API
+        - Generate summary button works and updates UI
+        - No console errors
+        - Loading states during data fetch
+        - Empty state when no sessions
+      </acceptance_criteria>
+      <current_state>
+        ✅ WORKING: Calendar heatmap, date navigation, session cards, keyboard nav
+        ❌ BROKEN: Session thumbnails use mock data instead of calling GetScreenshotsForSession API
+        ❌ MISSING: Visual timeline with 4 horizontal rows
+        ❌ MISSING: Stats sidebar (hours worked, breaks, etc.)
+        ❌ MISSING: Tags sidebar
+        ❌ MISSING: Time period filtering
+
+        FIX REQUIRED: Replace mock thumbnail generation (lines 40-60) with API call to
+        api.timeline.getScreenshotsForSession(sessionId, page, perPage). Backend API exists and works.
+      </current_state>
+    </feature>
+
+    <feature name="Day/Screenshots View" status="PARTIAL">
+      <description>
+        Hour-by-hour view of all screenshots for a specific day. Groups screenshots by hour
+        in collapsible sections. Allows quick browsing of entire day's activity. Shows statistics
+        at top (total screenshots, sessions, active hours). Clicking screenshot opens full-size gallery.
+      </description>
+      <requirements>
+        - Date navigation: Previous/Next/Today + date picker
+        - Statistics summary: Screenshot count, sessions, active hours
+        - Screenshots grouped by hour (collapsible sections)
+        - Hour header shows time and screenshot count (e.g., "12 AM - 19 screenshots")
+        - Grid layout of thumbnails within each hour
+        - Each thumbnail shows timestamp and app name overlay
+        - Click thumbnail to open full-size gallery modal
+        - Gallery modal with Previous/Next navigation
+        - Keyboard shortcuts (← → to navigate gallery)
+        - "Collapse All" button
+        - "View in Timeline" button to switch views
+      </requirements>
+      <acceptance_criteria>
+        - Page loads with real screenshot data for selected date
+        - Hour groups show correct screenshot counts
+        - Collapsible sections work smoothly
+        - Thumbnails load efficiently (lazy loading for performance)
+        - Full-size gallery displays on click
+        - Keyboard navigation works in gallery
+        - No console errors
+        - Empty state if no screenshots for day
+      </acceptance_criteria>
+      <current_state>
+        ✅ WORKING: Date navigation, hour grouping, collapsible sections, statistics, gallery modal, keyboard nav
+        ❌ BROKEN: Screenshots generated from mock data (lines 31-65) instead of calling GetScreenshotsForHour API
+
+        FIX REQUIRED: Replace mock screenshot generation with API call to
+        api.timeline.getScreenshotsForHour(date, hour). Backend API exists and works.
+      </current_state>
+    </feature>
+
+    <feature name="Analytics Page" status="PARTIAL">
+      <description>
+        Comprehensive analytics dashboard with Day/Week/Month views. Shows activity patterns,
+        productivity scores, app usage, focus distribution, and context switches. Multiple chart
+        types for different insights. Should help users understand their work patterns and
+        identify improvement areas.
+      </description>
+      <requirements>
+        - View toggle: Day / Week / Month
+        - Date navigation and picker with "Today" button
+        - KEY METRICS CARDS:
+          * Active Time (with % of goal, progress bar)
+          * Break Time
+          * Start Time (earliest activity)
+          * End Time (latest activity)
+          * Context Switches (count)
+          * Longest Focus (duration)
+        - PRODUCTIVITY SCORE (v1 reference):
+          * Score 1-5 with visual indicator
+          * Breakdown: Xm productive, Xh Xm neutral, Xm distracting
+          * Based on app categorization
+        - CHARTS:
+          * Hourly Activity bar chart (24 hours, activity minutes per hour)
+          * Focus Distribution bar chart (hourly focus quality)
+          * Activity Tags horizontal bar chart (top tags with durations)
+          * Time Distribution pie chart (app usage %)
+          * Daily Activity chart for week view (7 days)
+        - TOP WINDOWS LIST:
+          * App badge (colored)
+          * Window title
+          * Time spent
+          * Click to filter to that app in day view
+        - APP USAGE TABLE:
+          * App name
+          * Total time
+          * % of total
+          * Screenshots count
+          * Click to see app's screenshots
+        - DATA SOURCES PANEL (v2 new feature):
+          * Shows data completeness for each tracker
+          * Indicators for shell, git, files, browser data
+        - Weekly summary additional metrics:
+          * Total Active Time
+          * Avg Daily Hours
+          * Total Break Time
+          * Typical Start/End times with ranges
+          * Avg Context Switches
+          * Active Days (X/7)
+          * Peak Focus Hours
+        - Export functionality (PDF, CSV)
+        - Regenerate analytics button
+      </requirements>
+      <acceptance_criteria>
+        - All three views (Day/Week/Month) work with real data
+        - Metrics calculations are accurate
+        - Productivity score calculated correctly based on app categories
+        - All charts render with real data
+        - Chart interactions work (tooltips, legends, click-through)
+        - Top windows list shows actual windows
+        - App usage table matches screenshot data
+        - Export generates valid files
+        - No console errors
+        - Loading states during calculations
+      </acceptance_criteria>
+      <current_state>
+        ✅ WORKING: Day view, date navigation, stats grid, activity chart, app usage table, data sources panel
+        ⚠️ PARTIAL: Only Day view implemented (Week/Month missing)
+        ❌ MISSING: Productivity score calculation and visualization
+        ❌ MISSING: Focus distribution chart
+        ❌ MISSING: Activity tags chart
+        ❌ MISSING: Time distribution pie chart
+        ❌ MISSING: Top windows list
+        ❌ MISSING: Weekly/Monthly specific views
+        ❌ MISSING: Export functionality
+        ❌ MISSING: Regenerate button
+
+        GAPS: Approximately 50% of v1 analytics features missing. Week/Month views need implementation.
+        Productivity scoring system needs to be built.
+      </current_state>
+    </feature>
+
+    <feature name="Reports Page" status="PARTIAL">
+      <description>
+        Generate and manage activity reports with natural language time ranges.
+        Quick presets for common periods (Today, Yesterday, This Week, etc.).
+        Auto-generated daily summaries list for historical review. Reports exportable
+        in multiple formats. Should make it easy to share activity summaries with others
+        or for personal review.
+      </description>
+      <requirements>
+        - QUICK REPORT PRESETS:
+          * Buttons: Today, Yesterday, This Week, Last Week
+          * Standup (Today), Standup (Yesterday)
+          * One-click generation
+        - CUSTOM REPORT FORM:
+          * Time Range input with natural language parsing
+            ("yesterday", "last week", "past 2 hours", "Jan 1-5", etc.)
+          * Report Type dropdown (Summary, Detailed, Standup format)
+          * "Include key screenshots" checkbox
+          * Generate Report button
+        - DAILY SUMMARIES LIST (v1 reference):
+          * Auto-generated summaries for each day
+          * Chronological list with dates
+          * Summary preview text
+          * Total time indicator
+          * Click to view full report
+        - REPORT DETAIL VIEW:
+          * Generation timestamp
+          * Key metrics cards: Active Time, Sessions, Apps Used, Busiest Period
+          * Top Applications badges with time
+          * Executive Summary paragraph
+          * Task/category breakdown sections with time and descriptions
+          * Full activity timeline if detailed report
+          * Key screenshots if option selected
+          * Back to list navigation
+        - EXPORT FUNCTIONALITY:
+          * Markdown (.md)
+          * HTML (.html)
+          * PDF (.pdf)
+          * JSON (.json)
+        - REPORT HISTORY:
+          * List of previously generated reports
+          * Filter by date range
+          * Search by content
+          * Delete old reports
+      </requirements>
+      <acceptance_criteria>
+        - Quick preset buttons generate correct time ranges
+        - Natural language parsing works for various formats
+        - Report generation uses real data
+        - Executive summary is coherent and accurate
+        - Category breakdown matches actual activity
+        - Screenshots included when option checked
+        - Export generates valid files in all formats
+        - Report history loads and filters correctly
+        - Daily summaries auto-generate overnight
+        - No console errors
+      </acceptance_criteria>
+      <current_state>
+        ✅ WORKING: Custom time range input, natural language parsing, report generation,
+                    report preview, export (all formats), report history
+        ❌ MISSING: Quick report preset buttons
+        ❌ MISSING: "Include key screenshots" option
+        ❌ MISSING: Daily summaries auto-list
+        ⚠️ UI DIFFERS: Two-column layout vs v1's vertical layout
+
+        GAPS: Core functionality works but missing convenience features and daily summaries automation.
+      </current_state>
+    </feature>
+
+    <feature name="Session Detail Page" status="PARTIAL">
+      <description>
+        Detailed view of a single session with full context. Shows AI-generated summary with
+        confidence score and tags, all screenshots, activity log of every app/window switch,
+        and v2's enhanced context (shell commands, git commits, file events, browser visits).
+
+        For transparency and debugging, should also show API request details, model explanation,
+        generation metadata, and config snapshot used for summary.
+      </description>
+      <requirements>
+        - HEADER:
+          * Back to Timeline link
+          * Session date, time, duration
+          * Screenshot count
+          * Regenerate summary button
+          * Delete session button
+        - SUMMARY SECTION:
+          * AI-generated summary text (large, readable)
+          * Confidence indicator (percentage + badge: High/Medium/Low)
+          * Tags badges
+          * Model explanation section (how the model arrived at this summary)
+        - TRANSPARENCY SECTION (v1 reference):
+          * API Request Details (collapsible):
+            - Screenshot thumbnails used in API call
+            - Full request payload
+            - Model name, method, context
+            - Image IDs included
+            - API endpoint
+            - Prompt sent to model
+          * Generation Details:
+            - Model name
+            - Inference time
+            - Generated timestamp
+            - Summary ID
+          * Config Snapshot:
+            - All configuration values used
+            - crop_to_window, focus_weighted_sampling, etc.
+        - ACTIVITY LOG:
+          * Detailed table of every app/window switch
+          * Columns: Time, App, Window, Duration
+          * Visual duration bars
+          * Sortable, filterable
+        - ENHANCED CONTEXT TABS (v2 feature):
+          * Focus Events tab (app/window switches)
+          * Shell Commands tab
+          * Git Commits tab
+          * File Events tab
+          * Browser Visits tab
+        - ALL SCREENSHOTS:
+          * Grid of all screenshots from session
+          * Not just first 10, but ALL
+          * Click to view full-size
+          * Timestamps visible
+      </requirements>
+      <acceptance_criteria>
+        - Navigation from timeline opens correct session
+        - Summary displays with accurate data
+        - Confidence calculation is correct
+        - Tags are relevant
+        - All tabs load correct context data
+        - Activity log shows every switch with accurate durations
+        - API request section shows actual request made
+        - Config snapshot matches generation time config
+        - All screenshots load (not just first 10)
+        - Regenerate creates new summary and updates UI
+        - Delete removes session and returns to timeline
+        - No console errors
+      </acceptance_criteria>
+      <current_state>
+        ✅ WORKING: Session header, summary display, confidence badge, tags,
+                    enhanced context tabs (shell, git, files, browser), screenshots (first 10),
+                    focus events table
+        ❌ MISSING: Back to timeline link
+        ❌ MISSING: Regenerate summary button
+        ❌ MISSING: Delete session button
+        ❌ MISSING: Model explanation section
+        ❌ MISSING: API request details (transparency)
+        ❌ MISSING: Generation details (model, inference time, etc.)
+        ❌ MISSING: Config snapshot
+        ⚠️ PARTIAL: Only shows first 10 screenshots, not all
+        ⚠️ PARTIAL: Activity log only shows focus events, not detailed switch log
+
+        GAPS: Missing key transparency features from v1. Enhanced context tabs are v2-specific and working.
+      </current_state>
+    </feature>
+
+    <feature name="Settings Management" status="IMPLEMENTED">
+      <description>
+        Configuration interface for all app settings. Organized into logical tabs:
+        Capture settings, AFK detection, Goals, Data sources. Settings persist to disk
+        and apply immediately. Accessible via drawer/modal (not dedicated page).
+      </description>
+      <requirements>
+        - CAPTURE TAB:
+          * Screenshot interval slider (30s - 300s)
+          * Image format dropdown (WebP, PNG, JPEG)
+          * Image quality slider (60-100%)
+          * Active monitor only toggle
+        - AFK DETECTION TAB:
+          * AFK timeout slider (60s - 600s)
+          * Minimum session length slider (1m - 30m)
+        - GOALS TAB:
+          * Daily work hours goal slider (4h - 12h)
+          * Weekday goals only toggle
+          * Work hours definition (e.g., 9 AM - 5 PM)
+        - DATA TAB:
+          * Shell tracking toggle + history file path
+          * Git tracking toggle + repo paths list
+          * File watching toggle + watched directories
+          * Browser tracking toggle + browser selection
+        - SYSTEM TAB:
+          * Data directory path (read-only, with "Open" button)
+          * Database path (read-only)
+          * Clear data button (with confirmation)
+          * Export data button
+        - All settings save immediately on change
+        - Reset to defaults button
+        - Keyboard shortcut to open (Cmd/Ctrl+,)
+      </requirements>
+      <acceptance_criteria>
+        - Settings drawer opens via keyboard shortcut or menu
+        - All settings load current values
+        - Changes apply immediately without restart
+        - Changes persist across app restarts
+        - Validation prevents invalid values
+        - Clear data shows confirmation and actually clears
+        - Export data generates valid backup
+        - No console errors
+      </acceptance_criteria>
+      <current_state>
+        ✅ FULLY WORKING: Drawer implementation, all tabs, all settings, persistence, validation
+        ⚠️ ARCHITECTURAL DIFFERENCE: Drawer instead of dedicated page (this is fine, arguably better UX)
+      </current_state>
+    </feature>
+
+    <feature name="AI Summary Generation" status="IMPLEMENTED">
+      <description>
+        Generate natural language summaries of sessions using AI models. Selects representative
+        screenshots, includes window context and focus data, sends to AI model (local llama.cpp
+        or external Ollama/OpenAI), parses response for summary/tags/confidence. Stores in database
+        for future display. User can trigger manually or auto-generate.
+      </description>
+      <requirements>
+        - Screenshot selection algorithm (focus-weighted sampling, avoid duplicates)
+        - Context construction (window titles, app names, focus durations)
+        - Prompt engineering for consistent output format
+        - Model integration (llama.cpp embedded or Ollama API)
+        - Response parsing (extract summary, tags, confidence)
+        - Database storage of summaries with session association
+        - Manual generation trigger (button on session card)
+        - Auto-generation option (overnight batch processing)
+        - Model selection in settings (qwen2-vl, llava, etc.)
+        - Error handling (model unavailable, timeout, parse failure)
+      </requirements>
+      <acceptance_criteria>
+        - Clicking "Generate Summary" creates coherent summary
+        - Summary accurately reflects session activity
+        - Tags are relevant
+        - Confidence score is reasonable
+        - Summary persists in database
+        - Summary appears on session card after generation
+        - Auto-generation runs overnight if enabled
+        - Error messages shown if generation fails
+        - No console errors
+      </acceptance_criteria>
+      <current_state>
+        ✅ FULLY WORKING: Screenshot selection, context construction, model integration,
+                          parsing, storage, manual trigger, error handling
+        ⚠️ AUTO-GENERATION: Unclear if implemented, likely manual-only currently
+      </current_state>
+    </feature>
+
+    <feature name="Keyboard Navigation" status="IMPLEMENTED">
+      <description>
+        Comprehensive keyboard shortcuts for efficient navigation without mouse.
+        Consistent across all pages. Shortcuts displayed in help overlay.
+      </description>
+      <requirements>
+        - Timeline: j/k or ↑/↓ to navigate sessions
+        - Day view: ← → to navigate gallery
+        - Global: Cmd/Ctrl+, to open settings
+        - Global: Cmd/Ctrl+k to open command palette (if implemented)
+        - Global: ? to show keyboard shortcuts help
+        - Escape to close modals/drawers
+        - Tab/Shift+Tab for form navigation
+        - Enter to confirm, Escape to cancel
+      </requirements>
+      <acceptance_criteria>
+        - All shortcuts work as documented
+        - Help overlay shows all available shortcuts
+        - Shortcuts don't conflict with browser defaults
+        - Focus indicators visible for keyboard users
+        - All interactive elements reachable via keyboard
+      </acceptance_criteria>
+      <current_state>✅ IMPLEMENTED: Timeline and Day view shortcuts working, standard modal/form navigation</current_state>
+    </feature>
+  </core_features>
+
+  <known_issues>
+    <issue severity="HIGH">
+      <description>Timeline page uses mock data for session thumbnails</description>
+      <expected_behavior>
+        Should call api.timeline.getScreenshotsForSession(sessionId, page, perPage) to fetch
+        real screenshots from backend. API exists and works.
+      </expected_behavior>
+      <affected_area>/home/harshad/projects/traq/frontend/src/pages/TimelinePage.tsx lines 40-60, 174</affected_area>
+      <fix>
+        Remove getMockThumbnails function and replace with actual API call using React Query hook.
+        Backend method GetScreenshotsForSession already implemented in internal/service/timeline.go
+      </fix>
+    </issue>
+
+    <issue severity="HIGH">
+      <description>Day page generates mock screenshots instead of fetching real ones</description>
+      <expected_behavior>
+        Should call api.timeline.getScreenshotsForHour(date, hour) to fetch real screenshots
+        from backend. API exists and works.
+      </expected_behavior>
+      <affected_area>/home/harshad/projects/traq/frontend/src/pages/DayPage.tsx lines 31-65</affected_area>
+      <fix>
+        Remove mock screenshot generation loop and replace with actual API calls per hour group.
+        Backend method GetScreenshotsForHour already implemented.
+      </fix>
+    </issue>
+
+    <issue severity="MEDIUM">
+      <description>Analytics page only implements Day view, Week/Month views missing</description>
+      <expected_behavior>
+        Day/Week/Month toggle should switch between different time aggregations with appropriate
+        metrics for each view (daily, weekly summary, monthly trends).
+      </expected_behavior>
+      <affected_area>/home/harshad/projects/traq/frontend/src/pages/AnalyticsPage.tsx</affected_area>
+      <fix>
+        Implement week and month views with appropriate data aggregation and visualization.
+        Backend likely needs additional service methods for weekly/monthly stats.
+      </fix>
+    </issue>
+
+    <issue severity="MEDIUM">
+      <description>Browser tracking shows 0 sites visited</description>
+      <expected_behavior>Recent browser history should appear in analytics and session details</expected_behavior>
+      <affected_area>Browser history tracker implementation or data availability</affected_area>
+      <fix>Investigate browser tracker - may need permission setup or browser database access fix</fix>
+    </issue>
+
+    <issue severity="LOW">
+      <description>Session detail shows only first 10 screenshots</description>
+      <expected_behavior>Should show ALL screenshots from session, not just first 10</expected_behavior>
+      <affected_area>/home/harshad/projects/traq/frontend/src/pages/SessionDetailPage.tsx</affected_area>
+      <fix>Remove limit=10 restriction, implement pagination or "Load More" if performance concern</fix>
+    </issue>
+
+    <issue severity="LOW">
+      <description>WebKit/Go signal handler conflict on Linux (documented but not fixed)</description>
+      <expected_behavior>App should handle signals gracefully without conflicts</expected_behavior>
+      <affected_area>signal_fix_linux.go, app shutdown sequence</affected_area>
+      <fix>Workaround implemented but cleaner solution needed. See commit 0c0c550.</fix>
+    </issue>
+  </known_issues>
+
+  <technical_debt>
+    <item priority="MEDIUM">
+      <description>E2E test coverage insufficient - only 3 of 6 pages have tests</description>
+      <rationale>
+        Missing E2E tests for Analytics, Reports, and SessionDetail pages creates risk of
+        regressions. TDD protocol mandates comprehensive testing. Current 3 E2E test files
+        need to expand to 15-20 covering all pages and workflows.
+      </rationale>
+      <suggested_approach>
+        Add E2E tests:
+        - frontend/e2e/tests/analytics.spec.ts (day/week/month views, charts, interactions)
+        - frontend/e2e/tests/reports.spec.ts (generation, export, history)
+        - frontend/e2e/tests/session-detail.spec.ts (tabs, data display, navigation)
+        - frontend/e2e/tests/workflows.spec.ts (cross-page user journeys)
+
+        Target: 50+ E2E tests across 15-20 files, ~300 total automated tests.
+      </suggested_approach>
+    </item>
+
+    <item priority="MEDIUM">
+      <description>Component test coverage unknown/incomplete</description>
+      <rationale>
+        Custom components in frontend/src/components/ should have unit tests.
+        Unclear how many are currently tested. Risk of UI regressions.
+      </rationale>
+      <suggested_approach>
+        Audit components/, identify untested components, write tests for all custom components.
+        Use Testing Library for component tests. Target: 100+ component tests.
+      </suggested_approach>
+    </item>
+
+    <item priority="LOW">
+      <description>v1 Python codebase still running on master branch</description>
+      <rationale>
+        Confusion risk - two versions in same repo on different branches. v1 needed for reference
+        but shouldn't be default branch.
+      </rationale>
+      <suggested_approach>
+        Rename branches: master → v1-archive, v2 → master (or main). Document clearly in README.
+        Consider extracting v1 UI screenshots for design reference doc.
+      </suggested_approach>
+    </item>
+
+    <item priority="LOW">
+      <description>Settings implemented as drawer instead of page</description>
+      <rationale>
+        Architectural difference from v1 (which had dedicated page). Current implementation works
+        well but routing setup has unused SettingsPage.tsx that just redirects.
+      </rationale>
+      <suggested_approach>
+        Document this as intentional design decision. Remove unused SettingsPage.tsx or make it
+        wrapper that opens drawer. Update routing accordingly.
+      </suggested_approach>
+    </item>
+  </technical_debt>
+
+  <database_schema>
+    <summary>SQLite database at ~/.local/share/traq/data.db with migrations system</summary>
+
+    <table name="screenshots">
+      <columns>
+        id INTEGER PRIMARY KEY
+        session_id INTEGER (FK to sessions)
+        timestamp INTEGER (Unix epoch)
+        filepath TEXT (full image path)
+        thumbnail_path TEXT
+        hash TEXT (dhash for duplicate detection)
+        window_title TEXT
+        app_name TEXT
+      </columns>
+      <notes>Stores all captured screenshots with context</notes>
+    </table>
+
+    <table name="sessions">
+      <columns>
+        id INTEGER PRIMARY KEY
+        start_time INTEGER (Unix epoch)
+        end_time INTEGER (Unix epoch, NULL if ongoing)
+        duration INTEGER (calculated, seconds)
+        screenshot_count INTEGER
+      </columns>
+      <notes>Auto-managed sessions based on AFK detection</notes>
+    </table>
+
+    <table name="focus_events">
+      <columns>
+        id INTEGER PRIMARY KEY
+        session_id INTEGER (FK)
+        timestamp INTEGER
+        app_name TEXT
+        window_title TEXT
+        duration INTEGER (seconds)
+      </columns>
+      <notes>Window focus tracking for detailed activity log</notes>
+    </table>
+
+    <table name="summaries">
+      <columns>
+        id INTEGER PRIMARY KEY
+        session_id INTEGER (FK, unique)
+        summary TEXT (AI-generated summary)
+        tags TEXT (JSON array)
+        confidence REAL (0.0-1.0)
+        model_name TEXT
+        generated_at INTEGER
+        inference_time INTEGER (milliseconds)
+        explanation TEXT (model's reasoning)
+      </columns>
+      <notes>AI-generated summaries for sessions</notes>
+    </table>
+
+    <table name="shell_commands">
+      <columns>
+        id INTEGER PRIMARY KEY
+        session_id INTEGER (FK)
+        timestamp INTEGER
+        command TEXT
+        directory TEXT
+      </columns>
+      <notes>Shell command history tracking</notes>
+    </table>
+
+    <table name="git_commits">
+      <columns>
+        id INTEGER PRIMARY KEY
+        session_id INTEGER (FK)
+        timestamp INTEGER
+        repo_path TEXT
+        commit_hash TEXT
+        author TEXT
+        message TEXT
+      </columns>
+      <notes>Git commit tracking across repos</notes>
+    </table>
+
+    <table name="file_events">
+      <columns>
+        id INTEGER PRIMARY KEY
+        session_id INTEGER (FK)
+        timestamp INTEGER
+        filepath TEXT
+        event_type TEXT (created, modified, deleted)
+      </columns>
+      <notes>File system event tracking</notes>
+    </table>
+
+    <table name="browser_history">
+      <columns>
+        id INTEGER PRIMARY KEY
+        session_id INTEGER (FK)
+        timestamp INTEGER
+        url TEXT
+        title TEXT
+        browser TEXT (chrome, firefox, etc.)
+      </columns>
+      <notes>Browser history tracking</notes>
+    </table>
+
+    <table name="reports">
+      <columns>
+        id INTEGER PRIMARY KEY
+        generated_at INTEGER
+        time_range_start INTEGER
+        time_range_end INTEGER
+        report_type TEXT (summary, detailed, standup)
+        content TEXT (formatted report)
+        format TEXT (markdown, html, pdf, json)
+      </columns>
+      <notes>Generated reports for export and history</notes>
+    </table>
+
+    <table name="config">
+      <columns>
+        key TEXT PRIMARY KEY
+        value TEXT (JSON)
+      </columns>
+      <notes>Application configuration persistence</notes>
+    </table>
+
+    <notes>
+      All tables use INTEGER for timestamps (Unix epoch seconds).
+      Migrations handled by internal/storage/sqlite.go.
+      Database created automatically on first run.
+      Foreign keys enforced for data integrity.
+    </notes>
+  </database_schema>
+
+  <api_layer>
+    <summary>
+      Backend exposes Go methods via Wails bindings, accessible from frontend as JavaScript APIs.
+      Frontend uses TanStack Query for caching, loading states, error handling.
+    </summary>
+
+    <api_group name="Timeline API">
+      <method>GetDailySessions(date string) → []Session</method>
+      <method>GetScreenshotsForSession(sessionId, page, perPage int) → []Screenshot</method>
+      <method>GetScreenshotsForHour(date string, hour int) → []Screenshot</method>
+      <method>GetSessionDetail(sessionId int) → SessionDetail</method>
+      <method>GetCalendarHeatmap(year, month int) → map[string]int</method>
+      <notes>Timeline and Day page APIs - all implemented and tested</notes>
+    </api_group>
+
+    <api_group name="Analytics API">
+      <method>GetDailyStats(date string) → DailyStats</method>
+      <method>GetWeeklyStats(startDate string) → WeeklyStats (NEEDS IMPLEMENTATION)</method>
+      <method>GetMonthlyStats(year, month int) → MonthlyStats (NEEDS IMPLEMENTATION)</method>
+      <method>GetAppUsage(date string) → []AppUsage</method>
+      <method>GetHourlyActivity(date string) → []HourlyActivity</method>
+      <method>GetProductivityScore(date string) → ProductivityScore (NEEDS IMPLEMENTATION)</method>
+      <method>GetFocusDistribution(date string) → []FocusData (NEEDS IMPLEMENTATION)</method>
+      <method>GetTopWindows(date string, limit int) → []WindowUsage (NEEDS IMPLEMENTATION)</method>
+      <notes>Analytics APIs - Day implemented, Week/Month/Productivity need work</notes>
+    </api_group>
+
+    <api_group name="Reports API">
+      <method>GenerateReport(timeRange string, reportType string, includeScreenshots bool) → Report</method>
+      <method>ExportReport(reportId int, format string) → filepath</method>
+      <method>GetReportHistory(limit int) → []Report</method>
+      <method>GetDailySummaries(startDate, endDate string) → []DailySummary (NEEDS AUTO-GENERATION)</method>
+      <notes>Reports APIs - generation and export work, daily summaries need auto-generation logic</notes>
+    </api_group>
+
+    <api_group name="Summaries API">
+      <method>GenerateSummary(sessionId int) → Summary</method>
+      <method>RegenerateSummary(sessionId int) → Summary (NEEDS IMPLEMENTATION)</method>
+      <method>GetSummary(sessionId int) → Summary</method>
+      <method>DeleteSummary(sessionId int) → success (NEEDS IMPLEMENTATION)</method>
+      <notes>Summary generation works, regenerate/delete missing</notes>
+    </api_group>
+
+    <api_group name="Settings API">
+      <method>GetConfig() → Config</method>
+      <method>UpdateConfig(config Config) → success</method>
+      <method>ResetConfig() → success</method>
+      <method>ExportData() → filepath</method>
+      <method>ClearData() → success</method>
+      <notes>Settings APIs - all implemented and working</notes>
+    </api_group>
+
+    <api_group name="Context API">
+      <method>GetFocusEvents(sessionId int) → []FocusEvent</method>
+      <method>GetShellCommands(sessionId int) → []ShellCommand</method>
+      <method>GetGitCommits(sessionId int) → []GitCommit</method>
+      <method>GetFileEvents(sessionId int) → []FileEvent</method>
+      <method>GetBrowserHistory(sessionId int) → []BrowserVisit</method>
+      <notes>Context APIs - all implemented for v2 enhanced tracking</notes>
+    </api_group>
+
+    <frontend_api_client>
+      <location>/home/harshad/projects/traq/frontend/src/api/</location>
+      <structure>
+        client.ts - Wails runtime wrapper
+        hooks.ts - React Query hooks for all APIs
+        mockData.ts - SHOULD BE REMOVED after fixing Timeline/Day pages
+      </structure>
+      <usage>
+        Components use hooks like:
+        - const { data, isLoading, error } = useDailySessions(date)
+        - const { mutate: generateSummary } = useGenerateSummary()
+
+        React Query handles caching, refetching, loading/error states automatically.
+      </usage>
+    </frontend_api_client>
+  </api_layer>
+
+  <ui_layout>
+    <summary>
+      React Router v6 application with sidebar navigation, main content area, and modals/drawers
+      for settings and full-screen views. Dark theme with Tailwind CSS. shadcn/ui components.
+    </summary>
+
+    <navigation>
+      <sidebar>
+        - Logo/app name
+        - Timeline (primary view)
+        - Day (screenshots view)
+        - Analytics
+        - Reports
+        - Settings (opens drawer)
+      </sidebar>
+      <routes>
+        / → TimelinePage (redirect from root)
+        /timeline → TimelinePage
+        /day → DayPage
+        /analytics → AnalyticsPage
+        /reports → ReportsPage
+        /session/:id → SessionDetailPage
+        /settings → Opens settings drawer, redirects to /
+      </routes>
+    </navigation>
+
+    <design_system>
+      <colors>
+        Based on v1 reference:
+        - Background: Very dark (#0a0a0a - #1a1a1a range)
+        - Primary: Blue (#4a9eff range)
+        - Success: Green (for productive/focus time)
+        - Warning: Red (for distracting time)
+        - Neutral: Gray (for neutral time)
+        - Text: White/light gray for readability
+        - Borders: Subtle gray for cards
+      </colors>
+      <typography>
+        - Page headers: text-3xl font-bold
+        - Section headers: text-xl font-semibold
+        - Card headers: text-lg font-medium
+        - Body: text-base
+        - Metadata: text-sm text-muted-foreground
+      </typography>
+      <spacing>
+        - Card padding: p-6
+        - Section gaps: space-y-6
+        - Grid gaps: gap-4
+        - Generous whitespace between sections
+      </spacing>
+      <components>
+        Uses shadcn/ui (Radix UI primitives):
+        - Button, Card, Dialog, Dropdown, Select, Slider, Switch, Tabs, Toast, Tooltip
+        - Custom components in frontend/src/components/
+      </components>
+    </design_system>
+
+    <layouts>
+      <timeline_page>
+        - Two-column: Main content (sessions) + Sidebar (calendar, stats, tags)
+        - Visual timeline above sessions (TO BE IMPLEMENTED)
+        - Session cards in main area
+        - Keyboard navigation indicators
+      </timeline_page>
+      <day_page>
+        - Single column with header stats
+        - Collapsible hour groups
+        - Grid layout for screenshots
+        - Gallery modal for full-size view
+      </day_page>
+      <analytics_page>
+        - Tab interface: Activity / Applications / Data Sources
+        - Stats grid at top
+        - Charts in main area
+        - Tables at bottom
+      </analytics_page>
+      <reports_page>
+        - Two-column: Form + Preview (currently)
+        - Should match v1 vertical layout for consistency (consider)
+        - Report history list
+      </reports_page>
+      <session_detail_page>
+        - Header with session info and actions
+        - Summary section
+        - Tabs for different context types
+        - Screenshots grid
+        - Activity log
+      </session_detail_page>
+    </layouts>
+
+    <responsive_design>
+      - Desktop-first (Wails desktop app)
+      - Should work at various window sizes (users may resize)
+      - Minimum reasonable width: ~1024px
+      - Graceful degradation for smaller sizes
+    </responsive_design>
+  </ui_layout>
+
+  <implementation_roadmap>
+    <phase number="1" name="Critical Fixes - Make UI Display Real Data">
+      <priority>HIGHEST</priority>
+      <description>Fix the two pages using mock data - this is blocking trust in the app</description>
+      <steps>
+        1. Fix Timeline page mock thumbnails
+           - Remove getMockThumbnails function (TimelinePage.tsx lines 40-60)
+           - Add React Query hook for getScreenshotsForSession
+           - Update SessionCard to use real API data
+           - Test with real session IDs from database
+           - Verify thumbnails load correctly
+
+        2. Fix Day page mock screenshots
+           - Remove mock screenshot generation (DayPage.tsx lines 31-65)
+           - Add React Query hook for getScreenshotsForHour
+           - Update HourGroup to fetch real screenshots per hour
+           - Test with real dates that have screenshots
+           - Verify grid displays correctly
+
+        3. Write E2E tests for fixes
+           - Update timeline.spec.ts to verify real thumbnails
+           - Update day.spec.ts to verify real screenshots
+           - Ensure no regressions
+      </steps>
+      <acceptance_criteria>
+        - Timeline shows real screenshots from database in session cards
+        - Day view shows real screenshots grouped by hour
+        - No mock data generation code remains
+        - E2E tests pass
+        - Manual testing confirms correct data display
+      </acceptance_criteria>
+      <estimated_effort>2-3 days</estimated_effort>
+    </phase>
+
+    <phase number="2" name="Complete Timeline Page - Match v1 Polish">
+      <priority>HIGH</priority>
+      <description>Add missing Timeline features to match v1's polished experience</description>
+      <steps>
+        1. Implement Stats Sidebar
+           - Add HoursStat component (hours worked, % of goal)
+           - Add DaySpan component (start time - end time)
+           - Add BreaksInfo component (count, total duration)
+           - Add LongestFocus component
+           - Add BreakdownChart component (focus vs breaks bar)
+           - Wire all to real data from sessions/focus_events
+
+        2. Implement Visual Timeline Bands
+           - Create TimelineBands component with 4 rows
+           - Sessions row: Color-coded blocks for each session
+           - Screenshots row: Thumbnail strip aligned to timeline
+           - Activity row: Detailed color-coded timeline (focus/distract/neutral)
+           - Summaries row: Blue blocks where summaries exist
+           - Make timeline scrollable horizontally for 24 hours
+           - Add zoom controls (1hr, 4hr, 24hr views)
+           - Wire click handlers to navigate to details
+
+        3. Implement Tags Sidebar
+           - Extract tags from all sessions for selected date
+           - Count occurrences
+           - Display as list with counts
+           - Make clickable to filter sessions
+
+        4. Implement Time Period Filtering
+           - Add filter buttons: Morning, Afternoon, Evening, Night
+           - Add app filter (show sessions using specific app)
+           - Filter sessions list based on selection
+           - Update timeline bands to highlight filtered range
+
+        5. Write comprehensive E2E tests
+           - Test stats sidebar displays correct calculations
+           - Test timeline bands render and interactions
+           - Test tags sidebar and filtering
+           - Test all navigation paths from timeline
+      </steps>
+      <acceptance_criteria>
+        - Stats sidebar shows accurate metrics
+        - Visual timeline displays with all 4 rows
+        - Timeline is interactive (click blocks navigate)
+        - Tags sidebar lists all tags with counts
+        - Filtering works and updates UI
+        - Matches v1 visual appearance and functionality
+        - All E2E tests pass
+      </acceptance_criteria>
+      <estimated_effort>1-2 weeks</estimated_effort>
+    </phase>
+
+    <phase number="3" name="Complete Analytics Page - Add Missing Visualizations">
+      <priority>HIGH</priority>
+      <description>Implement all missing analytics features from v1</description>
+      <steps>
+        1. Implement Productivity Score System
+           - Backend: Create app categorization (productive/neutral/distracting)
+           - Backend: Calculate time in each category based on app usage
+           - Backend: Generate 1-5 score based on productive %
+           - Frontend: ProductivityScoreCard component
+           - Frontend: Time breakdown visualization
+           - Add settings UI for app categorization
+
+        2. Implement Focus Distribution Chart
+           - Backend: Calculate focus quality per hour (based on context switches)
+           - Frontend: Horizontal bar chart showing hourly focus patterns
+           - Wire to real data
+
+        3. Implement Activity Tags Chart
+           - Backend: Extract tags from summaries for date range
+           - Backend: Calculate time per tag
+           - Frontend: Horizontal bar chart of top tags
+           - Make bars clickable to filter
+
+        4. Implement Time Distribution Pie Chart
+           - Use existing app usage data
+           - Create pie chart component with Recharts
+           - Show percentage labels
+           - Make slices clickable to filter
+
+        5. Implement Top Windows List
+           - Backend: Query focus_events grouped by window_title
+           - Backend: Calculate time per window
+           - Frontend: WindowUsageList component with badges
+           - Make clickable to filter to that window in Day view
+
+        6. Implement Week/Month Views
+           - Backend: GetWeeklyStats API method
+           - Backend: GetMonthlyStats API method
+           - Frontend: WeeklyAnalytics component (7-day view)
+           - Frontend: MonthlyAnalytics component (30-day view)
+           - Weekly: Daily activity chart, averages, ranges
+           - Monthly: Trends, week-over-week comparisons
+
+        7. Implement Export Analytics
+           - Export button generates PDF/CSV of current view
+           - Include all charts and stats
+           - Format nicely for sharing
+
+        8. Implement Regenerate Analytics
+           - Button to force recalculation (useful after data changes)
+           - Show loading state during recalc
+
+        9. Write comprehensive E2E tests
+           - Test all charts render with data
+           - Test view switching (Day/Week/Month)
+           - Test productivity score calculation
+           - Test export functionality
+           - Test all click-through navigation
+      </steps>
+      <acceptance_criteria>
+        - Productivity score displays with accurate calculation
+        - All 5 missing charts implemented and functional
+        - Week and Month views work correctly
+        - Export generates valid files
+        - Matches v1 analytics functionality
+        - All E2E tests pass
+      </acceptance_criteria>
+      <estimated_effort>2-3 weeks</estimated_effort>
+    </phase>
+
+    <phase number="4" name="Enhance Session Detail Page - Add Transparency Features">
+      <priority>MEDIUM</priority>
+      <description>Add v1's transparency features for debugging and trust</description>
+      <steps>
+        1. Implement Back Navigation
+           - Add "Back to Timeline" link in header
+           - Preserve scroll position when returning
+
+        2. Implement Regenerate Summary
+           - Add button in header
+           - Backend: RegenerateSummary API method
+           - Frontend: Optimistic update + refetch
+           - Show loading state during regeneration
+
+        3. Implement Delete Session
+           - Add button in header with confirmation dialog
+           - Backend: DeleteSession API method
+           - Frontend: Navigate back after delete
+           - Update timeline to reflect deletion
+
+        4. Add Model Explanation Section
+           - Backend: Store model's reasoning in summaries table
+           - Frontend: Collapsible section showing explanation
+           - Format nicely for readability
+
+        5. Add API Request Details Section
+           - Backend: Store full API request payload with summary
+           - Frontend: Collapsible section showing:
+             * Screenshot thumbnails used
+             * Full request JSON (pretty-printed)
+             * Model, endpoint, prompt details
+           - Useful for debugging and transparency
+
+        6. Add Generation Details
+           - Display model name, inference time, timestamp
+           - Show summary ID
+           - Link to config snapshot
+
+        7. Add Config Snapshot
+           - Backend: Store config snapshot when summary generated
+           - Frontend: Collapsible section showing all config values
+           - Useful to understand why summary is what it is
+
+        8. Fix All Screenshots Display
+           - Remove limit=10 restriction
+           - Show ALL screenshots from session
+           - Add pagination or "Load More" if performance concern
+           - Maintain grid layout
+
+        9. Enhance Activity Log
+           - Show detailed table of EVERY app/window switch
+           - Include: Time, App, Window, Duration columns
+           - Visual duration bars
+           - Sortable by any column
+           - Filterable
+
+        10. Write E2E tests
+            - Test regenerate creates new summary
+            - Test delete removes session
+            - Test all sections expand/collapse
+            - Test all screenshots load
+            - Test activity log filtering/sorting
+      </steps>
+      <acceptance_criteria>
+        - Navigation works smoothly
+        - Regenerate and Delete function correctly
+        - All transparency sections display accurate data
+        - All screenshots shown (not just 10)
+        - Activity log shows complete data
+        - Matches v1 session detail functionality
+        - All E2E tests pass
+      </acceptance_criteria>
+      <estimated_effort>1-2 weeks</estimated_effort>
+    </phase>
+
+    <phase number="5" name="Improve Reports Page - Add Convenience Features">
+      <priority>MEDIUM</priority>
+      <description>Add missing reports features from v1</description>
+      <steps>
+        1. Implement Quick Report Presets
+           - Add preset buttons: Today, Yesterday, This Week, Last Week
+           - Add Standup (Today) and Standup (Yesterday) buttons
+           - Wire to existing generation logic with pre-filled time ranges
+
+        2. Add "Include Key Screenshots" Option
+           - Checkbox in report form
+           - Backend: Select representative screenshots for time range
+           - Include in report content (embedded or attached)
+
+        3. Implement Daily Summaries Auto-List
+           - Backend: Auto-generate summary for previous day overnight
+           - Frontend: DailySummariesList component
+           - Show chronological list of auto-generated summaries
+           - Click to view full report
+           - Preview shows date, summary excerpt, total time
+
+        4. Consider UI Layout
+           - Evaluate if current two-column layout works well
+           - Compare with v1 vertical layout
+           - Make decision: keep or change
+           - Implement chosen layout
+
+        5. Write E2E tests
+           - Test quick presets generate correct reports
+           - Test screenshot inclusion
+           - Test daily summaries list
+           - Test report detail view
+      </steps>
+      <acceptance_criteria>
+        - Quick presets work with one click
+        - Screenshots included when option checked
+        - Daily summaries auto-generate and display
+        - UI layout is clean and functional
+        - All E2E tests pass
+      </acceptance_criteria>
+      <estimated_effort>1 week</estimated_effort>
+    </phase>
+
+    <phase number="6" name="Testing & Quality Assurance - Achieve Test Coverage Goals">
+      <priority>HIGH</priority>
+      <description>Expand test suite to meet TDD protocol requirements</description>
+      <steps>
+        1. Add Missing Page E2E Tests
+           - Create analytics.spec.ts (comprehensive analytics testing)
+           - Create reports.spec.ts (generation, export, history)
+           - Create session-detail.spec.ts (all tabs, interactions)
+           - Target: Each spec file has 10+ tests covering all features
+
+        2. Add Workflow E2E Tests
+           - Create workflows.spec.ts
+           - Test complete user journeys:
+             * Browse timeline → Select session → View details → Generate summary
+             * Analytics → Click app → Navigate to Day view → View screenshots
+             * Generate report → Export → Verify file
+             * Change settings → Verify behavior changes in tracking
+             * Search/filter → Results → Detail view
+           - Target: 15+ workflow tests
+
+        3. Add Component Unit Tests
+           - Audit all components in frontend/src/components/
+           - Write tests for untested components
+           - Focus on:
+             * Timeline components (SessionCard, CalendarWidget, TimelineBands)
+             * Analytics components (all charts, StatCard)
+             * Reports components (ReportPreview, TimeRangeSelector)
+             * Common components (Screenshot, ImageGallery, DatePicker)
+           - Target: 100+ component tests
+
+        4. Add API Hook Tests
+           - Expand frontend/src/api/hooks.test.ts
+           - Test all hooks with mock API responses
+           - Test error handling for each hook
+           - Test loading states
+           - Test cache invalidation
+           - Test optimistic updates
+           - Target: 50+ hook tests
+
+        5. Visual Regression Testing
+           - Set up Playwright screenshot comparison
+           - Capture baseline screenshots of all pages
+           - Add visual regression tests to CI
+           - Test dark theme consistency
+           - Test responsive layouts
+
+        6. Performance/Load Testing
+           - Test with realistic data volumes:
+             * 1000+ screenshots in Day view
+             * 365 days in calendar heatmap
+             * Month-long reports
+           - Identify and fix performance bottlenecks
+           - Add performance budget tests
+
+        7. Backend Test Expansion
+           - Current: 115 backend tests
+           - Add tests for new APIs from phases 1-5
+           - Target: 150+ backend tests
+           - Maintain 80%+ code coverage
+
+        8. Test Quality Audit
+           - Review all tests for flakiness
+           - Ensure fast execution (< 10 min full suite)
+           - Clear test names describing behavior
+           - No skipped/disabled tests
+           - All tests passing consistently
+      </steps>
+      <acceptance_criteria>
+        - E2E tests: 50+ tests across 15-20 files (currently 3)
+        - Component tests: 100+ tests
+        - API hook tests: 50+ tests
+        - Backend tests: 150+ tests (currently 115)
+        - Total: 300+ automated tests
+        - All tests pass consistently
+        - CI runs all tests on every commit
+        - No flaky tests
+        - Test execution under 10 minutes
+        - Coverage reports generated
+      </acceptance_criteria>
+      <estimated_effort>2-3 weeks</estimated_effort>
+    </phase>
+
+    <phase number="7" name="Polish & Refinement - Match v1 UX Quality">
+      <priority>MEDIUM</priority>
+      <description>Fine-tune UI/UX to match v1's polish</description>
+      <steps>
+        1. Visual Design Audit
+           - Compare each v2 page with v1 screenshots
+           - Identify spacing, color, typography differences
+           - Adjust to match v1's visual polish
+           - Ensure consistent dark theme
+           - Fix any alignment issues
+
+        2. Interaction Polish
+           - Add smooth transitions/animations where v1 has them
+           - Ensure hover states are consistent
+           - Add loading skeletons that maintain layout
+           - Improve empty states with helpful messaging
+           - Add micro-interactions (button press effects, etc.)
+
+        3. Performance Optimization
+           - Optimize screenshot loading (lazy loading, virtualization)
+           - Optimize chart rendering for large datasets
+           - Add request debouncing where appropriate
+           - Minimize unnecessary re-renders
+           - Bundle size optimization
+
+        4. Error Handling Polish
+           - Friendly error messages
+           - Retry buttons where appropriate
+           - Offline state handling
+           - Graceful degradation
+
+        5. Accessibility Audit
+           - Ensure all interactive elements keyboard accessible
+           - Add ARIA labels where needed
+           - Test with screen reader
+           - Fix any accessibility issues
+
+        6. Documentation
+           - Update README with v2 features
+           - Document all keyboard shortcuts
+           - Add troubleshooting section
+           - Document build/dev process clearly
+           - Add screenshots to README
+      </steps>
+      <acceptance_criteria>
+        - Visual design matches v1 quality
+        - All interactions feel smooth
+        - Performance is good with large datasets
+        - Error handling is user-friendly
+        - Accessibility requirements met
+        - Documentation is comprehensive
+      </acceptance_criteria>
+      <estimated_effort>1-2 weeks</estimated_effort>
+    </phase>
+
+    <phase number="8" name="Optional Enhancements - Beyond v1">
+      <priority>LOW</priority>
+      <description>New features unique to v2 or improvements beyond v1</description>
+      <steps>
+        1. Enhanced Data Sources Panel
+           - Show data quality/completeness for each tracker
+           - Indicators for missing data
+           - Suggestions for configuration improvements
+           - Link to relevant settings
+
+        2. Command Palette
+           - Cmd/Ctrl+K to open
+           - Quick navigation to any page
+           - Quick actions (generate summary, export report)
+           - Search functionality
+
+        3. Global Search
+           - Search across all sessions, summaries, reports
+           - Filter by date range, app, tag
+           - Jump to results
+
+        4. Dashboard View
+           - New home page showing overview of recent activity
+           - Today's stats
+           - Recent sessions
+           - Quick actions
+
+        5. Notifications
+           - Notify when summary generated
+           - Notify when report exported
+           - Daily summary ready notification
+
+        6. Themes
+           - Light theme option
+           - Custom color schemes
+           - Theme switcher
+      </steps>
+      <acceptance_criteria>
+        - Features work as designed
+        - Don't interfere with core functionality
+        - Tested if implemented
+      </acceptance_criteria>
+      <estimated_effort>Variable, as desired</estimated_effort>
+    </phase>
+  </implementation_roadmap>
+
+  <testing_requirements>
+    <philosophy>
+      Follow TRAQ_DEV_PROTOCOL.md strictly: Test-Driven Development, tests before code,
+      comprehensive coverage, manual testing required, honest reporting.
+
+      "Done" means: App runs, feature works when human clicks it, no errors, tests pass.
+    </philosophy>
+
+    <test_types>
+      <backend_unit_tests>
+        <location>internal/*/\*_test.go</location>
+        <current_count>115+ tests across 25 test files</current_count>
+        <target>150+ tests (add tests for new APIs)</target>
+        <coverage_goal>80%+ code coverage on business logic</coverage_goal>
+        <requirements>
+          - Test happy path + edge cases + error conditions
+          - Storage layer: CRUD, query filters, null handling
+          - Platform layer: Integration tests (tagged) for OS-specific code
+          - Trackers: Capture, duplicate detection, session logic, error handling
+          - Services: Null/zero inputs, empty results, calculations, aggregations
+          - All calculations tested (durations, percentages, aggregations)
+        </requirements>
+      </backend_unit_tests>
+
+      <frontend_component_tests>
+        <location>frontend/src/components/\*\*/\*.test.tsx</location>
+        <current_count>Unknown, some exist</current_count>
+        <target>100+ component tests</target>
+        <requirements>
+          - All custom components have tests
+          - Test render without crashing
+          - Test with null/undefined/empty data
+          - Test loading states
+          - Test error states
+          - Test click handlers and interactions
+          - Use Testing Library best practices
+        </requirements>
+      </frontend_component_tests>
+
+      <frontend_hook_tests>
+        <location>frontend/src/api/hooks.test.ts</location>
+        <current_count>Some exist</current_count>
+        <target>50+ API hook tests</target>
+        <requirements>
+          - Test all hooks with mock responses
+          - Test error handling
+          - Test loading states
+          - Test cache invalidation
+          - Test optimistic updates
+          - Test retry logic
+        </requirements>
+      </frontend_hook_tests>
+
+      <e2e_tests>
+        <location>frontend/e2e/tests/\*.spec.ts</location>
+        <current_count>3 test files (timeline, day, settings)</current_count>
+        <target>15-20 test files, 50+ tests total</target>
+        <required_specs>
+          ✅ timeline.spec.ts (exists, needs expansion)
+          ✅ day.spec.ts (exists, needs expansion)
+          ✅ settings.spec.ts (exists)
+          ❌ analytics.spec.ts (REQUIRED - missing)
+          ❌ reports.spec.ts (REQUIRED - missing)
+          ❌ session-detail.spec.ts (REQUIRED - missing)
+          ❌ workflows.spec.ts (REQUIRED - missing)
+          ❌ navigation.spec.ts (cross-page navigation)
+          ❌ search-filter.spec.ts (if search implemented)
+        </required_specs>
+        <requirements>
+          - All 6 main pages have E2E tests
+          - All user workflows tested end-to-end
+          - Test with real data (fixture setup)
+          - Test all interactive features
+          - Test keyboard navigation
+          - Test error scenarios
+          - Page Object Model pattern for maintainability
+        </requirements>
+      </e2e_tests>
+
+      <visual_regression_tests>
+        <location>frontend/e2e/visual/\*.spec.ts</location>
+        <current_count>0 (not implemented)</current_count>
+        <target>10+ visual tests</target>
+        <requirements>
+          - Snapshot each page in different states
+          - Test dark theme consistency
+          - Test responsive layouts
+          - Use Playwright screenshot comparison
+          - Baseline screenshots in repo
+          - CI fails on visual regressions
+        </requirements>
+      </visual_regression_tests>
+
+      <performance_tests>
+        <location>frontend/e2e/performance/\*.spec.ts</location>
+        <current_count>0 (not implemented)</current_count>
+        <target>5+ performance tests</target>
+        <requirements>
+          - Test with 1000+ screenshots (Day view)
+          - Test with 365 days (Calendar heatmap)
+          - Test with large reports (month-long)
+          - Set performance budgets (load time, render time)
+          - Identify bottlenecks
+        </requirements>
+      </performance_tests>
+    </test_types>
+
+    <test_quality_standards>
+      <requirement>Tests written BEFORE implementation (TDD)</requirement>
+      <requirement>Tests must cover happy path + edge cases + error conditions</requirement>
+      <requirement>All tests must pass before merging code</requirement>
+      <requirement>No flaky tests (retry until fixed)</requirement>
+      <requirement>Fast execution (full suite under 10 minutes)</requirement>
+      <requirement>Clear test names describing behavior</requirement>
+      <requirement>No skipped/disabled tests without issue tracking</requirement>
+      <requirement>CI runs all tests on every commit</requirement>
+    </test_quality_standards>
+
+    <manual_testing_requirements>
+      <requirement>Every UI feature manually tested in running app before "done"</requirement>
+      <requirement>Check browser console for errors (must be none)</requirement>
+      <requirement>Visual verification required (not just automated tests)</requirement>
+      <requirement>Test on actual Linux system (not just mocks)</requirement>
+      <requirement>Test with real data (not just test fixtures)</requirement>
+      <requirement>Document manual test results in PR description</requirement>
+    </manual_testing_requirements>
+
+    <coverage_goals>
+      <backend>80%+ code coverage on business logic</backend>
+      <frontend_components>70%+ component coverage</frontend_components>
+      <e2e>All critical user paths covered</e2e>
+      <total_test_count>300+ automated tests (150 backend + 150 frontend)</total_test_count>
+    </coverage_goals>
+
+    <pre_merge_checklist>
+      - [ ] All new code has tests written first (TDD)
+      - [ ] All tests pass (go test ./..., npm test, npm run test:e2e)
+      - [ ] No console errors in manual testing
+      - [ ] Feature works when clicking in actual app
+      - [ ] No regressions (existing features still work)
+      - [ ] Code coverage maintained or improved
+      - [ ] No TODOs, FIXMEs, or debug statements
+      - [ ] Documentation updated if needed
+    </pre_merge_checklist>
+  </testing_requirements>
+
+  <development_workflow>
+    <tdd_process>
+      1. Understand acceptance criteria (what "working" means)
+      2. Write failing tests first (unit, component, E2E as appropriate)
+      3. Run tests - they MUST fail initially
+      4. Implement minimum code to make tests pass
+      5. Run tests - they MUST pass
+      6. Run the actual app and manually test
+      7. Report honestly: what works, what doesn't, known issues
+    </tdd_process>
+
+    <commit_protocol>
+      - Commit messages describe WHAT changed and WHY
+      - Reference issue numbers if applicable
+      - Each commit should be a logical unit
+      - Tests must pass before committing
+      - Follow conventional commits format if desired
+    </commit_protocol>
+
+    <branch_strategy>
+      - main/master: Stable, deployable code
+      - feature/\*: Feature branches for new work
+      - fix/\*: Bug fix branches
+      - test/\*: Test-only changes
+      - Pull requests required for merging
+      - Code review before merge
+    </branch_strategy>
+
+    <build_commands>
+      <dev>make dev (runs Wails in dev mode with hot reload)</dev>
+      <build>make build (compiles production binary to build/bin/traq)</build>
+      <test>make test (runs all Go tests)</test>
+      <test_frontend>make test-frontend (runs Vitest + Playwright)</test_frontend>
+      <bindings>make bindings (regenerates Wails bindings after Go changes)</bindings>
+      <clean>make clean (removes build artifacts)</clean>
+    </build_commands>
+
+    <code_style>
+      <backend>
+        - Go standard formatting (gofmt)
+        - Follow Go best practices
+        - Error handling: Always check errors, return errors, don't panic
+        - Naming: Clear, descriptive names
+        - Comments: Explain WHY, not WHAT
+      </backend>
+      <frontend>
+        - Prettier for formatting
+        - ESLint for linting
+        - TypeScript strict mode
+        - Functional components with hooks
+        - Props interfaces defined
+        - Meaningful component/variable names
+      </frontend>
+    </code_style>
+  </development_workflow>
+
+  <known_good_patterns>
+    <pattern name="React Query for API calls">
+      <description>
+        Use TanStack Query hooks for all backend API calls. Provides caching, loading states,
+        error handling, refetching, and optimistic updates automatically.
+      </description>
+      <example>
+        const { data, isLoading, error } = useDailySessions(date)
+        const { mutate: generateSummary } = useGenerateSummary()
+      </example>
+    </pattern>
+
+    <pattern name="Page Object Model for E2E tests">
+      <description>
+        Use Page Object pattern in Playwright tests for maintainability. Each page has a class
+        with methods for interactions and selectors encapsulated.
+      </description>
+      <location>frontend/e2e/pages/</location>
+    </pattern>
+
+    <pattern name="shadcn/ui components">
+      <description>
+        Use shadcn/ui components for consistent UI. Copy components into project, customize as needed.
+        Based on Radix UI primitives for accessibility.
+      </description>
+    </pattern>
+
+    <pattern name="Service layer for business logic">
+      <description>
+        Backend business logic in internal/service/, storage layer in internal/storage/.
+        Services use storage for data access, implement algorithms and calculations.
+        Keep clean separation of concerns.
+      </description>
+    </pattern>
+  </known_good_patterns>
+
+  <anti_patterns>
+    <anti_pattern>Don't skip tests because code is "simple" - every bug is a test you didn't write</anti_pattern>
+    <anti_pattern>Don't use mock data in production code - fix the API integration</anti_pattern>
+    <anti_pattern>Don't ignore console errors - they indicate real problems</anti_pattern>
+    <anti_pattern>Don't leave TODO comments without tracking them as issues</anti_pattern>
+    <anti_pattern>Don't declare "done" without manual testing in running app</anti_pattern>
+    <anti_pattern>Don't bypass TDD process - it catches bugs early</anti_pattern>
+    <anti_pattern>Don't commit debug statements (fmt.Println, console.log)</anti_pattern>
+  </anti_patterns>
+
+  <success_metrics>
+    <metric>All 6 main pages display real data from backend</metric>
+    <metric>Feature parity with v1 (15 missing features implemented)</metric>
+    <metric>300+ automated tests passing consistently</metric>
+    <metric>All E2E workflows tested</metric>
+    <metric>No console errors in normal usage</metric>
+    <metric>App runs smoothly with 1000+ screenshots</metric>
+    <metric>UI/UX matches or exceeds v1 polish</metric>
+    <metric>Build completes without errors</metric>
+    <metric>Documentation is comprehensive and accurate</metric>
+    <metric>New contributors can understand codebase from spec + docs</metric>
+  </success_metrics>
+
+  <out_of_scope>
+    <item>Mobile app version (desktop only via Wails)</item>
+    <item>Cloud sync (local-only SQLite database)</item>
+    <item>Multi-user support (single-user app)</item>
+    <item>Real-time collaboration</item>
+    <item>Browser extension for tracking</item>
+    <item>Integration with external services (Jira, Slack, etc.) - not currently planned</item>
+    <item>Video recording (screenshots only)</item>
+    <item>OCR on screenshots (future consideration)</item>
+  </out_of_scope>
+
+  <reference_materials>
+    <v1_instance>
+      Running at http://localhost:55555
+      Use for UI/UX reference, feature comparison, visual design guidance
+    </v1_instance>
+    <development_protocol>
+      TRAQ_DEV_PROTOCOL.md - MANDATORY reading, defines TDD requirements and "done" criteria
+    </development_protocol>
+    <phase1_guide>
+      TRAQ_PHASE1_IMPLEMENTATION.md - Historical implementation guide, useful context
+    </phase1_guide>
+    <git_history>
+      Review recent commits for bug fixes and feature additions:
+      - c8a0bf2: Defensive nil checks and Linux signal handler fix
+      - 0c0c550: WebKit/Go signal handler conflict documentation
+      - 5bf01dc: 5 UI bug fixes and daemon enhancements
+      - f5ac0b0: Null endTime duration bug fix and service unit tests
+      - fca6b7f: Playwright E2E testing addition
+      - 844409f: Frontend wiring to real Wails bindings
+    </git_history>
+  </reference_materials>
+
+  <final_notes>
+    <note>
+      This specification is PRESCRIPTIVE, not descriptive. It describes how the app SHOULD work,
+      not how it currently works. Current bugs and missing features are documented but not
+      codified as "correct behavior."
+    </note>
+    <note>
+      v1 (Python) represents the target UI/UX quality. v2 (Go/Wails) has better architecture
+      and new features (enhanced context tracking). The goal is to combine the best of both:
+      v1's polish + v2's architecture and features.
+    </note>
+    <note>
+      Testing is NOT optional. TDD protocol must be followed. "Done" means tests pass AND
+      manual testing confirms feature works. No exceptions.
+    </note>
+    <note>
+      The implementation roadmap is prioritized. Phase 1 is critical (fix mock data), then
+      build out missing features, then polish. Don't skip phases without good reason.
+    </note>
+    <note>
+      When in doubt, refer to v1 at localhost:55555 for how a feature should work and look.
+      Take screenshots for reference. Match that quality.
+    </note>
+    <note>
+      This is an activity tracker for users to understand their own time usage. The UI should
+      be clear, honest, and helpful. No deceptive patterns, no hiding of data. Transparency
+      is a feature (hence API request details, config snapshots, etc.).
+    </note>
+  </final_notes>
+</project_specification>

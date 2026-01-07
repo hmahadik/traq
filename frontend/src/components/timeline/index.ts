@@ -3,3 +3,4 @@ export { HourGroupWithScreenshots } from './HourGroupWithScreenshots';
 export { SessionCard, SessionCardSkeleton } from './SessionCard';
 export { SessionCardWithThumbnails } from './SessionCardWithThumbnails';
 export { CalendarWidget } from './CalendarWidget';
+export { TimelineStats } from './TimelineStats';

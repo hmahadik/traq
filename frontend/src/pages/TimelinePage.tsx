@@ -1,7 +1,7 @@
 import { useState, useCallback, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { SessionCardWithThumbnails, SessionCardSkeleton, CalendarWidget } from '@/components/timeline';
+import { SessionCardWithThumbnails, SessionCardSkeleton, CalendarWidget, TimelineStats } from '@/components/timeline';
 import {
   useSessionsForDate,
   useCalendarHeatmap,
@@ -86,6 +86,17 @@ export function TimelinePage() {
 
   return (
     <div className="flex gap-6 h-[calc(100vh-8rem)]">
+      {/* Stats Sidebar */}
+      <div className="hidden xl:block w-72 flex-shrink-0">
+        <div className="sticky top-0">
+          <TimelineStats
+            sessions={sessions}
+            isLoading={sessionsLoading}
+            date={selectedDate}
+          />
+        </div>
+      </div>
+
       {/* Main Content */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Header */}
