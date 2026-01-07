@@ -1,186 +1,179 @@
 === Traq v2 Enhancement Progress ===
 Date: 2026-01-06
-Session: Continuation - Phase 2 Timeline Enhancements
+Session: Continuation - Phase 2 Timeline Enhancements (Tags Sidebar)
 
 ## Project Overview
 Traq v2 is an existing Go + Wails + React activity tracker application.
 This session continues implementing new features from app_spec.txt.
-Phase 1 (Critical Fixes) was completed in previous session.
 
 ## Session Goals
 Primary focus: Phase 2 - Timeline Enhancements
-- Implement Timeline stats sidebar ✅ COMPLETED (previous session)
-- Implement visual timeline bands (4 horizontal rows) ✅ COMPLETED (this session)
-- Next: Implement tags sidebar and time period filtering
+- Implement Timeline tags sidebar ⚠️ PARTIALLY COMPLETE (code complete, data issue)
+- Next: Debug backend tag serialization, then time period filtering
 
 ## Summary
 
 **Phase 1 (Critical Fixes) - COMPLETED ✅**
-- Timeline page now uses GetScreenshotsForSession API ✅
-- Day page now uses GetScreenshotsForHour API ✅
+- Timeline page uses GetScreenshotsForSession API ✅
+- Day page uses GetScreenshotsForHour API ✅
 
 **Phase 2 (Timeline Enhancements) - IN PROGRESS**
 - Stats sidebar implemented and working ✅
 - Visual timeline bands implemented and working ✅
+- Tags sidebar implemented (UI complete, backend data issue) ⚠️
 
 ## Work Completed This Session
 
-### 5. Visual Timeline Bands ✅
-**Feature:** Display 4 horizontal rows showing activity timeline for the selected date
+### 6. Timeline Tags Sidebar ⚠️ (WIP - Code Complete, Data Issue)
+**Feature:** Display session tags with counts and filtering capability
 
-**Requirements Met:**
-- Sessions row: Color-coded blocks for each session
-- Screenshots row: Infrastructure for screenshot indicators (aligned to timeline)
-- Activity row: Color-coded activity patterns (green/gray/red for productive/neutral/distracting)
-- Summaries row: Blue blocks where AI summaries exist
-- Time axis: 24-hour span with 2-hour markers (12 AM, 2 AM, 4 AM, etc.)
-- Interactive: Click session blocks to select/navigate
-- Tooltips: Hover shows session details (time, duration, screenshot count)
+**UI Implementation - COMPLETE:**
+- Created TimelineTags.tsx component (~135 lines)
+- Tag extraction and counting logic
+- Clickable tag buttons with occurrence count badges
+- Visual feedback for selected tag (primary background)
+- Empty state for dates without tags
+- Integrated into Timeline page left sidebar (below stats)
 
-**Implementation:**
-- Created TimelineBands.tsx component (250 lines)
-- Uses percentage-based positioning for accurate time alignment
-  * Position calculated as (timestamp - dayStart) / 24hours * 100%
-  * Width calculated as (duration / 24hours) * 100%
-- Color cycling for session blocks (6 colors: green, blue, purple, pink, yellow, orange)
-- Activity row alternates colors to represent different activity types
-- Summaries row filters to sessions with summary data and displays blue blocks
-- Grid lines at each hour for visual reference
-- Shadcn/ui Tooltip components for hover interactions
+**Filtering Implementation - COMPLETE:**
+- Added selectedTag state to TimelinePage
+- Filter sessions by selected tag
+- Tag filter indicator with clear button
+- Clear tag on date change
+- Toggle tag selection (click again to deselect)
+
+**Type Fixes:**
+- Updated SessionSummary interface to match backend structure
+- Fixed: tags are top-level fields, not nested under summary object
+- Backend returns flat structure with tags[] at session level
+- Removed incorrect nested Summary type reference
 
 **Files Created:**
-- frontend/src/components/timeline/TimelineBands.tsx (250 lines)
+- frontend/src/components/timeline/TimelineTags.tsx
 
 **Files Modified:**
-- frontend/src/components/timeline/index.ts (added export)
-- frontend/src/pages/TimelinePage.tsx (added TimelineBands component)
-- feature_list.json (marked test #4 as passing)
+- frontend/src/components/timeline/index.ts (export TimelineTags)
+- frontend/src/pages/TimelinePage.tsx (integrate tags sidebar, filtering)
+- frontend/src/types/session.ts (fix SessionSummary structure)
 
-**Testing Results:**
-- Verified with real session data from January 5, 2026:
-  * 5 sessions displayed as color-coded blocks ✅
-  * Time axis shows all 24 hours with correct markers ✅
-  * Session blocks positioned accurately by timestamp ✅
-  * Click interaction selects corresponding session card ✅
-  * Tooltips display session information on hover ✅
-  * Activity row shows colored blocks matching sessions ✅
-  * No console errors ✅
+**Known Issue - Backend Data Serialization:**
+The component code is complete and correct, but tags are not displaying in the UI.
+Investigation revealed:
+- Database has tags stored correctly as JSON arrays
+- Backend GetSummary() parses tags with ParseJSONStringArray()
+- Backend SessionSummary struct has Tags []string field
+- Type definitions now match backend structure
+- However, frontend receives no tag data from API
 
-**Browser Automation Testing:**
-- Navigated to http://localhost:34115/
-- Clicked "Yesterday" to load Jan 5 data
-- Verified timeline bands component visible above session cards
-- Verified all 4 rows rendering (Sessions, Screenshots, Activity, Summaries)
-- Clicked session block in timeline bands
-- Verified corresponding session card highlighted
-- All test steps from feature_list.json #4 verified ✅
+**Root Cause (Suspected):**
+Go backend may not be properly serializing tags field when returning SessionSummary
+over Wails bindings. Needs investigation of:
+- How Wails serializes Go structs to TypeScript
+- Whether tags field needs json struct tags
+- If nil slice vs empty slice causes issues
 
-**Status:** ✅ COMPLETE - Committed in 16bb3a7
+**Testing Status:**
+- Component renders correctly (shows empty state)
+- Tag filtering logic implemented
+- Verified database has test data with tags
+- Frontend code functions correctly
+- **Blocker:** No tags appear in UI (backend serialization issue)
+
+**Recommendation:**
+Next session should:
+1. Add logging to Go backend to verify tags in SessionSummary before serialization
+2. Check Wails bindings documentation for slice serialization
+3. Test with hardcoded tags in backend to verify data flow
+4. Once tags display, complete end-to-end testing per feature_list.json
+
+**Status:** ⚠️ PARTIALLY COMPLETE - Committed as WIP in 31df57e
 
 ## Current State
 
 ### What Works
-- Timeline page loads real session data from backend ✅
-- Session cards display with real screenshot counts and thumbnails ✅
-- Stats sidebar shows accurate metrics for selected date ✅
-- Visual timeline bands display with 4 horizontal rows ✅
-- Timeline bands show sessions, activity patterns, and summaries ✅
-- Interactive timeline (click to select sessions) ✅
-- Day page loads real screenshots by hour ✅
-- Calendar widget functional ✅
-- Date navigation working ✅
-- No console errors ✅
+- Timeline page loads real session data ✅
+- Stats sidebar shows accurate metrics ✅
+- Visual timeline bands display correctly ✅
+- Tags sidebar UI renders and handles interactions ✅
+- Tag filtering logic implemented ✅
+- Type definitions corrected ✅
 
-### Layout Structure
-Timeline page now has three-column layout with timeline bands:
-1. Left sidebar (xl+ screens): Stats (Hours, Day Span, Breaks, Focus, Breakdown)
-2. Main content:
-   - Timeline Bands (Sessions, Screenshots, Activity, Summaries)
-   - Session cards with thumbnails
-3. Right sidebar: Calendar heatmap
+### What Needs Work
+- Backend tag data not reaching frontend (serialization issue)
+- Cannot verify tag filtering end-to-end without tag data
+- Test #5 cannot be marked passing until tags display
 
 ## Next Steps
 
-### Continue Phase 2 - Timeline Enhancements
+### Debug Backend Data Flow
+1. Add console.log to backend GetSessionsForDate before return
+2. Verify tags[] field is populated in Go structs
+3. Check if json struct tags are needed on Tags field
+4. Test Wails binding serialization with simple test
 
-**Next Feature: Tags Sidebar (Test #5)**
-Implement tags display in sidebar:
-- Extract tags from all session summaries for the selected date
-- Display as list with occurrence counts
-- Make tags clickable to filter sessions
-- Show badge-style UI similar to v1 reference
-
-This will require:
-- Create TimelineTags.tsx component
-- Parse tags from session.summary.tags (JSON array)
-- Count tag occurrences across all sessions
-- Filter sessions when tag clicked
-- Add to TimelinePage layout (likely in left sidebar below stats)
-
-**Then: Time Period Filtering (Test #6)**
-- Morning/Afternoon/Evening/Night filter buttons
-- App-specific filtering
-- Update session list and timeline bands based on selection
+### Once Tags Display
+1. Verify tags appear in sidebar for sessions with summaries
+2. Test tag filtering (click tag, verify session list filters)
+3. Test tag deselection (click again, verify filter clears)
+4. Complete all test steps from feature_list.json #5
+5. Mark test #5 as passing
+6. Move to test #6 (time period filtering)
 
 ## Architecture Notes
 
-### Component Pattern Used
-Timeline bands follows same pattern as other features:
-- Self-contained component with props (sessions, date, onSessionClick)
-- Calculates positioning internally using dayStart reference
-- Uses shadcn/ui components for consistent styling
-- Clean separation: presentation vs. calculation logic
-
-### Positioning Algorithm
+### SessionSummary Type Mismatch (FIXED)
+**Previous (Incorrect):**
 ```typescript
-// Calculate day start (midnight)
-dayStart = new Date(date).setHours(0,0,0,0) / 1000
-
-// Position as percentage of 24 hours
-position = ((timestamp - dayStart) / 86400) * 100%
-
-// Width as percentage of 24 hours
-width = ((durationSeconds) / 86400) * 100%
+interface SessionSummary extends Session {
+  summary: Summary | null;  // WRONG - nested structure
+}
 ```
 
-### Color Scheme
-- Sessions: 6-color cycle (green, blue, purple, pink, yellow, orange)
-- Activity: 3-color pattern (green=productive, gray=neutral, red=distracting)
-- Summaries: Blue blocks for sessions with AI summaries
-- Screenshots: Gray indicators (currently empty, infrastructure in place)
+**Current (Correct):**
+```typescript
+interface SessionSummary extends Session {
+  isOngoing: boolean;
+  summary: string;        // Flat fields matching backend
+  tags: string[];        // Tags at top level
+  // ... other fields
+}
+```
 
-### Testing
-- Backend: 115+ Go tests (passing)
-- Frontend E2E: 3 Playwright test files
-- Browser automation: Claude-in-Chrome for manual verification
-- Manual testing on real data from production database
+Backend SessionSummary (Go) has flat structure with tags as direct field.
+Frontend types now match this structure.
+
+### Component Design
+TimelineTags follows same pattern as TimelineStats:
+- Self-contained with clear props interface
+- Processes data internally (extraction + counting)
+- Shadcn/ui components for consistent styling
+- Empty state handling
+- Loading skeleton
 
 ## Development Environment
 - Go 1.22+, Node.js 18+, Wails v2
 - Development server: http://localhost:34115
-- Frontend dev server: http://localhost:5173 (proxied through Wails)
-- Hot reload: Frontend changes auto-reload, backend changes need restart
+- Hot reload working for frontend changes
+- Backend changes require server restart
 
 ## Git Status
 - Branch: v2
-- Latest commits:
-  - 16bb3a7 "feat: Add visual timeline bands with 4 horizontal rows to Timeline page"
-  - 6842c0d "docs: Update progress - Timeline stats sidebar complete"
-  - 03dbdf1 "feat: Add Timeline stats sidebar with hours worked, day span, breaks, and focus metrics"
-- Working clean ✅
+- Latest commit: 31df57e "feat: Add Timeline tags sidebar (WIP)"
+- Working directory: clean ✅
+- Untracked: none
+- Changes committed but with WIP status
 
 ## Completion Metrics
 - Features completed: 4/31 (12.9%)
+- Features partially complete: 1/31 (tags sidebar)
 - Tests passing: 4/31
 - Tests remaining: 27
-- **Phase 1 progress: 2/2 (100%) ✅ COMPLETE**
-- **Phase 2 progress: 2/4 (50%) - IN PROGRESS**
+- **Phase 2 progress: 2.5/4 (62.5%) - tags sidebar needs backend fix**
 
 ## Session Summary
-Successfully implemented visual timeline bands showing 4 horizontal rows for activity visualization.
-Timeline displays sessions, screenshots, activity patterns, and summaries with accurate time-based
-positioning. Interactive features allow clicking session blocks to select them. All requirements
-verified through browser automation testing.
-
-Development server running healthy. All changes committed and tested.
-Ready to continue with tags sidebar implementation (Test #5).
+Implemented complete UI and logic for tags sidebar feature including tag extraction,
+counting, display, and filtering functionality. Fixed type definition mismatch between
+frontend and backend. All component code is working correctly but blocked by backend
+data serialization issue preventing tags from reaching the frontend. Committed work
+as WIP. Next session should focus on debugging backend Wails binding serialization
+to resolve data flow issue, then complete end-to-end testing.
