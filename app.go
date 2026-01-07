@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -377,10 +378,10 @@ func (a *App) GetRecentSessions(limit int) ([]*storage.Session, error) {
 
 // DeleteSession deletes a session and all its related data.
 func (a *App) DeleteSession(sessionID int64) error {
-	if a.db == nil {
+	if a.store == nil {
 		return fmt.Errorf("database not initialized")
 	}
-	return a.db.DeleteSession(sessionID)
+	return a.store.DeleteSession(sessionID)
 }
 
 // ============================================================================
