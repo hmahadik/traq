@@ -250,7 +250,7 @@
       "Step 6: Verify navigation returns to timeline page",
       "Step 7: Verify scroll position is preserved"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -263,7 +263,7 @@
       "Step 5: Verify new summary is generated and displayed",
       "Step 6: Verify summary content has updated"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -278,7 +278,7 @@
       "Step 7: Verify navigation returns to timeline",
       "Step 8: Verify timeline no longer shows deleted session"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",

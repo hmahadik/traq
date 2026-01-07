@@ -383,3 +383,17 @@ export function useRegenerateSummary() {
     },
   });
 }
+
+export function useDeleteSession() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (sessionId: number) => api.timeline.deleteSession(sessionId),
+    onSuccess: () => {
+      // Invalidate all timeline queries since the session is deleted
+      queryClient.invalidateQueries({ queryKey: ['timeline'] });
+      queryClient.invalidateQueries({ queryKey: ['sessions'] });
+      queryClient.invalidateQueries({ queryKey: ['calendar'] });
+    },
+  });
+}

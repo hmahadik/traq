@@ -95,6 +95,10 @@ export const timeline = {
   getRecentSessions: async (limit: number) => {
     return App.GetRecentSessions(limit);
   },
+
+  deleteSession: async (sessionId: number) => {
+    return App.DeleteSession(sessionId);
+  },
 };
 
 /**

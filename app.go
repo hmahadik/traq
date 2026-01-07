@@ -3,7 +3,10 @@ package main
 import (
 	"context"
 	"log"
+	"net/http"
+	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"traq/internal/platform"
@@ -96,8 +99,52 @@ func (a *App) startup(ctx context.Context) {
 	// Initialize reports service (after timeline service)
 	a.Reports = service.NewReportsService(a.store, a.Timeline)
 
+	// Start screenshot server for dev mode (Vite proxies to this)
+	go startScreenshotServer(dataDir)
+
 	// Mark as ready
 	a.ready = true
+}
+
+// startScreenshotServer starts an HTTP server on port 34116 to serve screenshots.
+// This is used in dev mode where Vite proxies /screenshots/* requests here.
+// In production, the Wails asset handler serves screenshots directly.
+func startScreenshotServer(dataDir string) {
+	screenshotsDir := filepath.Join(dataDir, "screenshots")
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/screenshots/", func(w http.ResponseWriter, r *http.Request) {
+		// Extract relative path
+		relPath := strings.TrimPrefix(r.URL.Path, "/screenshots/")
+		if relPath == "" {
+			http.NotFound(w, r)
+			return
+		}
+
+		// Build full path
+		fullPath := filepath.Join(screenshotsDir, relPath)
+
+		// Security: ensure we don't escape the screenshots directory
+		if !strings.HasPrefix(fullPath, screenshotsDir) {
+			http.Error(w, "Invalid path", http.StatusForbidden)
+			return
+		}
+
+		// Check if file exists
+		if _, err := os.Stat(fullPath); os.IsNotExist(err) {
+			http.NotFound(w, r)
+			return
+		}
+
+		// Serve the file
+		http.ServeFile(w, r, fullPath)
+	})
+
+	// Start server on port 34116 (don't fail if port is in use)
+	log.Printf("Starting screenshot server on :34116")
+	if err := http.ListenAndServe(":34116", mux); err != nil {
+		log.Printf("Screenshot server error (may be expected if already running): %v", err)
+	}
 }
 
 // shutdown is called when the app is closing
@@ -326,6 +373,14 @@ func (a *App) GetRecentSessions(limit int) ([]*storage.Session, error) {
 		return nil, nil
 	}
 	return a.Timeline.GetRecentSessions(limit)
+}
+
+// DeleteSession deletes a session and all its related data.
+func (a *App) DeleteSession(sessionID int64) error {
+	if a.db == nil {
+		return fmt.Errorf("database not initialized")
+	}
+	return a.db.DeleteSession(sessionID)
 }
 
 // ============================================================================

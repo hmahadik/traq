@@ -89,6 +89,13 @@ func (s *TimelineService) GetSessionsForDate(date string) ([]*SessionSummary, er
 			summary.DurationSeconds = &duration
 		}
 
+		// Skip empty sessions (zero duration AND zero screenshots)
+		// These are sessions that were created but never captured any data
+		if !summary.IsOngoing && summary.ScreenshotCount == 0 &&
+			(summary.DurationSeconds == nil || *summary.DurationSeconds == 0) {
+			continue
+		}
+
 		// Get summary if exists
 		if sess.SummaryID.Valid {
 			sum, err := s.store.GetSummary(sess.SummaryID.Int64)

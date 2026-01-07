@@ -178,6 +178,45 @@ func (s *Store) SetSessionSummary(sessionID, summaryID int64) error {
 	return nil
 }
 
+// DeleteSession deletes a session and all its related data (screenshots, summaries, focus events, etc).
+func (s *Store) DeleteSession(id int64) error {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	// Delete related data in order (respecting foreign key constraints)
+	tables := []string{
+		"summaries",
+		"focus_events",
+		"shell_commands",
+		"git_commits",
+		"file_events",
+		"browser_history",
+		"screenshots",
+	}
+
+	for _, table := range tables {
+		_, err = tx.Exec(fmt.Sprintf("DELETE FROM %s WHERE session_id = ?", table), id)
+		if err != nil {
+			return fmt.Errorf("failed to delete from %s: %w", table, err)
+		}
+	}
+
+	// Finally, delete the session itself
+	_, err = tx.Exec("DELETE FROM sessions WHERE id = ?", id)
+	if err != nil {
+		return fmt.Errorf("failed to delete session: %w", err)
+	}
+
+	if err = tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	return nil
+}
+
 // GetSessionsWithoutSummary retrieves sessions that don't have a summary yet.
 func (s *Store) GetSessionsWithoutSummary(limit int) ([]*Session, error) {
 	rows, err := s.db.Query(`

@@ -1,18 +1,48 @@
-import { useParams, Link } from 'react-router-dom';
+import { useState } from 'react';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { useSessionContext } from '@/api/hooks';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { useSessionContext, useRegenerateSummary, useDeleteSession } from '@/api/hooks';
 import { formatTimeRange, formatDuration, formatTimestamp } from '@/lib/utils';
-import { Terminal, GitCommit, FileText, Globe, ArrowLeft } from 'lucide-react';
+import { Terminal, GitCommit, FileText, Globe, ArrowLeft, RefreshCw, Trash2 } from 'lucide-react';
 import { Screenshot } from '@/components/common/Screenshot';
+import { toast } from 'sonner';
 
 export function SessionDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const sessionId = parseInt(id || '0', 10);
-  const { data: context, isLoading } = useSessionContext(sessionId);
+  const { data: context, isLoading, refetch } = useSessionContext(sessionId);
+  const regenerateMutation = useRegenerateSummary();
+  const deleteMutation = useDeleteSession();
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+
+  const handleRegenerateSummary = async () => {
+    try {
+      await regenerateMutation.mutateAsync(sessionId);
+      toast.success('Summary regenerated successfully');
+      refetch(); // Refetch the session context to get the new summary
+    } catch (error) {
+      toast.error('Failed to regenerate summary');
+      console.error('Regenerate summary error:', error);
+    }
+  };
+
+  const handleDeleteSession = async () => {
+    try {
+      await deleteMutation.mutateAsync(sessionId);
+      toast.success('Session deleted successfully');
+      setDeleteDialogOpen(false);
+      navigate('/timeline'); // Navigate back to timeline
+    } catch (error) {
+      toast.error('Failed to delete session');
+      console.error('Delete session error:', error);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -51,12 +81,32 @@ export function SessionDetailPage() {
               {formatTimeRange(session.startTime, session.endTime ?? session.startTime)} ({formatDuration(session.durationSeconds ?? 0)})
             </p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 items-center">
             {summary?.confidence && (
               <Badge variant={summary.confidence === 'high' ? 'default' : 'secondary'}>
                 {summary.confidence} confidence
               </Badge>
             )}
+            {summary && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleRegenerateSummary}
+                disabled={regenerateMutation.isPending}
+              >
+                <RefreshCw className={`h-4 w-4 mr-2 ${regenerateMutation.isPending ? 'animate-spin' : ''}`} />
+                {regenerateMutation.isPending ? 'Regenerating...' : 'Regenerate Summary'}
+              </Button>
+            )}
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={() => setDeleteDialogOpen(true)}
+              disabled={deleteMutation.isPending}
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Delete Session
+            </Button>
           </div>
         </div>
       </div>
@@ -198,6 +248,35 @@ export function SessionDetailPage() {
           </Tabs>
         </CardContent>
       </Card>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Session</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete this session? This action cannot be undone.
+              All screenshots, summaries, and related data will be permanently deleted.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setDeleteDialogOpen(false)}
+              disabled={deleteMutation.isPending}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDeleteSession}
+              disabled={deleteMutation.isPending}
+            >
+              {deleteMutation.isPending ? 'Deleting...' : 'Delete Session'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

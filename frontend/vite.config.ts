@@ -11,6 +11,15 @@ export default defineConfig({
       "@wailsjs": path.resolve(__dirname, "./wailsjs"),
     },
   },
+  server: {
+    proxy: {
+      // Proxy screenshot requests to the Go screenshot server (for dev mode)
+      '/screenshots': {
+        target: 'http://localhost:34116',
+        changeOrigin: true,
+      },
+    },
+  },
   test: {
     globals: true,
     environment: 'jsdom',

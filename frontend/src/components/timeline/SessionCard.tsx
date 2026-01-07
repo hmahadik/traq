@@ -24,14 +24,14 @@ function ThumbnailImage({ screenshot }: { screenshot: Screenshot }) {
   const { data: thumbnailUrl, isLoading } = useThumbnail(screenshot.id);
 
   if (isLoading) {
-    return <Skeleton className="w-full h-full" />;
+    return <Skeleton className="absolute inset-0" />;
   }
 
   return (
     <img
       src={thumbnailUrl}
       alt=""
-      className="w-full h-full object-cover"
+      className="absolute inset-0 w-full h-full object-cover"
       loading="lazy"
     />
   );
@@ -62,7 +62,7 @@ export function SessionCard({
   };
 
   const displayThumbnails = thumbnails.slice(0, 6);
-  const remainingCount = thumbnails.length - 6;
+  const remainingCount = session.screenshotCount - displayThumbnails.length;
 
   return (
     <Card
@@ -128,13 +128,13 @@ export function SessionCard({
             {displayThumbnails.map((thumb) => (
               <div
                 key={thumb.id}
-                className="flex-shrink-0 w-20 aspect-video rounded overflow-hidden bg-muted"
+                className="relative flex-shrink-0 w-20 h-[45px] rounded overflow-hidden bg-muted"
               >
                 <ThumbnailImage screenshot={thumb} />
               </div>
             ))}
             {remainingCount > 0 && (
-              <div className="flex-shrink-0 w-20 aspect-video rounded bg-muted flex items-center justify-center">
+              <div className="flex-shrink-0 w-20 h-[45px] rounded bg-muted flex items-center justify-center">
                 <span className="text-sm text-muted-foreground">+{remainingCount}</span>
               </div>
             )}
@@ -240,7 +240,7 @@ export function SessionCardSkeleton() {
       <CardContent className="pt-0 pb-3">
         <div className="flex gap-1">
           {Array.from({ length: 6 }).map((_, i) => (
-            <Skeleton key={i} className="w-20 aspect-video rounded" />
+            <Skeleton key={i} className="w-20 h-[45px] rounded" />
           ))}
         </div>
       </CardContent>

@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Progress } from '@/components/ui/progress';
-import { formatDuration } from '@/lib/utils';
+import { formatDuration, formatTimestamp } from '@/lib/utils';
 import { Clock, Calendar, Coffee, Target } from 'lucide-react';
 import type { Session } from '@/types';
 
@@ -20,7 +20,7 @@ interface DayStats {
   longestFocus: number; // seconds
 }
 
-function calculateDayStats(sessions: Session[]): DayStats {
+function calculateDayStats(sessions: Session[], date: Date): DayStats {
   if (!sessions || sessions.length === 0) {
     return {
       totalActiveTime: 0,
@@ -32,19 +32,38 @@ function calculateDayStats(sessions: Session[]): DayStats {
     };
   }
 
+  // Calculate day boundaries (in seconds)
+  const dayStart = Math.floor(new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime() / 1000);
+  const dayEnd = dayStart + 86400 - 1; // End of day (23:59:59)
+
   // Sort sessions by start time
   const sortedSessions = [...sessions].sort((a, b) => a.startTime - b.startTime);
 
-  // Calculate total active time
+  // Calculate total active time, clamping each session to day boundaries
+  // This ensures sessions that span midnight only count time within the selected day
   const totalActiveTime = sortedSessions.reduce((sum, session) => {
-    return sum + (session.durationSeconds || 0);
+    const sessionStart = Math.max(session.startTime, dayStart);
+    const sessionEnd = Math.min(session.endTime || session.startTime, dayEnd);
+    const clampedDuration = Math.max(0, sessionEnd - sessionStart);
+    return sum + clampedDuration;
   }, 0);
 
-  // Day span
-  const startTime = sortedSessions[0].startTime;
-  const endTime = sortedSessions[sortedSessions.length - 1].endTime || sortedSessions[sortedSessions.length - 1].startTime;
+  // Day span - clamp times to the selected day
+  // This ensures we show the day's activity range, not cross-day spans
+  let startTime = sortedSessions[0].startTime;
+  let endTime = sortedSessions[sortedSessions.length - 1].endTime || sortedSessions[sortedSessions.length - 1].startTime;
 
-  // Calculate breaks (gaps between sessions)
+  // Clamp to day boundaries
+  if (startTime < dayStart) startTime = dayStart;
+  if (endTime > dayEnd) endTime = dayEnd;
+
+  // Calculate breaks as gaps between consecutive sessions
+  // A "break" is defined as a gap between 3 minutes and 2 hours
+  // - Gaps < 3 minutes are session transitions, not breaks
+  // - Gaps > 2 hours are considered "away time" (lunch, overnight, etc.), not breaks
+  const MIN_BREAK_SECONDS = 180;     // 3 minutes
+  const MAX_BREAK_SECONDS = 7200;    // 2 hours
+
   let breaksCount = 0;
   let breaksDuration = 0;
 
@@ -52,11 +71,20 @@ function calculateDayStats(sessions: Session[]): DayStats {
     const prevSession = sortedSessions[i - 1];
     const currentSession = sortedSessions[i];
 
-    const prevEnd = prevSession.endTime || prevSession.startTime;
-    const gap = currentSession.startTime - prevEnd;
+    // Clamp session times to day boundaries for accurate gap calculation
+    const prevEnd = Math.min(
+      Math.max(prevSession.endTime || prevSession.startTime, dayStart),
+      dayEnd
+    );
+    const currStart = Math.min(
+      Math.max(currentSession.startTime, dayStart),
+      dayEnd
+    );
 
-    // Consider gaps > 3 minutes as breaks
-    if (gap > 180) {
+    const gap = currStart - prevEnd;
+
+    // Only count gaps within the break threshold range
+    if (gap > MIN_BREAK_SECONDS && gap <= MAX_BREAK_SECONDS) {
       breaksCount++;
       breaksDuration += gap;
     }
@@ -75,13 +103,6 @@ function calculateDayStats(sessions: Session[]): DayStats {
   };
 }
 
-function formatTime(timestamp: number): string {
-  return new Date(timestamp * 1000).toLocaleTimeString('en-US', {
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: true,
-  });
-}
 
 function StatsSkeleton() {
   return (
@@ -117,7 +138,7 @@ export function TimelineStats({ sessions, isLoading, date }: TimelineStatsProps)
     );
   }
 
-  const stats = calculateDayStats(sessions);
+  const stats = calculateDayStats(sessions, date);
   const dailyGoalHours = 8; // TODO: Get from config
   const dailyGoalSeconds = dailyGoalHours * 3600;
   const hoursWorkedPercent = (stats.totalActiveTime / dailyGoalSeconds) * 100;
@@ -157,7 +178,7 @@ export function TimelineStats({ sessions, isLoading, date }: TimelineStatsProps)
         <CardContent>
           <div className="text-lg font-semibold">
             {stats.startTime && stats.endTime
-              ? `${formatTime(stats.startTime)} - ${formatTime(stats.endTime)}`
+              ? `${formatTimestamp(stats.startTime)} - ${formatTimestamp(stats.endTime)}`
               : 'N/A'}
           </div>
         </CardContent>
