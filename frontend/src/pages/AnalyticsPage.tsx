@@ -12,6 +12,7 @@ import {
   AppUsageTable,
   ProductivityScoreCard,
   FocusDistributionChart,
+  ActivityTagsChart,
 } from '@/components/analytics';
 import {
   useDailyStats,
@@ -20,6 +21,7 @@ import {
   useDataSourceStats,
   useProductivityScore,
   useFocusDistribution,
+  useActivityTags,
 } from '@/api/hooks';
 import { Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
 
@@ -45,6 +47,7 @@ export function AnalyticsPage() {
   const { data: dataSourceStats, isLoading: dataSourcesLoading } = useDataSourceStats(dateStr);
   const { data: productivityScore, isLoading: productivityLoading } = useProductivityScore(dateStr);
   const { data: focusDistribution, isLoading: focusLoading } = useFocusDistribution(dateStr);
+  const { data: activityTags, isLoading: tagsLoading } = useActivityTags(dateStr);
 
   const handlePrevDay = () => {
     setSelectedDate((d) => addDays(d, -1));
@@ -131,7 +134,10 @@ export function AnalyticsPage() {
             <ActivityChart data={hourlyActivity} isLoading={hourlyLoading} />
             <HeatmapChart data={undefined} isLoading={hourlyLoading} />
           </div>
-          <FocusDistributionChart data={focusDistribution} isLoading={focusLoading} />
+          <div className="grid gap-4 lg:grid-cols-2">
+            <FocusDistributionChart data={focusDistribution} isLoading={focusLoading} />
+            <ActivityTagsChart data={activityTags} isLoading={tagsLoading} />
+          </div>
         </TabsContent>
 
         <TabsContent value="apps" className="space-y-4">

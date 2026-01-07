@@ -157,6 +157,14 @@ type HourlyFocus struct {
 	FocusLabel      string  `json:"focusLabel"`      // "Excellent", "Good", "Fair", "Poor", "Very Poor"
 }
 
+// TagUsage represents usage statistics for an activity tag.
+type TagUsage struct {
+	Tag          string  `json:"tag"`
+	SessionCount int     `json:"sessionCount"` // Number of sessions with this tag
+	TotalMinutes int64   `json:"totalMinutes"` // Total time across sessions with this tag
+	Percentage   float64 `json:"percentage"`   // Percentage of total tagged time
+}
+
 // GetDailyStats returns statistics for a specific date.
 func (s *AnalyticsService) GetDailyStats(date string) (*DailyStats, error) {
 	// Parse date to get start/end timestamps
@@ -635,4 +643,85 @@ func (s *AnalyticsService) GetFocusDistribution(date string) ([]*HourlyFocus, er
 	}
 
 	return result, nil
+}
+
+// GetActivityTags extracts and aggregates tags from session summaries for a given date.
+// Returns top tags sorted by total time spent, useful for understanding activity distribution.
+func (s *AnalyticsService) GetActivityTags(date string) ([]*TagUsage, error) {
+	// Parse date to get start/end timestamps
+	t, err := time.Parse("2006-01-02", date)
+	if err != nil {
+		return nil, err
+	}
+
+	start := t.Unix()
+	end := t.Add(24 * time.Hour).Unix() - 1
+
+	// Get all sessions for the day
+	sessions, err := s.store.GetSessionsByTimeRange(start, end)
+	if err != nil {
+		return nil, err
+	}
+
+	// Get summaries for these sessions
+	tagDurations := make(map[string]int64)  // tag -> total minutes
+	tagSessions := make(map[string]int)     // tag -> session count
+
+	for _, session := range sessions {
+		// Get summary for this session
+		summary, err := s.store.GetSummaryBySession(session.ID)
+		if err != nil || summary == nil {
+			continue
+		}
+
+		// Calculate session duration in minutes
+		sessionMinutes := int64(0)
+		if session.DurationSeconds.Valid && session.DurationSeconds.Int64 > 0 {
+			sessionMinutes = session.DurationSeconds.Int64 / 60
+		}
+
+		// Tags are already parsed as []string from database
+		for _, tag := range summary.Tags {
+			tagDurations[tag] += sessionMinutes
+			tagSessions[tag]++
+		}
+	}
+
+	// Calculate total time for percentage calculation
+	var totalMinutes int64
+	for _, duration := range tagDurations {
+		totalMinutes += duration
+	}
+
+	// Convert to sorted slice
+	var tags []*TagUsage
+	for tag, duration := range tagDurations {
+		percentage := 0.0
+		if totalMinutes > 0 {
+			percentage = (float64(duration) / float64(totalMinutes)) * 100
+		}
+
+		tags = append(tags, &TagUsage{
+			Tag:          tag,
+			SessionCount: tagSessions[tag],
+			TotalMinutes: duration,
+			Percentage:   percentage,
+		})
+	}
+
+	// Sort by total minutes descending
+	for i := 0; i < len(tags); i++ {
+		for j := i + 1; j < len(tags); j++ {
+			if tags[j].TotalMinutes > tags[i].TotalMinutes {
+				tags[i], tags[j] = tags[j], tags[i]
+			}
+		}
+	}
+
+	// Return top 10 tags
+	if len(tags) > 10 {
+		return tags[:10], nil
+	}
+
+	return tags, nil
 }

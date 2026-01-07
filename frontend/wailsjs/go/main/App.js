@@ -18,6 +18,10 @@ export function GenerateReport(arg1, arg2) {
   return window['go']['main']['App']['GenerateReport'](arg1, arg2);
 }
 
+export function GetActivityTags(arg1) {
+  return window['go']['main']['App']['GetActivityTags'](arg1);
+}
+
 export function GetAppUsage(arg1, arg2) {
   return window['go']['main']['App']['GetAppUsage'](arg1, arg2);
 }

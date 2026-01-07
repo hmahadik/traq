@@ -118,7 +118,7 @@
       "Step 4: Verify chart shows top tags with durations as horizontal bars",
       "Step 5: Click a tag bar and verify it filters the view to that tag"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",

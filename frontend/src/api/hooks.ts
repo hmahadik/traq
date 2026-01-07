@@ -28,6 +28,7 @@ export const queryKeys = {
     dataSources: (start: number, end: number) => ['analytics', 'dataSources', start, end] as const,
     productivityScore: (date: string) => ['analytics', 'productivityScore', date] as const,
     focusDistribution: (date: string) => ['analytics', 'focusDistribution', date] as const,
+    activityTags: (date: string) => ['analytics', 'activityTags', date] as const,
   },
   timeline: {
     sessions: (date: string) => ['timeline', 'sessions', date] as const,
@@ -135,6 +136,14 @@ export function useFocusDistribution(date: string) {
   return useQuery({
     queryKey: queryKeys.analytics.focusDistribution(date),
     queryFn: () => api.analytics.getFocusDistribution(date),
+    staleTime: 60_000,
+  });
+}
+
+export function useActivityTags(date: string) {
+  return useQuery({
+    queryKey: queryKeys.analytics.activityTags(date),
+    queryFn: () => api.analytics.getActivityTags(date),
     staleTime: 60_000,
   });
 }

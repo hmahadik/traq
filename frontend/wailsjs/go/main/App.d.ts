@@ -11,6 +11,8 @@ export function ForceCapture():Promise<string>;
 
 export function GenerateReport(arg1:string,arg2:string):Promise<storage.Report>;
 
+export function GetActivityTags(arg1:string):Promise<Array<service.TagUsage>>;
+
 export function GetAppUsage(arg1:number,arg2:number):Promise<Array<service.AppUsage>>;
 
 export function GetCalendarHeatmap(arg1:number,arg2:number):Promise<service.CalendarData>;

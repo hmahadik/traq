@@ -240,6 +240,14 @@ func (a *App) GetFocusDistribution(date string) ([]*service.HourlyFocus, error) 
 	return a.Analytics.GetFocusDistribution(date)
 }
 
+// GetActivityTags extracts and aggregates activity tags for a date.
+func (a *App) GetActivityTags(date string) ([]*service.TagUsage, error) {
+	if a.Analytics == nil {
+		return nil, nil
+	}
+	return a.Analytics.GetActivityTags(date)
+}
+
 // ============================================================================
 // Timeline Methods (exposed to frontend)
 // ============================================================================

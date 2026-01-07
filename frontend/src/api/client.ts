@@ -50,6 +50,10 @@ export const analytics = {
   getFocusDistribution: async (date: string) => {
     return App.GetFocusDistribution(date);
   },
+
+  getActivityTags: async (date: string) => {
+    return App.GetActivityTags(date);
+  },
 };
 
 /**

@@ -929,6 +929,24 @@ export namespace service {
 	    }
 	}
 	
+	export class TagUsage {
+	    tag: string;
+	    sessionCount: number;
+	    totalMinutes: number;
+	    percentage: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new TagUsage(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.tag = source["tag"];
+	        this.sessionCount = source["sessionCount"];
+	        this.totalMinutes = source["totalMinutes"];
+	        this.percentage = source["percentage"];
+	    }
+	}
 	export class TimeRange {
 	    start: number;
 	    end: number;
