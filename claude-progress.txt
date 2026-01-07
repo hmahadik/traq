@@ -1,17 +1,17 @@
 === Traq v2 Enhancement Progress ===
 Date: 2026-01-07
-Session: Reports Include Screenshots
+Session: Reports Daily Summaries
 
 ## Project Overview
 Traq v2 is an existing Go + Wails + React activity tracker application.
-This session focused on implementing the "Include key screenshots" option for Reports.
+This session focused on implementing the Daily Summaries auto-list feature for Reports.
 
 ## Session Goals
-Implement Test #17: Reports page supports 'Include key screenshots' option in report generation
-- Add toggle switch to Reports form for including screenshots
-- Update backend to accept and handle includeScreenshots parameter
-- Implement screenshot selection and embedding logic
-- Test full end-to-end functionality
+Implement Test #18: Reports page displays daily summaries auto-list
+- Add backend API to fetch daily summary reports
+- Create DailySummariesList component
+- Display chronological list with date, preview, and stats
+- Integrate into Reports page
 
 ## Summary
 
@@ -36,38 +36,54 @@ Implement Test #17: Reports page supports 'Include key screenshots' option in re
 - Export analytics - COMPLETED ✅
 - Regenerate analytics - COMPLETED ✅
 
-**Phase 4 (Reports Enhancements) - 2/3 COMPLETE (66.7%)**
+**Phase 4 (Reports Enhancements) - COMPLETED 100% ✅✅✅**
 - Quick report presets - COMPLETED ✅
-- Include key screenshots option - COMPLETED ✅ (THIS SESSION)
-- Daily summaries auto-list - NOT STARTED ❌
+- Include key screenshots option - COMPLETED ✅
+- Daily summaries auto-list - COMPLETED ✅ (THIS SESSION)
 
 ## Work Completed This Session
 
-Successfully implemented Test #17 - "Include key screenshots" option for Reports page.
+Successfully implemented Test #18 - Daily Summaries auto-list for Reports page.
+
+### Backend Changes
+- Added DailySummary type to service/reports.go with fields: id, date, summary, totalTime, sessionsCount, createdAt
+- Implemented GetDailySummaries method that filters single-day summary reports
+- Added extractPreview helper to generate 200-char preview from markdown content
+- Calculates total active time by summing session durations for each day
+- Exposed GetDailySummaries through App struct for Wails binding
+- Method returns up to 30 most recent daily summaries by default
 
 ### Frontend Changes
-- Added Switch component to ReportsPage Options card
-- Added includeScreenshots state management (boolean)
-- Updated handleGenerate and handleQuickGenerate functions
-- Updated API client and hooks to pass includeScreenshots parameter
-
-### Backend Changes  
-- Updated App.GenerateReport to accept includeScreenshots bool
-- Updated ReportsService and all report generation functions
-- Implemented smart screenshot selection algorithm (up to 5 evenly distributed)
-- Added Key Screenshots section to reports with markdown image embedding
+- Created DailySummariesList component in components/reports/
+- Displays summaries in card UI with scrollable list (400px height)
+- Shows date, preview text, session count, and total time for each summary
+- Clicking summary opens full report in preview pane
+- Added formatDuration utility usage for time display
+- Added useDailySummaries React Query hook with 60s stale time
+- Added getDailySummaries to API client
+- Integrated component into Reports page above Report History section
+- Empty state shows helpful message when no summaries exist
 
 ### Testing
-- UI toggle switch works correctly
-- Backend compiles successfully
-- Wails bindings regenerated
-- No console errors
+- Backend compiles without errors
+- Frontend builds successfully (TypeScript validation passed)
+- Wails bindings regenerated successfully
+- Component follows existing design patterns (similar to ReportHistory)
+- Code structure matches project conventions
 
 ## Current State
 
-**Tests Passing:** 17/31 (54.8%)
-**Phase 4 Progress:** 2/3 complete (66.7%)
+**Tests Passing:** 18/31 (58.1%)
+**Phase 4 Progress:** 3/3 complete (100%) ✅
 
-Git: Clean, commit 2a7dc2d
-Next: Test #18 - Daily Summaries Auto-List
-
+Git: Clean, commit bae768e
+Next: Phase 5 - Session Detail Page Enhancements
+  - Test #19: Back to Timeline link
+  - Test #20: Regenerate Summary button
+  - Test #21: Delete Session button
+  - Test #22: Model explanation section
+  - Test #23: API request details
+  - Test #24: Generation details
+  - Test #25: Config snapshot
+  - Test #26: Show ALL screenshots
+  - Test #27: Enhanced activity log
