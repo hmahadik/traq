@@ -64,6 +64,14 @@ export function SessionDetailPage() {
 
   const { session, summary, screenshots, focusEvents, shellCommands, gitCommits, fileEvents, browserVisits } = context;
 
+  // Defensive null checks - provide empty arrays if data is missing
+  const safeScreenshots = screenshots || [];
+  const safeFocusEvents = focusEvents || [];
+  const safeShellCommands = shellCommands || [];
+  const safeGitCommits = gitCommits || [];
+  const safeFileEvents = fileEvents || [];
+  const safeBrowserVisits = browserVisits || [];
+
   return (
     <div className="space-y-6">
       <div>
@@ -139,11 +147,11 @@ export function SessionDetailPage() {
       {/* Screenshots */}
       <Card>
         <CardHeader>
-          <CardTitle>Screenshots ({screenshots.length})</CardTitle>
+          <CardTitle>Screenshots ({safeScreenshots.length})</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-5 gap-2">
-            {screenshots.map((screenshot) => (
+            {safeScreenshots.map((screenshot) => (
               <Screenshot
                 key={screenshot.id}
                 screenshot={screenshot}
@@ -163,19 +171,19 @@ export function SessionDetailPage() {
         <CardContent>
           <Tabs defaultValue="focus">
             <TabsList>
-              <TabsTrigger value="focus">Focus ({focusEvents.length})</TabsTrigger>
-              <TabsTrigger value="shell">Shell ({shellCommands.length})</TabsTrigger>
-              <TabsTrigger value="git">Git ({gitCommits.length})</TabsTrigger>
-              <TabsTrigger value="files">Files ({fileEvents.length})</TabsTrigger>
-              <TabsTrigger value="browser">Browser ({browserVisits.length})</TabsTrigger>
+              <TabsTrigger value="focus">Focus ({safeFocusEvents.length})</TabsTrigger>
+              <TabsTrigger value="shell">Shell ({safeShellCommands.length})</TabsTrigger>
+              <TabsTrigger value="git">Git ({safeGitCommits.length})</TabsTrigger>
+              <TabsTrigger value="files">Files ({safeFileEvents.length})</TabsTrigger>
+              <TabsTrigger value="browser">Browser ({safeBrowserVisits.length})</TabsTrigger>
             </TabsList>
 
             <TabsContent value="focus" className="mt-4">
-              <ActivityLogTable focusEvents={focusEvents} />
+              <ActivityLogTable focusEvents={safeFocusEvents} />
             </TabsContent>
 
             <TabsContent value="shell" className="mt-4 space-y-2">
-              {shellCommands.map((cmd) => (
+              {safeShellCommands.map((cmd) => (
                 <div key={cmd.id} className="flex items-center gap-3 p-2 rounded-lg border">
                   <Terminal className="h-4 w-4 text-muted-foreground" />
                   <div className="flex-1">
@@ -190,7 +198,7 @@ export function SessionDetailPage() {
             </TabsContent>
 
             <TabsContent value="git" className="mt-4 space-y-2">
-              {gitCommits.map((commit) => (
+              {safeGitCommits.map((commit) => (
                 <div key={commit.id} className="flex items-center gap-3 p-2 rounded-lg border">
                   <GitCommit className="h-4 w-4 text-muted-foreground" />
                   <div className="flex-1">
@@ -208,7 +216,7 @@ export function SessionDetailPage() {
             </TabsContent>
 
             <TabsContent value="files" className="mt-4 space-y-2">
-              {fileEvents.map((event) => (
+              {safeFileEvents.map((event) => (
                 <div key={event.id} className="flex items-center gap-3 p-2 rounded-lg border">
                   <FileText className="h-4 w-4 text-muted-foreground" />
                   <div className="flex-1">
@@ -223,7 +231,7 @@ export function SessionDetailPage() {
             </TabsContent>
 
             <TabsContent value="browser" className="mt-4 space-y-2">
-              {browserVisits.map((visit) => (
+              {safeBrowserVisits.map((visit) => (
                 <div key={visit.id} className="flex items-center gap-3 p-2 rounded-lg border">
                   <Globe className="h-4 w-4 text-muted-foreground" />
                   <div className="flex-1">
