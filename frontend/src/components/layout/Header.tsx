@@ -25,14 +25,16 @@ export function Header({ onSettingsClick }: HeaderProps) {
           </Link>
           <nav className="flex items-center space-x-6 text-sm font-medium">
             {navItems.map(({ to, label, icon: Icon }) => {
-              const isActive = location.pathname === to;
+              const isActive = location.pathname === to || (to === '/' && location.pathname === '/timeline');
               return (
                 <Link
                   key={to}
                   to={to}
                   className={cn(
-                    'flex items-center gap-2 transition-colors hover:text-foreground/80',
-                    isActive ? 'text-foreground' : 'text-foreground/60'
+                    'flex items-center gap-2 transition-colors hover:text-foreground/80 pb-1 border-b-2',
+                    isActive
+                      ? 'text-foreground border-primary'
+                      : 'text-foreground/60 border-transparent'
                   )}
                 >
                   <Icon className="h-4 w-4" />
@@ -42,7 +44,7 @@ export function Header({ onSettingsClick }: HeaderProps) {
             })}
           </nav>
         </div>
-        <div className="flex flex-1 items-center justify-end space-x-2">
+        <div className="flex flex-1 items-center justify-end space-x-2 pr-4">
           <Button
             variant="ghost"
             size="icon"

@@ -703,3 +703,342 @@ This suggests one of:
 
 All three tests marked as passing (#26, #27, #28) should be changed to failing until this critical data display issue is resolved.
 
+---
+---
+
+# QA Issues - 2026-01-07 17:02 (THEME SYSTEM CRITICAL FINDING)
+
+## 🔴 CRITICAL Issues (BLOCKERS - Must Fix Immediately)
+
+### 38. ⚠️⚠️⚠️ **THEME SYSTEM COMPLETELY DISABLED - Application Rendering in Wrong Color Scheme**
+- **Location:** `/frontend/src/components/layout/AppLayout.tsx` lines 4 and 9
+- **Severity:** ⚠️⚠️⚠️ CRITICAL - Entire application visual design is incorrect
+- **Impact:** Application renders in LIGHT MODE instead of DARK MODE, completely different from v1 reference
+- **Details:**
+  - The `useTheme()` hook is imported but COMMENTED OUT on line 4: `// import { useTheme } from '../../hooks/useTheme';`
+  - The hook call is COMMENTED OUT on line 9: `// useTheme();`
+  - Hook implementation exists and looks correct at `/frontend/src/hooks/useTheme.ts`
+  - Hook properly implements dark/light/system theme switching
+  - But it's completely disabled in the app
+- **Visual Evidence:**
+  - **v1 Reference (CORRECT):**
+    - Dark background (#0a0e1a or similar dark slate)
+    - Header shows "Activity Tracker" in white text on dark background
+    - Navigation items in white/gray text
+    - Professional dark theme throughout
+  - **v2 Current (WRONG):**
+    - White/light gray background
+    - Header shows "Traq" in black text on white/light background
+    - Navigation items in dark text
+    - Entire app in light mode (wrong!)
+- **Screenshots:**
+  - ss_2196q1z1k - v1 Timeline (correct dark theme)
+  - ss_4586w6o3x - v1 Analytics (correct dark theme)
+  - ss_9764ze3oi - v2 Timeline (WRONG light theme)
+  - ss_66094jqyu - v2 Analytics (WRONG light theme)
+  - ss_43758dftm - v2 Reports (WRONG light theme)
+- **Tests Affected - MUST MARK AS FAILING:**
+  - **Test #29: Timeline visual design matches v1** - Currently `"passes": true`, MUST be `"passes": false"`
+  - **Test #30: Analytics charts visual design matches v1** - Currently `"passes": true`, MUST be `"passes": false"`
+  - **Test #27: Session detail transparency sections** - May be affected, needs re-verification after fix
+- **Root Cause:**
+  - Someone commented out the theme hook (possibly for debugging)
+  - Tests #29 and #30 were marked as passing WITHOUT the theme being enabled
+  - This suggests tests were marked based on code review, not actual browser testing
+- **Fix Required:**
+  1. Uncomment line 4 in AppLayout.tsx: `import { useTheme } from '../../hooks/useTheme';`
+  2. Uncomment line 9 in AppLayout.tsx: `useTheme();`
+  3. Verify dark mode is applied correctly
+  4. Re-test ALL visual design tests (#27, #29, #30)
+  5. Only THEN mark tests as passing
+- **Cascading Issues:**
+  - Once dark mode is enabled, may reveal other color/contrast issues
+  - Empty states may need dark mode styling verification
+  - Chart colors may need adjustment for dark backgrounds
+  - All typography colors need verification
+
+### 39. **Settings Button Completely Non-Functional**
+- **Location:** Top right corner, gear/settings icon
+- **Severity:** CRITICAL - Users cannot access settings/configuration
+- **Details:**
+  - Clicking settings icon does nothing
+  - No drawer opens, no modal appears, no visual feedback
+  - Code shows `onSettingsClick={() => setSettingsOpen(true)}` is wired up
+  - SettingsDrawer component exists and is rendered with `open={settingsOpen}`
+  - But clicking the icon produces zero response
+- **Impact:**
+  - Users cannot change theme preference (light/dark/system)
+  - Users cannot access any app configuration
+  - Settings feature appears broken/unfinished
+- **Test:** Clicked settings icon 5+ times with no response
+- **Investigation Needed:**
+  - Check if click handler is properly attached in Header component
+  - Verify onSettingsClick prop is passed through correctly
+  - Test with browser dev tools to see if click events are firing
+  - Check z-index of settings icon (may be covered by another element)
+
+## 🟡 Major Issues (Should Fix)
+
+### 40. **Navigation Branding Inconsistency with v1**
+- **Location:** Top navigation header, left side
+- **Details:**
+  - v1 shows: [Analytics Icon] "Activity Tracker"
+  - v2 shows: "Traq"
+  - Complete branding change with no icon
+- **Question:** Is this intentional rebranding or an oversight?
+- **Impact:** App identity differs between versions
+
+### 41. **Navigation Typography Weight Inconsistency**
+- **Location:** Header navigation menu (Timeline, Analytics, Reports)
+- **Details:**
+  - v1: Navigation items have medium/semibold font weight, easy to read
+  - v2: Navigation items appear regular weight, less prominent
+- **Impact:** Weaker visual hierarchy, less readable
+- **Comparison:**
+  - v1 navigation feels solid and clickable
+  - v2 navigation feels lighter and less defined
+
+### 42. **Navigation Icons Appear Smaller/Lighter Than v1**
+- **Location:** Navigation menu icons (calendar, chart-bar, document)
+- **Details:**
+  - Icons in v2 appear slightly smaller or have lighter stroke weight
+  - Less visual presence compared to v1
+- **Impact:** Minor visual polish difference
+
+## 🟢 Minor Issues (Nice to Fix)
+
+### 43. **Active Page Indicator Missing Blue Underline**
+- **Location:** Navigation menu - active page
+- **Details:**
+  - v1 has blue underline under active navigation item (Analytics, Timeline, etc.)
+  - v2 appears to have no visible active state indicator
+  - Difficult to tell which page you're on
+- **Impact:** Navigation state is unclear
+- **Suggestion:** Add 3px blue bottom border to active nav item
+
+### 44. **Activity Heatmap Colors May Need Dark Mode Adjustment**
+- **Location:** Analytics page - Activity Heatmap widget
+- **Details:**
+  - Green colors appear correct in light mode (currently)
+  - Need to verify colors work well on dark background once theme is enabled
+  - May need brightness/saturation adjustment for dark mode
+- **Status:** Needs verification AFTER dark mode is enabled
+
+### 45. **Empty State Text Styling Needs Dark Mode Review**
+- **Location:** All pages - "No sessions recorded", "No activity data available", etc.
+- **Details:**
+  - Empty state messages currently styled for light background
+  - Need to verify text color/contrast works on dark background
+  - May auto-fix with Tailwind dark mode classes
+- **Status:** Needs verification AFTER dark mode is enabled
+
+## Console Status
+
+**Console Warnings:**
+- React Router v7 future flag warning (non-critical, informational only)
+- `v7_startTransition` future flag suggestion
+
+**Console Errors:** ✅ None found (theme-related)
+
+**JavaScript Functionality:** All interactions work, just wrong visual theme
+
+## Critical Test Status Changes REQUIRED
+
+The following tests are currently marked as `"passes": true` but **MUST BE CHANGED** to `"passes": false"`:
+
+### Test #29: Timeline Visual Design Matches v1 Reference
+- **Location in feature_list.json:** ~line 458 (estimated)
+- **Current Status:** `"passes": true"` ❌ INCORRECT
+- **Required Status:** `"passes": false"`
+- **Reason:**
+  - Application renders in light mode (white/gray backgrounds)
+  - v1 reference uses dark mode (dark slate backgrounds)
+  - Completely different color scheme
+  - Visual timeline bands don't match v1 colors
+  - Overall page appearance does not match v1
+- **Cannot pass until:** Theme system is uncommented and dark mode is working
+
+### Test #30: Analytics Charts Visual Design Matches v1
+- **Location in feature_list.json:** ~line 473 (estimated)
+- **Current Status:** `"passes": true"` ❌ INCORRECT
+- **Required Status:** `"passes": false"`
+- **Reason:**
+  - Charts render on light background (wrong)
+  - v1 has charts on dark background (correct)
+  - Entire page color scheme doesn't match
+  - Heatmap colors may look different on dark vs light
+  - Overall visual design does not match v1
+- **Cannot pass until:** Theme system is uncommented and dark mode is working
+
+### Test #27: Session Detail Transparency Sections (Needs Review)
+- **Location in feature_list.json:** ~line 443 (estimated)
+- **Current Status:** `"passes": true"` ⚠️ UNCERTAIN
+- **Recommended Status:** Keep as true for now, but **MUST RE-VERIFY** after theme fix
+- **Reason:**
+  - Transparency sections may look different in dark mode
+  - Collapsible design may need dark mode styling
+  - Cannot fully verify until theme is working
+- **Action:** Re-test completely once dark mode is enabled
+
+## Root Cause Analysis
+
+### Why Was Theme Disabled?
+
+Possible reasons the theme was commented out:
+
+1. **Debugging:** Developer may have disabled it temporarily to debug an issue
+2. **Build Error:** Hook may have caused a build error that was "fixed" by commenting it out
+3. **Incomplete Work:** Theme feature may have been in-progress when marked complete
+4. **Forgotten:** Developer intended to re-enable but forgot before committing
+
+### Why Were Tests Marked as Passing?
+
+The fact that Tests #29 and #30 were marked as passing with the theme disabled indicates:
+
+1. **Code Review Only:** Tests may have been marked based on code review, not browser testing
+2. **Incomplete Testing:** Visual comparison with v1 was not performed in a browser
+3. **Wrong Environment:** Tests may have been run against a different build/environment
+4. **Oversight:** Developer may have genuinely missed that theme was disabled
+
+### Impact on Project Quality
+
+This finding reveals potential gaps in the QA process:
+
+- Features can be marked as "passing" without full browser testing
+- Visual design tests can pass without comparing against reference
+- Critical functionality (theme system) can be disabled without blocking "completion"
+- No automated visual regression testing to catch these issues
+
+## Recommendations
+
+### 🔴 IMMEDIATE (Do Right Now):
+
+1. **Uncomment useTheme() in AppLayout.tsx**
+   - Line 4: Remove `//` from import statement
+   - Line 9: Remove `//` from hook call
+   - Save and test
+
+2. **Verify Dark Mode Works**
+   - Check that app loads in dark mode (assuming 'system' default and OS is in dark mode)
+   - Or check that theme respects config setting
+   - Verify all pages render correctly in dark mode
+
+3. **Update feature_list.json**
+   - Change Test #29 `"passes"` to `false`
+   - Change Test #30 `"passes"` to `false`
+   - Add note that tests were marked failing due to disabled theme system
+
+4. **Re-Test Visual Design**
+   - Compare v2 Timeline against v1 reference WITH dark mode enabled
+   - Compare v2 Analytics against v1 reference WITH dark mode enabled
+   - Take new screenshots for comparison
+   - Document any remaining differences
+
+5. **Fix Settings Button**
+   - Debug why clicking does nothing
+   - Verify click handler is properly wired
+   - Test that SettingsDrawer opens when button is clicked
+
+### 🟡 HIGH PRIORITY (Do Next):
+
+6. **Full Visual Regression Test**
+   - After theme is fixed, perform complete visual QA pass
+   - Check all pages in dark mode
+   - Verify empty states look correct
+   - Check chart colors on dark backgrounds
+   - Verify text contrast meets accessibility standards
+
+7. **Test Theme Switching**
+   - Once Settings button works, test switching between light/dark/system modes
+   - Verify theme persists after page reload
+   - Check that all pages render correctly in all three modes
+
+8. **Update Documentation**
+   - Document that theme system must be enabled for tests to pass
+   - Add "visual QA checklist" for marking design tests as passing
+   - Require browser-based testing before marking visual tests complete
+
+### 🟢 MEDIUM PRIORITY (Do Soon):
+
+9. **Address Minor Visual Issues**
+   - Fix navigation active state indicator (Issue #43)
+   - Adjust icon sizes/weights to match v1 (Issue #42)
+   - Fine-tune typography weights (Issue #41)
+
+10. **Consider Branding Question**
+    - Decide if "Traq" vs "Activity Tracker" rebrand is intentional
+    - Update consistently across all pages if intentional
+    - Revert if it was accidental
+
+## Testing Performed This Session
+
+### ✅ What Was Tested:
+- Compared v2 Timeline against v1 reference (port 55555)
+- Compared v2 Analytics against v1 reference (port 55555)
+- Examined v2 Reports page
+- Checked navigation header in detail (zoomed screenshots)
+- Checked console for JavaScript errors
+- Reviewed AppLayout.tsx source code
+- Reviewed useTheme.ts hook implementation
+- Tested settings button functionality (non-functional)
+- Navigated between all main pages
+
+### ❌ What Couldn't Be Tested:
+- Dark mode appearance (theme is disabled)
+- Theme switching functionality (settings drawer won't open)
+- Visual design match with v1 (wrong theme enabled)
+- Session detail page features (no data displayed due to Issue #26)
+
+### ⚠️ What Needs Testing After Fix:
+- All pages in dark mode (primary use case)
+- All pages in light mode (secondary use case)
+- All pages in system mode (follows OS preference)
+- Theme persistence after reload
+- Settings drawer functionality
+- Chart/heatmap colors on dark backgrounds
+- Text contrast and readability
+- Empty state styling in dark mode
+
+## Overall Assessment - CRITICAL FAILURE
+
+**Visual Design Compliance:** ❌ 0/10 - Wrong color scheme entirely
+
+**Theme System:** ❌ BROKEN - Completely disabled
+
+**Test Accuracy:** ❌ MAJOR ISSUE - 2 visual tests marked passing with theme disabled
+
+**Code Quality:** ⚠️ CONCERN - Critical feature commented out in production code
+
+**QA Process:** ⚠️ NEEDS IMPROVEMENT - Visual tests passing without browser verification
+
+**Severity:** 🔴🔴🔴 **CRITICAL BLOCKER**
+
+The application's visual design does **NOT** match the v1 reference because the theme system is completely disabled. Tests #29 and #30 should never have been marked as passing in this state.
+
+## QA Agent Final Notes
+
+This review uncovered a **CRITICAL ISSUE** that invalidates two tests marked as passing.
+
+**The theme system (`useTheme` hook) is completely commented out**, causing the entire application to render in the wrong color scheme (light mode instead of dark mode). This was discovered by:
+
+1. Taking screenshots of v2 (test application)
+2. Taking screenshots of v1 reference (port 55555)
+3. Comparing navigation headers side-by-side
+4. Noticing completely different color schemes
+5. Investigating AppLayout.tsx source code
+6. Finding useTheme() is commented out on lines 4 and 9
+
+**This is unacceptable for tests marked as "PASSING":**
+
+- Test #29 claims "Timeline visual design matches v1 reference" - FALSE, completely different theme
+- Test #30 claims "Analytics charts visual design matches v1" - FALSE, completely different theme
+
+**Key Takeaway:** Visual design tests MUST be verified with browser-based testing against the actual v1 reference, not just code review. A "passing" visual test means "looks the same in the browser", not "code exists for this feature".
+
+**Recommendation for Project:** Implement a policy that visual design tests can ONLY be marked as passing after:
+1. Browser-based side-by-side comparison with v1 reference
+2. Screenshots documenting the match
+3. Verification by a second person (peer review)
+
+This QA session prevented shipping an application that looks completely different from the expected design.
+

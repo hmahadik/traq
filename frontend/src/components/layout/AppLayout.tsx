@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import { Toaster } from 'sonner';
+import { useTheme } from '../../hooks/useTheme';
 import { Header } from './Header';
 import { SettingsDrawer } from './SettingsDrawer';
 
 export function AppLayout() {
+  useTheme();
   const [settingsOpen, setSettingsOpen] = useState(false);
 
   return (

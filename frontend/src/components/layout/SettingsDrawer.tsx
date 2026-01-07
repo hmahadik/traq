@@ -29,14 +29,12 @@ interface SettingsDrawerProps {
 }
 
 export function SettingsDrawer({ open, onOpenChange }: SettingsDrawerProps) {
-  const { data: config } = useConfig();
+  const { data: config, isLoading } = useConfig();
   const { data: inferenceStatus } = useInferenceStatus();
   const { data: models } = useAvailableModels();
   const updateConfig = useUpdateConfig();
 
   const [downloadProgress] = useState<number | null>(null);
-
-  if (!config) return null;
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -48,6 +46,11 @@ export function SettingsDrawer({ open, onOpenChange }: SettingsDrawerProps) {
           </SheetDescription>
         </SheetHeader>
 
+        {isLoading || !config ? (
+          <div className="mt-6 flex items-center justify-center py-12">
+            <p className="text-muted-foreground">Loading settings...</p>
+          </div>
+        ) : (
         <Tabs defaultValue="capture" className="mt-6">
           <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="capture">Capture</TabsTrigger>
@@ -441,6 +444,7 @@ export function SettingsDrawer({ open, onOpenChange }: SettingsDrawerProps) {
             </div>
           </TabsContent>
         </Tabs>
+        )}
       </SheetContent>
     </Sheet>
   );

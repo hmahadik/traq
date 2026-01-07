@@ -388,7 +388,7 @@
       "Step 6: Verify timeline is horizontally scrollable",
       "Step 7: Verify zoom controls work and maintain visual clarity"
     ],
-    "passes": true
+    "passes": false
   },
   {
     "category": "style",
@@ -401,7 +401,7 @@
       "Step 5: Verify chart colors match app categorization theme (green/gray/red)",
       "Step 6: Verify chart spacing and layout matches v1 polish"
     ],
-    "passes": true
+    "passes": false
   },
   {
     "category": "style",
