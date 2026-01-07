@@ -1,6 +1,9 @@
 package service
 
 import (
+	"encoding/json"
+	"fmt"
+	"strings"
 	"time"
 
 	"traq/internal/storage"
@@ -910,4 +913,345 @@ func (s *AnalyticsService) GetTopWindows(start, end int64, limit int) ([]*Window
 		return windows[:limit], nil
 	}
 	return windows, nil
+}
+
+// ExportAnalytics exports analytics data in the specified format.
+// Supports: "csv", "html", "json"
+func (s *AnalyticsService) ExportAnalytics(date, viewMode, format string) (string, error) {
+	switch viewMode {
+	case "day":
+		return s.exportDailyAnalytics(date, format)
+	case "week":
+		return s.exportWeeklyAnalytics(date, format)
+	case "month":
+		// Parse year and month from date string (YYYY-MM-DD)
+		t, err := time.Parse("2006-01-02", date)
+		if err != nil {
+			return "", err
+		}
+		return s.exportMonthlyAnalytics(t.Year(), int(t.Month()), format)
+	default:
+		return s.exportDailyAnalytics(date, format)
+	}
+}
+
+// exportDailyAnalytics exports daily analytics in the specified format.
+func (s *AnalyticsService) exportDailyAnalytics(date, format string) (string, error) {
+	stats, err := s.GetDailyStats(date)
+	if err != nil {
+		return "", err
+	}
+
+	// Parse date to get start/end timestamps for GetAppUsage
+	t, err := time.Parse("2006-01-02", date)
+	if err != nil {
+		return "", err
+	}
+	start := t.Unix()
+	end := t.Add(24 * time.Hour).Unix() - 1
+
+	appUsage, err := s.GetAppUsage(start, end)
+	if err != nil {
+		return "", err
+	}
+
+	hourlyActivity, err := s.GetHourlyActivity(date)
+	if err != nil {
+		return "", err
+	}
+
+	switch format {
+	case "csv":
+		return s.exportDailyCSV(stats, appUsage, hourlyActivity), nil
+	case "html":
+		return s.exportDailyHTML(stats, appUsage, hourlyActivity), nil
+	case "json":
+		return s.exportDailyJSON(stats, appUsage, hourlyActivity), nil
+	default:
+		return s.exportDailyCSV(stats, appUsage, hourlyActivity), nil
+	}
+}
+
+// exportWeeklyAnalytics exports weekly analytics in the specified format.
+func (s *AnalyticsService) exportWeeklyAnalytics(date, format string) (string, error) {
+	stats, err := s.GetWeeklyStats(date)
+	if err != nil {
+		return "", err
+	}
+
+	switch format {
+	case "csv":
+		return s.exportWeeklyCSV(stats), nil
+	case "html":
+		return s.exportWeeklyHTML(stats), nil
+	case "json":
+		return s.exportWeeklyJSON(stats), nil
+	default:
+		return s.exportWeeklyCSV(stats), nil
+	}
+}
+
+// exportMonthlyAnalytics exports monthly analytics in the specified format.
+func (s *AnalyticsService) exportMonthlyAnalytics(year, month int, format string) (string, error) {
+	stats, err := s.GetMonthlyStats(year, month)
+	if err != nil {
+		return "", err
+	}
+
+	switch format {
+	case "csv":
+		return s.exportMonthlyCSV(stats), nil
+	case "html":
+		return s.exportMonthlyHTML(stats), nil
+	case "json":
+		return s.exportMonthlyJSON(stats), nil
+	default:
+		return s.exportMonthlyCSV(stats), nil
+	}
+}
+
+// Helper functions for CSV export
+
+func (s *AnalyticsService) exportDailyCSV(stats *DailyStats, appUsage []*AppUsage, hourlyActivity []*HourlyActivity) string {
+	var csv strings.Builder
+	
+	// Summary section
+	csv.WriteString("Daily Analytics Summary\n")
+	csv.WriteString(fmt.Sprintf("Date,%s\n", stats.Date))
+	csv.WriteString(fmt.Sprintf("Active Time (minutes),%d\n", stats.ActiveMinutes))
+	csv.WriteString(fmt.Sprintf("Total Sessions,%d\n", stats.TotalSessions))
+	csv.WriteString(fmt.Sprintf("Total Screenshots,%d\n", stats.TotalScreenshots))
+	csv.WriteString(fmt.Sprintf("Shell Commands,%d\n", stats.ShellCommands))
+	csv.WriteString(fmt.Sprintf("Git Commits,%d\n", stats.GitCommits))
+	csv.WriteString(fmt.Sprintf("Files Modified,%d\n", stats.FilesModified))
+	csv.WriteString(fmt.Sprintf("Sites Visited,%d\n\n", stats.SitesVisited))
+	
+	// App usage section
+	csv.WriteString("Application Usage\n")
+	csv.WriteString("App Name,Duration (seconds),Percentage,Focus Count\n")
+	for _, app := range appUsage {
+		csv.WriteString(fmt.Sprintf("%s,%.2f,%.2f%%,%d\n", 
+			app.AppName, app.DurationSeconds, app.Percentage, app.FocusCount))
+	}
+	csv.WriteString("\n")
+	
+	// Hourly activity section
+	csv.WriteString("Hourly Activity\n")
+	csv.WriteString("Hour,Screenshots,Active Minutes\n")
+	for _, hour := range hourlyActivity {
+		csv.WriteString(fmt.Sprintf("%d:00,%d,%d\n", 
+			hour.Hour, hour.ScreenshotCount, hour.ActiveMinutes))
+	}
+	
+	return csv.String()
+}
+
+func (s *AnalyticsService) exportWeeklyCSV(stats *WeeklyStats) string {
+	var csv strings.Builder
+	
+	csv.WriteString("Weekly Analytics Summary\n")
+	csv.WriteString(fmt.Sprintf("Week,%s to %s\n", stats.StartDate, stats.EndDate))
+	csv.WriteString(fmt.Sprintf("Total Active Time (minutes),%d\n\n", stats.TotalActive))
+	
+	if stats.Averages != nil {
+		csv.WriteString("Average Daily Stats\n")
+		csv.WriteString(fmt.Sprintf("Active Time (minutes),%d\n", stats.Averages.ActiveMinutes))
+		csv.WriteString(fmt.Sprintf("Sessions,%d\n", stats.Averages.TotalSessions))
+		csv.WriteString(fmt.Sprintf("Screenshots,%d\n\n", stats.Averages.TotalScreenshots))
+	}
+	
+	csv.WriteString("Daily Breakdown\n")
+	csv.WriteString("Date,Active Minutes,Sessions,Screenshots,Shell Commands,Git Commits\n")
+	for _, day := range stats.DailyStats {
+		csv.WriteString(fmt.Sprintf("%s,%d,%d,%d,%d,%d\n",
+			day.Date, day.ActiveMinutes, day.TotalSessions, day.TotalScreenshots,
+			day.ShellCommands, day.GitCommits))
+	}
+	
+	return csv.String()
+}
+
+func (s *AnalyticsService) exportMonthlyCSV(stats *MonthlyStats) string {
+	var csv strings.Builder
+	
+	csv.WriteString("Monthly Analytics Summary\n")
+	csv.WriteString(fmt.Sprintf("Month,%d-%02d\n", stats.Year, stats.Month))
+	csv.WriteString(fmt.Sprintf("Period,%s to %s\n", stats.StartDate, stats.EndDate))
+	csv.WriteString(fmt.Sprintf("Total Active Time (minutes),%d\n\n", stats.TotalActive))
+	
+	if stats.Averages != nil {
+		csv.WriteString("Average Daily Stats\n")
+		csv.WriteString(fmt.Sprintf("Active Time (minutes),%d\n", stats.Averages.ActiveMinutes))
+		csv.WriteString(fmt.Sprintf("Sessions,%d\n", stats.Averages.TotalSessions))
+		csv.WriteString(fmt.Sprintf("Screenshots,%d\n\n", stats.Averages.TotalScreenshots))
+	}
+	
+	csv.WriteString("Weekly Breakdown\n")
+	csv.WriteString("Week,Start Date,End Date,Total Active (minutes),Active Days\n")
+	for _, week := range stats.WeeklyStats {
+		csv.WriteString(fmt.Sprintf("%d,%s,%s,%d,%d\n",
+			week.WeekNumber, week.StartDate, week.EndDate, week.TotalActive, week.ActiveDays))
+	}
+	
+	return csv.String()
+}
+
+// Helper functions for JSON export
+
+func (s *AnalyticsService) exportDailyJSON(stats *DailyStats, appUsage []*AppUsage, hourlyActivity []*HourlyActivity) string {
+	data := map[string]interface{}{
+		"summary":        stats,
+		"appUsage":       appUsage,
+		"hourlyActivity": hourlyActivity,
+	}
+	jsonBytes, _ := json.MarshalIndent(data, "", "  ")
+	return string(jsonBytes)
+}
+
+func (s *AnalyticsService) exportWeeklyJSON(stats *WeeklyStats) string {
+	jsonBytes, _ := json.MarshalIndent(stats, "", "  ")
+	return string(jsonBytes)
+}
+
+func (s *AnalyticsService) exportMonthlyJSON(stats *MonthlyStats) string {
+	jsonBytes, _ := json.MarshalIndent(stats, "", "  ")
+	return string(jsonBytes)
+}
+
+// Helper functions for HTML export
+
+func (s *AnalyticsService) exportDailyHTML(stats *DailyStats, appUsage []*AppUsage, hourlyActivity []*HourlyActivity) string {
+	var html strings.Builder
+	
+	html.WriteString("<!DOCTYPE html><html><head>")
+	html.WriteString("<meta charset='UTF-8'>")
+	html.WriteString("<title>Daily Analytics - " + stats.Date + "</title>")
+	html.WriteString("<style>")
+	html.WriteString("body { font-family: Arial, sans-serif; max-width: 1200px; margin: 40px auto; padding: 20px; }")
+	html.WriteString("h1 { color: #333; border-bottom: 3px solid #4a9eff; padding-bottom: 10px; }")
+	html.WriteString("h2 { color: #666; margin-top: 30px; }")
+	html.WriteString("table { width: 100%; border-collapse: collapse; margin-top: 15px; }")
+	html.WriteString("th, td { padding: 12px; text-align: left; border-bottom: 1px solid #ddd; }")
+	html.WriteString("th { background-color: #4a9eff; color: white; }")
+	html.WriteString("tr:hover { background-color: #f5f5f5; }")
+	html.WriteString(".summary { background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0; }")
+	html.WriteString(".stat { display: inline-block; margin: 10px 20px 10px 0; }")
+	html.WriteString(".stat-label { color: #666; font-size: 14px; }")
+	html.WriteString(".stat-value { font-size: 24px; font-weight: bold; color: #333; }")
+	html.WriteString("</style></head><body>")
+	
+	html.WriteString(fmt.Sprintf("<h1>Daily Analytics - %s</h1>", stats.Date))
+	
+	html.WriteString("<div class='summary'>")
+	html.WriteString(fmt.Sprintf("<div class='stat'><div class='stat-label'>Active Time</div><div class='stat-value'>%d min</div></div>", stats.ActiveMinutes))
+	html.WriteString(fmt.Sprintf("<div class='stat'><div class='stat-label'>Sessions</div><div class='stat-value'>%d</div></div>", stats.TotalSessions))
+	html.WriteString(fmt.Sprintf("<div class='stat'><div class='stat-label'>Screenshots</div><div class='stat-value'>%d</div></div>", stats.TotalScreenshots))
+	html.WriteString(fmt.Sprintf("<div class='stat'><div class='stat-label'>Shell Commands</div><div class='stat-value'>%d</div></div>", stats.ShellCommands))
+	html.WriteString(fmt.Sprintf("<div class='stat'><div class='stat-label'>Git Commits</div><div class='stat-value'>%d</div></div>", stats.GitCommits))
+	html.WriteString("</div>")
+	
+	html.WriteString("<h2>Application Usage</h2>")
+	html.WriteString("<table><thead><tr><th>Application</th><th>Duration</th><th>Percentage</th><th>Focus Count</th></tr></thead><tbody>")
+	for _, app := range appUsage {
+		minutes := int(app.DurationSeconds / 60)
+		html.WriteString(fmt.Sprintf("<tr><td>%s</td><td>%d min</td><td>%.1f%%</td><td>%d</td></tr>", 
+			app.AppName, minutes, app.Percentage, app.FocusCount))
+	}
+	html.WriteString("</tbody></table>")
+	
+	html.WriteString("<h2>Hourly Activity</h2>")
+	html.WriteString("<table><thead><tr><th>Hour</th><th>Screenshots</th><th>Active Minutes</th></tr></thead><tbody>")
+	for _, hour := range hourlyActivity {
+		if hour.ScreenshotCount > 0 || hour.ActiveMinutes > 0 {
+			html.WriteString(fmt.Sprintf("<tr><td>%d:00</td><td>%d</td><td>%d</td></tr>", 
+				hour.Hour, hour.ScreenshotCount, hour.ActiveMinutes))
+		}
+	}
+	html.WriteString("</tbody></table>")
+	
+	html.WriteString("</body></html>")
+	return html.String()
+}
+
+func (s *AnalyticsService) exportWeeklyHTML(stats *WeeklyStats) string {
+	var html strings.Builder
+	
+	html.WriteString("<!DOCTYPE html><html><head>")
+	html.WriteString("<meta charset='UTF-8'>")
+	html.WriteString(fmt.Sprintf("<title>Weekly Analytics - %s to %s</title>", stats.StartDate, stats.EndDate))
+	html.WriteString("<style>")
+	html.WriteString("body { font-family: Arial, sans-serif; max-width: 1200px; margin: 40px auto; padding: 20px; }")
+	html.WriteString("h1 { color: #333; border-bottom: 3px solid #4a9eff; padding-bottom: 10px; }")
+	html.WriteString("h2 { color: #666; margin-top: 30px; }")
+	html.WriteString("table { width: 100%; border-collapse: collapse; margin-top: 15px; }")
+	html.WriteString("th, td { padding: 12px; text-align: left; border-bottom: 1px solid #ddd; }")
+	html.WriteString("th { background-color: #4a9eff; color: white; }")
+	html.WriteString("tr:hover { background-color: #f5f5f5; }")
+	html.WriteString(".summary { background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0; }")
+	html.WriteString(".stat { display: inline-block; margin: 10px 20px 10px 0; }")
+	html.WriteString(".stat-label { color: #666; font-size: 14px; }")
+	html.WriteString(".stat-value { font-size: 24px; font-weight: bold; color: #333; }")
+	html.WriteString("</style></head><body>")
+	
+	html.WriteString(fmt.Sprintf("<h1>Weekly Analytics - %s to %s</h1>", stats.StartDate, stats.EndDate))
+	
+	html.WriteString("<div class='summary'>")
+	html.WriteString(fmt.Sprintf("<div class='stat'><div class='stat-label'>Total Active Time</div><div class='stat-value'>%d min</div></div>", stats.TotalActive))
+	if stats.Averages != nil {
+		html.WriteString(fmt.Sprintf("<div class='stat'><div class='stat-label'>Avg Daily Active</div><div class='stat-value'>%d min</div></div>", stats.Averages.ActiveMinutes))
+		html.WriteString(fmt.Sprintf("<div class='stat'><div class='stat-label'>Avg Sessions</div><div class='stat-value'>%d</div></div>", stats.Averages.TotalSessions))
+	}
+	html.WriteString("</div>")
+	
+	html.WriteString("<h2>Daily Breakdown</h2>")
+	html.WriteString("<table><thead><tr><th>Date</th><th>Active Time</th><th>Sessions</th><th>Screenshots</th><th>Shell Commands</th><th>Git Commits</th></tr></thead><tbody>")
+	for _, day := range stats.DailyStats {
+		html.WriteString(fmt.Sprintf("<tr><td>%s</td><td>%d min</td><td>%d</td><td>%d</td><td>%d</td><td>%d</td></tr>",
+			day.Date, day.ActiveMinutes, day.TotalSessions, day.TotalScreenshots, day.ShellCommands, day.GitCommits))
+	}
+	html.WriteString("</tbody></table>")
+	
+	html.WriteString("</body></html>")
+	return html.String()
+}
+
+func (s *AnalyticsService) exportMonthlyHTML(stats *MonthlyStats) string {
+	var html strings.Builder
+	
+	html.WriteString("<!DOCTYPE html><html><head>")
+	html.WriteString("<meta charset='UTF-8'>")
+	html.WriteString(fmt.Sprintf("<title>Monthly Analytics - %d-%02d</title>", stats.Year, stats.Month))
+	html.WriteString("<style>")
+	html.WriteString("body { font-family: Arial, sans-serif; max-width: 1200px; margin: 40px auto; padding: 20px; }")
+	html.WriteString("h1 { color: #333; border-bottom: 3px solid #4a9eff; padding-bottom: 10px; }")
+	html.WriteString("h2 { color: #666; margin-top: 30px; }")
+	html.WriteString("table { width: 100%; border-collapse: collapse; margin-top: 15px; }")
+	html.WriteString("th, td { padding: 12px; text-align: left; border-bottom: 1px solid #ddd; }")
+	html.WriteString("th { background-color: #4a9eff; color: white; }")
+	html.WriteString("tr:hover { background-color: #f5f5f5; }")
+	html.WriteString(".summary { background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0; }")
+	html.WriteString(".stat { display: inline-block; margin: 10px 20px 10px 0; }")
+	html.WriteString(".stat-label { color: #666; font-size: 14px; }")
+	html.WriteString(".stat-value { font-size: 24px; font-weight: bold; color: #333; }")
+	html.WriteString("</style></head><body>")
+	
+	html.WriteString(fmt.Sprintf("<h1>Monthly Analytics - %d-%02d</h1>", stats.Year, stats.Month))
+	
+	html.WriteString("<div class='summary'>")
+	html.WriteString(fmt.Sprintf("<div class='stat'><div class='stat-label'>Total Active Time</div><div class='stat-value'>%d min</div></div>", stats.TotalActive))
+	if stats.Averages != nil {
+		html.WriteString(fmt.Sprintf("<div class='stat'><div class='stat-label'>Avg Daily Active</div><div class='stat-value'>%d min</div></div>", stats.Averages.ActiveMinutes))
+	}
+	html.WriteString("</div>")
+	
+	html.WriteString("<h2>Weekly Breakdown</h2>")
+	html.WriteString("<table><thead><tr><th>Week</th><th>Period</th><th>Active Time</th><th>Active Days</th></tr></thead><tbody>")
+	for _, week := range stats.WeeklyStats {
+		html.WriteString(fmt.Sprintf("<tr><td>Week %d</td><td>%s to %s</td><td>%d min</td><td>%d</td></tr>",
+			week.WeekNumber, week.StartDate, week.EndDate, week.TotalActive, week.ActiveDays))
+	}
+	html.WriteString("</tbody></table>")
+	
+	html.WriteString("</body></html>")
+	return html.String()
 }

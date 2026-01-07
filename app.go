@@ -200,6 +200,16 @@ func (a *App) GetMonthlyStats(year, month int) (*service.MonthlyStats, error) {
 	return a.Analytics.GetMonthlyStats(year, month)
 }
 
+// ExportAnalytics exports analytics data in the specified format.
+// viewMode can be "day", "week", or "month"
+// format can be "csv", "html", or "json"
+func (a *App) ExportAnalytics(date, viewMode, format string) (string, error) {
+	if a.Analytics == nil {
+		return "", nil
+	}
+	return a.Analytics.ExportAnalytics(date, viewMode, format)
+}
+
 // GetCalendarHeatmap returns calendar data for a month.
 func (a *App) GetCalendarHeatmap(year, month int) (*service.CalendarData, error) {
 	if a.Analytics == nil {

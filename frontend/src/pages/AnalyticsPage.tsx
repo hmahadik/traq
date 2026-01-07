@@ -30,7 +30,15 @@ import {
   useWeeklyStats,
   useMonthlyStats,
 } from '@/api/hooks';
-import { Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Calendar, ChevronLeft, ChevronRight, Download } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { api } from '@/api/client';
+import { toast } from 'sonner';
 
 type ViewMode = 'day' | 'week' | 'month';
 
@@ -97,6 +105,30 @@ export function AnalyticsPage() {
     navigate(`/day/${dateStr}?window=${encodeURIComponent(windowTitle)}&app=${encodeURIComponent(appName)}`);
   };
 
+  const handleExport = async (format: 'csv' | 'html' | 'json') => {
+    try {
+      const content = await api.analytics.exportAnalytics(dateStr, viewMode, format);
+
+      // Create a download
+      const blob = new Blob([content], {
+        type: format === 'csv' ? 'text/csv' : format === 'html' ? 'text/html' : 'application/json'
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `analytics-${viewMode}-${dateStr}.${format}`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      toast.success(`Analytics exported as ${format.toUpperCase()}`);
+    } catch (error) {
+      console.error('Export failed:', error);
+      toast.error('Failed to export analytics');
+    }
+  };
+
   const formattedDate = selectedDate.toLocaleDateString('en-US', {
     weekday: 'long',
     year: 'numeric',
@@ -153,6 +185,27 @@ export function AnalyticsPage() {
               Today
             </Button>
           )}
+
+          {/* Export Button */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="gap-2">
+                <Download className="h-4 w-4" />
+                Export
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => handleExport('csv')}>
+                Export as CSV
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleExport('html')}>
+                Export as HTML (PDF)
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleExport('json')}>
+                Export as JSON
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 

@@ -5,6 +5,8 @@ import {service} from '../models';
 
 export function DeleteScreenshot(arg1:number):Promise<void>;
 
+export function ExportAnalytics(arg1:string,arg2:string,arg3:string):Promise<string>;
+
 export function ExportReport(arg1:number,arg2:string):Promise<string>;
 
 export function ForceCapture():Promise<string>;

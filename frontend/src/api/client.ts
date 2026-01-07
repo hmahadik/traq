@@ -62,6 +62,10 @@ export const analytics = {
   getTopWindows: async (date: string, limit: number) => {
     return App.GetTopWindows(date, limit);
   },
+
+  exportAnalytics: async (date: string, viewMode: string, format: string) => {
+    return App.ExportAnalytics(date, viewMode, format);
+  },
 };
 
 /**
