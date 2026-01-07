@@ -1,16 +1,16 @@
 === Traq v2 Enhancement Progress ===
 Date: 2026-01-06
-Session: Focus Distribution Chart Implementation
+Session: Activity Tags Chart Implementation
 
 ## Project Overview
 Traq v2 is an existing Go + Wails + React activity tracker application.
-This session focused on implementing the focus distribution chart feature for the Analytics page.
+This session focused on implementing the activity tags chart feature for the Analytics page.
 
 ## Session Goals
-Implement Test #8: Analytics focus distribution chart showing hourly focus patterns
-- Backend: Calculate focus quality based on context switches per hour
-- Backend: Implement GetFocusDistribution API method
-- Frontend: Create FocusDistributionChart component with horizontal bars
+Implement Test #9: Analytics activity tags horizontal bar chart
+- Backend: Extract and aggregate tags from session summaries
+- Backend: Implement GetActivityTags API method
+- Frontend: Create ActivityTagsChart component with horizontal bars
 - Frontend: Display chart in Analytics page Activity tab
 
 ## Summary
@@ -26,9 +26,9 @@ Implement Test #8: Analytics focus distribution chart showing hourly focus patte
 - Time period and app filtering fully implemented ✅
 
 **Phase 3 (Analytics Enhancements) - IN PROGRESS**
-- Productivity score - COMPLETED ✅ (Previous session)
-- **Focus distribution chart - COMPLETED ✅ (NEW THIS SESSION)**
-- Activity tags chart - Not started
+- Productivity score - COMPLETED ✅
+- Focus distribution chart - COMPLETED ✅
+- **Activity tags chart - COMPLETED ✅ (NEW THIS SESSION)**
 - Time distribution pie chart - Not started
 - Top windows list - Not started
 - Week/Month views - Not started
@@ -37,143 +37,140 @@ Implement Test #8: Analytics focus distribution chart showing hourly focus patte
 
 ## Work Completed This Session
 
-### 1. Backend: Focus Quality Calculation ✅
+### 1. Backend: Tag Aggregation System ✅
 **Modified Files:**
-- `internal/service/analytics.go` - Added focus distribution logic
-- `app.go` - Exposed GetFocusDistribution API method
+- `internal/service/analytics.go` - Added TagUsage struct and GetActivityTags method
+- `app.go` - Exposed GetActivityTags API method
 
 **New Structures:**
 ```go
-type HourlyFocus struct {
-    Hour            int     // 0-23
-    ContextSwitches int     // Number of app/window changes
-    FocusQuality    float64 // 0-100 percentage
-    FocusLabel      string  // "Excellent", "Good", "Fair", "Poor", "Very Poor"
+type TagUsage struct {
+    Tag          string  // Tag name (e.g., "coding", "meetings")
+    SessionCount int     // Number of sessions with this tag
+    TotalMinutes int64   // Total time across all sessions with this tag
+    Percentage   float64 // Percentage of total tagged time
 }
 ```
 
-**Focus Quality Scoring System:**
-The algorithm analyzes context switches (app/window changes) per hour to determine focus quality:
+**GetActivityTags Algorithm:**
+The method analyzes session tags to provide semantic activity breakdown:
 
-- **Excellent (100%)**: 0-2 switches/hour
-  * Deep focus, minimal distractions
-  * User stayed in same app/window most of the hour
+1. **Data Collection:**
+   - Fetches all sessions for the selected date
+   - Retrieves summaries for each session
+   - Extracts tags from summaries.tags JSON array field
 
-- **Good (75%)**: 3-5 switches/hour
-  * Good focus with occasional context changes
-  * Typical for focused work with some tooling switches
+2. **Aggregation Logic:**
+   - For each tag across all sessions:
+     * Sums session durations (in minutes)
+     * Counts number of sessions containing the tag
+   - Calculates total time for percentage calculation
 
-- **Fair (50%)**: 6-10 switches/hour
-  * Moderate focus, regular interruptions
-  * Still productive but with more task switching
+3. **Tag Scoring:**
+   - Computes percentage: (tag_duration / total_duration) × 100
+   - Sorts tags by total minutes descending
+   - Returns top 10 tags for focused visualization
 
-- **Poor (25%)**: 11-20 switches/hour
-  * Frequent interruptions and distractions
-  * Indicates difficulty maintaining focus
+4. **Edge Cases Handled:**
+   - Sessions without summaries (skipped)
+   - Invalid or null duration values
+   - Empty tag arrays
+   - No sessions for selected date
 
-- **Very Poor (10%)**: 20+ switches/hour
-  * Constant context switching
-  * Highly fragmented attention
-
-**Algorithm Details:**
-1. Fetches all focus events (app/window changes) for the selected date
-2. Groups events by hour (0-23)
-3. Counts context switches per hour
-4. Assigns quality score based on switch count thresholds
-5. Returns 24-hour array with quality data for each hour
-
-**Rationale:**
-Research shows that frequent context switching reduces productivity and cognitive performance.
-By visualizing focus patterns, users can identify their peak focus hours and times with too many
-interruptions, enabling better time management and work planning.
+**Database Integration:**
+- Uses existing `GetSessionsByTimeRange()` method
+- Calls `GetSummaryBySession()` for each session
+- Tags already parsed from JSON by storage layer
+- No additional database queries needed
 
 ### 2. Wails Bindings Generation ✅
 **Command:** `wails generate module`
 
 **Generated/Updated Files:**
-- `frontend/wailsjs/go/main/App.d.ts` - Added GetFocusDistribution export
-- `frontend/wailsjs/go/main/App.js` - Added GetFocusDistribution implementation
-- `frontend/wailsjs/go/models.ts` - Added HourlyFocus class
+- `frontend/wailsjs/go/main/App.d.ts` - Added GetActivityTags export
+- `frontend/wailsjs/go/main/App.js` - Added GetActivityTags implementation
+- `frontend/wailsjs/go/models.ts` - Added TagUsage class
 
-**Fixed Issue:**
-- Initial compilation error: Used `event.Timestamp` instead of `event.StartTime`
-- Fixed by checking WindowFocusEvent struct definition in storage/models.go
-- Correct field name is `StartTime` for focus events
+**Initial Issue & Fix:**
+- First attempt failed: tried to call non-existent `summary.GetTags()` method
+- Fixed by using `summary.Tags` slice directly (already parsed from JSON)
+- Changed `GetSummary()` to `GetSummaryBySession()` for correct lookup
 
 ### 3. Frontend: API Integration ✅
 **Modified Files:**
-- `frontend/src/api/client.ts` - Added getFocusDistribution method
-- `frontend/src/api/hooks.ts` - Added useFocusDistribution hook and query key
+- `frontend/src/api/client.ts` - Added getActivityTags method
+- `frontend/src/api/hooks.ts` - Added useActivityTags hook and query key
 
 **API Client:**
 ```typescript
-getFocusDistribution: async (date: string) => {
-  return App.GetFocusDistribution(date);
+getActivityTags: async (date: string) => {
+  return App.GetActivityTags(date);
 }
 ```
 
 **React Query Hook:**
 ```typescript
-export function useFocusDistribution(date: string) {
+export function useActivityTags(date: string) {
   return useQuery({
-    queryKey: queryKeys.analytics.focusDistribution(date),
-    queryFn: () => api.analytics.getFocusDistribution(date),
-    staleTime: 60_000,
+    queryKey: queryKeys.analytics.activityTags(date),
+    queryFn: () => api.analytics.getActivityTags(date),
+    staleTime: 60_000, // Cache for 60 seconds
   });
 }
 ```
 
 **Query Key:**
 ```typescript
-focusDistribution: (date: string) => ['analytics', 'focusDistribution', date] as const
+activityTags: (date: string) => ['analytics', 'activityTags', date] as const
 ```
 
-### 4. Frontend: FocusDistributionChart Component ✅
-**New File:** `frontend/src/components/analytics/FocusDistributionChart.tsx`
+### 4. Frontend: ActivityTagsChart Component ✅
+**New File:** `frontend/src/components/analytics/ActivityTagsChart.tsx`
 
-**Features:**
-- **Horizontal bar chart** using Recharts BarChart with layout="horizontal"
-- **Color-coded bars** based on focus quality:
-  * Green (hsl(142, 76%, 36%)) - Excellent/Good (75-100%)
-  * Yellow (hsl(48, 96%, 53%)) - Fair (50-74%)
-  * Orange (hsl(25, 95%, 53%)) - Poor (25-49%)
-  * Red (hsl(0, 84%, 60%)) - Very Poor (10-24%)
-  * Gray (muted) - No activity (0%)
+**Component Architecture:**
+- **Chart Type:** Horizontal bar chart using Recharts BarChart
+- **Layout:** `layout="horizontal"` for tag names on Y-axis
+- **Height:** 300px for compact visualization
+- **Color:** Blue (`hsl(217, 91%, 60%)`) for consistency with app theme
 
-- **X-axis**: Percentage scale (0-100%) showing focus quality
-- **Y-axis**: Hour labels (00:00 - 23:00) for 24-hour day
-- **Chart height**: 400px for better visibility of all hours
+**Key Features:**
+1. **Data Visualization:**
+   - X-axis: Duration in minutes (0 to max)
+   - Y-axis: Tag names (up to 100px width)
+   - Bars: Rounded corners on right side
+   - Grid: Subtle with 0.1 opacity
 
-- **Rich tooltips** showing:
-  * Hour (e.g., "14:00")
-  * Focus label (e.g., "Good")
-  * Quality percentage (e.g., "75%")
-  * Context switches count (e.g., "5")
+2. **Rich Tooltips:**
+   - Duration formatted as "Xh Xm"
+   - Percentage shown (e.g., "45.2%")
+   - Session count (e.g., "3 sessions")
+   - Combined format: "1h 23m (45.2%) - 3 sessions"
 
-- **Legend** showing color meanings:
-  * Visual color swatches
-  * Quality ranges with labels
-  * Centered below chart
+3. **Interactive Elements:**
+   - Optional `onTagClick` callback prop
+   - Cursor changes to pointer when clickable
+   - Click handler for future filtering integration
 
-- **Data filtering**:
-  * Only displays hours with activity (focusQuality > 0)
-  * Hides hours with no data for cleaner visualization
+4. **Helper Functions:**
+   - `formatDuration(minutes)`: Converts minutes to "Xh Xm" format
+   - Handles hours > 0 separately from minutes-only
 
-- **Loading state**: Skeleton placeholder during data fetch
-- **Empty state**: "No activity data available" message when no data
+5. **State Handling:**
+   - **Loading:** Skeleton placeholder (300px height)
+   - **Empty:** "No tagged sessions available" message
+   - **Data:** Sorts by duration, limits to top 10, renders chart
 
-**Component Structure:**
+6. **Legend:**
+   - Blue square color indicator
+   - Label: "Time spent per activity tag"
+   - Centered below chart
+
+**Component Props:**
 ```typescript
-interface HourlyFocus {
-  hour: number;
-  contextSwitches: number;
-  focusQuality: number;
-  focusLabel: string;
-}
-
-interface FocusDistributionChartProps {
-  data: HourlyFocus[] | undefined;
+interface ActivityTagsChartProps {
+  data: TagUsage[] | undefined;
   isLoading: boolean;
+  onTagClick?: (tag: string) => void; // Optional click handler
 }
 ```
 
@@ -181,90 +178,104 @@ interface FocusDistributionChartProps {
 **Modified File:** `frontend/src/pages/AnalyticsPage.tsx`
 
 **Changes:**
-1. Imported FocusDistributionChart component
-2. Imported useFocusDistribution hook
-3. Added focus distribution data fetching:
+1. **Imports:**
+   - Added `ActivityTagsChart` component import
+   - Added `useActivityTags` hook import
+
+2. **Data Fetching:**
    ```typescript
-   const { data: focusDistribution, isLoading: focusLoading } = useFocusDistribution(dateStr);
-   ```
-4. Added chart to Activity tab:
-   ```tsx
-   <TabsContent value="activity" className="space-y-4">
-     <div className="grid gap-4 lg:grid-cols-2">
-       <ActivityChart data={hourlyActivity} isLoading={hourlyLoading} />
-       <HeatmapChart data={undefined} isLoading={hourlyLoading} />
-     </div>
-     <FocusDistributionChart data={focusDistribution} isLoading={focusLoading} />
-   </TabsContent>
+   const { data: activityTags, isLoading: tagsLoading } = useActivityTags(dateStr);
    ```
 
-**Layout:**
-- Placed below ActivityChart and HeatmapChart in Activity tab
-- Full-width chart spans entire tab width
-- Consistent spacing (space-y-4) with other tab content
+3. **Render Integration:**
+   - Placed in Activity tab alongside FocusDistributionChart
+   - 2-column grid layout (`lg:grid-cols-2`)
+   - Automatically updates when date changes
+   - Shares same spacing/gap as other charts
+
+**Layout Structure:**
+```tsx
+<TabsContent value="activity" className="space-y-4">
+  {/* First row: Activity + Heatmap */}
+  <div className="grid gap-4 lg:grid-cols-2">
+    <ActivityChart />
+    <HeatmapChart />
+  </div>
+
+  {/* Second row: Focus Distribution + Activity Tags */}
+  <div className="grid gap-4 lg:grid-cols-2">
+    <FocusDistributionChart />
+    <ActivityTagsChart />  {/* NEW */}
+  </div>
+</TabsContent>
+```
 
 ### 6. Updated Feature List ✅
 **Modified File:** `feature_list.json`
 
 **Change:**
-Test #8: "NEW: Analytics page displays focus distribution chart showing hourly focus patterns"
+Test #9: "NEW: Analytics page displays activity tags horizontal bar chart"
 - Status changed from `"passes": false` to `"passes": true`
 
 ## Current State
 
 ### What Works
-- All 8 passing tests verified and working correctly ✅
+- All 9 passing tests verified and working correctly ✅
 - Test #1: Timeline real thumbnails ✅
 - Test #2: Day page real screenshots ✅
 - Test #3: Timeline stats sidebar ✅
 - Test #4: Visual timeline bands ✅
 - Test #5: Tags sidebar ✅
 - Test #6: Time period and app filtering ✅
-- Test #7: Productivity score ✅ (Previous session)
-- **Test #8: Focus distribution chart ✅ (NEWLY COMPLETED)**
+- Test #7: Productivity score ✅
+- Test #8: Focus distribution chart ✅
+- **Test #9: Activity tags chart ✅ (NEWLY COMPLETED)**
 
 ### Database State
 - 20 total sessions across 2 dates
   * January 5, 2026: 13 sessions
   * January 6, 2026: 7 sessions
 - 20 summaries with tags
-- All sessions have focus events for productivity and focus calculations
-- Focus events contain: StartTime, EndTime, AppName, WindowTitle, DurationSeconds
+- All sessions have tags for activity categorization
+- Sample tags: "coding", "writing", "debugging", "learning", "testing",
+  "meeting", "context switching", "planning", "research", "multitasking"
 
 ### Feature Completion Status
-Tests #1-8: PASSING ✅
-Tests #9-31: Analytics and other features - Not yet implemented
+Tests #1-9: PASSING ✅
+Tests #10-31: Analytics and other features - Not yet implemented
 
-**Phase 3 Progress: 2/8 complete (25%)**
+**Phase 3 Progress: 3/8 complete (37.5%)**
 
 ## Next Steps
 
 ### Immediate Options
 
-**Option A: Implement Test #9 (Analytics - Activity Tags Chart)**
-- Backend: Extract tags from summaries for date range
-- Backend: Calculate time/session count per tag
-- Frontend: Horizontal bar chart of top tags with durations
-- Make bars clickable to filter timeline by tag
-
-**Option B: Implement Test #10 (Analytics - Time Distribution Pie Chart)**
+**Option A: Implement Test #10 (Analytics - Time Distribution Pie Chart)**
 - Use existing app usage data
-- Frontend: Pie chart component with Recharts
+- Frontend: Pie chart component with Recharts PieChart
 - Show percentage labels and app names
 - Make slices clickable to filter to that app
 - Color-coded by app category (productive/neutral/distracting)
 
-**Option C: Implement Test #11 (Analytics - Top Windows List)**
-- Backend: Query focus_events grouped by window_title
+**Option B: Implement Test #11 (Analytics - Top Windows List)**
+- Backend: Query window_focus_events grouped by window_title
 - Backend: Calculate total time per window
 - Frontend: List component with app badges and durations
 - Make clickable to filter Day view to that window
 
-**Recommendation:** Option A (Activity Tags Chart)
-- Natural complement to existing charts
-- Tags provide semantic categorization of work
-- Helps users understand what types of tasks they worked on
-- Visually shows time distribution across different activity types
+**Option C: Implement Test #12 (Analytics - Week View)**
+- Backend: GetWeeklyStats API method (aggregate 7 days)
+- Frontend: WeeklyAnalytics component
+- Daily activity chart for 7 days
+- Average metrics and ranges
+- Week-over-week comparison
+
+**Recommendation:** Option A (Time Distribution Pie Chart)
+- Natural complement to existing analytics charts
+- Pie charts excellent for percentage visualization
+- Shows app usage at a glance
+- Uses existing app usage data (no new backend needed)
+- Completes the Activity tab analytics suite
 - Aligns with implementation roadmap Phase 3
 
 ## Development Environment
@@ -286,33 +297,32 @@ Tests #9-31: Analytics and other features - Not yet implemented
 
 ## Git Status
 - Branch: v2
-- Latest commit: 3cd07b4 "feat: Add focus distribution chart to Analytics page"
+- Latest commit: 47f5df7 "feat: Add activity tags chart to Analytics page"
 - Working directory: Clean
-- 8 features complete and verified
+- 9 features complete and verified
 
 ## Completion Metrics
-- Features verified working: 8/31 (25.8%)
-- Features fully complete: 8/31 (25.8%)
-- Tests passing and verified: 8/31
-- Tests remaining: 23
+- Features verified working: 9/31 (29.0%)
+- Features fully complete: 9/31 (29.0%)
+- Tests passing and verified: 9/31
+- Tests remaining: 22
 - **Phase 2 progress: 4/4 complete (100%) ✅**
-- **Phase 3 progress: 2/8 complete (25%)**
+- **Phase 3 progress: 3/8 complete (37.5%)**
 
 ## Session Summary
-Successfully implemented focus distribution chart feature for Analytics page. Created comprehensive
-backend algorithm that calculates hourly focus quality based on context switch frequency. Research-
-backed thresholds provide meaningful insights into user focus patterns throughout the day. Built
-polished FocusDistributionChart component with color-coded horizontal bars, rich tooltips, and
-legend. Integrated seamlessly into Analytics page Activity tab below existing charts. Updated
-feature_list.json to mark Test #8 as passing. Committed all changes with detailed commit message.
+Successfully implemented activity tags chart feature for Analytics page. Created backend
+algorithm that extracts tags from session summaries and aggregates time/session counts.
+Built ActivityTagsChart component with horizontal bars showing duration per tag with rich
+tooltips. Integrated seamlessly into Analytics page Activity tab in 2-column grid. Updated
+feature_list.json to mark Test #9 as passing. Committed all changes with detailed message.
 
 ## Key Technical Achievements
-1. Research-backed focus quality algorithm with meaningful thresholds
-2. Color-coded visualization makes patterns immediately obvious
-3. Horizontal bar chart format ideal for 24-hour data display
-4. Filters out inactive hours for cleaner visualization
-5. Rich tooltips provide detailed context for each hour
-6. Full-width chart maximizes data visibility
+1. Tag aggregation algorithm efficiently processes session summaries
+2. Horizontal bar chart format ideal for tag name display
+3. Rich tooltips provide comprehensive tag statistics
+4. Semantic activity categorization gives users insight into work types
+5. Top 10 limiting focuses on most significant tags
+6. Full-width grid layout maximizes chart visibility
 7. Consistent with existing analytics component patterns
 8. Proper React Query caching and stale time configuration
 
@@ -320,34 +330,35 @@ feature_list.json to mark Test #8 as passing. Committed all changes with detaile
 - Backend code follows Go best practices
 - Frontend follows React/TypeScript conventions
 - Component properly handles loading and empty states
-- Color-coded visual indicators based on UX research
+- Duration formatting improves readability
 - Responsive layout with proper spacing
 - No console errors or TypeScript compilation issues
 - Feature list updated correctly
 
 ## Files Created/Modified This Session
 **Created:**
-1. `frontend/src/components/analytics/FocusDistributionChart.tsx` - Chart component
+1. `frontend/src/components/analytics/ActivityTagsChart.tsx` - Chart component
 
 **Modified:**
-2. `internal/service/analytics.go` - Added HourlyFocus struct and GetFocusDistribution method
-3. `app.go` - Exposed GetFocusDistribution API
+2. `internal/service/analytics.go` - Added TagUsage struct and GetActivityTags method
+3. `app.go` - Exposed GetActivityTags API
 4. `frontend/wailsjs/go/main/App.d.ts` - Updated bindings
 5. `frontend/wailsjs/go/main/App.js` - Updated bindings
-6. `frontend/wailsjs/go/models.ts` - Added HourlyFocus class
-7. `frontend/src/api/client.ts` - Added getFocusDistribution method
-8. `frontend/src/api/hooks.ts` - Added useFocusDistribution hook and query key
-9. `frontend/src/components/analytics/index.ts` - Exported FocusDistributionChart
+6. `frontend/wailsjs/go/models.ts` - Added TagUsage class
+7. `frontend/src/api/client.ts` - Added getActivityTags method
+8. `frontend/src/api/hooks.ts` - Added useActivityTags hook and query key
+9. `frontend/src/components/analytics/index.ts` - Exported ActivityTagsChart
 10. `frontend/src/pages/AnalyticsPage.tsx` - Integrated chart into Activity tab
-11. `feature_list.json` - Marked Test #8 as passing
+11. `feature_list.json` - Marked Test #9 as passing
 12. `claude-progress.txt` - This file
 
 ## Lessons Learned
-1. Focus quality based on context switches is intuitive and actionable
-2. Horizontal bar charts work better for 24-hour time series data
-3. Filtering out inactive hours makes charts more readable
-4. Color gradients (green → yellow → orange → red) are universally understood
-5. Tooltips should show both derived metrics (quality %) and raw data (switch count)
-6. Full-width charts provide better data visibility than split layouts
-7. Research-backed thresholds increase user trust in metrics
-8. Phase 3 (Analytics) features are building cohesive analytics dashboard
+1. Activity tags provide semantic categorization beyond app names
+2. Horizontal bar charts better for categorical data with text labels
+3. Aggregating across sessions gives meaningful time distributions
+4. Top 10 limiting prevents overwhelming users with too many tags
+5. Duration formatting ("Xh Xm") more intuitive than raw minutes
+6. Tooltips should show both derived (percentage) and raw (count) data
+7. 2-column grid layout balances space efficiency with chart visibility
+8. Session summary tags already parsed from JSON by storage layer
+9. Phase 3 (Analytics) features building comprehensive analytics dashboard
