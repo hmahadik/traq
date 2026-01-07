@@ -6,3 +6,4 @@ export { CalendarWidget } from './CalendarWidget';
 export { TimelineStats } from './TimelineStats';
 export { TimelineBands } from './TimelineBands';
 export { TimelineTags } from './TimelineTags';
+export { TimelineFilters, type TimePeriod, getTimePeriodRange } from './TimelineFilters';

@@ -1,7 +1,7 @@
 import { useState, useCallback, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { SessionCardWithThumbnails, SessionCardSkeleton, CalendarWidget, TimelineStats, TimelineBands, TimelineTags } from '@/components/timeline';
+import { SessionCardWithThumbnails, SessionCardSkeleton, CalendarWidget, TimelineStats, TimelineBands, TimelineTags, TimelineFilters, type TimePeriod, getTimePeriodRange } from '@/components/timeline';
 import {
   useSessionsForDate,
   useCalendarHeatmap,
@@ -26,6 +26,8 @@ export function TimelinePage() {
   const [selectedSessionId, setSelectedSessionId] = useState<number | null>(null);
   const [showCalendar, setShowCalendar] = useState(true);
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
+  const [timePeriod, setTimePeriod] = useState<TimePeriod>(null);
+  const [selectedApp, setSelectedApp] = useState<string | null>(null);
 
   const dateStr = getDateString(selectedDate);
   const isToday = dateStr === getDateString(new Date());
@@ -37,13 +39,52 @@ export function TimelinePage() {
   );
   const generateSummary = useGenerateSummary();
 
-  // Filter sessions by selected tag
+  // Get list of all apps from sessions for filter dropdown
+  const availableApps = useMemo(() => {
+    if (!sessions) return [];
+    const appsSet = new Set<string>();
+    sessions.forEach(session => {
+      if (session.topApps) {
+        session.topApps.forEach(app => appsSet.add(app));
+      }
+    });
+    return Array.from(appsSet).sort();
+  }, [sessions]);
+
+  // Filter sessions by tag, time period, and app
   const filteredSessions = useMemo(() => {
-    if (!sessions || !selectedTag) return sessions;
-    return sessions.filter(session =>
-      session.tags?.includes(selectedTag)
-    );
-  }, [sessions, selectedTag]);
+    if (!sessions) return sessions;
+
+    let filtered = sessions;
+
+    // Filter by tag
+    if (selectedTag) {
+      filtered = filtered.filter(session =>
+        session.tags?.includes(selectedTag)
+      );
+    }
+
+    // Filter by time period
+    if (timePeriod) {
+      const periodRange = getTimePeriodRange(timePeriod);
+      if (periodRange) {
+        filtered = filtered.filter(session => {
+          const sessionDate = new Date(session.startTime * 1000);
+          const hour = sessionDate.getHours();
+          return hour >= periodRange.startHour && hour < periodRange.endHour;
+        });
+      }
+    }
+
+    // Filter by app
+    if (selectedApp) {
+      filtered = filtered.filter(session =>
+        session.topApps?.includes(selectedApp)
+      );
+    }
+
+    return filtered;
+  }, [sessions, selectedTag, timePeriod, selectedApp]);
 
   // Navigation handlers
   const goToPreviousDay = useCallback(() => {
@@ -85,11 +126,23 @@ export function TimelinePage() {
     setSelectedDate(date);
     setSelectedSessionId(null);
     setSelectedTag(null); // Clear tag filter on date change
+    setTimePeriod(null); // Clear time period filter on date change
+    setSelectedApp(null); // Clear app filter on date change
   }, []);
 
   const handleTagClick = useCallback((tag: string) => {
     // Toggle tag selection
     setSelectedTag(currentTag => currentTag === tag ? null : tag);
+    setSelectedSessionId(null); // Clear session selection
+  }, []);
+
+  const handleTimePeriodChange = useCallback((period: TimePeriod) => {
+    setTimePeriod(period);
+    setSelectedSessionId(null); // Clear session selection
+  }, []);
+
+  const handleAppChange = useCallback((app: string | null) => {
+    setSelectedApp(app);
     setSelectedSessionId(null); // Clear session selection
   }, []);
 
@@ -165,10 +218,22 @@ export function TimelinePage() {
             sessions={sessions}
             date={selectedDate}
             onSessionClick={handleSessionSelect}
+            highlightedTimeRange={timePeriod ? getTimePeriodRange(timePeriod) : null}
           />
         )}
 
-        {/* Tag Filter Indicator */}
+        {/* Time Period and App Filters */}
+        {sessions && sessions.length > 0 && (
+          <TimelineFilters
+            timePeriod={timePeriod}
+            selectedApp={selectedApp}
+            availableApps={availableApps}
+            onTimePeriodChange={handleTimePeriodChange}
+            onAppChange={handleAppChange}
+          />
+        )}
+
+        {/* Active Tag Filter Indicator */}
         {selectedTag && (
           <div className="mb-4 flex items-center gap-2 text-sm">
             <span className="text-muted-foreground">Filtering by tag:</span>
@@ -195,11 +260,13 @@ export function TimelinePage() {
               <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
                 <List className="h-12 w-12 mb-4 opacity-50" />
                 <p className="text-lg font-medium">
-                  {selectedTag ? 'No sessions with this tag' : 'No sessions recorded'}
+                  {timePeriod || selectedApp || selectedTag
+                    ? 'No sessions match the current filters'
+                    : 'No sessions recorded'}
                 </p>
                 <p className="text-sm mt-1">
-                  {selectedTag ? (
-                    <>Click the tag filter above to see all sessions</>
+                  {timePeriod || selectedApp || selectedTag ? (
+                    <>Clear filters to see all sessions for this date</>
                   ) : isToday ? (
                     'Sessions will appear here as you work'
                   ) : (

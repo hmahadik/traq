@@ -80,7 +80,7 @@
       "Step 8: Verify only evening sessions (after 5pm) are displayed",
       "Step 9: Select an app filter and verify only sessions using that app display"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",

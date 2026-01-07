@@ -10,6 +10,7 @@ interface TimelineBandsProps {
   screenshots?: Screenshot[];
   date: Date;
   onSessionClick?: (sessionId: number) => void;
+  highlightedTimeRange?: { startHour: number; endHour: number } | null;
 }
 
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
@@ -46,6 +47,7 @@ export function TimelineBands({
   screenshots = [],
   date,
   onSessionClick,
+  highlightedTimeRange,
 }: TimelineBandsProps) {
   const dayStart = useMemo(() => {
     const start = new Date(date);
@@ -82,6 +84,18 @@ export function TimelineBands({
         {/* Sessions Row */}
         <div className="relative" style={{ height: BAND_HEIGHT }}>
           <div className="absolute inset-0 bg-muted/20 rounded">
+            {/* Highlighted time range overlay */}
+            {highlightedTimeRange && (
+              <div
+                className="absolute bg-primary/10 border-l-2 border-r-2 border-primary/30"
+                style={{
+                  left: `${(highlightedTimeRange.startHour / 24) * 100}%`,
+                  width: `${((highlightedTimeRange.endHour - highlightedTimeRange.startHour) / 24) * 100}%`,
+                  height: '100%',
+                  top: 0,
+                }}
+              />
+            )}
             <TooltipProvider>
               {sessions.map((session, index) => {
                 const left = getTimePosition(session.startTime, dayStart);
@@ -129,6 +143,18 @@ export function TimelineBands({
         {/* Screenshots Row */}
         <div className="relative" style={{ height: BAND_HEIGHT }}>
           <div className="absolute inset-0 bg-muted/20 rounded overflow-hidden">
+            {/* Highlighted time range overlay */}
+            {highlightedTimeRange && (
+              <div
+                className="absolute bg-primary/10 border-l-2 border-r-2 border-primary/30"
+                style={{
+                  left: `${(highlightedTimeRange.startHour / 24) * 100}%`,
+                  width: `${((highlightedTimeRange.endHour - highlightedTimeRange.startHour) / 24) * 100}%`,
+                  height: '100%',
+                  top: 0,
+                }}
+              />
+            )}
             {dayScreenshots.map((screenshot) => {
               const left = getTimePosition(screenshot.timestamp, dayStart);
               const width = 0.5; // Small width for each screenshot indicator
@@ -157,6 +183,18 @@ export function TimelineBands({
         {/* Activity Row - Color-coded based on app/window type */}
         <div className="relative" style={{ height: BAND_HEIGHT }}>
           <div className="absolute inset-0 bg-muted/20 rounded">
+            {/* Highlighted time range overlay */}
+            {highlightedTimeRange && (
+              <div
+                className="absolute bg-primary/10 border-l-2 border-r-2 border-primary/30"
+                style={{
+                  left: `${(highlightedTimeRange.startHour / 24) * 100}%`,
+                  width: `${((highlightedTimeRange.endHour - highlightedTimeRange.startHour) / 24) * 100}%`,
+                  height: '100%',
+                  top: 0,
+                }}
+              />
+            )}
             {/* For now, we'll show sessions with different colors to represent activity */}
             {sessions.map((session, index) => {
               const left = getTimePosition(session.startTime, dayStart);
@@ -192,6 +230,18 @@ export function TimelineBands({
         {/* AI Summaries Row */}
         <div className="relative" style={{ height: BAND_HEIGHT }}>
           <div className="absolute inset-0 bg-muted/20 rounded">
+            {/* Highlighted time range overlay */}
+            {highlightedTimeRange && (
+              <div
+                className="absolute bg-primary/10 border-l-2 border-r-2 border-primary/30"
+                style={{
+                  left: `${(highlightedTimeRange.startHour / 24) * 100}%`,
+                  width: `${((highlightedTimeRange.endHour - highlightedTimeRange.startHour) / 24) * 100}%`,
+                  height: '100%',
+                  top: 0,
+                }}
+              />
+            )}
             <TooltipProvider>
               {sessionsWithSummaries.map((session) => {
                 const left = getTimePosition(session.startTime, dayStart);
