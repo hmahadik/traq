@@ -218,6 +218,14 @@ export function useReportHistory() {
   });
 }
 
+export function useDailySummaries(limit: number = 30) {
+  return useQuery({
+    queryKey: ['reports', 'dailySummaries', limit],
+    queryFn: () => api.reports.getDailySummaries(limit),
+    staleTime: 60_000,
+  });
+}
+
 export function useParseTimeRange(input: string) {
   return useQuery({
     queryKey: queryKeys.reports.timeRange(input),

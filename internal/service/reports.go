@@ -343,6 +343,16 @@ func (s *ReportsService) GetReport(id int64) (*storage.Report, error) {
 	return s.store.GetReport(id)
 }
 
+// DailySummary represents a daily summary report for the list view.
+type DailySummary struct {
+	ID          int64  `json:"id"`
+	Date        string `json:"date"`        // YYYY-MM-DD
+	Summary     string `json:"summary"`     // Preview text (first ~200 chars)
+	TotalTime   int64  `json:"totalTime"`   // Total active time in seconds
+	SessionsCount int  `json:"sessionsCount"`
+	CreatedAt   int64  `json:"createdAt"`
+}
+
 // GetReportHistory returns past generated reports.
 func (s *ReportsService) GetReportHistory() ([]*ReportMeta, error) {
 	reports, err := s.store.GetAllReports()
@@ -363,6 +373,110 @@ func (s *ReportsService) GetReportHistory() ([]*ReportMeta, error) {
 	}
 
 	return metas, nil
+}
+
+// GetDailySummaries returns auto-generated daily summary reports.
+// Returns summaries for days with activity, most recent first.
+func (s *ReportsService) GetDailySummaries(limit int) ([]*DailySummary, error) {
+	if limit <= 0 {
+		limit = 30 // Default to last 30 days
+	}
+
+	// Get all summary-type reports that cover full days
+	reports, err := s.store.GetAllReports()
+	if err != nil {
+		return nil, err
+	}
+
+	var summaries []*DailySummary
+	for _, r := range reports {
+		// Filter to only summary reports for single days
+		if r.ReportType != "summary" {
+			continue
+		}
+
+		// Check if this is a single-day report
+		if !r.StartTime.Valid || !r.EndTime.Valid {
+			continue
+		}
+
+		startTime := time.Unix(r.StartTime.Int64, 0)
+		endTime := time.Unix(r.EndTime.Int64, 0)
+
+		// Check if start and end are on the same day
+		if startTime.Format("2006-01-02") != endTime.Format("2006-01-02") {
+			continue
+		}
+
+		// Get sessions for this day to calculate total time
+		sessions, _ := s.store.GetSessionsByTimeRange(r.StartTime.Int64, r.EndTime.Int64)
+		var totalTime int64
+		for _, sess := range sessions {
+			if sess.DurationSeconds.Valid {
+				totalTime += sess.DurationSeconds.Int64
+			}
+		}
+
+		// Extract preview text (first paragraph or ~200 chars)
+		preview := extractPreview(r.Content.String)
+
+		summaries = append(summaries, &DailySummary{
+			ID:            r.ID,
+			Date:          startTime.Format("2006-01-02"),
+			Summary:       preview,
+			TotalTime:     totalTime,
+			SessionsCount: len(sessions),
+			CreatedAt:     r.CreatedAt,
+		})
+
+		if len(summaries) >= limit {
+			break
+		}
+	}
+
+	return summaries, nil
+}
+
+// extractPreview extracts a preview from markdown content.
+func extractPreview(content string) string {
+	if content == "" {
+		return "No summary available"
+	}
+
+	// Remove markdown headers
+	lines := strings.Split(content, "\n")
+	var textLines []string
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		// Skip headers, empty lines, and horizontal rules
+		if strings.HasPrefix(line, "#") || line == "" || strings.HasPrefix(line, "---") {
+			continue
+		}
+		// Skip bullet points and numbered lists for preview
+		if strings.HasPrefix(line, "- ") || strings.HasPrefix(line, "* ") {
+			continue
+		}
+		if len(line) > 0 {
+			textLines = append(textLines, line)
+		}
+		// Stop after we have some content
+		if len(textLines) >= 2 {
+			break
+		}
+	}
+
+	preview := strings.Join(textLines, " ")
+
+	// Limit to ~200 chars
+	if len(preview) > 200 {
+		preview = preview[:197] + "..."
+	}
+
+	if preview == "" {
+		return "Daily activity summary"
+	}
+
+	return preview
 }
 
 // ParseTimeRange parses natural language time input.

@@ -117,6 +117,10 @@ export const reports = {
     return App.GetReportHistory();
   },
 
+  getDailySummaries: async (limit: number = 30) => {
+    return App.GetDailySummaries(limit);
+  },
+
   parseTimeRange: async (input: string) => {
     return App.ParseTimeRange(input);
   },

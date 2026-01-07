@@ -25,3 +25,12 @@ export interface TimeRange {
   end: number;
   label: string;
 }
+
+export interface DailySummary {
+  id: number;
+  date: string; // YYYY-MM-DD
+  summary: string; // Preview text
+  totalTime: number; // Total active time in seconds
+  sessionsCount: number;
+  createdAt: number;
+}

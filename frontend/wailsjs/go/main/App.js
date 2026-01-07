@@ -50,6 +50,10 @@ export function GetDailyStats(arg1) {
   return window['go']['main']['App']['GetDailyStats'](arg1);
 }
 
+export function GetDailySummaries(arg1) {
+  return window['go']['main']['App']['GetDailySummaries'](arg1);
+}
+
 export function GetDataDir() {
   return window['go']['main']['App']['GetDataDir']();
 }

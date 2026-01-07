@@ -236,7 +236,7 @@
       "Step 5: Click a summary to view full report",
       "Step 6: Verify full report opens with complete details"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",

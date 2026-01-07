@@ -517,6 +517,28 @@ export namespace service {
 		    return a;
 		}
 	}
+	export class DailySummary {
+	    id: number;
+	    date: string;
+	    summary: string;
+	    totalTime: number;
+	    sessionsCount: number;
+	    createdAt: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new DailySummary(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.date = source["date"];
+	        this.summary = source["summary"];
+	        this.totalTime = source["totalTime"];
+	        this.sessionsCount = source["sessionsCount"];
+	        this.createdAt = source["createdAt"];
+	    }
+	}
 	export class FileStats {
 	    totalEvents: number;
 	    eventsByType: Record<string, number>;

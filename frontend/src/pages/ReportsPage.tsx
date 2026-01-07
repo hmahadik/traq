@@ -8,9 +8,11 @@ import {
   ReportTypeSelector,
   ReportPreview,
   ReportHistory,
+  DailySummariesList,
 } from '@/components/reports';
 import {
   useReportHistory,
+  useDailySummaries,
   useGenerateReport,
   useExportReport,
   useParseTimeRange,
@@ -26,6 +28,7 @@ export function ReportsPage() {
   const [generatedReport, setGeneratedReport] = useState<Report | undefined>();
 
   const { data: history, isLoading: historyLoading } = useReportHistory();
+  const { data: dailySummaries, isLoading: summariesLoading } = useDailySummaries(30);
   const { data: parsedRange } = useParseTimeRange(timeRange);
   const generateReport = useGenerateReport();
   const exportReport = useExportReport();
@@ -168,6 +171,13 @@ export function ReportsPage() {
           isExporting={exportReport.isPending}
         />
       </div>
+
+      {/* Daily Summaries */}
+      <DailySummariesList
+        summaries={dailySummaries}
+        isLoading={summariesLoading}
+        onView={handleViewReport}
+      />
 
       {/* Report History */}
       <ReportHistory

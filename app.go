@@ -420,6 +420,14 @@ func (a *App) GetReportHistory() ([]*service.ReportMeta, error) {
 	return a.Reports.GetReportHistory()
 }
 
+// GetDailySummaries returns auto-generated daily summary reports.
+func (a *App) GetDailySummaries(limit int) ([]*service.DailySummary, error) {
+	if a.Reports == nil {
+		return nil, nil
+	}
+	return a.Reports.GetDailySummaries(limit)
+}
+
 // ParseTimeRange parses natural language time input.
 func (a *App) ParseTimeRange(input string) (*service.TimeRange, error) {
 	if a.Reports == nil {
