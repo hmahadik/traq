@@ -13,6 +13,7 @@ import {
   ProductivityScoreCard,
   FocusDistributionChart,
   ActivityTagsChart,
+  TimeDistributionChart,
 } from '@/components/analytics';
 import {
   useDailyStats,
@@ -143,6 +144,13 @@ export function AnalyticsPage() {
         <TabsContent value="apps" className="space-y-4">
           <div className="grid gap-4 lg:grid-cols-2">
             <AppUsageChart data={appUsage} isLoading={appUsageLoading} />
+            <TimeDistributionChart
+              data={appUsage}
+              isLoading={appUsageLoading}
+              onAppClick={handleAppClick}
+            />
+          </div>
+          <div className="grid gap-4">
             <AppUsageTable
               data={appUsage}
               isLoading={appUsageLoading}
