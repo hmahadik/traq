@@ -27,6 +27,8 @@ export function GetDataDir():Promise<string>;
 
 export function GetDataSourceStats(arg1:number,arg2:number):Promise<service.DataSourceStats>;
 
+export function GetFocusDistribution(arg1:string):Promise<Array<service.HourlyFocus>>;
+
 export function GetHourlyActivity(arg1:string):Promise<Array<service.HourlyActivity>>;
 
 export function GetProductivityScore(arg1:string):Promise<service.ProductivityScore>;

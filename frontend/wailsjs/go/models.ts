@@ -681,6 +681,24 @@ export namespace service {
 	        this.activeMinutes = source["activeMinutes"];
 	    }
 	}
+	export class HourlyFocus {
+	    hour: number;
+	    contextSwitches: number;
+	    focusQuality: number;
+	    focusLabel: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new HourlyFocus(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.hour = source["hour"];
+	        this.contextSwitches = source["contextSwitches"];
+	        this.focusQuality = source["focusQuality"];
+	        this.focusLabel = source["focusLabel"];
+	    }
+	}
 	
 	
 	export class ProductivityScore {

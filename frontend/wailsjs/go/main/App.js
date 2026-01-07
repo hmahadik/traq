@@ -50,6 +50,10 @@ export function GetDataSourceStats(arg1, arg2) {
   return window['go']['main']['App']['GetDataSourceStats'](arg1, arg2);
 }
 
+export function GetFocusDistribution(arg1) {
+  return window['go']['main']['App']['GetFocusDistribution'](arg1);
+}
+
 export function GetHourlyActivity(arg1) {
   return window['go']['main']['App']['GetHourlyActivity'](arg1);
 }

@@ -149,6 +149,14 @@ type ProductivityScore struct {
 	ProductivePercentage float64 `json:"productivePercentage"`
 }
 
+// HourlyFocus represents focus quality for a specific hour.
+type HourlyFocus struct {
+	Hour            int     `json:"hour"`            // 0-23
+	ContextSwitches int     `json:"contextSwitches"` // Number of app/window changes
+	FocusQuality    float64 `json:"focusQuality"`    // 0-100 percentage
+	FocusLabel      string  `json:"focusLabel"`      // "Excellent", "Good", "Fair", "Poor", "Very Poor"
+}
+
 // GetDailyStats returns statistics for a specific date.
 func (s *AnalyticsService) GetDailyStats(date string) (*DailyStats, error) {
 	// Parse date to get start/end timestamps
@@ -542,4 +550,89 @@ func (s *AnalyticsService) sortAppUsage(appDurations map[string]float64) []*AppU
 		return apps[:10]
 	}
 	return apps
+}
+
+// GetFocusDistribution calculates hourly focus quality based on context switches.
+// Lower context switches indicate better focus.
+func (s *AnalyticsService) GetFocusDistribution(date string) ([]*HourlyFocus, error) {
+	// Parse date to get start/end timestamps
+	layout := "2006-01-02"
+	t, err := time.Parse(layout, date)
+	if err != nil {
+		return nil, err
+	}
+
+	startTime := time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, t.Location()).Unix()
+	endTime := time.Date(t.Year(), t.Month(), t.Day(), 23, 59, 59, 0, t.Location()).Unix()
+
+	// Get all focus events for the day
+	events, err := s.store.GetFocusEventsByTimeRange(startTime, endTime)
+	if err != nil {
+		return nil, err
+	}
+
+	// Initialize hourly data (0-23 hours)
+	hourlyData := make(map[int]*HourlyFocus)
+	for hour := 0; hour < 24; hour++ {
+		hourlyData[hour] = &HourlyFocus{
+			Hour:            hour,
+			ContextSwitches: 0,
+			FocusQuality:    0,
+			FocusLabel:      "No Activity",
+		}
+	}
+
+	// Count context switches per hour
+	// Each focus event represents a context switch (change of window/app)
+	for _, event := range events {
+		eventTime := time.Unix(event.StartTime, 0)
+		hour := eventTime.Hour()
+
+		if data, exists := hourlyData[hour]; exists {
+			data.ContextSwitches++
+		}
+	}
+
+	// Calculate focus quality based on context switches
+	// Scoring logic:
+	// 0-2 switches = Excellent (100%)
+	// 3-5 switches = Good (75%)
+	// 6-10 switches = Fair (50%)
+	// 11-20 switches = Poor (25%)
+	// 20+ switches = Very Poor (10%)
+	result := make([]*HourlyFocus, 24)
+	for hour := 0; hour < 24; hour++ {
+		data := hourlyData[hour]
+		switches := data.ContextSwitches
+
+		// Calculate quality
+		var quality float64
+		var label string
+
+		if switches == 0 {
+			quality = 0
+			label = "No Activity"
+		} else if switches <= 2 {
+			quality = 100
+			label = "Excellent"
+		} else if switches <= 5 {
+			quality = 75
+			label = "Good"
+		} else if switches <= 10 {
+			quality = 50
+			label = "Fair"
+		} else if switches <= 20 {
+			quality = 25
+			label = "Poor"
+		} else {
+			quality = 10
+			label = "Very Poor"
+		}
+
+		data.FocusQuality = quality
+		data.FocusLabel = label
+		result[hour] = data
+	}
+
+	return result, nil
 }

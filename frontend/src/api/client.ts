@@ -46,6 +46,10 @@ export const analytics = {
   getProductivityScore: async (date: string) => {
     return App.GetProductivityScore(date);
   },
+
+  getFocusDistribution: async (date: string) => {
+    return App.GetFocusDistribution(date);
+  },
 };
 
 /**

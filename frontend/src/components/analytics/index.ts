@@ -5,3 +5,4 @@ export { HeatmapChart } from './HeatmapChart';
 export { DataSourcesPanel } from './DataSourcesPanel';
 export { AppUsageTable } from './AppUsageTable';
 export { ProductivityScoreCard } from './ProductivityScoreCard';
+export { FocusDistributionChart } from './FocusDistributionChart';

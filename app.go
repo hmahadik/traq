@@ -232,6 +232,14 @@ func (a *App) GetProductivityScore(date string) (*service.ProductivityScore, err
 	return a.Analytics.GetProductivityScore(date)
 }
 
+// GetFocusDistribution calculates hourly focus quality for a date.
+func (a *App) GetFocusDistribution(date string) ([]*service.HourlyFocus, error) {
+	if a.Analytics == nil {
+		return nil, nil
+	}
+	return a.Analytics.GetFocusDistribution(date)
+}
+
 // ============================================================================
 // Timeline Methods (exposed to frontend)
 // ============================================================================

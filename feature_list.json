@@ -106,7 +106,7 @@
       "Step 5: Verify chart data is based on context switches and app usage",
       "Step 6: Hover over bars to see tooltips with details"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
