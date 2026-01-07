@@ -130,6 +130,25 @@ type DomainUsage struct {
 	VisitCount int64  `json:"visitCount"`
 }
 
+// AppCategory represents how an app is categorized for productivity.
+type AppCategory string
+
+const (
+	CategoryProductive   AppCategory = "productive"
+	CategoryNeutral      AppCategory = "neutral"
+	CategoryDistracting  AppCategory = "distracting"
+)
+
+// ProductivityScore represents productivity analysis for a time period.
+type ProductivityScore struct {
+	Score                int     `json:"score"`                // 1-5 rating
+	ProductiveMinutes    int64   `json:"productiveMinutes"`
+	NeutralMinutes       int64   `json:"neutralMinutes"`
+	DistractingMinutes   int64   `json:"distractingMinutes"`
+	TotalMinutes         int64   `json:"totalMinutes"`
+	ProductivePercentage float64 `json:"productivePercentage"`
+}
+
 // GetDailyStats returns statistics for a specific date.
 func (s *AnalyticsService) GetDailyStats(date string) (*DailyStats, error) {
 	// Parse date to get start/end timestamps
@@ -376,6 +395,117 @@ func (s *AnalyticsService) GetDataSourceStats(start, end int64) (*DataSourceStat
 	stats.Browser = browserStats
 
 	return stats, nil
+}
+
+// categorizeApp returns the productivity category for an app name.
+// Uses a default categorization that can be overridden via config in the future.
+func (s *AnalyticsService) categorizeApp(appName string) AppCategory {
+	// Default categorization based on common apps
+	productive := map[string]bool{
+		"Code":          true,
+		"code":          true,
+		"vim":           true,
+		"nvim":          true,
+		"emacs":         true,
+		"IntelliJ IDEA": true,
+		"PyCharm":       true,
+		"GoLand":        true,
+		"Terminal":      true,
+		"gnome-terminal": true,
+		"iTerm2":        true,
+		"alacritty":     true,
+		"kitty":         true,
+		"Postman":       true,
+		"Insomnia":      true,
+		"DataGrip":      true,
+		"DBeaver":       true,
+		"TablePlus":     true,
+		"Figma":         true,
+		"Sketch":        true,
+	}
+
+	distracting := map[string]bool{
+		"YouTube":       true,
+		"Netflix":       true,
+		"Reddit":        true,
+		"Twitter":       true,
+		"Facebook":      true,
+		"Instagram":     true,
+		"TikTok":        true,
+		"Twitch":        true,
+		"Discord":       true,
+		"Slack":         true, // Can be work but often distracting
+		"Steam":         true,
+		"Spotify":       true,
+		"Music":         true,
+	}
+
+	if productive[appName] {
+		return CategoryProductive
+	}
+	if distracting[appName] {
+		return CategoryDistracting
+	}
+	return CategoryNeutral
+}
+
+// GetProductivityScore calculates productivity score for a date.
+func (s *AnalyticsService) GetProductivityScore(date string) (*ProductivityScore, error) {
+	// Parse date to get start/end timestamps
+	t, err := time.Parse("2006-01-02", date)
+	if err != nil {
+		return nil, err
+	}
+
+	start := t.Unix()
+	end := t.Add(24 * time.Hour).Unix() - 1
+
+	// Get all focus events for the day
+	focusEvents, err := s.store.GetWindowFocusEventsByTimeRange(start, end)
+	if err != nil {
+		return nil, err
+	}
+
+	score := &ProductivityScore{}
+
+	// Categorize and sum durations
+	for _, evt := range focusEvents {
+		minutes := int64(evt.DurationSeconds / 60)
+
+		category := s.categorizeApp(evt.AppName)
+		switch category {
+		case CategoryProductive:
+			score.ProductiveMinutes += minutes
+		case CategoryDistracting:
+			score.DistractingMinutes += minutes
+		case CategoryNeutral:
+			score.NeutralMinutes += minutes
+		}
+	}
+
+	score.TotalMinutes = score.ProductiveMinutes + score.NeutralMinutes + score.DistractingMinutes
+
+	// Calculate percentage
+	if score.TotalMinutes > 0 {
+		score.ProductivePercentage = (float64(score.ProductiveMinutes) / float64(score.TotalMinutes)) * 100
+	}
+
+	// Calculate score (1-5) based on productive percentage
+	// 80%+ = 5, 60-80% = 4, 40-60% = 3, 20-40% = 2, <20% = 1
+	switch {
+	case score.ProductivePercentage >= 80:
+		score.Score = 5
+	case score.ProductivePercentage >= 60:
+		score.Score = 4
+	case score.ProductivePercentage >= 40:
+		score.Score = 3
+	case score.ProductivePercentage >= 20:
+		score.Score = 2
+	default:
+		score.Score = 1
+	}
+
+	return score, nil
 }
 
 // sortAppUsage converts duration map to sorted slice with percentages.

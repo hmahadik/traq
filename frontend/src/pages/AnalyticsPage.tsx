@@ -10,12 +10,14 @@ import {
   HeatmapChart,
   DataSourcesPanel,
   AppUsageTable,
+  ProductivityScoreCard,
 } from '@/components/analytics';
 import {
   useDailyStats,
   useHourlyActivity,
   useAppUsage,
   useDataSourceStats,
+  useProductivityScore,
 } from '@/api/hooks';
 import { Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
 
@@ -39,6 +41,7 @@ export function AnalyticsPage() {
   const { data: hourlyActivity, isLoading: hourlyLoading } = useHourlyActivity(dateStr);
   const { data: appUsage, isLoading: appUsageLoading } = useAppUsage(dateStr);
   const { data: dataSourceStats, isLoading: dataSourcesLoading } = useDataSourceStats(dateStr);
+  const { data: productivityScore, isLoading: productivityLoading } = useProductivityScore(dateStr);
 
   const handlePrevDay = () => {
     setSelectedDate((d) => addDays(d, -1));
@@ -106,6 +109,11 @@ export function AnalyticsPage() {
 
       {/* Stats Grid */}
       <StatsGrid stats={stats} isLoading={statsLoading} />
+
+      {/* Productivity Score */}
+      <div className="grid gap-4 md:grid-cols-2">
+        <ProductivityScoreCard score={productivityScore} isLoading={productivityLoading} />
+      </div>
 
       {/* Main Content Tabs */}
       <Tabs defaultValue="activity" className="space-y-4">

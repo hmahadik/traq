@@ -224,6 +224,14 @@ func (a *App) GetDataSourceStats(start, end int64) (*service.DataSourceStats, er
 	return a.Analytics.GetDataSourceStats(start, end)
 }
 
+// GetProductivityScore calculates productivity score for a date.
+func (a *App) GetProductivityScore(date string) (*service.ProductivityScore, error) {
+	if a.Analytics == nil {
+		return nil, nil
+	}
+	return a.Analytics.GetProductivityScore(date)
+}
+
 // ============================================================================
 // Timeline Methods (exposed to frontend)
 // ============================================================================

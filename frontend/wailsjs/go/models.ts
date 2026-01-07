@@ -683,6 +683,28 @@ export namespace service {
 	}
 	
 	
+	export class ProductivityScore {
+	    score: number;
+	    productiveMinutes: number;
+	    neutralMinutes: number;
+	    distractingMinutes: number;
+	    totalMinutes: number;
+	    productivePercentage: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new ProductivityScore(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.score = source["score"];
+	        this.productiveMinutes = source["productiveMinutes"];
+	        this.neutralMinutes = source["neutralMinutes"];
+	        this.distractingMinutes = source["distractingMinutes"];
+	        this.totalMinutes = source["totalMinutes"];
+	        this.productivePercentage = source["productivePercentage"];
+	    }
+	}
 	
 	export class ReportMeta {
 	    id: number;

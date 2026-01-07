@@ -42,6 +42,10 @@ export const analytics = {
   getDataSourceStats: async (start: number, end: number) => {
     return App.GetDataSourceStats(start, end);
   },
+
+  getProductivityScore: async (date: string) => {
+    return App.GetProductivityScore(date);
+  },
 };
 
 /**

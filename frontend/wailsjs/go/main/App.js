@@ -54,6 +54,10 @@ export function GetHourlyActivity(arg1) {
   return window['go']['main']['App']['GetHourlyActivity'](arg1);
 }
 
+export function GetProductivityScore(arg1) {
+  return window['go']['main']['App']['GetProductivityScore'](arg1);
+}
+
 export function GetRecentSessions(arg1) {
   return window['go']['main']['App']['GetRecentSessions'](arg1);
 }

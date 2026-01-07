@@ -26,6 +26,7 @@ export const queryKeys = {
     appUsage: (start: number, end: number) => ['analytics', 'appUsage', start, end] as const,
     hourly: (date: string) => ['analytics', 'hourly', date] as const,
     dataSources: (start: number, end: number) => ['analytics', 'dataSources', start, end] as const,
+    productivityScore: (date: string) => ['analytics', 'productivityScore', date] as const,
   },
   timeline: {
     sessions: (date: string) => ['timeline', 'sessions', date] as const,
@@ -117,6 +118,14 @@ export function useDataSourceStats(date: string) {
   return useQuery({
     queryKey: queryKeys.analytics.dataSources(start, end),
     queryFn: () => api.analytics.getDataSourceStats(start, end),
+    staleTime: 60_000,
+  });
+}
+
+export function useProductivityScore(date: string) {
+  return useQuery({
+    queryKey: queryKeys.analytics.productivityScore(date),
+    queryFn: () => api.analytics.getProductivityScore(date),
     staleTime: 60_000,
   });
 }

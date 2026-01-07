@@ -93,7 +93,7 @@
       "Step 5: Verify breakdown shows Xm productive, Xh Xm neutral, Xm distracting",
       "Step 6: Verify score is based on app categorization (productive/neutral/distracting)"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",

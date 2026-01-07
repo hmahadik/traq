@@ -29,6 +29,8 @@ export function GetDataSourceStats(arg1:number,arg2:number):Promise<service.Data
 
 export function GetHourlyActivity(arg1:string):Promise<Array<service.HourlyActivity>>;
 
+export function GetProductivityScore(arg1:string):Promise<service.ProductivityScore>;
+
 export function GetRecentSessions(arg1:number):Promise<Array<storage.Session>>;
 
 export function GetReport(arg1:number):Promise<storage.Report>;
