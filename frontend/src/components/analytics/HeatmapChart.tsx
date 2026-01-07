@@ -99,7 +99,7 @@ export function HeatmapChart({ data, isLoading }: HeatmapChartProps) {
               <div className="space-y-1">
                 {DAYS.map((day, dayIndex) => (
                   <div key={day} className="flex items-center gap-1">
-                    <div className="w-10 text-xs text-muted-foreground text-right pr-2">
+                    <div className="w-10 text-sm font-medium text-foreground/70 text-right pr-2">
                       {day}
                     </div>
                     <div className="flex-1 flex gap-[2px]">
