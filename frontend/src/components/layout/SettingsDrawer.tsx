@@ -21,6 +21,7 @@ import {
 import { Progress } from '@/components/ui/progress';
 import { useConfig, useUpdateConfig, useInferenceStatus, useAvailableModels } from '@/api/hooks';
 import { formatBytes } from '@/lib/utils';
+import { CategoriesTab } from '@/components/settings/CategoriesTab';
 
 interface SettingsDrawerProps {
   open: boolean;
@@ -48,9 +49,10 @@ export function SettingsDrawer({ open, onOpenChange }: SettingsDrawerProps) {
         </SheetHeader>
 
         <Tabs defaultValue="capture" className="mt-6">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="capture">Capture</TabsTrigger>
             <TabsTrigger value="ai">AI</TabsTrigger>
+            <TabsTrigger value="categories">Categories</TabsTrigger>
             <TabsTrigger value="sources">Sources</TabsTrigger>
             <TabsTrigger value="system">System</TabsTrigger>
           </TabsList>
@@ -367,6 +369,10 @@ export function SettingsDrawer({ open, onOpenChange }: SettingsDrawerProps) {
                 }
               />
             </div>
+          </TabsContent>
+
+          <TabsContent value="categories" className="space-y-6 mt-4">
+            <CategoriesTab />
           </TabsContent>
 
           <TabsContent value="system" className="space-y-6 mt-4">

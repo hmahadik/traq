@@ -561,3 +561,61 @@ func (a *App) GetWatchedDirectories() []string {
 	}
 	return a.daemon.GetWatchedDirectories()
 }
+
+// ============================================================================
+// App Categorization Methods
+// ============================================================================
+
+// AppWithCategory represents an app with its categorization status.
+type AppWithCategory struct {
+	AppName  string `json:"appName"`
+	Category string `json:"category"` // "productive", "neutral", "distracting", or empty if not categorized
+}
+
+// GetAllApps returns all detected apps from focus events with their current categorization.
+func (a *App) GetAllApps() ([]*AppWithCategory, error) {
+	// Get all distinct app names from focus events
+	appNames, err := a.store.GetDistinctAppNames()
+	if err != nil {
+		return nil, err
+	}
+
+	// Get all existing categories
+	categories, err := a.store.GetAllAppCategories()
+	if err != nil {
+		return nil, err
+	}
+
+	// Create a map of app name -> category for quick lookup
+	categoryMap := make(map[string]string)
+	for _, cat := range categories {
+		categoryMap[cat.AppName] = cat.Category
+	}
+
+	// Build result with categorization status
+	var result []*AppWithCategory
+	for _, appName := range appNames {
+		category := categoryMap[appName]
+		result = append(result, &AppWithCategory{
+			AppName:  appName,
+			Category: category, // Empty string if not categorized
+		})
+	}
+
+	return result, nil
+}
+
+// GetAppCategories returns all app categorizations.
+func (a *App) GetAppCategories() ([]*storage.AppCategoryRecord, error) {
+	return a.store.GetAllAppCategories()
+}
+
+// SaveAppCategory sets or updates the category for an app.
+func (a *App) SaveAppCategory(appName, category string) error {
+	return a.store.SetAppCategory(appName, category)
+}
+
+// DeleteAppCategory removes the category for an app.
+func (a *App) DeleteAppCategory(appName string) error {
+	return a.store.DeleteAppCategory(appName)
+}

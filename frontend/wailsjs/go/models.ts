@@ -1,3 +1,22 @@
+export namespace main {
+	
+	export class AppWithCategory {
+	    appName: string;
+	    category: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new AppWithCategory(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.appName = source["appName"];
+	        this.category = source["category"];
+	    }
+	}
+
+}
+
 export namespace service {
 	
 	export class AFKConfig {
@@ -1166,6 +1185,26 @@ export namespace sql {
 
 export namespace storage {
 	
+	export class AppCategoryRecord {
+	    id: number;
+	    appName: string;
+	    category: string;
+	    createdAt: number;
+	    updatedAt: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new AppCategoryRecord(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.appName = source["appName"];
+	        this.category = source["category"];
+	        this.createdAt = source["createdAt"];
+	        this.updatedAt = source["updatedAt"];
+	    }
+	}
 	export class BrowserVisit {
 	    id: number;
 	    timestamp: number;

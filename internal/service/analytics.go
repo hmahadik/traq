@@ -542,9 +542,15 @@ func (s *AnalyticsService) GetDataSourceStats(start, end int64) (*DataSourceStat
 }
 
 // categorizeApp returns the productivity category for an app name.
-// Uses a default categorization that can be overridden via config in the future.
+// First checks user-defined categories from database, then falls back to defaults.
 func (s *AnalyticsService) categorizeApp(appName string) AppCategory {
-	// Default categorization based on common apps
+	// Try to get user-defined category from database
+	appCategory, err := s.store.GetAppCategory(appName)
+	if err == nil && appCategory != nil {
+		return AppCategory(appCategory.Category)
+	}
+
+	// Fall back to default categorization based on common apps
 	productive := map[string]bool{
 		"Code":          true,
 		"code":          true,

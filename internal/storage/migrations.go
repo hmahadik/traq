@@ -190,6 +190,17 @@ CREATE TABLE IF NOT EXISTS config (
     updated_at INTEGER DEFAULT (strftime('%s', 'now'))
 );
 
+CREATE TABLE IF NOT EXISTS app_categories (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    app_name TEXT UNIQUE NOT NULL,
+    category TEXT NOT NULL CHECK(category IN ('productive', 'neutral', 'distracting')),
+    created_at INTEGER DEFAULT (strftime('%s', 'now')),
+    updated_at INTEGER DEFAULT (strftime('%s', 'now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_app_categories_name ON app_categories(app_name);
+CREATE INDEX IF NOT EXISTS idx_app_categories_category ON app_categories(category);
+
 -- ============================================================================
 -- Schema Version
 -- ============================================================================
