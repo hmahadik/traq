@@ -21,18 +21,18 @@ const __dirname = path.dirname(__filename);
 const SCREENSHOT_DIR = path.join(__dirname, '../../../docs/public/screenshots');
 
 // Screenshot configurations
+// Note: App uses hash-based routing, so paths need /#/ prefix
 const screenshots = [
-  { name: 'dashboard', path: '/', waitFor: 'main' },
-  { name: 'timeline', path: '/timeline', waitFor: '[data-testid="calendar-heatmap"], .calendar-heatmap, main' },
-  { name: 'analytics', path: '/analytics', waitFor: '[data-testid="analytics-charts"], main' },
-  { name: 'reports', path: '/reports', waitFor: 'main' },
-  { name: 'settings', path: '/', action: 'openSettings', waitFor: '[role="dialog"]' },
+  { name: 'timeline', path: '/#/', waitFor: 'main' },
+  { name: 'analytics', path: '/#/analytics', waitFor: 'main' },
+  { name: 'reports', path: '/#/reports', waitFor: 'main' },
+  { name: 'settings', path: '/#/', action: 'openSettings', waitFor: '[role="dialog"]' },
 ] as const;
 
 // Additional detail screenshots
 const detailScreenshots = [
-  { name: 'session-details', path: '/session/1', waitFor: 'main' },
-  { name: 'activity-heatmap', path: '/analytics', waitFor: 'main', scroll: '[data-testid="activity-heatmap"]' },
+  { name: 'session-details', path: '/#/session/1', waitFor: 'main' },
+  { name: 'activity-heatmap', path: '/#/analytics', waitFor: 'main', scroll: '[data-testid="activity-heatmap"]' },
 ] as const;
 
 type Theme = 'light' | 'dark';

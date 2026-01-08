@@ -5,6 +5,10 @@ hero:
   name: Traq
   text: Activity Tracker
   tagline: Automatic screenshots, window tracking, and productivity analytics for your desktop
+  image:
+    light: /screenshots/timeline.png
+    dark: /screenshots/timeline-dark.png
+    alt: Traq Timeline View
   actions:
     - theme: brand
       text: Get Started

@@ -14,23 +14,17 @@ When you first launch Traq, it will:
 
 ## Basic Usage
 
-### Dashboard
-
-The main dashboard shows:
-- Today's activity summary
-- Recent screenshots with timestamps
-- Quick stats (active time, sessions, screenshots captured)
-
-![Dashboard](/screenshots/dashboard.png)
-
 ### Timeline View
 
-Click on **Timeline** in the navigation to see:
+The main view shows your activity timeline:
 - A calendar heatmap showing activity by day
 - Click any day to see session breakdowns
 - Browse screenshots from specific time periods
 
-![Timeline](/screenshots/timeline.png)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="/screenshots/timeline-dark.png">
+  <img src="/screenshots/timeline.png" alt="Timeline View">
+</picture>
 
 ### Analytics
 
@@ -39,7 +33,10 @@ The **Analytics** view provides:
 - Activity patterns by hour and day of week
 - Trends over time
 
-![Analytics](/screenshots/analytics.png)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="/screenshots/analytics-dark.png">
+  <img src="/screenshots/analytics.png" alt="Analytics">
+</picture>
 
 ### Settings
 
@@ -48,7 +45,10 @@ Access **Settings** to configure:
 - Image quality and format
 - AFK timeout duration
 
-![Settings](/screenshots/settings.png)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="/screenshots/settings-dark.png">
+  <img src="/screenshots/settings.png" alt="Settings">
+</picture>
 
 ## Stopping Capture
 

@@ -2,7 +2,10 @@
 
 The Timeline is your daily activity log, showing sessions and screenshots in chronological order.
 
-![Timeline View](/screenshots/timeline.png)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="/screenshots/timeline-dark.png">
+  <img src="/screenshots/timeline.png" alt="Timeline View">
+</picture>
 
 ## Calendar Heatmap
 
@@ -38,7 +41,10 @@ Click "View Details" on a session card to see:
 - Activity log with window focus events
 - Time spent per application within the session
 
-![Session Details](/screenshots/session-details.png)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="/screenshots/session-details-dark.png">
+  <img src="/screenshots/session-details.png" alt="Session Details">
+</picture>
 
 ## Navigation Tips
 
