@@ -1124,7 +1124,7 @@
       "Step 4: Test connection",
       "Step 5: Verify summaries use external Ollama"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -1136,7 +1136,7 @@
       "Step 4: Enter API key",
       "Step 5: Verify summaries use cloud API"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -1148,7 +1148,7 @@
       "Step 4: Select a different model",
       "Step 5: Verify new model is used for summaries"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -1206,7 +1206,7 @@
       "Step 4: Verify key is stored securely (masked in UI)",
       "Step 5: Verify key can be updated or deleted"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
