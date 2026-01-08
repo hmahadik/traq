@@ -208,8 +208,19 @@ func (s *ConfigService) GetConfig() (*Config, error) {
 }
 
 // UpdateConfig updates configuration values.
+// It handles nested objects by flattening them to dot-notation keys.
 func (s *ConfigService) UpdateConfig(updates map[string]interface{}) error {
-	for key, value := range updates {
+	// Flatten nested objects and map keys to storage format
+	flattened := make(map[string]interface{})
+	flattenUpdates("", updates, flattened)
+
+	for key, value := range flattened {
+		// Map frontend keys to storage keys
+		storageKey := mapToStorageKey(key)
+		if storageKey == "" {
+			continue // Skip unknown keys
+		}
+
 		var strVal string
 		switch v := value.(type) {
 		case string:
@@ -231,12 +242,74 @@ func (s *ConfigService) UpdateConfig(updates map[string]interface{}) error {
 			strVal = string(b)
 		}
 
-		if err := s.store.SetConfig(key, strVal); err != nil {
+		if err := s.store.SetConfig(storageKey, strVal); err != nil {
 			return err
 		}
 	}
 
 	return nil
+}
+
+// flattenUpdates recursively flattens nested maps to dot-notation keys.
+func flattenUpdates(prefix string, input map[string]interface{}, output map[string]interface{}) {
+	for key, value := range input {
+		fullKey := key
+		if prefix != "" {
+			fullKey = prefix + "." + key
+		}
+
+		if nested, ok := value.(map[string]interface{}); ok {
+			flattenUpdates(fullKey, nested, output)
+		} else {
+			output[fullKey] = value
+		}
+	}
+}
+
+// mapToStorageKey maps frontend config keys to storage keys.
+// Returns empty string for unknown keys.
+func mapToStorageKey(frontendKey string) string {
+	keyMap := map[string]string{
+		// Capture settings
+		"capture.enabled":            "capture.enabled",
+		"capture.intervalSeconds":    "capture.interval",
+		"capture.quality":            "capture.quality",
+		"capture.duplicateThreshold": "capture.duplicateThreshold",
+
+		// AFK settings
+		"afk.timeoutSeconds":    "afk.timeout",
+		"afk.minSessionMinutes": "afk.minSessionMinutes",
+
+		// UI settings
+		"ui.theme":             "ui.theme",
+		"ui.showNotifications": "ui.showNotifications",
+		"ui.startMinimized":    "ui.startMinimized",
+
+		// System settings
+		"system.startOnLogin": "system.startOnLogin",
+		"system.autoStart":    "system.autoStart",
+
+		// Data sources
+		"dataSources.shell.enabled":   "shell.enabled",
+		"dataSources.git.enabled":     "git.enabled",
+		"dataSources.git.searchPaths": "git.searchPaths",
+		"dataSources.files.enabled":   "files.enabled",
+		"dataSources.browser.enabled": "browser.enabled",
+
+		// Inference settings
+		"inference.engine":         "inference.engine",
+		"inference.bundled.model":  "inference.bundled.model",
+		"inference.ollama.host":    "inference.ollama.host",
+		"inference.ollama.model":   "inference.ollama.model",
+		"inference.cloud.provider": "inference.cloud.provider",
+		"inference.cloud.apiKey":   "inference.cloud.apiKey",
+		"inference.cloud.model":    "inference.cloud.model",
+	}
+
+	if storageKey, ok := keyMap[frontendKey]; ok {
+		return storageKey
+	}
+	return ""
 }
 
 // GetDaemonStatus returns the current daemon status.
