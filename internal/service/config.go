@@ -65,6 +65,7 @@ type CloudConfig struct {
 	Provider string `json:"provider"` // "anthropic", "openai"
 	APIKey   string `json:"apiKey"`
 	Model    string `json:"model"`
+	Endpoint string `json:"endpoint"` // Custom API endpoint (optional)
 }
 
 // CaptureConfig contains screenshot capture settings.
@@ -484,6 +485,7 @@ func (s *ConfigService) getDefaultInferenceConfig() *InferenceConfig {
 			Provider: "anthropic",
 			APIKey:   "",
 			Model:    "claude-sonnet-4-20250514",
+			Endpoint: "", // Empty = use default provider endpoint
 		},
 	}
 }

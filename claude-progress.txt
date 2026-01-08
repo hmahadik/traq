@@ -3,7 +3,7 @@
 ## Session: January 8, 2026 (Session 15)
 
 ### Summary
-Verified and marked App Categorization and Productivity Time Tracking features (Tests 72-74) as passing. These features were already fully implemented in previous sessions.
+Verified App Categorization/Productivity features (Tests 72-74) and implemented Custom API Endpoints (Test 107).
 
 ### Features Verified This Session
 
@@ -24,12 +24,20 @@ Verified and marked App Categorization and Productivity Time Tracking features (
 - Shows `distractingMinutes` formatted as hours/minutes
 - Backend uses `categorizeApp()` which checks user-defined categories first, then falls back to defaults
 
-### Current Status
-- **Tests Passing:** 71/150 (47.3%)
-- **Tests Remaining:** 79
-- **New Tests Passing:** 3 (Tests 72, 73, 74)
+### Features Implemented This Session
 
-### All Passing Tests (71 total)
+**Custom API Endpoints (Test 107):**
+- Added `endpoint` field to `CloudConfig` in backend (`internal/service/config.go`)
+- Added `endpoint` field to `CloudConfig` interface in frontend (`frontend/src/types/config.ts`)
+- Added "Custom API Endpoint" input field in Settings > AI > Cloud section
+- Shows placeholder "https://api.example.com/v1" and helper text
+
+### Current Status
+- **Tests Passing:** 72/150 (48.0%)
+- **Tests Remaining:** 78
+- **New Tests Passing:** 4 (Tests 72, 73, 74, 107)
+
+### All Passing Tests (72 total)
 - Test 16: Daily Timeline View
 - Test 17: Session Cards
 - Test 18: Screenshot Thumbnails
@@ -83,6 +91,7 @@ Verified and marked App Categorization and Productivity Time Tracking features (
 - Test 103: Model Selection
 - Test 105: Download Progress Indicator
 - Test 106: Inference Status Display
+- Test 107: Custom API Endpoints (NEW)
 - Test 108: API Key Management
 - Test 119: Force Capture Button
 - Test 131: Storage Statistics

@@ -39,6 +39,7 @@ export interface CloudConfig {
   provider: 'anthropic' | 'openai';
   apiKey: string;
   model: string;
+  endpoint: string; // Custom API endpoint (optional)
 }
 
 export interface DataSourcesConfig {

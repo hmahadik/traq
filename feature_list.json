@@ -1194,7 +1194,7 @@
       "Step 4: Save and test connection",
       "Step 5: Verify requests go to custom endpoint"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",

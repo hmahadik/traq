@@ -350,6 +350,24 @@ export function SettingsDrawer({ open, onOpenChange }: SettingsDrawerProps) {
                     placeholder="sk-..."
                   />
                 </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Custom API Endpoint</label>
+                  <p className="text-xs text-muted-foreground">
+                    Leave empty to use default endpoint
+                  </p>
+                  <Input
+                    value={config.inference.cloud.endpoint || ''}
+                    onChange={(e) =>
+                      updateConfig.mutate({
+                        inference: {
+                          ...config.inference,
+                          cloud: { ...config.inference.cloud, endpoint: e.target.value },
+                        },
+                      })
+                    }
+                    placeholder="https://api.example.com/v1"
+                  />
+                </div>
               </div>
             )}
           </TabsContent>
