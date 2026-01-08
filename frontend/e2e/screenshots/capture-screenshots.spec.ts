@@ -22,17 +22,20 @@ const SCREENSHOT_DIR = path.join(__dirname, '../../../docs/public/screenshots');
 
 // Screenshot configurations
 // Note: App uses hash-based routing, so paths need /#/ prefix
+// Add ?mock=true to enable mock data mode for realistic screenshots
+const MOCK_PARAM = '?mock=true';
+
 const screenshots = [
-  { name: 'timeline', path: '/#/', waitFor: 'main' },
-  { name: 'analytics', path: '/#/analytics', waitFor: 'main' },
-  { name: 'reports', path: '/#/reports', waitFor: 'main' },
-  { name: 'settings', path: '/#/', action: 'openSettings', waitFor: '[role="dialog"]' },
+  { name: 'timeline', path: `/${MOCK_PARAM}#/`, waitFor: 'main' },
+  { name: 'analytics', path: `/${MOCK_PARAM}#/analytics`, waitFor: 'main' },
+  { name: 'reports', path: `/${MOCK_PARAM}#/reports`, waitFor: 'main' },
+  { name: 'settings', path: `/${MOCK_PARAM}#/`, action: 'openSettings', waitFor: '[role="dialog"]' },
 ] as const;
 
 // Additional detail screenshots
 const detailScreenshots = [
-  { name: 'session-details', path: '/#/session/1', waitFor: 'main' },
-  { name: 'activity-heatmap', path: '/#/analytics', waitFor: 'main', scroll: '[data-testid="activity-heatmap"]' },
+  { name: 'session-details', path: `/${MOCK_PARAM}#/session/1`, waitFor: 'main' },
+  { name: 'activity-heatmap', path: `/${MOCK_PARAM}#/analytics`, waitFor: 'main', scroll: '[data-testid="activity-heatmap"]' },
 ] as const;
 
 type Theme = 'light' | 'dark';
