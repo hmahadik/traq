@@ -2,6 +2,8 @@
 
 The Analytics dashboard provides insights into your activity patterns and application usage.
 
+![Analytics Dashboard](/screenshots/analytics.png)
+
 ## Daily Statistics
 
 At a glance, see:
@@ -33,6 +35,8 @@ Chart showing when you're most active throughout the day. Useful for identifying
 ### Activity Heatmap
 
 A 7-day by 24-hour grid showing your typical activity patterns. Darker cells indicate more activity at that time slot.
+
+![Activity Heatmap](/screenshots/activity-heatmap.png)
 
 ## Time Periods
 

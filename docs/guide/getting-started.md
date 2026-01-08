@@ -21,12 +21,16 @@ The main dashboard shows:
 - Recent screenshots with timestamps
 - Quick stats (active time, sessions, screenshots captured)
 
+![Dashboard](/screenshots/dashboard.png)
+
 ### Timeline View
 
 Click on **Timeline** in the navigation to see:
 - A calendar heatmap showing activity by day
 - Click any day to see session breakdowns
 - Browse screenshots from specific time periods
+
+![Timeline](/screenshots/timeline.png)
 
 ### Analytics
 
@@ -35,12 +39,16 @@ The **Analytics** view provides:
 - Activity patterns by hour and day of week
 - Trends over time
 
+![Analytics](/screenshots/analytics.png)
+
 ### Settings
 
 Access **Settings** to configure:
 - Capture interval (how often to take screenshots)
 - Image quality and format
 - AFK timeout duration
+
+![Settings](/screenshots/settings.png)
 
 ## Stopping Capture
 

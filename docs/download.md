@@ -2,7 +2,35 @@
 
 ## Pre-built Binaries
 
-Coming soon. For now, build from source.
+Download the latest release for your platform:
+
+| Platform | Download |
+|----------|----------|
+| Linux (x64) | [traq-linux-amd64](https://github.com/hmahadik/activity-tracker/releases/latest/download/traq-linux-amd64) |
+| macOS (Universal) | [traq-macos-universal.zip](https://github.com/hmahadik/activity-tracker/releases/latest/download/traq-macos-universal.zip) |
+| Windows (x64) | [traq-windows-amd64.exe](https://github.com/hmahadik/activity-tracker/releases/latest/download/traq-windows-amd64.exe) |
+
+### Linux
+
+```bash
+# Download and make executable
+curl -L -o traq https://github.com/hmahadik/activity-tracker/releases/latest/download/traq-linux-amd64
+chmod +x traq
+
+# Run
+./traq
+```
+
+### macOS
+
+1. Download and extract the zip file
+2. Move `traq.app` to your Applications folder
+3. Right-click and select "Open" (first launch only, to bypass Gatekeeper)
+
+### Windows
+
+1. Download the `.exe` file
+2. Double-click to run
 
 ## Build from Source
 
