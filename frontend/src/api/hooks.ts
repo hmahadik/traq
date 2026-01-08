@@ -317,6 +317,28 @@ export function useDownloadModel() {
   });
 }
 
+export function useStorageStats() {
+  return useQuery({
+    queryKey: ['config', 'storage'],
+    queryFn: () => api.config.getStorageStats(),
+    staleTime: 60_000, // 1 minute
+  });
+}
+
+export function useOpenDataDir() {
+  return useMutation({
+    mutationFn: () => api.system.openDataDir(),
+  });
+}
+
+export function useDataDir() {
+  return useQuery({
+    queryKey: ['system', 'dataDir'],
+    queryFn: () => api.system.getDataDir(),
+    staleTime: Infinity, // Data directory doesn't change
+  });
+}
+
 // ============================================================================
 // Screenshot Hooks
 // ============================================================================

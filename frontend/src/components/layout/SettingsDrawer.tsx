@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { Database, FolderOpen, HardDrive, Image } from 'lucide-react';
+import { toast } from 'sonner';
 import {
   Sheet,
   SheetContent,
@@ -19,7 +21,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Progress } from '@/components/ui/progress';
-import { useConfig, useUpdateConfig, useInferenceStatus, useAvailableModels } from '@/api/hooks';
+import { useConfig, useUpdateConfig, useInferenceStatus, useAvailableModels, useStorageStats, useOpenDataDir, useDataDir } from '@/api/hooks';
 import { formatBytes } from '@/lib/utils';
 import { CategoriesTab } from '@/components/settings/CategoriesTab';
 
@@ -32,9 +34,23 @@ export function SettingsDrawer({ open, onOpenChange }: SettingsDrawerProps) {
   const { data: config, isLoading } = useConfig();
   const { data: inferenceStatus } = useInferenceStatus();
   const { data: models } = useAvailableModels();
+  const { data: storageStats } = useStorageStats();
+  const { data: dataDir } = useDataDir();
   const updateConfig = useUpdateConfig();
+  const openDataDir = useOpenDataDir();
 
   const [downloadProgress] = useState<number | null>(null);
+
+  const handleOpenDataDir = async () => {
+    try {
+      await openDataDir.mutateAsync();
+      toast.success('Opened data directory');
+    } catch (error) {
+      toast.error('Failed to open data directory', {
+        description: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  };
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -131,6 +147,52 @@ export function SettingsDrawer({ open, onOpenChange }: SettingsDrawerProps) {
                 onValueChange={([value]) =>
                   updateConfig.mutate({
                     afk: { ...config.afk, timeoutSeconds: value * 60 },
+                  })
+                }
+              />
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-medium">Duplicate Threshold</label>
+                <span className="text-sm text-muted-foreground">
+                  {config.capture.duplicateThreshold}
+                </span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Lower values skip more similar screenshots (1-10)
+              </p>
+              <Slider
+                value={[config.capture.duplicateThreshold]}
+                min={1}
+                max={10}
+                step={1}
+                onValueChange={([value]) =>
+                  updateConfig.mutate({
+                    capture: { ...config.capture, duplicateThreshold: value },
+                  })
+                }
+              />
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-medium">Min Session Duration</label>
+                <span className="text-sm text-muted-foreground">
+                  {config.afk.minSessionMinutes}m
+                </span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Sessions shorter than this won't be saved
+              </p>
+              <Slider
+                value={[config.afk.minSessionMinutes]}
+                min={1}
+                max={30}
+                step={1}
+                onValueChange={([value]) =>
+                  updateConfig.mutate({
+                    afk: { ...config.afk, minSessionMinutes: value },
                   })
                 }
               />
@@ -379,6 +441,62 @@ export function SettingsDrawer({ open, onOpenChange }: SettingsDrawerProps) {
           </TabsContent>
 
           <TabsContent value="system" className="space-y-6 mt-4">
+            {/* Storage Statistics */}
+            <div className="space-y-3">
+              <label className="text-sm font-medium flex items-center gap-2">
+                <HardDrive className="h-4 w-4" />
+                Storage
+              </label>
+              {storageStats ? (
+                <div className="rounded-lg bg-muted p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Database className="h-4 w-4" />
+                      Database
+                    </div>
+                    <span className="text-sm font-medium">
+                      {formatBytes(storageStats.databaseSize || 0)}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Image className="h-4 w-4" />
+                      Screenshots
+                    </div>
+                    <span className="text-sm font-medium">
+                      {formatBytes(storageStats.screenshotsSize || 0)}
+                    </span>
+                  </div>
+                  <div className="border-t pt-2 flex items-center justify-between">
+                    <span className="text-sm font-medium">Total</span>
+                    <span className="text-sm font-bold">
+                      {formatBytes((storageStats.databaseSize || 0) + (storageStats.screenshotsSize || 0))}
+                    </span>
+                  </div>
+                </div>
+              ) : (
+                <div className="rounded-lg bg-muted p-4 text-sm text-muted-foreground">
+                  Loading storage stats...
+                </div>
+              )}
+              {/* Data Directory Path */}
+              {dataDir && (
+                <div className="rounded-lg bg-muted/50 p-3 space-y-1">
+                  <p className="text-xs text-muted-foreground">Data Directory</p>
+                  <p className="text-xs font-mono break-all">{dataDir}</p>
+                </div>
+              )}
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={handleOpenDataDir}
+                disabled={openDataDir.isPending}
+              >
+                <FolderOpen className="h-4 w-4 mr-2" />
+                Open Data Directory
+              </Button>
+            </div>
+
             <div className="space-y-2">
               <label className="text-sm font-medium">Theme</label>
               <Select

@@ -1,26 +1,49 @@
 # Traq v2 Development Progress
 
-## Session: January 8, 2026 (Session 10)
+## Session: January 8, 2026 (Session 11)
 
 ### Summary
-Verified and marked 4 additional AI configuration tests as passing through browser UI testing and code review.
-All features were already implemented in SettingsDrawer.tsx - just needed verification.
+Added UI controls for three settings features that were missing from SettingsDrawer:
+1. Duplicate Threshold slider (Test 28)
+2. Minimum Session Duration slider (Test 30)
+3. Data Directory path display (Test 132)
 
-### Tests Verified This Session
+Also added `useDataDir` hook to fetch and display the data directory path.
 
-**AI Configuration Features (Tests 101-103, 108):**
-1. **Test 101: External Ollama Support** - AI tab shows Ollama Host input, Model input, and Test Connection button (SettingsDrawer.tsx lines 228-263)
-2. **Test 102: Cloud API Support** - AI tab shows provider selection (Anthropic/OpenAI) with API key input (SettingsDrawer.tsx lines 266-306)
-3. **Test 103: Model Selection** - Bundled model selection dropdown implemented (SettingsDrawer.tsx lines 177-225)
-4. **Test 108: API Key Management** - API key input with password type for secure entry (SettingsDrawer.tsx lines 290-304)
+### UI Features Implemented This Session
 
-**Caching Feature (Test 139):**
-5. **Test 139: Background Refresh** - refetchInterval: 30_000 in hooks.ts provides background refresh for inference status
+**Capture Tab (SettingsDrawer.tsx):**
+1. **Duplicate Threshold slider** (lines 155-175)
+   - Slider with range 1-10
+   - Description: "Lower values skip more similar screenshots"
+   - Updates `config.capture.duplicateThreshold`
+
+2. **Min Session Duration slider** (lines 178-199)
+   - Slider with range 1-30 minutes
+   - Description: "Sessions shorter than this won't be saved"
+   - Updates `config.afk.minSessionMinutes`
+
+**System Tab (SettingsDrawer.tsx):**
+3. **Data Directory Path display** (lines 482-488)
+   - Shows current data directory path with monospace font
+   - Uses new `useDataDir()` hook from hooks.ts
+
+**API Hook Added (hooks.ts):**
+- `useDataDir()` - Fetches data directory path via `api.system.getDataDir()`
+
+### Tests Status
+These UI features implement the frontend components for Tests 28, 30, and 132.
+However, full test verification requires native Wails app testing because:
+- Test 28 requires verifying duplicate detection behavior changes
+- Test 30 requires creating sessions and verifying minimum duration filtering
+- Test 132 requires displaying the actual path (needs Wails bindings)
+
+**Tests NOT marked as passing** - require backend verification in native app.
 
 ### Current Status
 - **Tests Passing:** 64/150 (42.7%)
 - **Tests Remaining:** 86
-- **New Tests Passing This Session:** 5
+- **UI Components Added:** 3
 
 ### All Passing Tests (64 total)
 - Test 16: Daily Timeline View
@@ -67,18 +90,18 @@ All features were already implemented in SettingsDrawer.tsx - just needed verifi
 - Test 98: Time Period Filtering
 - Test 99: App Filtering
 - Test 100: Collapsible Sections
-- Test 101: External Ollama Support (NEW)
-- Test 102: Cloud API Support (NEW)
-- Test 103: Model Selection (NEW)
+- Test 101: External Ollama Support
+- Test 102: Cloud API Support
+- Test 103: Model Selection
 - Test 105: Download Progress Indicator
 - Test 106: Inference Status Display
-- Test 108: API Key Management (NEW)
+- Test 108: API Key Management
 - Test 119: Force Capture Button
 - Test 131: Storage Statistics
 - Test 133: Open Data Directory
 - Test 136: Lazy Image Loading
 - Test 138: Query Caching
-- Test 139: Background Refresh (NEW)
+- Test 139: Background Refresh
 - Test 140: Stale Time Configuration
 - Test 141: Hour Groups
 - Test 142: Timeline Bands
@@ -87,12 +110,6 @@ All features were already implemented in SettingsDrawer.tsx - just needed verifi
 - Test 147: Empty State Handling
 - Test 149: Quick Date Jumps
 - Test 150: Calendar Month Navigation
-
-### Browser Testing Completed This Session
-- Verified Settings drawer opens correctly
-- Verified AI tab shows Ollama configuration (External Ollama mode)
-- Verified Inference Engine dropdown has Bundled, External Ollama, Cloud API options
-- Verified keyboard navigation (j/k) still works on Timeline
 
 ### Browser Testing Limitations (Important for Future Sessions)
 **Browser automation cannot fully test Wails apps:**
@@ -111,9 +128,7 @@ All features were already implemented in SettingsDrawer.tsx - just needed verifi
 
 ### What to Work on Next (Priority)
 1. Many remaining tests require backend functionality (capture, AFK detection, etc.)
-2. Consider verifying more UI-focused tests via code review:
-   - Data Sources toggle settings (Tests 51-60)
-   - Additional capture settings (Tests 26-30)
+2. Tests 28, 30, 132 - Need native Wails app verification to mark passing
 3. Tests requiring native Wails app:
    - Screenshot capture tests (1-10)
    - AI summary generation tests (11-15)
