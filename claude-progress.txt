@@ -37,19 +37,22 @@ Updated feature_list.json to reflect actual implementation status.
 19. **Test 97: Tag Filtering** - TimelinePage.tsx selectedTag state filtering
 
 ### Current Status
-- **Tests Passing:** 56/150 (37.3%)
-- **Tests Remaining:** 94
-- **New Tests Passing This Session:** 25
+- **Tests Passing:** 59/150 (39.3%)
+- **Tests Remaining:** 91
+- **New Tests Passing This Session:** 28
 
 **Additional Tests Verified:**
 - Test 105: Download Progress Indicator - SettingsDrawer.tsx lines 206-213
 - Test 106: Inference Status Display - SettingsDrawer.tsx lines 215-224
 - Test 131: Storage Statistics - SettingsDrawer.tsx lines 398-444
 - Test 133: Open Data Directory - SettingsDrawer.tsx lines 435-443
+- Test 136: Lazy Image Loading - loading="lazy" attribute in Screenshot.tsx
+- Test 138: Query Caching - TanStack Query with staleTime configuration
+- Test 140: Stale Time Configuration - staleTime in hooks.ts
 - Test 141: Hour Groups - HourGroup.tsx component
 - Test 142: Timeline Bands - TimelineBands.tsx component
 
-### All Passing Tests (56 total)
+### All Passing Tests (59 total)
 - Test 16: Daily Timeline View
 - Test 17: Session Cards
 - Test 18: Screenshot Thumbnails
@@ -99,6 +102,9 @@ Updated feature_list.json to reflect actual implementation status.
 - Test 119: Force Capture Button
 - Test 131: Storage Statistics
 - Test 133: Open Data Directory
+- Test 136: Lazy Image Loading
+- Test 138: Query Caching
+- Test 140: Stale Time Configuration
 - Test 141: Hour Groups
 - Test 142: Timeline Bands
 - Test 143: Session Duration Display

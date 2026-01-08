@@ -1513,7 +1513,7 @@
       "Step 3: Scroll to load more images",
       "Step 4: Verify images load as they come into view"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -1535,7 +1535,7 @@
       "Step 3: Verify data loads instantly from cache",
       "Step 4: Verify stale data is refreshed in background"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -1556,7 +1556,7 @@
       "Step 2: Modify stale time if configurable",
       "Step 3: Verify cache respects configured stale time"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "style",
