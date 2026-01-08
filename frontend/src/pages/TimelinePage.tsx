@@ -192,15 +192,36 @@ export function TimelinePage() {
             >
               <ChevronRight className="h-4 w-4" />
             </Button>
-            {!isToday && (
+            {/* Quick Date Jump Buttons */}
+            <div className="hidden sm:flex items-center gap-1 ml-2">
               <Button
-                variant="ghost"
+                variant={isToday ? 'secondary' : 'ghost'}
                 size="sm"
                 onClick={() => handleDateSelect(new Date())}
               >
                 Today
               </Button>
-            )}
+              <Button
+                variant={dateStr === getDateString(addDays(new Date(), -1)) ? 'secondary' : 'ghost'}
+                size="sm"
+                onClick={() => handleDateSelect(addDays(new Date(), -1))}
+              >
+                Yesterday
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  // Go to start of current week (Sunday)
+                  const today = new Date();
+                  const dayOfWeek = today.getDay();
+                  const startOfWeek = addDays(today, -dayOfWeek);
+                  handleDateSelect(startOfWeek);
+                }}
+              >
+                This Week
+              </Button>
+            </div>
             <Button
               variant="outline"
               size="icon"

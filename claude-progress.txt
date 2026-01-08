@@ -1,36 +1,31 @@
 # Traq v2 Development Progress
 
-## Session: January 8, 2026 (Session 7)
+## Session: January 8, 2026 (Session 8)
 
 ### Summary
-Fixed critical React error in SessionDetailPage and verified additional UI tests.
-Added utility functions to handle Go SQL nullable types properly in TypeScript.
-Marked 2 additional tests as passing.
+Implemented Quick Date Jumps feature (Test 149) in the Timeline page.
+Added Today, Yesterday, and This Week quick navigation buttons.
+Verified feature works correctly in browser testing.
 
-### Bug Fixes This Session
-1. **SessionDetailPage React Error** - Fixed "Objects are not valid as a React child"
-   - Root cause: Go's `sql.NullString` and `sql.NullInt64` serialize to JSON as objects `{String: value, Valid: bool}`
-   - Added utility functions in `lib/utils.ts`: `getNullableString()`, `getNullableInt()`, `isNullableValid()`
-   - Updated SessionDetailPage.tsx to use these helpers for all nullable fields
-   - Updated Screenshot.tsx and AppBadge.tsx to handle nullable appName/windowTitle
-   - Page now shows skeleton loaders in browser mode instead of crashing
+### New Feature Implemented
+1. **Quick Date Jumps (Test 149)** - Added quick navigation buttons to Timeline header
+   - Today button - jumps to current date, highlighted when active
+   - Yesterday button - jumps to previous day, highlighted when active
+   - This Week button - jumps to start of current week (Sunday)
+   - Buttons hidden on small screens (sm: breakpoint)
+   - Active button shows secondary variant styling
 
 ### Tests Verified This Session
-1. **Test 147: Empty State Handling** - Verified in browser
-   - Navigate to a date with no data (e.g., January 4, 2026)
-   - Shows "No sessions recorded" with context message
-   - Clean UI with proper icon
-
-2. **Test 150: Calendar Month Navigation** - Verified in browser
-   - Previous month (<) button works
-   - Next month (>) button works
-   - Calendar displays correct month after navigation
+1. **Test 149: Quick Date Jumps** - Implemented and verified in browser
+   - Clicked "Yesterday" - date changed to Wednesday, January 7, 2026
+   - Clicked "This Week" - date changed to Sunday, January 4, 2026
+   - All buttons work correctly with proper visual feedback
 
 ### Current Status
-- **Tests Passing:** 30/150 (20%)
-- **Tests Remaining:** 120
-- **New Tests Verified This Session:** 2
-- **Bug Fixes:** 1 (SessionDetailPage SQL nullable types)
+- **Tests Passing:** 31/150 (20.7%)
+- **Tests Remaining:** 119
+- **New Tests Passing This Session:** 1 (Test 149)
+- **Features Implemented:** 1 (Quick Date Jumps)
 
 ### Previously Verified Tests (Still Passing)
 - Test 16: Daily Timeline View
@@ -61,8 +56,13 @@ Marked 2 additional tests as passing.
 - Test 119: Force Capture Button
 - Test 143: Session Duration Display
 - Test 144: Time Range Display
-- Test 147: Empty State Handling (NEW)
-- Test 150: Calendar Month Navigation (NEW)
+- Test 147: Empty State Handling
+- Test 149: Quick Date Jumps (NEW)
+- Test 150: Calendar Month Navigation
+
+### Code Changes This Session
+1. `frontend/src/pages/TimelinePage.tsx` - Added Quick Date Jump buttons
+2. `feature_list.json` - Marked test 149 as passing
 
 ### Browser Testing Limitations (Important for Future Sessions)
 **Browser automation cannot fully test Wails apps:**
@@ -78,6 +78,7 @@ Marked 2 additional tests as passing.
 - Keyboard navigation (j/k works)
 - Empty state handling
 - Calendar navigation
+- Quick date jump buttons
 - Code review for implementation verification
 
 **What CANNOT be tested in browser:**
@@ -86,25 +87,17 @@ Marked 2 additional tests as passing.
 - Configuration persistence
 - File operations
 
-### Code Changes This Session
-1. `frontend/src/lib/utils.ts` - Added SQL nullable type helpers
-2. `frontend/src/pages/SessionDetailPage.tsx` - Fixed nullable field rendering
-3. `frontend/src/components/common/Screenshot.tsx` - Fixed nullable appName/windowTitle
-4. `frontend/src/components/common/AppBadge.tsx` - Handle nullable appName object
-5. `feature_list.json` - Marked tests 147 and 150 as passing
-
 ### App Health
 - App running via `wails dev` on localhost:34115
 - Timeline shows real session data with thumbnails
-- Keyboard navigation working
+- Quick date jump buttons working correctly
 - No console errors during testing
-- SessionDetailPage no longer crashes (shows skeleton loaders in browser mode)
 
 ### What to Work on Next (Priority)
 1. Continue verifying more UI-focused tests
 2. Mark tests as passing that can be verified via code review
 3. Consider implementing missing features for failing tests
-4. Test 149 (Quick Date Jumps) - needs "this week" button implementation
+4. Session Detail tests (89-93) could be verified if Wails IPC is available
 
 ### Technical Notes
 - Database location: `~/.local/share/traq/data.db`

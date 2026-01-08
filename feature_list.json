@@ -1655,7 +1655,7 @@
       "Step 3: Use preset buttons (today, yesterday, this week)",
       "Step 4: Verify view jumps to correct date"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
