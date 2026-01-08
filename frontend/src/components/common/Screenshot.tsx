@@ -2,13 +2,17 @@ import { useThumbnail, useScreenshotImage } from '@/api/hooks';
 import { cn, formatTimestamp } from '@/lib/utils';
 import type { Screenshot as ScreenshotType } from '@/types';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Button } from '@/components/ui/button';
 import { AppBadge } from './AppBadge';
+import { Trash2 } from 'lucide-react';
 
 interface ScreenshotProps {
   screenshot: ScreenshotType;
   size?: 'thumbnail' | 'medium' | 'full';
   showOverlay?: boolean;
   onClick?: () => void;
+  onDelete?: (id: number) => void;
+  isDeleting?: boolean;
   className?: string;
 }
 
@@ -17,6 +21,8 @@ export function Screenshot({
   size = 'thumbnail',
   showOverlay = true,
   onClick,
+  onDelete,
+  isDeleting = false,
   className,
 }: ScreenshotProps) {
   const { data: thumbnailUrl, isLoading: thumbnailLoading } = useThumbnail(screenshot.id);
@@ -69,6 +75,20 @@ export function Screenshot({
             </p>
           )}
         </div>
+      )}
+      {onDelete && (
+        <Button
+          variant="destructive"
+          size="icon"
+          className="absolute top-1 right-1 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity z-10"
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete(screenshot.id);
+          }}
+          disabled={isDeleting}
+        >
+          <Trash2 className={cn("h-3 w-3", isDeleting && "animate-spin")} />
+        </Button>
       )}
     </div>
   );

@@ -1046,7 +1046,7 @@
       "Step 3: Click delete button",
       "Step 4: Verify screenshot is removed from session"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",

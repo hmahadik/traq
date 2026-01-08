@@ -1,51 +1,37 @@
 # Traq v2 Development Progress
 
-## Session: January 8, 2026 (Session 11)
+## Session: January 8, 2026 (Session 12)
 
 ### Summary
-Added UI controls for three settings features that were missing from SettingsDrawer:
-1. Duplicate Threshold slider (Test 28)
-2. Minimum Session Duration slider (Test 30)
-3. Data Directory path display (Test 132)
+Implemented Screenshot Deletion feature (Test 94) - users can now delete individual screenshots from a session.
 
-Also added `useDataDir` hook to fetch and display the data directory path.
+### Feature Implemented This Session
 
-### UI Features Implemented This Session
+**Screenshot Deletion (Test 94):**
+- Added `onDelete` and `isDeleting` props to Screenshot component
+- Added red trash icon button that appears on hover over screenshots
+- Button is positioned in top-right corner with proper z-index
+- Clicking the button triggers the delete handler
+- Loading state shown while deletion is in progress
 
-**Capture Tab (SettingsDrawer.tsx):**
-1. **Duplicate Threshold slider** (lines 155-175)
-   - Slider with range 1-10
-   - Description: "Lower values skip more similar screenshots"
-   - Updates `config.capture.duplicateThreshold`
+**Files Modified:**
+1. `frontend/src/components/common/Screenshot.tsx`
+   - Added Button and Trash2 icon imports
+   - Added onDelete and isDeleting props to interface
+   - Added delete button that shows on hover (lines 79-92)
 
-2. **Min Session Duration slider** (lines 178-199)
-   - Slider with range 1-30 minutes
-   - Description: "Sessions shorter than this won't be saved"
-   - Updates `config.afk.minSessionMinutes`
-
-**System Tab (SettingsDrawer.tsx):**
-3. **Data Directory Path display** (lines 482-488)
-   - Shows current data directory path with monospace font
-   - Uses new `useDataDir()` hook from hooks.ts
-
-**API Hook Added (hooks.ts):**
-- `useDataDir()` - Fetches data directory path via `api.system.getDataDir()`
-
-### Tests Status
-These UI features implement the frontend components for Tests 28, 30, and 132.
-However, full test verification requires native Wails app testing because:
-- Test 28 requires verifying duplicate detection behavior changes
-- Test 30 requires creating sessions and verifying minimum duration filtering
-- Test 132 requires displaying the actual path (needs Wails bindings)
-
-**Tests NOT marked as passing** - require backend verification in native app.
+2. `frontend/src/pages/SessionDetailPage.tsx`
+   - Added useDeleteScreenshot hook import
+   - Added deletingScreenshotId state
+   - Added handleDeleteScreenshot function (lines 51-63)
+   - Passed onDelete and isDeleting props to Screenshot components (lines 296-297)
 
 ### Current Status
-- **Tests Passing:** 64/150 (42.7%)
-- **Tests Remaining:** 86
-- **UI Components Added:** 3
+- **Tests Passing:** 65/150 (43.3%)
+- **Tests Remaining:** 85
+- **New Tests Passing:** 1 (Test 94)
 
-### All Passing Tests (64 total)
+### All Passing Tests (65 total)
 - Test 16: Daily Timeline View
 - Test 17: Session Cards
 - Test 18: Screenshot Thumbnails
@@ -84,6 +70,7 @@ However, full test verification requires native Wails app testing because:
 - Test 91: Activity Log Table
 - Test 92: Session Context
 - Test 93: Session Deletion
+- Test 94: Screenshot Deletion (NEW)
 - Test 95: Keyboard Navigation
 - Test 96: Image Lightbox
 - Test 97: Tag Filtering
@@ -139,3 +126,4 @@ However, full test verification requires native Wails app testing because:
 - Wails dev server: frontend port 5173, bindings port 34115
 - Screenshot server: port 34116
 - Settings saved via Wails config system
+- Build passes successfully after changes

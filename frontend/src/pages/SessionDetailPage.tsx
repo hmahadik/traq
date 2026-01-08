@@ -6,7 +6,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { useSessionContext, useRegenerateSummary, useDeleteSession } from '@/api/hooks';
+import { useSessionContext, useRegenerateSummary, useDeleteSession, useDeleteScreenshot } from '@/api/hooks';
 import { formatTimeRange, formatDuration, formatTimestamp, getNullableInt, getNullableString, isNullableValid } from '@/lib/utils';
 import { Terminal, GitCommit, FileText, Globe, ArrowLeft, RefreshCw, Trash2 } from 'lucide-react';
 import { Screenshot } from '@/components/common/Screenshot';
@@ -21,7 +21,9 @@ export function SessionDetailPage() {
   const { data: context, isLoading, refetch } = useSessionContext(sessionId);
   const regenerateMutation = useRegenerateSummary();
   const deleteMutation = useDeleteSession();
+  const deleteScreenshotMutation = useDeleteScreenshot();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deletingScreenshotId, setDeletingScreenshotId] = useState<number | null>(null);
 
   const handleRegenerateSummary = async () => {
     try {
@@ -43,6 +45,20 @@ export function SessionDetailPage() {
     } catch (error) {
       toast.error('Failed to delete session');
       console.error('Delete session error:', error);
+    }
+  };
+
+  const handleDeleteScreenshot = async (screenshotId: number) => {
+    try {
+      setDeletingScreenshotId(screenshotId);
+      await deleteScreenshotMutation.mutateAsync(screenshotId);
+      toast.success('Screenshot deleted successfully');
+      refetch(); // Refetch the session context to update the screenshot list
+    } catch (error) {
+      toast.error('Failed to delete screenshot');
+      console.error('Delete screenshot error:', error);
+    } finally {
+      setDeletingScreenshotId(null);
     }
   };
 
@@ -277,6 +293,8 @@ export function SessionDetailPage() {
                 screenshot={screenshot}
                 size="thumbnail"
                 showOverlay={true}
+                onDelete={handleDeleteScreenshot}
+                isDeleting={deletingScreenshotId === screenshot.id}
               />
             ))}
           </div>
