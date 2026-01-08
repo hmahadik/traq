@@ -86,7 +86,7 @@
       "Step 3: Verify no data is sent to external servers",
       "Step 4: Verify all files exist in local data directory"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -97,7 +97,7 @@
       "Step 3: Open database and verify schema is valid",
       "Step 4: Query database to confirm data integrity"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -108,7 +108,7 @@
       "Step 3: Verify YYYY/MM/DD folder structure exists",
       "Step 4: Verify screenshots are in correct date folders"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -274,7 +274,7 @@
       "Step 3: Verify memory usage stays under 200MB",
       "Step 4: Verify native OS integration works"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -379,7 +379,7 @@
       "Step 3: Verify migrations run automatically on startup",
       "Step 4: Verify schema matches expected version"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -390,7 +390,7 @@
       "Step 3: Attempt to create orphan records",
       "Step 4: Verify constraints prevent invalid data"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
