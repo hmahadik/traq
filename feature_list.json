@@ -1171,7 +1171,7 @@
       "Step 3: Verify progress updates during download",
       "Step 4: Verify completion is indicated"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "style",
@@ -1182,7 +1182,7 @@
       "Step 3: Verify active model name is displayed",
       "Step 4: Verify status updates when model changes"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -1458,7 +1458,7 @@
       "Step 3: Verify database size is displayed",
       "Step 4: Verify screenshot storage size is displayed"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -1480,7 +1480,7 @@
       "Step 3: Click button",
       "Step 4: Verify file manager opens to correct directory"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -1567,7 +1567,7 @@
       "Step 3: Verify screenshots are grouped by hour",
       "Step 4: Verify hour headers are displayed"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "style",
@@ -1578,7 +1578,7 @@
       "Step 3: Verify sessions are shown as bands across time",
       "Step 4: Verify band lengths reflect session duration"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "style",

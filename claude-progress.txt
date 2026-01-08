@@ -37,11 +37,19 @@ Updated feature_list.json to reflect actual implementation status.
 19. **Test 97: Tag Filtering** - TimelinePage.tsx selectedTag state filtering
 
 ### Current Status
-- **Tests Passing:** 50/150 (33.3%)
-- **Tests Remaining:** 100
-- **New Tests Passing This Session:** 19
+- **Tests Passing:** 56/150 (37.3%)
+- **Tests Remaining:** 94
+- **New Tests Passing This Session:** 25
 
-### All Passing Tests (50 total)
+**Additional Tests Verified:**
+- Test 105: Download Progress Indicator - SettingsDrawer.tsx lines 206-213
+- Test 106: Inference Status Display - SettingsDrawer.tsx lines 215-224
+- Test 131: Storage Statistics - SettingsDrawer.tsx lines 398-444
+- Test 133: Open Data Directory - SettingsDrawer.tsx lines 435-443
+- Test 141: Hour Groups - HourGroup.tsx component
+- Test 142: Timeline Bands - TimelineBands.tsx component
+
+### All Passing Tests (56 total)
 - Test 16: Daily Timeline View
 - Test 17: Session Cards
 - Test 18: Screenshot Thumbnails
@@ -86,7 +94,13 @@ Updated feature_list.json to reflect actual implementation status.
 - Test 98: Time Period Filtering
 - Test 99: App Filtering
 - Test 100: Collapsible Sections
+- Test 105: Download Progress Indicator
+- Test 106: Inference Status Display
 - Test 119: Force Capture Button
+- Test 131: Storage Statistics
+- Test 133: Open Data Directory
+- Test 141: Hour Groups
+- Test 142: Timeline Bands
 - Test 143: Session Duration Display
 - Test 144: Time Range Display
 - Test 147: Empty State Handling
