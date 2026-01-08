@@ -1,16 +1,8 @@
 name: Update Screenshots
 
 on:
-  # Manual trigger
+  # Manual trigger only - run locally for better results
   workflow_dispatch:
-
-  # Auto-trigger on UI changes to main branch
-  push:
-    branches: [v2, main]
-    paths:
-      - 'frontend/src/**/*.tsx'
-      - 'frontend/src/**/*.css'
-      - 'frontend/tailwind.config.ts'
 
 jobs:
   capture:
