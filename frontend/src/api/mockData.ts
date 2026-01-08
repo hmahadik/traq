@@ -72,10 +72,51 @@ function generateScreenshots(sessionId: number, count: number, startTime: number
   }));
 }
 
-// Generate mock session
+// Session templates for realistic mock data
+const sessionTemplates = [
+  {
+    summary: 'Morning standup and code review. Reviewed 3 pull requests for the authentication module, left feedback on error handling patterns. Discussed sprint priorities with the team.',
+    tags: ['meetings', 'code-review'],
+    confidence: 'high' as const,
+    topApps: ['Slack', 'GitHub', 'VS Code'],
+  },
+  {
+    summary: 'Deep work session on the dashboard redesign. Implemented the new chart components using Recharts, added responsive breakpoints, and integrated with the analytics API.',
+    tags: ['coding', 'frontend'],
+    confidence: 'high' as const,
+    topApps: ['VS Code', 'Firefox', 'Terminal'],
+  },
+  {
+    summary: 'Research and documentation for the new caching layer. Compared Redis vs Memcached performance benchmarks, drafted architecture decision record (ADR).',
+    tags: ['research', 'documentation'],
+    confidence: 'medium' as const,
+    topApps: ['Firefox', 'Notion', 'VS Code'],
+  },
+  {
+    summary: 'Debugging session for the file upload issue. Traced the problem to incorrect MIME type handling, wrote regression tests, and deployed the fix to staging.',
+    tags: ['debugging', 'testing'],
+    confidence: 'high' as const,
+    topApps: ['VS Code', 'Terminal', 'Chrome'],
+  },
+  {
+    summary: 'End-of-day wrap-up. Updated Jira tickets, pushed work-in-progress branch, and drafted tomorrow\'s task list. Quick sync with PM about timeline.',
+    tags: ['planning', 'communication'],
+    confidence: 'medium' as const,
+    topApps: ['Jira', 'Slack', 'VS Code'],
+  },
+  {
+    summary: 'API integration work for the third-party payment provider. Implemented webhook handlers, added retry logic for failed transactions, updated API documentation.',
+    tags: ['coding', 'backend'],
+    confidence: 'high' as const,
+    topApps: ['VS Code', 'Postman', 'Terminal'],
+  },
+];
+
+// Generate mock session with rich, varied data
 function generateSession(id: number, startTime: number, duration: number): SessionSummary {
   const endTime = startTime + duration;
   const screenshotCount = Math.floor(duration / 30);
+  const template = sessionTemplates[id % sessionTemplates.length];
 
   return {
     id,
@@ -88,10 +129,10 @@ function generateSession(id: number, startTime: number, duration: number): Sessi
     summary: {
       id,
       sessionId: id,
-      summary: `Worked on implementing the ${['frontend', 'backend', 'API', 'database', 'tests'][id % 5]} components. Made progress on the core functionality and addressed several issues.`,
+      summary: template.summary,
       explanation: 'Analyzed window focus patterns and screenshot content to determine the primary activities during this session.',
-      confidence: ['high', 'medium', 'low'][id % 3] as 'high' | 'medium' | 'low',
-      tags: [['coding', 'development'], ['research', 'documentation'], ['meetings', 'communication']][id % 3],
+      confidence: template.confidence,
+      tags: template.tags,
       modelUsed: 'gemma3n-e2b-q4',
       inferenceTimeMs: 2500 + Math.random() * 1000,
       screenshotIds: Array.from({ length: 5 }, (_, i) => id * 100 + i),
@@ -222,10 +263,11 @@ export const mockData = {
     const dayStart = dateToTimestamp(date);
 
     return [
-      generateSession(1, dayStart + 9 * hour, 2 * hour),
-      generateSession(2, dayStart + 11 * hour + 30 * 60, hour + 30 * 60),
-      generateSession(3, dayStart + 14 * hour, 3 * hour),
-      generateSession(4, dayStart + 17 * hour + 30 * 60, hour),
+      generateSession(1, dayStart + 9 * hour, 45 * 60),           // 9:00-9:45 - Standup & code review
+      generateSession(2, dayStart + 10 * hour, 2 * hour),         // 10:00-12:00 - Deep work coding
+      generateSession(3, dayStart + 13 * hour, hour + 30 * 60),   // 13:00-14:30 - Research & docs
+      generateSession(4, dayStart + 14 * hour + 45 * 60, 2 * hour), // 14:45-16:45 - Debugging
+      generateSession(5, dayStart + 17 * hour, 45 * 60),          // 17:00-17:45 - Wrap-up
     ];
   },
 
