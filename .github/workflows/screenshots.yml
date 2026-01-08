@@ -72,3 +72,4 @@ jobs:
           git add docs/public/screenshots/
           git commit -m "docs: Update screenshots [skip ci]"
           git push
+
