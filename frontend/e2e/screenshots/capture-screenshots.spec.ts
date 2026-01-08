@@ -26,8 +26,8 @@ const SCREENSHOT_DIR = path.join(__dirname, '../../../docs/public/screenshots');
 const MOCK_PARAM = '?mock=true';
 
 const screenshots = [
-  { name: 'timeline', path: `/${MOCK_PARAM}#/`, waitFor: 'main' },
-  { name: 'analytics', path: `/${MOCK_PARAM}#/analytics`, waitFor: 'main' },
+  { name: 'timeline', path: `/${MOCK_PARAM}#/`, waitFor: '[data-testid="session-card"]' },
+  { name: 'analytics', path: `/${MOCK_PARAM}#/analytics`, waitFor: '[data-testid="productivity-score"], .recharts-wrapper' },
   { name: 'reports', path: `/${MOCK_PARAM}#/reports`, waitFor: 'main' },
   { name: 'settings', path: `/${MOCK_PARAM}#/`, action: 'openSettings', waitFor: '[role="dialog"]' },
 ] as const;
