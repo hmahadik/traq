@@ -119,6 +119,44 @@ export function SettingsDrawer({ open, onOpenChange }: SettingsDrawerProps) {
                   {config.capture.quality}%
                 </span>
               </div>
+              <div className="flex gap-2 mb-2">
+                <Button
+                  variant={config.capture.quality <= 70 ? "default" : "outline"}
+                  size="sm"
+                  className="flex-1"
+                  onClick={() =>
+                    updateConfig.mutate({
+                      capture: { ...config.capture, quality: 65 },
+                    })
+                  }
+                >
+                  Low
+                </Button>
+                <Button
+                  variant={config.capture.quality > 70 && config.capture.quality <= 85 ? "default" : "outline"}
+                  size="sm"
+                  className="flex-1"
+                  onClick={() =>
+                    updateConfig.mutate({
+                      capture: { ...config.capture, quality: 80 },
+                    })
+                  }
+                >
+                  Medium
+                </Button>
+                <Button
+                  variant={config.capture.quality > 85 ? "default" : "outline"}
+                  size="sm"
+                  className="flex-1"
+                  onClick={() =>
+                    updateConfig.mutate({
+                      capture: { ...config.capture, quality: 95 },
+                    })
+                  }
+                >
+                  High
+                </Button>
+              </div>
               <Slider
                 value={[config.capture.quality]}
                 min={60}
@@ -130,6 +168,9 @@ export function SettingsDrawer({ open, onOpenChange }: SettingsDrawerProps) {
                   })
                 }
               />
+              <p className="text-xs text-muted-foreground">
+                Low (~30KB), Medium (~60KB), High (~100KB per screenshot)
+              </p>
             </div>
 
             <div className="space-y-2">

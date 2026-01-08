@@ -32,12 +32,18 @@ Verified App Categorization/Productivity features (Tests 72-74) and implemented 
 - Added "Custom API Endpoint" input field in Settings > AI > Cloud section
 - Shows placeholder "https://api.example.com/v1" and helper text
 
-### Current Status
-- **Tests Passing:** 72/150 (48.0%)
-- **Tests Remaining:** 78
-- **New Tests Passing:** 4 (Tests 72, 73, 74, 107)
+**Screenshot Quality Presets (Test 111):**
+- Added Low/Medium/High preset buttons in Settings > Capture > Image Quality
+- Buttons set quality to 65% (Low), 80% (Medium), 95% (High)
+- Active button is highlighted with default variant
+- Helper text shows approximate file sizes per preset
 
-### All Passing Tests (72 total)
+### Current Status
+- **Tests Passing:** 73/150 (48.7%)
+- **Tests Remaining:** 77
+- **New Tests Passing:** 5 (Tests 72, 73, 74, 107, 111)
+
+### All Passing Tests (73 total)
 - Test 16: Daily Timeline View
 - Test 17: Session Cards
 - Test 18: Screenshot Thumbnails
@@ -93,6 +99,7 @@ Verified App Categorization/Productivity features (Tests 72-74) and implemented 
 - Test 106: Inference Status Display
 - Test 107: Custom API Endpoints (NEW)
 - Test 108: API Key Management
+- Test 111: Screenshot Quality Presets (NEW)
 - Test 119: Force Capture Button
 - Test 131: Storage Statistics
 - Test 133: Open Data Directory
