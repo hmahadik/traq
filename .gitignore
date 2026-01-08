@@ -19,6 +19,10 @@ node_modules/
 frontend/dist/
 frontend/package.json.md5
 
+# Docs
+docs/.vitepress/dist/
+docs/.vitepress/cache/
+
 # Activity tracker data
 activity-tracker-data/
 
