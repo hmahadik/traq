@@ -180,6 +180,11 @@ func (s *ConfigService) GetConfig() (*Config, error) {
 			config.AFK.TimeoutSeconds = v
 		}
 	}
+	if val, err := s.store.GetConfig("afk.minSessionMinutes"); err == nil {
+		if v, e := strconv.Atoi(val); e == nil {
+			config.AFK.MinSessionMinutes = v
+		}
+	}
 	if val, err := s.store.GetConfig("ui.theme"); err == nil {
 		config.UI.Theme = val
 	}
@@ -203,6 +208,32 @@ func (s *ConfigService) GetConfig() (*Config, error) {
 	}
 	if val, err := s.store.GetConfig("browser.browsers"); err == nil {
 		json.Unmarshal([]byte(val), &config.DataSources.Browser.Browsers)
+	}
+
+	// Inference settings
+	if val, err := s.store.GetConfig("inference.engine"); err == nil && val != "" {
+		config.Inference.Engine = val
+	}
+	if val, err := s.store.GetConfig("inference.bundled.model"); err == nil && val != "" {
+		config.Inference.Bundled.Model = val
+	}
+	if val, err := s.store.GetConfig("inference.ollama.host"); err == nil && val != "" {
+		config.Inference.Ollama.Host = val
+	}
+	if val, err := s.store.GetConfig("inference.ollama.model"); err == nil && val != "" {
+		config.Inference.Ollama.Model = val
+	}
+	if val, err := s.store.GetConfig("inference.cloud.provider"); err == nil && val != "" {
+		config.Inference.Cloud.Provider = val
+	}
+	if val, err := s.store.GetConfig("inference.cloud.apiKey"); err == nil && val != "" {
+		config.Inference.Cloud.APIKey = val
+	}
+	if val, err := s.store.GetConfig("inference.cloud.model"); err == nil && val != "" {
+		config.Inference.Cloud.Model = val
+	}
+	if val, err := s.store.GetConfig("inference.cloud.endpoint"); err == nil && val != "" {
+		config.Inference.Cloud.Endpoint = val
 	}
 
 	return config, nil
@@ -305,6 +336,7 @@ func mapToStorageKey(frontendKey string) string {
 		"inference.cloud.provider": "inference.cloud.provider",
 		"inference.cloud.apiKey":   "inference.cloud.apiKey",
 		"inference.cloud.model":    "inference.cloud.model",
+		"inference.cloud.endpoint": "inference.cloud.endpoint",
 	}
 
 	if storageKey, ok := keyMap[frontendKey]; ok {
@@ -373,6 +405,7 @@ func (s *ConfigService) RestartDaemon() error {
 	daemonConfig := &tracker.DaemonConfig{
 		Interval:           time.Duration(config.Capture.IntervalSeconds) * time.Second,
 		AFKTimeout:         time.Duration(config.AFK.TimeoutSeconds) * time.Second,
+		ResumeWindow:       time.Duration(config.AFK.MinSessionMinutes) * time.Minute,
 		Quality:            config.Capture.Quality,
 		DuplicateThreshold: config.Capture.DuplicateThreshold,
 		DataDir:            s.platform.DataDir(),

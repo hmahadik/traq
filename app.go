@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"traq/internal/inference"
 	"traq/internal/platform"
 	"traq/internal/service"
 	"traq/internal/storage"
@@ -32,6 +33,10 @@ type App struct {
 	Reports     *service.ReportsService
 	Config      *service.ConfigService
 	Screenshots *service.ScreenshotService
+	Summary     *service.SummaryService
+
+	// Inference engine
+	inference *inference.Service
 }
 
 // NewApp creates a new App application struct
@@ -100,6 +105,14 @@ func (a *App) startup(ctx context.Context) {
 	// Initialize reports service (after timeline service)
 	a.Reports = service.NewReportsService(a.store, a.Timeline)
 
+	// Initialize inference service from config
+	config, _ := a.Config.GetConfig()
+	inferenceConfig := buildInferenceConfig(config)
+	a.inference = inference.NewService(inferenceConfig)
+
+	// Initialize summary service
+	a.Summary = service.NewSummaryService(a.store, a.inference)
+
 	// Start screenshot server for dev mode (Vite proxies to this)
 	go startScreenshotServer(dataDir)
 
@@ -157,6 +170,11 @@ func (a *App) shutdown(ctx context.Context) {
 		}
 	}
 
+	// Shutdown inference (stops bundled server if running)
+	if a.inference != nil {
+		a.inference.Shutdown()
+	}
+
 	// Close storage
 	if a.store != nil {
 		if err := a.store.Close(); err != nil {
@@ -177,8 +195,14 @@ func (a *App) beforeClose(ctx context.Context) bool {
 // ============================================================================
 
 // GetDaemonStatus returns the current daemon status.
-func (a *App) GetDaemonStatus() (*service.DaemonStatus, error) {
-	if a.Config == nil {
+func (a *App) GetDaemonStatus() (result *service.DaemonStatus, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			result = nil
+			err = fmt.Errorf("internal error: %v", r)
+		}
+	}()
+	if a == nil || !a.ready || a.Config == nil {
 		return nil, nil
 	}
 	return a.Config.GetDaemonStatus()
@@ -225,24 +249,42 @@ func (a *App) ForceCapture() (string, error) {
 // ============================================================================
 
 // GetDailyStats returns statistics for a specific date.
-func (a *App) GetDailyStats(date string) (*service.DailyStats, error) {
-	if a.Analytics == nil {
+func (a *App) GetDailyStats(date string) (result *service.DailyStats, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			result = nil
+			err = fmt.Errorf("internal error: %v", r)
+		}
+	}()
+	if a == nil || !a.ready || a.Analytics == nil {
 		return nil, nil
 	}
 	return a.Analytics.GetDailyStats(date)
 }
 
 // GetWeeklyStats returns statistics for a week.
-func (a *App) GetWeeklyStats(startDate string) (*service.WeeklyStats, error) {
-	if a.Analytics == nil {
+func (a *App) GetWeeklyStats(startDate string) (result *service.WeeklyStats, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			result = nil
+			err = fmt.Errorf("internal error: %v", r)
+		}
+	}()
+	if a == nil || !a.ready || a.Analytics == nil {
 		return nil, nil
 	}
 	return a.Analytics.GetWeeklyStats(startDate)
 }
 
 // GetMonthlyStats returns statistics for a month.
-func (a *App) GetMonthlyStats(year, month int) (*service.MonthlyStats, error) {
-	if a.Analytics == nil {
+func (a *App) GetMonthlyStats(year, month int) (result *service.MonthlyStats, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			result = nil
+			err = fmt.Errorf("internal error: %v", r)
+		}
+	}()
+	if a == nil || !a.ready || a.Analytics == nil {
 		return nil, nil
 	}
 	return a.Analytics.GetMonthlyStats(year, month)
@@ -259,8 +301,14 @@ func (a *App) ExportAnalytics(date, viewMode, format string) (string, error) {
 }
 
 // GetCalendarHeatmap returns calendar data for a month.
-func (a *App) GetCalendarHeatmap(year, month int) (*service.CalendarData, error) {
-	if a.Analytics == nil {
+func (a *App) GetCalendarHeatmap(year, month int) (result *service.CalendarData, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			result = nil
+			err = fmt.Errorf("internal error: %v", r)
+		}
+	}()
+	if a == nil || !a.ready || a.Analytics == nil {
 		return nil, nil
 	}
 	return a.Analytics.GetCalendarHeatmap(year, month)
@@ -337,8 +385,14 @@ func (a *App) GetTopWindows(date string, limit int) ([]*service.WindowUsage, err
 // ============================================================================
 
 // GetSessionsForDate returns all sessions for a date.
-func (a *App) GetSessionsForDate(date string) ([]*service.SessionSummary, error) {
-	if a.Timeline == nil {
+func (a *App) GetSessionsForDate(date string) (result []*service.SessionSummary, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			result = nil
+			err = fmt.Errorf("internal error: %v", r)
+		}
+	}()
+	if a == nil || !a.ready || a.Timeline == nil {
 		return nil, nil
 	}
 	return a.Timeline.GetSessionsForDate(date)
@@ -369,8 +423,14 @@ func (a *App) GetSessionContext(sessionID int64) (*service.SessionContext, error
 }
 
 // GetRecentSessions returns the most recent sessions.
-func (a *App) GetRecentSessions(limit int) ([]*storage.Session, error) {
-	if a.Timeline == nil {
+func (a *App) GetRecentSessions(limit int) (result []*storage.Session, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			result = nil
+			err = fmt.Errorf("internal error: %v", r)
+		}
+	}()
+	if a == nil || !a.ready || a.Timeline == nil {
 		return nil, nil
 	}
 	return a.Timeline.GetRecentSessions(limit)
@@ -493,12 +553,54 @@ func (a *App) ParseTimeRange(input string) (*service.TimeRange, error) {
 }
 
 // ============================================================================
+// Summary Methods (exposed to frontend)
+// ============================================================================
+
+// GenerateSummary generates an AI summary for a session.
+func (a *App) GenerateSummary(sessionID int64) (*storage.Summary, error) {
+	if a.Summary == nil {
+		return nil, fmt.Errorf("summary service not initialized")
+	}
+	return a.Summary.GenerateSummary(sessionID)
+}
+
+// RegenerateSummary regenerates an AI summary for a session.
+func (a *App) RegenerateSummary(sessionID int64) (*storage.Summary, error) {
+	if a.Summary == nil {
+		return nil, fmt.Errorf("summary service not initialized")
+	}
+	return a.Summary.RegenerateSummary(sessionID)
+}
+
+// GetSummary retrieves a summary by ID.
+func (a *App) GetSummary(summaryID int64) (*storage.Summary, error) {
+	if a.Summary == nil {
+		return nil, nil
+	}
+	return a.Summary.GetSummary(summaryID)
+}
+
+// GetSummaryBySession retrieves a summary by session ID.
+func (a *App) GetSummaryBySession(sessionID int64) (*storage.Summary, error) {
+	if a.Summary == nil {
+		return nil, nil
+	}
+	return a.Summary.GetSummaryBySession(sessionID)
+}
+
+// ============================================================================
 // Config Methods (exposed to frontend)
 // ============================================================================
 
 // GetConfig returns the current configuration.
-func (a *App) GetConfig() (*service.Config, error) {
-	if a.Config == nil {
+func (a *App) GetConfig() (result *service.Config, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			result = nil
+			err = fmt.Errorf("internal error: %v", r)
+		}
+	}()
+	if a == nil || !a.ready || a.Config == nil {
 		return nil, nil
 	}
 	return a.Config.GetConfig()
@@ -674,4 +776,89 @@ func (a *App) SaveAppCategory(appName, category string) error {
 // DeleteAppCategory removes the category for an app.
 func (a *App) DeleteAppCategory(appName string) error {
 	return a.store.DeleteAppCategory(appName)
+}
+
+// ============================================================================
+// Inference Methods (exposed to frontend)
+// ============================================================================
+
+// GetInferenceStatus returns the current status of the AI inference service.
+func (a *App) GetInferenceStatus() *inference.InferenceStatus {
+	if a.inference == nil {
+		return &inference.InferenceStatus{
+			Engine:    "none",
+			Available: false,
+		}
+	}
+	return a.inference.GetStatus()
+}
+
+// GetBundledStatus returns detailed status of the bundled AI engine.
+func (a *App) GetBundledStatus() *inference.BundledStatus {
+	if a.inference == nil {
+		return &inference.BundledStatus{
+			Available: false,
+		}
+	}
+	return a.inference.GetBundledStatus()
+}
+
+// ============================================================================
+// Helper functions
+// ============================================================================
+
+// buildInferenceConfig converts app config to inference config.
+func buildInferenceConfig(config *service.Config) *inference.Config {
+	if config == nil || config.Inference == nil {
+		// Return default Ollama config
+		return &inference.Config{
+			Engine: inference.EngineOllama,
+			Ollama: &inference.OllamaConfig{
+				Host:  "http://localhost:11434",
+				Model: "gemma3:12b-it-qat",
+			},
+		}
+	}
+
+	ic := &inference.Config{}
+
+	switch config.Inference.Engine {
+	case "bundled":
+		ic.Engine = inference.EngineBundled
+		if config.Inference.Bundled != nil {
+			serverPath, modelPath := inference.GetDefaultPaths()
+			ic.Bundled = &inference.BundledConfig{
+				ModelPath:  modelPath,
+				ServerPath: serverPath,
+				Port:       8080,
+			}
+		}
+	case "cloud":
+		ic.Engine = inference.EngineCloud
+		if config.Inference.Cloud != nil {
+			ic.Cloud = &inference.CloudConfig{
+				Provider: config.Inference.Cloud.Provider,
+				APIKey:   config.Inference.Cloud.APIKey,
+				Model:    config.Inference.Cloud.Model,
+				Endpoint: config.Inference.Cloud.Endpoint,
+			}
+		}
+	default: // "ollama" or unset
+		ic.Engine = inference.EngineOllama
+		if config.Inference.Ollama != nil {
+			ic.Ollama = &inference.OllamaConfig{
+				Host:  config.Inference.Ollama.Host,
+				Model: config.Inference.Ollama.Model,
+			}
+		}
+		// Ensure defaults
+		if ic.Ollama == nil || ic.Ollama.Host == "" {
+			ic.Ollama = &inference.OllamaConfig{
+				Host:  "http://localhost:11434",
+				Model: "gemma3:12b-it-qat",
+			}
+		}
+	}
+
+	return ic
 }

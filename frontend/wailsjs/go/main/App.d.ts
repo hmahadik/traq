@@ -3,6 +3,7 @@
 import {storage} from '../models';
 import {service} from '../models';
 import {main} from '../models';
+import {inference} from '../models';
 
 export function DeleteAppCategory(arg1:string):Promise<void>;
 
@@ -18,6 +19,8 @@ export function ForceCapture():Promise<string>;
 
 export function GenerateReport(arg1:string,arg2:string,arg3:boolean):Promise<storage.Report>;
 
+export function GenerateSummary(arg1:number):Promise<storage.Summary>;
+
 export function GetActivityTags(arg1:string):Promise<Array<service.TagUsage>>;
 
 export function GetAllApps():Promise<Array<main.AppWithCategory>>;
@@ -25,6 +28,8 @@ export function GetAllApps():Promise<Array<main.AppWithCategory>>;
 export function GetAppCategories():Promise<Array<storage.AppCategoryRecord>>;
 
 export function GetAppUsage(arg1:number,arg2:number):Promise<Array<service.AppUsage>>;
+
+export function GetBundledStatus():Promise<inference.BundledStatus>;
 
 export function GetCalendarHeatmap(arg1:number,arg2:number):Promise<service.CalendarData>;
 
@@ -45,6 +50,8 @@ export function GetDataSourceStats(arg1:number,arg2:number):Promise<service.Data
 export function GetFocusDistribution(arg1:string):Promise<Array<service.HourlyFocus>>;
 
 export function GetHourlyActivity(arg1:string):Promise<Array<service.HourlyActivity>>;
+
+export function GetInferenceStatus():Promise<inference.InferenceStatus>;
 
 export function GetMonthlyStats(arg1:number,arg2:number):Promise<service.MonthlyStats>;
 
@@ -72,6 +79,10 @@ export function GetSessionsForDate(arg1:string):Promise<Array<service.SessionSum
 
 export function GetStorageStats():Promise<service.StorageStats>;
 
+export function GetSummary(arg1:number):Promise<storage.Summary>;
+
+export function GetSummaryBySession(arg1:number):Promise<storage.Summary>;
+
 export function GetSystemInfo():Promise<Record<string, string>>;
 
 export function GetThumbnailPath(arg1:number):Promise<string>;
@@ -91,6 +102,8 @@ export function IsReady():Promise<boolean>;
 export function OpenDataDir():Promise<void>;
 
 export function ParseTimeRange(arg1:string):Promise<service.TimeRange>;
+
+export function RegenerateSummary(arg1:number):Promise<storage.Summary>;
 
 export function RegisterGitRepository(arg1:string):Promise<storage.GitRepository>;
 

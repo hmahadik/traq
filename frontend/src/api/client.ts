@@ -12,6 +12,108 @@ import type {
   ModelInfo,
 } from '@/types';
 
+// ============================================================================
+// Wails Runtime Utilities
+// ============================================================================
+
+/** Track if the app backend is ready */
+let appReady = false;
+let readyPromise: Promise<void> | null = null;
+
+/**
+ * Wait for the Wails backend to be ready.
+ * Polls IsReady() until it returns true, with exponential backoff.
+ */
+export async function waitForReady(maxAttempts = 20, initialDelay = 100): Promise<void> {
+  if (appReady) return;
+  
+  if (readyPromise) return readyPromise;
+  
+  readyPromise = (async () => {
+    let delay = initialDelay;
+    for (let i = 0; i < maxAttempts; i++) {
+      try {
+        const ready = await App.IsReady();
+        if (ready) {
+          appReady = true;
+          return;
+        }
+      } catch {
+        // Wails runtime not yet available, keep trying
+      }
+      await new Promise(resolve => setTimeout(resolve, delay));
+      delay = Math.min(delay * 1.5, 2000); // Cap at 2 seconds
+    }
+    console.warn('Wails backend did not become ready within timeout');
+  })();
+  
+  return readyPromise;
+}
+
+/**
+ * Check if the Wails runtime is available (window.__go_wails__ exists)
+ */
+export function isWailsRuntimeAvailable(): boolean {
+  return typeof window !== 'undefined' && 
+    (window as unknown as { go?: unknown }).go !== undefined;
+}
+
+/**
+ * Wrap an async function with retry logic for transient Wails failures.
+ * @param fn The async function to call
+ * @param retries Number of retry attempts (default: 3)
+ * @param delay Initial delay between retries in ms (default: 200)
+ */
+export async function withRetry<T>(
+  fn: () => Promise<T>,
+  retries = 3,
+  delay = 200
+): Promise<T> {
+  let lastError: Error | null = null;
+  
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      lastError = err instanceof Error ? err : new Error(String(err));
+      
+      // Don't retry if this is clearly not a transient error
+      if (lastError.message.includes('not found') || 
+          lastError.message.includes('invalid')) {
+        throw lastError;
+      }
+      
+      if (attempt < retries) {
+        await new Promise(resolve => setTimeout(resolve, delay * (attempt + 1)));
+      }
+    }
+  }
+  
+  throw lastError || new Error('Operation failed after retries');
+}
+
+/**
+ * Safe wrapper for Wails API calls that handles runtime unavailability gracefully.
+ * Returns undefined if Wails runtime is not available.
+ */
+export async function safeCall<T>(
+  fn: () => Promise<T>,
+  fallback?: T
+): Promise<T | undefined> {
+  if (!isWailsRuntimeAvailable()) {
+    console.warn('Wails runtime not available - running in browser mode?');
+    return fallback;
+  }
+  
+  try {
+    await waitForReady();
+    return await fn();
+  } catch (err) {
+    console.error('Wails API call failed:', err);
+    return fallback;
+  }
+}
+
 // Use 'unknown' for backend types that may differ from frontend definitions
 // Components should handle the actual structure
 
@@ -20,51 +122,63 @@ import type {
  */
 export const analytics = {
   getDailyStats: async (date: string) => {
-    return App.GetDailyStats(date);
+    await waitForReady();
+    return withRetry(() => App.GetDailyStats(date));
   },
 
   getWeeklyStats: async (startDate: string) => {
-    return App.GetWeeklyStats(startDate);
+    await waitForReady();
+    return withRetry(() => App.GetWeeklyStats(startDate));
   },
 
   getMonthlyStats: async (year: number, month: number) => {
-    return App.GetMonthlyStats(year, month);
+    await waitForReady();
+    return withRetry(() => App.GetMonthlyStats(year, month));
   },
 
   getCalendarHeatmap: async (year: number, month: number) => {
-    return App.GetCalendarHeatmap(year, month);
+    await waitForReady();
+    return withRetry(() => App.GetCalendarHeatmap(year, month));
   },
 
   getAppUsage: async (start: number, end: number) => {
-    return App.GetAppUsage(start, end);
+    await waitForReady();
+    return withRetry(() => App.GetAppUsage(start, end));
   },
 
   getHourlyActivity: async (date: string) => {
-    return App.GetHourlyActivity(date);
+    await waitForReady();
+    return withRetry(() => App.GetHourlyActivity(date));
   },
 
   getDataSourceStats: async (start: number, end: number) => {
-    return App.GetDataSourceStats(start, end);
+    await waitForReady();
+    return withRetry(() => App.GetDataSourceStats(start, end));
   },
 
   getProductivityScore: async (date: string) => {
-    return App.GetProductivityScore(date);
+    await waitForReady();
+    return withRetry(() => App.GetProductivityScore(date));
   },
 
   getFocusDistribution: async (date: string) => {
-    return App.GetFocusDistribution(date);
+    await waitForReady();
+    return withRetry(() => App.GetFocusDistribution(date));
   },
 
   getActivityTags: async (date: string) => {
-    return App.GetActivityTags(date);
+    await waitForReady();
+    return withRetry(() => App.GetActivityTags(date));
   },
 
   getTopWindows: async (date: string, limit: number) => {
-    return App.GetTopWindows(date, limit);
+    await waitForReady();
+    return withRetry(() => App.GetTopWindows(date, limit));
   },
 
   exportAnalytics: async (date: string, viewMode: string, format: string) => {
-    return App.ExportAnalytics(date, viewMode, format);
+    await waitForReady();
+    return withRetry(() => App.ExportAnalytics(date, viewMode, format));
   },
 };
 
@@ -73,7 +187,8 @@ export const analytics = {
  */
 export const timeline = {
   getSessionsForDate: async (date: string) => {
-    return App.GetSessionsForDate(date);
+    await waitForReady();
+    return withRetry(() => App.GetSessionsForDate(date));
   },
 
   getScreenshotsForSession: async (
@@ -81,22 +196,27 @@ export const timeline = {
     page: number,
     perPage: number
   ) => {
-    return App.GetScreenshotsForSession(sessionId, page, perPage);
+    await waitForReady();
+    return withRetry(() => App.GetScreenshotsForSession(sessionId, page, perPage));
   },
 
   getScreenshotsForHour: async (date: string, hour: number) => {
-    return App.GetScreenshotsForHour(date, hour);
+    await waitForReady();
+    return withRetry(() => App.GetScreenshotsForHour(date, hour));
   },
 
   getSessionContext: async (sessionId: number) => {
-    return App.GetSessionContext(sessionId);
+    await waitForReady();
+    return withRetry(() => App.GetSessionContext(sessionId));
   },
 
   getRecentSessions: async (limit: number) => {
-    return App.GetRecentSessions(limit);
+    await waitForReady();
+    return withRetry(() => App.GetRecentSessions(limit));
   },
 
   deleteSession: async (sessionId: number) => {
+    await waitForReady();
     return App.DeleteSession(sessionId);
   },
 };
@@ -106,27 +226,33 @@ export const timeline = {
  */
 export const reports = {
   generateReport: async (timeRange: string, reportType: string, includeScreenshots: boolean) => {
-    return App.GenerateReport(timeRange, reportType, includeScreenshots);
+    await waitForReady();
+    return withRetry(() => App.GenerateReport(timeRange, reportType, includeScreenshots));
   },
 
   getReport: async (id: number) => {
-    return App.GetReport(id);
+    await waitForReady();
+    return withRetry(() => App.GetReport(id));
   },
 
   exportReport: async (reportId: number, format: string) => {
-    return App.ExportReport(reportId, format);
+    await waitForReady();
+    return withRetry(() => App.ExportReport(reportId, format));
   },
 
   getReportHistory: async () => {
-    return App.GetReportHistory();
+    await waitForReady();
+    return withRetry(() => App.GetReportHistory());
   },
 
   getDailySummaries: async (limit: number = 30) => {
-    return App.GetDailySummaries(limit);
+    await waitForReady();
+    return withRetry(() => App.GetDailySummaries(limit));
   },
 
   parseTimeRange: async (input: string) => {
-    return App.ParseTimeRange(input);
+    await waitForReady();
+    return withRetry(() => App.ParseTimeRange(input));
   },
 };
 
@@ -135,31 +261,38 @@ export const reports = {
  */
 export const config = {
   getConfig: async () => {
-    return App.GetConfig();
+    await waitForReady();
+    return withRetry(() => App.GetConfig());
   },
 
   updateConfig: async (updates: Record<string, unknown>) => {
+    await waitForReady();
     return App.UpdateConfig(updates);
   },
 
   restartDaemon: async () => {
+    await waitForReady();
     return App.RestartTracking();
   },
 
   getDaemonStatus: async () => {
-    return App.GetDaemonStatus();
+    await waitForReady();
+    return withRetry(() => App.GetDaemonStatus());
   },
 
   startDaemon: async () => {
+    await waitForReady();
     return App.StartTracking();
   },
 
   stopDaemon: async () => {
+    await waitForReady();
     return App.StopTracking();
   },
 
   getStorageStats: async () => {
-    return App.GetStorageStats();
+    await waitForReady();
+    return withRetry(() => App.GetStorageStats());
   },
 
   // These are stubs - inference not implemented yet
@@ -189,20 +322,24 @@ export const config = {
  */
 export const screenshots = {
   getScreenshot: async (id: number) => {
-    return App.GetScreenshot(id);
+    await waitForReady();
+    return withRetry(() => App.GetScreenshot(id));
   },
 
   getScreenshotImage: async (id: number) => {
     // Returns the file:// path to the screenshot
-    return App.GetScreenshotPath(id);
+    await waitForReady();
+    return withRetry(() => App.GetScreenshotPath(id));
   },
 
   getThumbnail: async (id: number) => {
     // Returns the file:// path to the thumbnail
-    return App.GetThumbnailPath(id);
+    await waitForReady();
+    return withRetry(() => App.GetThumbnailPath(id));
   },
 
   deleteScreenshot: async (id: number) => {
+    await waitForReady();
     return App.DeleteScreenshot(id);
   },
 };
@@ -212,40 +349,48 @@ export const screenshots = {
  */
 export const system = {
   getDataDir: async () => {
+    await waitForReady();
     return App.GetDataDir();
   },
 
   getVersion: async () => {
+    await waitForReady();
     return App.GetVersion();
   },
 
   getSystemInfo: async () => {
-    return App.GetSystemInfo();
+    await waitForReady();
+    return withRetry(() => App.GetSystemInfo());
   },
 
   getCurrentTime: async () => {
+    await waitForReady();
     return App.GetCurrentTime();
   },
 
   openDataDir: async () => {
+    await waitForReady();
     return App.OpenDataDir();
   },
 
   forceCapture: async () => {
+    await waitForReady();
     return App.ForceCapture();
   },
 };
 
 /**
- * Summaries API (stubs - not yet implemented in backend)
+ * Summaries API - AI-generated session summaries
  */
 export const summaries = {
-  generateSummary: async (_sessionId: number): Promise<void> => {
-    console.warn('Summary generation not implemented');
+  generateSummary: async (sessionId: number): Promise<void> => {
+    await waitForReady();
+    await App.GenerateSummary(sessionId);
   },
 
-  regenerateSummary: async (_sessionId: number): Promise<void> => {
-    console.warn('Summary regeneration not implemented');
+  regenerateSummary: async (sessionId: number): Promise<void> => {
+    await waitForReady();
+    await App.RegenerateSummary(sessionId);
   },
 };
 

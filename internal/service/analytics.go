@@ -214,21 +214,22 @@ func (s *AnalyticsService) GetDailyStats(date string) (*DailyStats, error) {
 	// Get screenshot count
 	stats.TotalScreenshots, _ = s.store.CountScreenshotsByTimeRange(start, end)
 
-	// Get session count and calculate active minutes
+	// Get session count
 	sessions, _ := s.store.GetSessionsByTimeRange(start, end)
 	stats.TotalSessions = int64(len(sessions))
 
-	var totalSeconds int64
-	for _, sess := range sessions {
-		// Only count positive durations (ignore corrupt data)
-		if sess.DurationSeconds.Valid && sess.DurationSeconds.Int64 > 0 {
-			totalSeconds += sess.DurationSeconds.Int64
+	// Calculate active minutes from focus events (excludes AFK periods)
+	// Focus events only record time when user is actively interacting with windows
+	focusEvents, _ := s.store.GetWindowFocusEventsByTimeRange(start, end)
+	var totalActiveSeconds float64
+	for _, evt := range focusEvents {
+		if evt.DurationSeconds > 0 {
+			totalActiveSeconds += evt.DurationSeconds
 		}
 	}
-	stats.ActiveMinutes = totalSeconds / 60
+	stats.ActiveMinutes = int64(totalActiveSeconds / 60)
 
-	// Get top apps from window focus events
-	focusEvents, _ := s.store.GetWindowFocusEventsByTimeRange(start, end)
+	// Get top apps from the same focus events (already fetched above)
 	appDurations := make(map[string]float64)
 	for _, evt := range focusEvents {
 		appDurations[evt.AppName] += evt.DurationSeconds

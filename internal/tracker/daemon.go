@@ -16,6 +16,7 @@ import (
 type DaemonConfig struct {
 	Interval           time.Duration
 	AFKTimeout         time.Duration
+	ResumeWindow       time.Duration
 	Quality            int
 	DuplicateThreshold int
 	DataDir            string
@@ -26,6 +27,7 @@ func DefaultDaemonConfig(dataDir string) *DaemonConfig {
 	return &DaemonConfig{
 		Interval:           30 * time.Second,
 		AFKTimeout:         3 * time.Minute,
+		ResumeWindow:       5 * time.Minute,
 		Quality:            80,
 		DuplicateThreshold: 3,
 		DataDir:            dataDir,
@@ -230,7 +232,11 @@ func (d *Daemon) tick() {
 	if d.lastDHash != "" {
 		similar, _ := d.capture.AreSimilar(d.lastDHash, result.DHash)
 		if similar {
-			// Skip duplicate screenshot
+			// Skip duplicate screenshot - clean up the saved files
+			os.Remove(result.Filepath)
+			if result.ThumbnailPath != "" {
+				os.Remove(result.ThumbnailPath)
+			}
 			return
 		}
 	}
@@ -305,6 +311,9 @@ func (d *Daemon) UpdateConfig(config *DaemonConfig) {
 	d.capture.quality = config.Quality
 	d.capture.SetDuplicateThreshold(config.DuplicateThreshold)
 	d.afk.SetTimeout(config.AFKTimeout)
+	if config.ResumeWindow > 0 {
+		d.session.SetResumeWindow(config.ResumeWindow)
+	}
 }
 
 // ForceCapture forces an immediate screenshot capture.

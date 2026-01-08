@@ -24,8 +24,8 @@ type screenshotHandler struct {
 func (h *screenshotHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Only handle paths starting with /screenshots/
 	if !strings.HasPrefix(r.URL.Path, "/screenshots/") {
-		// Not our request, let the default handler deal with it
-		http.NotFound(w, r)
+		// Not a screenshot request - don't handle it here.
+		// Return without writing anything to let Wails serve index.html for SPA routing.
 		return
 	}
 

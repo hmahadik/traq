@@ -30,6 +30,10 @@ export function GenerateReport(arg1, arg2, arg3) {
   return window['go']['main']['App']['GenerateReport'](arg1, arg2, arg3);
 }
 
+export function GenerateSummary(arg1) {
+  return window['go']['main']['App']['GenerateSummary'](arg1);
+}
+
 export function GetActivityTags(arg1) {
   return window['go']['main']['App']['GetActivityTags'](arg1);
 }
@@ -44,6 +48,10 @@ export function GetAppCategories() {
 
 export function GetAppUsage(arg1, arg2) {
   return window['go']['main']['App']['GetAppUsage'](arg1, arg2);
+}
+
+export function GetBundledStatus() {
+  return window['go']['main']['App']['GetBundledStatus']();
 }
 
 export function GetCalendarHeatmap(arg1, arg2) {
@@ -84,6 +92,10 @@ export function GetFocusDistribution(arg1) {
 
 export function GetHourlyActivity(arg1) {
   return window['go']['main']['App']['GetHourlyActivity'](arg1);
+}
+
+export function GetInferenceStatus() {
+  return window['go']['main']['App']['GetInferenceStatus']();
 }
 
 export function GetMonthlyStats(arg1, arg2) {
@@ -138,6 +150,14 @@ export function GetStorageStats() {
   return window['go']['main']['App']['GetStorageStats']();
 }
 
+export function GetSummary(arg1) {
+  return window['go']['main']['App']['GetSummary'](arg1);
+}
+
+export function GetSummaryBySession(arg1) {
+  return window['go']['main']['App']['GetSummaryBySession'](arg1);
+}
+
 export function GetSystemInfo() {
   return window['go']['main']['App']['GetSystemInfo']();
 }
@@ -176,6 +196,10 @@ export function OpenDataDir() {
 
 export function ParseTimeRange(arg1) {
   return window['go']['main']['App']['ParseTimeRange'](arg1);
+}
+
+export function RegenerateSummary(arg1) {
+  return window['go']['main']['App']['RegenerateSummary'](arg1);
 }
 
 export function RegisterGitRepository(arg1) {

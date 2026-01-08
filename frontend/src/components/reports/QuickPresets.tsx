@@ -1,6 +1,6 @@
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Zap, Calendar, Clock, MessageSquare } from 'lucide-react';
+import { Zap, Sun, History, CalendarDays, CalendarRange, MessageSquare } from 'lucide-react';
 
 interface QuickPresetsProps {
   onGenerate: (timeRange: string, reportType: 'summary' | 'detailed' | 'standup') => void;
@@ -12,28 +12,28 @@ const QUICK_PRESETS = [
     label: 'Today',
     timeRange: 'today',
     reportType: 'summary' as const,
-    icon: Calendar,
+    icon: Sun,
     description: 'Summary report for today',
   },
   {
     label: 'Yesterday',
     timeRange: 'yesterday',
     reportType: 'summary' as const,
-    icon: Calendar,
+    icon: History,
     description: 'Summary report for yesterday',
   },
   {
     label: 'This Week',
     timeRange: 'this week',
     reportType: 'summary' as const,
-    icon: Calendar,
+    icon: CalendarDays,
     description: 'Weekly summary report',
   },
   {
     label: 'Last Week',
     timeRange: 'last week',
     reportType: 'summary' as const,
-    icon: Calendar,
+    icon: CalendarRange,
     description: 'Summary for last week',
   },
   {

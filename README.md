@@ -79,6 +79,10 @@ make test-frontend
 make bindings
 ```
 
+### URL Routing
+
+The app uses **hash-based routing** (e.g., `/#/session/37` instead of `/session/37`). This is required for Wails compatibility - browser history routing doesn't work reliably in Wails dev mode due to IPC initialization issues with direct URL access to non-root paths.
+
 ## Build Notes
 
 ### Ubuntu 24.04+ (webkit2gtk-4.1)

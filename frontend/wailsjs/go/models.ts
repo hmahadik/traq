@@ -1,3 +1,56 @@
+export namespace inference {
+	
+	export class BundledStatus {
+	    available: boolean;
+	    running: boolean;
+	    modelDownloaded: boolean;
+	    serverInstalled: boolean;
+	    modelPath: string;
+	    serverPath: string;
+	    port: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new BundledStatus(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.available = source["available"];
+	        this.running = source["running"];
+	        this.modelDownloaded = source["modelDownloaded"];
+	        this.serverInstalled = source["serverInstalled"];
+	        this.modelPath = source["modelPath"];
+	        this.serverPath = source["serverPath"];
+	        this.port = source["port"];
+	    }
+	}
+	export class InferenceStatus {
+	    engine: string;
+	    available: boolean;
+	    modelName: string;
+	    bundledRunning?: boolean;
+	    bundledReady?: boolean;
+	    ollamaConnected?: boolean;
+	    cloudConfigured?: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new InferenceStatus(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.engine = source["engine"];
+	        this.available = source["available"];
+	        this.modelName = source["modelName"];
+	        this.bundledRunning = source["bundledRunning"];
+	        this.bundledReady = source["bundledReady"];
+	        this.ollamaConnected = source["ollamaConnected"];
+	        this.cloudConfigured = source["cloudConfigured"];
+	    }
+	}
+
+}
+
 export namespace main {
 	
 	export class AppWithCategory {
@@ -208,6 +261,7 @@ export namespace service {
 	    provider: string;
 	    apiKey: string;
 	    model: string;
+	    endpoint: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new CloudConfig(source);
@@ -218,6 +272,7 @@ export namespace service {
 	        this.provider = source["provider"];
 	        this.apiKey = source["apiKey"];
 	        this.model = source["model"];
+	        this.endpoint = source["endpoint"];
 	    }
 	}
 	export class CommandUsage {

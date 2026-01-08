@@ -8,7 +8,7 @@
       "Step 3: Verify a new screenshot appears in the timeline",
       "Step 4: Check screenshot is saved to disk in correct location"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -31,7 +31,7 @@
       "Step 3: View the captured screenshot details",
       "Step 4: Verify window title and app name are recorded"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -42,7 +42,7 @@
       "Step 3: Navigate to timeline view",
       "Step 4: Verify screenshots are grouped into a single session"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -53,7 +53,7 @@
       "Step 3: Verify no new screenshots are captured during idle period",
       "Step 4: Verify session shows AFK status or paused state"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -64,7 +64,7 @@
       "Step 3: Return within the resume window timeout",
       "Step 4: Verify new captures are added to same session"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -75,7 +75,7 @@
       "Step 3: Check screenshot count",
       "Step 4: Verify duplicate frames were skipped (fewer screenshots than intervals)"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -119,7 +119,7 @@
       "Step 3: View session in timeline",
       "Step 4: Verify AI-generated summary text is displayed"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -141,7 +141,7 @@
       "Step 3: Verify automatic tags are applied (e.g., 'coding', 'browsing')",
       "Step 4: Verify tags match actual activity content"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -152,7 +152,7 @@
       "Step 3: Verify confidence level is displayed (percentage or scale)",
       "Step 4: Verify indicator reflects summary reliability"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -163,7 +163,7 @@
       "Step 3: Read summary content",
       "Step 4: Verify summary references specific apps and windows used"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -230,7 +230,7 @@
       "Step 3: Verify window title detection works",
       "Step 4: Verify all core features function correctly"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -345,7 +345,7 @@
       "Step 3: Restart the application",
       "Step 4: Verify previous session data was preserved"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -356,7 +356,7 @@
       "Step 3: Verify file exists and is complete",
       "Step 4: Verify database references valid file path"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -368,7 +368,7 @@
       "Step 4: Verify session was properly closed",
       "Step 5: Verify all data was saved correctly"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -425,7 +425,7 @@
       "Step 3: Verify session count matches actual sessions",
       "Step 4: Verify count updates when new sessions are added"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -437,7 +437,7 @@
       "Step 4: Check active time statistic",
       "Step 5: Verify AFK time is excluded from total"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -448,7 +448,7 @@
       "Step 3: Refresh statistics",
       "Step 4: Verify count increased correctly"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "style",

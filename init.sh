@@ -59,6 +59,18 @@ wails generate module || true  # Don't fail if bindings already exist
 echo "✓ Bindings generated"
 echo ""
 
+# Kill existing server instance if running
+echo "Checking for existing server instance..."
+if pgrep -f "wails dev" > /dev/null; then
+    echo "- Killing existing wails dev process..."
+    pkill -f "wails dev" || true
+    sleep 1  # Give it time to clean up
+    echo "✓ Existing server stopped"
+else
+    echo "✓ No existing server running"
+fi
+echo ""
+
 # Start development server
 echo "=== Starting Wails Development Server ==="
 echo ""
