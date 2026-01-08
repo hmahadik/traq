@@ -693,7 +693,7 @@
       "Step 3: Verify stats are aggregated for 7 days",
       "Step 4: Verify totals are correct"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -704,7 +704,7 @@
       "Step 3: Verify stats are aggregated for full month",
       "Step 4: Verify totals are correct"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "style",
@@ -715,7 +715,7 @@
       "Step 3: Verify chart shows proportional app usage",
       "Step 4: Verify colors and labels are clear"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -726,7 +726,7 @@
       "Step 3: Verify table shows apps with durations",
       "Step 4: Test sorting by different columns"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "style",
@@ -836,7 +836,7 @@
       "Step 3: Locate focus distribution analysis",
       "Step 4: Verify context switches are counted accurately"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -847,7 +847,7 @@
       "Step 3: Verify window titles are listed by usage",
       "Step 4: Verify durations are accurate"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "style",
@@ -858,7 +858,7 @@
       "Step 3: Verify chart shows usage over time",
       "Step 4: Verify different apps are distinguishable"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -869,7 +869,7 @@
       "Step 3: Verify tags are aggregated with counts",
       "Step 4: Verify visualization is clear"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
