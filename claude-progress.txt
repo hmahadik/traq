@@ -3,7 +3,7 @@
 ## Session: January 8, 2026 (Session 3)
 
 ### Summary
-Continued from previous session. Verified app functionality and marked 2 additional tests as passing (Tests 42, 44).
+Verified app functionality and marked 4 additional tests as passing (Tests 42, 44, 97, 98).
 
 ### Tests Verified and Marked as Passing This Session
 
@@ -17,6 +17,19 @@ Continued from previous session. Verified app functionality and marked 2 additio
    - Verified: Clicking "Regenerate" on Analytics page triggers toast notification
    - Toast appears in bottom-right corner with message "Analytics regenerated successfully"
    - Toast includes checkmark icon for success state
+   - Implemented using Sonner library
+
+3. **Test 97: Time Period Filtering** - Filter by morning/afternoon/evening/night
+   - Verified: Filter buttons visible on Timeline page (Morning, Afternoon, Evening, Night)
+   - Clicking a filter highlights the button and filters sessions
+   - "Clear Filters" button appears when filter is active
+   - Sessions correctly filtered by time period (tested Evening filter)
+
+4. **Test 98: App Filtering** - Filter sessions by application
+   - Verified: "Filter by App" dropdown shows list of applications
+   - Applications include: org.gnome.Nautilus, slack, tilix, traq, traq-dev-linux-amd64
+   - Selecting an app creates a filter chip and filters sessions
+   - Only sessions with that app's activity are shown
 
 ### Previously Verified Tests (Still Passing)
 - Test 16: Daily Timeline View
@@ -40,31 +53,33 @@ Continued from previous session. Verified app functionality and marked 2 additio
 - Test 144: Time Range Display
 
 ### Current Status
-- **Tests Passing:** 21/150 (14.0%)
-- **Tests Remaining:** 129
+- **Tests Passing:** 23/150 (15.3%)
+- **Tests Remaining:** 127
 
 ### App Health
 - App successfully running via `wails dev` on localhost:34115
 - All three main pages functional (Timeline, Analytics, Reports)
-- Settings drawer opens but shows "Loading settings..." (may have API issue)
+- Settings drawer opens but loads slowly (may have API performance issue)
 - Toast notifications working (Sonner library, bottom-right position)
 - Skeleton loaders working on Analytics page
+- Time Period and App filtering working on Timeline page
 
 ### Technical Notes
 - Wails dev server runs frontend on port 5173/5174 and bindings on port 34115
 - Browser testing requires accessing http://localhost:34115 (not the Vite server directly)
 - Screenshot server runs on port 34116
 - Toast library: Sonner (position: bottom-right)
+- Filter system uses button toggles with "Clear Filters" option
 
 ### What to Work on Next
-1. Investigate Settings drawer "Loading settings..." issue
+1. Investigate Settings drawer slow loading issue
 2. Test actual report generation and export formats (Tests 82-85)
 3. Verify Session Detail View functionality (Test 88)
 4. Test Image Lightbox for screenshots (Test 95)
-5. Implement Time Period Filtering (Test 97) and App Filtering (Test 98)
+5. Test Collapsible Sections (Test 99)
 
 ### Notes
 - The app has extensive implemented functionality
 - Many UI components are polished and working
-- Toast notifications and skeleton loaders are well-implemented
-- Analytics page shows rich data visualizations when data exists
+- Timeline page has comprehensive filtering (time period + app)
+- Analytics page shows rich data visualizations

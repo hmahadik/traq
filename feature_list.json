@@ -1090,7 +1090,7 @@
       "Step 3: Select a time period",
       "Step 4: Verify only sessions from that period are shown"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -1101,7 +1101,7 @@
       "Step 3: Select an application",
       "Step 4: Verify only sessions with that app are shown"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "style",
