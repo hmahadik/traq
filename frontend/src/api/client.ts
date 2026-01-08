@@ -192,15 +192,34 @@ export const analytics = {
   },
 
   getProductivityScore: async (date: string) => {
-    if (MOCK_MODE) return { score: 75, breakdown: { focused: 60, productive: 80, balanced: 85 } };
+    if (MOCK_MODE) return {
+      score: 4,
+      productiveMinutes: 240,
+      neutralMinutes: 90,
+      distractingMinutes: 30,
+      totalMinutes: 360,
+      productivePercentage: 66.7,
+    };
     await waitForReady();
     return withRetry(() => App.GetProductivityScore(date));
   },
 
-  getFocusDistribution: async (date: string) => {
-    if (MOCK_MODE) return { focused: 45, fragmented: 30, idle: 25 };
+  getFocusDistribution: async (_date: string) => {
+    if (MOCK_MODE) {
+      // Return hourly focus data
+      return Array.from({ length: 24 }, (_, hour) => {
+        const isWorkHour = hour >= 9 && hour <= 18;
+        const focusQuality = isWorkHour ? 50 + Math.floor(Math.random() * 50) : Math.floor(Math.random() * 30);
+        return {
+          hour,
+          contextSwitches: isWorkHour ? Math.floor(Math.random() * 10) : 0,
+          focusQuality,
+          focusLabel: focusQuality >= 75 ? 'Focused' : focusQuality >= 50 ? 'Fair' : focusQuality > 0 ? 'Fragmented' : 'Inactive',
+        };
+      });
+    }
     await waitForReady();
-    return withRetry(() => App.GetFocusDistribution(date));
+    return withRetry(() => App.GetFocusDistribution(_date));
   },
 
   getActivityTags: async (date: string) => {

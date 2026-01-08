@@ -101,6 +101,9 @@ test.describe('Documentation Screenshots', () => {
             await basePage.openSettings();
           }
 
+          // Re-apply theme after navigation (navigation may reset it)
+          await setTheme(page, theme);
+
           // Wait for content to load
           try {
             const selectors = shot.waitFor.split(', ');
@@ -129,6 +132,9 @@ test.describe('Documentation Screenshots', () => {
           console.log(`\nCapturing ${shot.name} (${theme})...`);
 
           await page.goto(shot.path);
+
+          // Re-apply theme after navigation (navigation may reset it)
+          await setTheme(page, theme);
 
           try {
             await page.waitForSelector(shot.waitFor, { timeout: 5000 });
