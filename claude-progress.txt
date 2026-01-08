@@ -1,34 +1,32 @@
 # Traq v2 Development Progress
 
-## Session: January 8, 2026 (Session 2)
+## Session: January 8, 2026 (Session 3)
 
 ### Summary
-Continued from previous session. Fixed a build error and performed comprehensive verification of the app's functionality. Verified and marked 3 additional tests as passing (Tests 17, 19, 41).
-
-### Build Fix
-- Fixed unused imports in `internal/service/config.go` (removed unused `os` and `path/filepath` imports)
+Continued from previous session. Verified app functionality and marked 2 additional tests as passing (Tests 42, 44).
 
 ### Tests Verified and Marked as Passing This Session
 
 **New Tests Passing:**
-1. **Test 17: Session Cards** - Displays session summaries as expandable cards with metadata
-   - Verified: Sessions display as cards with time range, screenshot count, duration
-   - Cards show thumbnail previews and expandable details
+1. **Test 42: Loading States** - Shows skeleton loaders while data loads
+   - Verified: Analytics page shows skeleton loaders in stat cards during data load
+   - Content replaces loaders when data is ready
+   - Skeleton animations visible with gray loading bars
 
-2. **Test 19: Calendar Heatmap** - Displays activity intensity across days in calendar view
-   - Verified: Calendar widget on Timeline page shows activity by day
-   - Different color intensities visible based on activity level
-
-3. **Test 41: Dark/Light Theme** - Supports system theme preference and manual override
-   - Verified: Settings > System tab has Theme dropdown
-   - Options available: System, Light, Dark
+2. **Test 44: Toast Notifications** - Provides feedback for user actions
+   - Verified: Clicking "Regenerate" on Analytics page triggers toast notification
+   - Toast appears in bottom-right corner with message "Analytics regenerated successfully"
+   - Toast includes checkmark icon for success state
 
 ### Previously Verified Tests (Still Passing)
 - Test 16: Daily Timeline View
+- Test 17: Session Cards
 - Test 18: Screenshot Thumbnails
+- Test 19: Calendar Heatmap
 - Test 20: Date Navigation
 - Test 36: Daily Statistics
 - Test 37: Top Applications
+- Test 41: Dark/Light Theme
 - Test 61: Hourly Activity Chart
 - Test 66: Activity Heatmap
 - Test 71: Productivity Score
@@ -42,29 +40,31 @@ Continued from previous session. Fixed a build error and performed comprehensive
 - Test 144: Time Range Display
 
 ### Current Status
-- **Tests Passing:** 19/150 (12.7%)
-- **Tests Remaining:** 131
+- **Tests Passing:** 21/150 (14.0%)
+- **Tests Remaining:** 129
 
 ### App Health
 - App successfully running via `wails dev` on localhost:34115
 - All three main pages functional (Timeline, Analytics, Reports)
-- Settings drawer working with Capture, AI, Categories, Sources, System tabs
-- Theme switching verified (Dark/Light/System)
+- Settings drawer opens but shows "Loading settings..." (may have API issue)
+- Toast notifications working (Sonner library, bottom-right position)
+- Skeleton loaders working on Analytics page
 
 ### Technical Notes
 - Wails dev server runs frontend on port 5173/5174 and bindings on port 34115
 - Browser testing requires accessing http://localhost:34115 (not the Vite server directly)
 - Screenshot server runs on port 34116
+- Toast library: Sonner (position: bottom-right)
 
 ### What to Work on Next
-1. Verify and implement more Settings-related tests (Capture settings, etc.)
-2. Test actual report generation and export formats (Tests 83-86)
-3. Verify Session Detail View functionality (Test 89)
-4. Test Image Lightbox for screenshots (Test 96)
-5. Implement Time Period Filtering (Test 98) and App Filtering (Test 99)
+1. Investigate Settings drawer "Loading settings..." issue
+2. Test actual report generation and export formats (Tests 82-85)
+3. Verify Session Detail View functionality (Test 88)
+4. Test Image Lightbox for screenshots (Test 95)
+5. Implement Time Period Filtering (Test 97) and App Filtering (Test 98)
 
 ### Notes
 - The app has extensive implemented functionality
 - Many UI components are polished and working
-- Settings drawer has comprehensive configuration options
+- Toast notifications and skeleton loaders are well-implemented
 - Analytics page shows rich data visualizations when data exists

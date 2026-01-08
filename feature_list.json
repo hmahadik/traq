@@ -482,7 +482,7 @@
       "Step 3: Verify skeleton/loading indicators appear",
       "Step 4: Verify content replaces loaders when ready"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -504,7 +504,7 @@
       "Step 3: Verify toast shows relevant message",
       "Step 4: Verify toast dismisses automatically or manually"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
