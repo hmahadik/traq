@@ -1,42 +1,46 @@
 # Traq v2 Development Progress
 
-## Session: January 8, 2026 (Session 13)
+## Session: January 8, 2026 (Session 14)
 
 ### Summary
-Implemented two timeline features: Top Apps in Session (Test 145) and Data Source Indicators (Test 146). Session cards now display app badges showing top used applications and colored icons indicating available data sources.
+Implemented Date Range Selection feature (Test 148) for the Analytics page. Users can now select custom date ranges to filter analytics data, with a new DateRangePicker component and "Custom" view mode.
 
 ### Features Implemented This Session
 
-**Top Apps in Session (Test 145):**
-- Added AppBadge import to SessionCard component
-- Display up to 3 top apps as colored letter badges below session time
-- Shows "+N more" indicator when session has more than 3 apps
-- Apps shown with size="sm" and showName={false} for compact display
+**Date Range Selection (Test 148):**
+- Created new `DateRangePicker` component (`frontend/src/components/common/DateRangePicker.tsx`)
+  - Calendar-based date selection with start/end date picking
+  - Visual range highlighting
+  - Quick select buttons: "Last 7 days", "Last 14 days", "Last 30 days"
+  - Cancel/Apply buttons
+  - maxDate support to prevent selecting future dates
+- Added "Custom" view mode to Analytics page
+  - New tab in Day/Week/Month/Custom toggle
+  - Shows DateRangePicker button when Custom is selected
+  - Displays "Custom Date Range" summary card with days count and date range
+  - Filters App Usage and Data Sources data for selected range
+- Updated hooks imports to use `useAppUsageRange` and `useDataSourceStatsRange`
+- Exported DateRangePicker and DateRange type from common components
 
-**Data Source Indicators (Test 146):**
-- Added Terminal, GitBranch, FileText, Globe icons from lucide-react
-- Added TooltipProvider wrapper for data source icons
-- Display colored icons for each data source with tooltips:
-  - Shell commands: cyan terminal icon
-  - Git activity: orange git branch icon
-  - File events: green file icon
-  - Browser history: blue globe icon
-- Icons only shown if session has data for that source
+**Files Created:**
+1. `frontend/src/components/common/DateRangePicker.tsx` - New date range picker component
 
 **Files Modified:**
-1. `frontend/src/components/timeline/SessionCard.tsx`
-   - Added AppBadge import (line 9)
-   - Added Terminal, GitBranch, FileText, Globe icons (lines 20-23)
-   - Added TooltipProvider import (line 29)
-   - Added top apps display section (lines 106-127)
-   - Added data source indicators section with tooltips (lines 141-187)
+1. `frontend/src/components/common/index.ts` - Added DateRangePicker export
+2. `frontend/src/pages/AnalyticsPage.tsx`
+   - Added 'custom' to ViewMode type
+   - Added customRange state and timestamp calculations
+   - Added Custom tab trigger
+   - Added DateRangePicker for custom view
+   - Added custom range analytics content section
+   - Updated subtitle to show custom range when active
 
 ### Current Status
-- **Tests Passing:** 67/150 (44.7%)
-- **Tests Remaining:** 83
-- **New Tests Passing:** 2 (Tests 145, 146)
+- **Tests Passing:** 68/150 (45.3%)
+- **Tests Remaining:** 82
+- **New Tests Passing:** 1 (Test 148)
 
-### All Passing Tests (67 total)
+### All Passing Tests (68 total)
 - Test 16: Daily Timeline View
 - Test 17: Session Cards
 - Test 18: Screenshot Thumbnails
@@ -99,9 +103,10 @@ Implemented two timeline features: Top Apps in Session (Test 145) and Data Sourc
 - Test 142: Timeline Bands
 - Test 143: Session Duration Display
 - Test 144: Time Range Display
-- Test 145: Top Apps in Session (NEW)
-- Test 146: Data Source Indicators (NEW)
+- Test 145: Top Apps in Session
+- Test 146: Data Source Indicators
 - Test 147: Empty State Handling
+- Test 148: Date Range Selection (NEW)
 - Test 149: Quick Date Jumps
 - Test 150: Calendar Month Navigation
 
@@ -116,14 +121,16 @@ Implemented two timeline features: Top Apps in Session (Test 145) and Data Sourc
 - Static UI layout and styling
 - Navigation between pages
 - Component rendering
-- View toggles (Day/Week/Month)
+- View toggles (Day/Week/Month/Custom)
 - Keyboard navigation
 - Settings drawer UI elements
+- Date range picker UI
 
 ### What to Work on Next (Priority)
-1. Test 148: Date Range Selection - UI feature for custom date ranges
-2. Many remaining tests require backend functionality (capture, AFK detection, etc.)
-3. Tests requiring native Wails app:
+1. App Categorization (Tests 72-74) - Productivity tracking features
+2. Custom API Endpoints (Test 107) - AI configuration
+3. Many remaining tests require backend functionality (capture, AFK detection, etc.)
+4. Tests requiring native Wails app:
    - Screenshot capture tests (1-10)
    - AI summary generation tests (11-15)
    - System tray tests (46-50)

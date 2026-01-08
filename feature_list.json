@@ -1644,7 +1644,7 @@
       "Step 3: Select custom start and end dates",
       "Step 4: Verify data is filtered to selected range"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",

@@ -4,6 +4,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { DatePicker } from '@/components/common/DatePicker';
+import { DateRangePicker, type DateRange } from '@/components/common';
 import {
   StatsGrid,
   ActivityChart,
@@ -23,7 +24,9 @@ import {
   useDailyStats,
   useHourlyActivity,
   useAppUsage,
+  useAppUsageRange,
   useDataSourceStats,
+  useDataSourceStatsRange,
   useProductivityScore,
   useFocusDistribution,
   useActivityTags,
@@ -42,7 +45,7 @@ import {
 import { api } from '@/api/client';
 import { toast } from 'sonner';
 
-type ViewMode = 'day' | 'week' | 'month';
+type ViewMode = 'day' | 'week' | 'month' | 'custom';
 
 function getDateString(date: Date): string {
   return date.toISOString().split('T')[0];
@@ -67,9 +70,20 @@ export function AnalyticsPage() {
   const [viewMode, setViewMode] = useState<ViewMode>('day');
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [isRegenerating, setIsRegenerating] = useState(false);
+  // Custom date range state
+  const [customRange, setCustomRange] = useState<DateRange>(() => {
+    const end = new Date();
+    const start = new Date();
+    start.setDate(start.getDate() - 6); // Default to last 7 days
+    return { start, end };
+  });
   const dateStr = getDateString(selectedDate);
   const weekStartStr = getDateString(getWeekStart(selectedDate));
   const isToday = dateStr === getDateString(new Date());
+
+  // Calculate custom range timestamps
+  const customStartTs = Math.floor(customRange.start.setHours(0, 0, 0, 0) / 1000);
+  const customEndTs = Math.floor(customRange.end.setHours(23, 59, 59, 999) / 1000);
 
   // Day view data
   const { data: stats, isLoading: statsLoading } = useDailyStats(dateStr);
@@ -88,6 +102,10 @@ export function AnalyticsPage() {
   const year = selectedDate.getFullYear();
   const month = selectedDate.getMonth() + 1; // JavaScript months are 0-indexed
   const { data: monthlyStats, isLoading: monthlyStatsLoading } = useMonthlyStats(year, month);
+
+  // Custom range data
+  const { data: customAppUsage, isLoading: customAppUsageLoading } = useAppUsageRange(customStartTs, customEndTs);
+  const { data: customDataSourceStats, isLoading: customDataSourcesLoading } = useDataSourceStatsRange(customStartTs, customEndTs);
 
   const handlePrevDay = () => {
     setSelectedDate((d) => addDays(d, -1));
@@ -174,7 +192,11 @@ export function AnalyticsPage() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Analytics</h1>
-          <p className="text-muted-foreground">{formattedDate}</p>
+          <p className="text-muted-foreground">
+            {viewMode === 'custom'
+              ? `${customRange.start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${customRange.end.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`
+              : formattedDate}
+          </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           {/* View Mode Toggle */}
@@ -183,39 +205,53 @@ export function AnalyticsPage() {
               <TabsTrigger value="day" className="text-xs px-3">Day</TabsTrigger>
               <TabsTrigger value="week" className="text-xs px-3">Week</TabsTrigger>
               <TabsTrigger value="month" className="text-xs px-3">Month</TabsTrigger>
+              <TabsTrigger value="custom" className="text-xs px-3">Custom</TabsTrigger>
             </TabsList>
           </Tabs>
 
-          {/* Date Navigation */}
-          <Button variant="outline" size="icon" onClick={handlePrevDay}>
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          <DatePicker
-            value={selectedDate}
-            onChange={setSelectedDate}
-            trigger={
-              <Button variant="outline" className="gap-2">
-                <Calendar className="h-4 w-4" />
-                {isToday ? 'Today' : selectedDate.toLocaleDateString()}
+          {/* Date Navigation - show for non-custom views */}
+          {viewMode !== 'custom' && (
+            <>
+              <Button variant="outline" size="icon" onClick={handlePrevDay}>
+                <ChevronLeft className="h-4 w-4" />
               </Button>
-            }
-          />
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={handleNextDay}
-            disabled={isToday}
-          >
-            <ChevronRight className="h-4 w-4" />
-          </Button>
-          {!isToday && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setSelectedDate(new Date())}
-            >
-              Today
-            </Button>
+              <DatePicker
+                value={selectedDate}
+                onChange={setSelectedDate}
+                trigger={
+                  <Button variant="outline" className="gap-2">
+                    <Calendar className="h-4 w-4" />
+                    {isToday ? 'Today' : selectedDate.toLocaleDateString()}
+                  </Button>
+                }
+              />
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={handleNextDay}
+                disabled={isToday}
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+              {!isToday && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setSelectedDate(new Date())}
+                >
+                  Today
+                </Button>
+              )}
+            </>
+          )}
+
+          {/* Custom Date Range Picker - show for custom view */}
+          {viewMode === 'custom' && (
+            <DateRangePicker
+              value={customRange}
+              onChange={setCustomRange}
+              maxDate={new Date()}
+            />
           )}
 
           {/* Regenerate Button */}
@@ -319,6 +355,52 @@ export function AnalyticsPage() {
 
       {viewMode === 'month' && (
         <MonthlyAnalytics data={monthlyStats} isLoading={monthlyStatsLoading} />
+      )}
+
+      {viewMode === 'custom' && (
+        <>
+          {/* Custom Range Summary */}
+          <div className="p-4 border rounded-lg bg-muted/30">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="font-semibold">Custom Date Range</h3>
+                <p className="text-sm text-muted-foreground">
+                  {Math.ceil((customRange.end.getTime() - customRange.start.getTime()) / (1000 * 60 * 60 * 24)) + 1} days selected
+                </p>
+              </div>
+              <div className="text-right">
+                <p className="text-sm text-muted-foreground">
+                  {customRange.start.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+                  {' - '}
+                  {customRange.end.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Custom Range Analytics */}
+          <Tabs defaultValue="apps" className="space-y-4">
+            <TabsList>
+              <TabsTrigger value="apps">Applications</TabsTrigger>
+              <TabsTrigger value="sources">Data Sources</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="apps" className="space-y-4">
+              <div className="grid gap-4 lg:grid-cols-2">
+                <AppUsageChart data={customAppUsage} isLoading={customAppUsageLoading} />
+                <AppUsageTable
+                  data={customAppUsage}
+                  isLoading={customAppUsageLoading}
+                  onAppClick={handleAppClick}
+                />
+              </div>
+            </TabsContent>
+
+            <TabsContent value="sources" className="space-y-4">
+              <DataSourcesPanel data={customDataSourceStats} isLoading={customDataSourcesLoading} />
+            </TabsContent>
+          </Tabs>
+        </>
       )}
     </div>
   );

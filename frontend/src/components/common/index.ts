@@ -6,6 +6,8 @@ export { ConfidenceBadge } from './ConfidenceBadge';
 export { TimeDisplay, TimeRangeDisplay } from './TimeDisplay';
 export { ImageGallery } from './ImageGallery';
 export { DatePicker } from './DatePicker';
+export { DateRangePicker } from './DateRangePicker';
+export type { DateRange } from './DateRangePicker';
 export {
   ScreenshotSkeleton,
   SessionCardSkeleton,
