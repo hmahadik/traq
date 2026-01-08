@@ -38,17 +38,32 @@ Verified App Categorization/Productivity features (Tests 72-74) and implemented 
 - Active button is highlighted with default variant
 - Helper text shows approximate file sizes per preset
 
-### Current Status
-- **Tests Passing:** 73/150 (48.7%)
-- **Tests Remaining:** 77
-- **New Tests Passing:** 5 (Tests 72, 73, 74, 107, 111)
+**Settings Features Verified (Tests 2, 26-30, 132):**
+- Configurable Capture Interval (Test 2): Slider with 10-120s range
+- Enable/Disable Capture (Test 26): Toggle switch for capture
+- Quality Settings (Test 27): Quality slider + presets
+- Duplicate Threshold (Test 28): Slider for sensitivity (1-10)
+- AFK Timeout Configuration (Test 29): Slider for timeout (1-10 min)
+- Minimum Session Duration (Test 30): Slider for min duration (1-30 min)
+- Data Directory Location (Test 132): Shows path in System tab
 
-### All Passing Tests (73 total)
+### Current Status
+- **Tests Passing:** 80/150 (53.3%)
+- **Tests Remaining:** 70
+- **New Tests Passing:** 12 (Tests 2, 26-30, 72-74, 107, 111, 132)
+
+### All Passing Tests (80 total)
+- Test 2: Configurable Capture Interval (NEW)
 - Test 16: Daily Timeline View
 - Test 17: Session Cards
 - Test 18: Screenshot Thumbnails
 - Test 19: Calendar Heatmap
 - Test 20: Date Navigation
+- Test 26: Enable/Disable Capture (NEW)
+- Test 27: Quality Settings (NEW)
+- Test 28: Duplicate Threshold (NEW)
+- Test 29: AFK Timeout Configuration (NEW)
+- Test 30: Minimum Session Duration (NEW)
 - Test 36: Daily Statistics
 - Test 37: Top Applications
 - Test 41: Dark/Light Theme
@@ -102,6 +117,7 @@ Verified App Categorization/Productivity features (Tests 72-74) and implemented 
 - Test 111: Screenshot Quality Presets (NEW)
 - Test 119: Force Capture Button
 - Test 131: Storage Statistics
+- Test 132: Data Directory Location (NEW)
 - Test 133: Open Data Directory
 - Test 136: Lazy Image Loading
 - Test 138: Query Caching

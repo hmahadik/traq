@@ -20,7 +20,7 @@
       "Step 4: Verify setting persists after closing settings",
       "Step 5: Verify captures occur at new interval"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -286,7 +286,7 @@
       "Step 4: Re-enable capture",
       "Step 5: Verify screenshots resume"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -298,7 +298,7 @@
       "Step 4: Capture new screenshots",
       "Step 5: Verify file sizes change with quality setting"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -310,7 +310,7 @@
       "Step 4: Test with similar screenshots",
       "Step 5: Verify threshold affects duplicate detection behavior"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -322,7 +322,7 @@
       "Step 4: Go idle and measure time until AFK triggers",
       "Step 5: Verify AFK triggers at configured time"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -334,7 +334,7 @@
       "Step 4: Verify short session is not saved",
       "Step 5: Create session above minimum and verify it saves"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -1469,7 +1469,7 @@
       "Step 3: Verify current path is displayed",
       "Step 4: Test changing to a different location if supported"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
