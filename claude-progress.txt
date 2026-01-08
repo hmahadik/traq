@@ -1,55 +1,70 @@
 # Traq v2 Development Progress
 
-## Session: January 8, 2026
+## Session: January 8, 2026 (Session 2)
 
 ### Summary
-Started from a fresh context window with 0/150 tests passing. Performed comprehensive verification of the app's functionality across Timeline, Analytics, and Reports pages. Marked 16 tests as passing.
+Continued from previous session. Fixed a build error and performed comprehensive verification of the app's functionality. Verified and marked 3 additional tests as passing (Tests 17, 19, 41).
 
-### Tests Verified and Marked as Passing
+### Build Fix
+- Fixed unused imports in `internal/service/config.go` (removed unused `os` and `path/filepath` imports)
 
-**Timeline Tests:**
-1. **Test 16: Daily Timeline View** - Shows all sessions in chronological order ✓
-2. **Test 18: Screenshot Thumbnails** - Small previews within session cards ✓
-3. **Test 20: Date Navigation** - Prev/next/calendar/today buttons work ✓
-4. **Test 143: Session Duration Display** - Human-readable format (e.g., "2m 29s") ✓
-5. **Test 144: Time Range Display** - Shows start/end times (e.g., "07:42 PM - 07:45 PM") ✓
+### Tests Verified and Marked as Passing This Session
 
-**Analytics Tests:**
-6. **Test 36: Daily Statistics** - Screenshots, sessions, active time per day ✓
-7. **Test 37: Top Applications** - Most-used apps with time spent ✓
-8. **Test 61: Hourly Activity Chart** - 24-hour activity distribution ✓
-9. **Test 66: Activity Heatmap** - 7x24 grid with color intensity ✓
-10. **Test 71: Productivity Score** - 1-5 scale rating with time breakdown ✓
+**New Tests Passing:**
+1. **Test 17: Session Cards** - Displays session summaries as expandable cards with metadata
+   - Verified: Sessions display as cards with time range, screenshot count, duration
+   - Cards show thumbnail previews and expandable details
 
-**Reports Tests:**
-11. **Test 79: Natural Language Date Parsing** - "today", "yesterday", "last week" ✓
-12. **Test 80: Summary Report Type** - High-level overview option ✓
-13. **Test 81: Detailed Report Type** - Comprehensive metrics option ✓
-14. **Test 82: Standup Report Type** - Team standup format ✓
-15. **Test 88: Quick Report Presets** - One-click generation buttons ✓
+2. **Test 19: Calendar Heatmap** - Displays activity intensity across days in calendar view
+   - Verified: Calendar widget on Timeline page shows activity by day
+   - Different color intensities visible based on activity level
 
-**Capture Tests:**
-16. **Test 119: Force Capture Button** - Camera icon in header ✓
+3. **Test 41: Dark/Light Theme** - Supports system theme preference and manual override
+   - Verified: Settings > System tab has Theme dropdown
+   - Options available: System, Light, Dark
+
+### Previously Verified Tests (Still Passing)
+- Test 16: Daily Timeline View
+- Test 18: Screenshot Thumbnails
+- Test 20: Date Navigation
+- Test 36: Daily Statistics
+- Test 37: Top Applications
+- Test 61: Hourly Activity Chart
+- Test 66: Activity Heatmap
+- Test 71: Productivity Score
+- Test 79: Natural Language Date Parsing
+- Test 80: Summary Report Type
+- Test 81: Detailed Report Type
+- Test 82: Standup Report Type
+- Test 88: Quick Report Presets
+- Test 119: Force Capture Button
+- Test 143: Session Duration Display
+- Test 144: Time Range Display
 
 ### Current Status
-- **Tests Passing:** 16/150 (10.7%)
-- **Tests Remaining:** 134
+- **Tests Passing:** 19/150 (12.7%)
+- **Tests Remaining:** 131
 
 ### App Health
-- App is running on localhost:34115
-- All three main pages fully functional (Timeline, Analytics, Reports)
-- Settings drawer working with multiple tabs
-- Date navigation working
-- Report generation UI complete
+- App successfully running via `wails dev` on localhost:34115
+- All three main pages functional (Timeline, Analytics, Reports)
+- Settings drawer working with Capture, AI, Categories, Sources, System tabs
+- Theme switching verified (Dark/Light/System)
+
+### Technical Notes
+- Wails dev server runs frontend on port 5173/5174 and bindings on port 34115
+- Browser testing requires accessing http://localhost:34115 (not the Vite server directly)
+- Screenshot server runs on port 34116
 
 ### What to Work on Next
-1. Verify Settings persistence and configuration options
-2. Test actual report generation and export formats
-3. Verify capture functionality with daemon running
-4. Test session detail views and screenshot galleries
+1. Verify and implement more Settings-related tests (Capture settings, etc.)
+2. Test actual report generation and export formats (Tests 83-86)
+3. Verify Session Detail View functionality (Test 89)
+4. Test Image Lightbox for screenshots (Test 96)
+5. Implement Time Period Filtering (Test 98) and App Filtering (Test 99)
 
 ### Notes
 - The app has extensive implemented functionality
 - Many UI components are polished and working
-- Reports page has full feature set including Quick Presets
-- Analytics has comprehensive charts and statistics
+- Settings drawer has comprehensive configuration options
+- Analytics page shows rich data visualizations when data exists

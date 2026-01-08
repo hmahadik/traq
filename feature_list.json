@@ -185,7 +185,7 @@
       "Step 3: Verify cards show summary, time, and metadata",
       "Step 4: Click to expand card and verify additional details appear"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "style",
@@ -207,7 +207,7 @@
       "Step 3: Verify days with more activity show darker/different colors",
       "Step 4: Verify color intensity correlates with activity level"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -460,7 +460,7 @@
       "Step 4: Verify UI updates accordingly",
       "Step 5: Verify system theme option works"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "style",
