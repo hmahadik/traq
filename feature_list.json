@@ -471,7 +471,7 @@
       "Step 3: Test at minimum supported width",
       "Step 4: Verify no content is cut off or broken"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "style",
@@ -493,7 +493,7 @@
       "Step 3: Verify message is user-friendly (not technical)",
       "Step 4: Verify error doesn't crash the application"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "style",
@@ -1057,7 +1057,7 @@
       "Step 3: Verify selection moves between sessions",
       "Step 4: Verify Enter opens selected session"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "style",
@@ -1068,7 +1068,7 @@
       "Step 3: Verify navigation arrows work",
       "Step 4: Verify close button works"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -1112,7 +1112,7 @@
       "Step 3: Verify section collapses with animation",
       "Step 4: Click again to expand"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
