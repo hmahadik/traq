@@ -225,6 +225,65 @@ export function sleep(ms: number): Promise<void> {
 }
 
 /**
+ * SQL Nullable Type Helpers
+ * Go's database/sql package serializes nullable types as objects:
+ * - sql.NullString -> { String: string, Valid: boolean }
+ * - sql.NullInt64 -> { Int64: number, Valid: boolean }
+ * - sql.NullFloat64 -> { Float64: number, Valid: boolean }
+ * These helpers extract the actual value or return a default.
+ */
+
+interface SqlNullString {
+  String: string;
+  Valid: boolean;
+}
+
+interface SqlNullInt64 {
+  Int64: number;
+  Valid: boolean;
+}
+
+interface SqlNullFloat64 {
+  Float64: number;
+  Valid: boolean;
+}
+
+export function getNullableString(value: string | SqlNullString | null | undefined, defaultValue: string = ''): string {
+  if (value === null || value === undefined) return defaultValue;
+  if (typeof value === 'string') return value;
+  if (typeof value === 'object' && 'Valid' in value) {
+    return value.Valid ? value.String : defaultValue;
+  }
+  return defaultValue;
+}
+
+export function getNullableInt(value: number | SqlNullInt64 | null | undefined, defaultValue: number = 0): number {
+  if (value === null || value === undefined) return defaultValue;
+  if (typeof value === 'number') return value;
+  if (typeof value === 'object' && 'Valid' in value) {
+    return value.Valid ? value.Int64 : defaultValue;
+  }
+  return defaultValue;
+}
+
+export function getNullableFloat(value: number | SqlNullFloat64 | null | undefined, defaultValue: number = 0): number {
+  if (value === null || value === undefined) return defaultValue;
+  if (typeof value === 'number') return value;
+  if (typeof value === 'object' && 'Valid' in value) {
+    return value.Valid ? value.Float64 : defaultValue;
+  }
+  return defaultValue;
+}
+
+export function isNullableValid(value: unknown): boolean {
+  if (value === null || value === undefined) return false;
+  if (typeof value === 'object' && 'Valid' in (value as Record<string, unknown>)) {
+    return (value as { Valid: boolean }).Valid;
+  }
+  return true;
+}
+
+/**
  * Parse a natural language time range
  * Returns [start, end] as Unix timestamps
  */

@@ -7,7 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useSessionContext, useRegenerateSummary, useDeleteSession } from '@/api/hooks';
-import { formatTimeRange, formatDuration, formatTimestamp } from '@/lib/utils';
+import { formatTimeRange, formatDuration, formatTimestamp, getNullableInt, getNullableString, isNullableValid } from '@/lib/utils';
 import { Terminal, GitCommit, FileText, Globe, ArrowLeft, RefreshCw, Trash2 } from 'lucide-react';
 import { Screenshot } from '@/components/common/Screenshot';
 import { ActivityLogTable } from '@/components/session/ActivityLogTable';
@@ -88,13 +88,13 @@ export function SessionDetailPage() {
               Session {session.id}
             </h1>
             <p className="text-muted-foreground">
-              {formatTimeRange(session.startTime, session.endTime?.Int64 ?? session.startTime)} ({formatDuration(session.durationSeconds?.Int64 ?? 0)})
+              {formatTimeRange(session.startTime, getNullableInt(session.endTime, session.startTime))} ({formatDuration(getNullableInt(session.durationSeconds, 0))})
             </p>
           </div>
           <div className="flex gap-2 items-center">
-            {summary?.confidence?.Valid && (
-              <Badge variant={summary.confidence.String === 'high' ? 'default' : 'secondary'}>
-                {summary.confidence.String} confidence
+            {isNullableValid(summary?.confidence) && (
+              <Badge variant={getNullableString(summary?.confidence) === 'high' ? 'default' : 'secondary'}>
+                {getNullableString(summary?.confidence)} confidence
               </Badge>
             )}
             {summary && (
@@ -141,14 +141,14 @@ export function SessionDetailPage() {
           </Card>
 
           {/* Model Explanation Section - Test #22 */}
-          {summary.explanation?.Valid && (
+          {isNullableValid(summary.explanation) && (
             <CollapsibleSection title="Model Explanation" defaultOpen={false}>
               <div className="space-y-2">
                 <p className="text-sm text-muted-foreground">
                   This section shows how the AI model analyzed the session and arrived at the summary above.
                 </p>
                 <div className="p-4 bg-muted/30 rounded-md">
-                  <p className="text-sm leading-relaxed whitespace-pre-wrap">{summary.explanation.String}</p>
+                  <p className="text-sm leading-relaxed whitespace-pre-wrap">{getNullableString(summary.explanation)}</p>
                 </div>
               </div>
             </CollapsibleSection>
@@ -163,7 +163,7 @@ export function SessionDetailPage() {
               </div>
               <div>
                 <p className="text-muted-foreground">Inference Time</p>
-                <p className="font-mono">{summary.inferenceTimeMs?.Valid ? `${summary.inferenceTimeMs.Int64}ms` : 'N/A'}</p>
+                <p className="font-mono">{isNullableValid(summary.inferenceTimeMs) ? `${getNullableInt(summary.inferenceTimeMs)}ms` : 'N/A'}</p>
               </div>
               <div>
                 <p className="text-muted-foreground">Generated At</p>
@@ -205,8 +205,8 @@ export function SessionDetailPage() {
               <div>
                 <h4 className="text-sm font-semibold mb-2">Request Context</h4>
                 <pre className="p-4 bg-muted/30 rounded-md overflow-x-auto text-xs font-mono">
-                  {summary.contextJson?.Valid && summary.contextJson.String
-                    ? JSON.stringify(JSON.parse(summary.contextJson.String), null, 2)
+                  {isNullableValid(summary.contextJson) && getNullableString(summary.contextJson)
+                    ? JSON.stringify(JSON.parse(getNullableString(summary.contextJson)), null, 2)
                     : '{}'}
                 </pre>
               </div>
@@ -220,7 +220,7 @@ export function SessionDetailPage() {
                   </div>
                   <div className="flex justify-between p-2 bg-muted/20 rounded">
                     <span className="text-muted-foreground">Session ID:</span>
-                    <span className="font-mono">{summary.sessionId?.Int64 ?? 'N/A'}</span>
+                    <span className="font-mono">{isNullableValid(summary.sessionId) ? getNullableInt(summary.sessionId) : 'N/A'}</span>
                   </div>
                 </div>
               </div>
@@ -245,11 +245,11 @@ export function SessionDetailPage() {
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Inference Time:</span>
-                    <span className="font-mono">{summary.inferenceTimeMs?.Valid ? `${summary.inferenceTimeMs.Int64}ms` : 'N/A'}</span>
+                    <span className="font-mono">{isNullableValid(summary.inferenceTimeMs) ? `${getNullableInt(summary.inferenceTimeMs)}ms` : 'N/A'}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Session:</span>
-                    <span className="font-mono">#{summary.sessionId?.Int64 ?? 'N/A'}</span>
+                    <span className="font-mono">#{isNullableValid(summary.sessionId) ? getNullableInt(summary.sessionId) : 'N/A'}</span>
                   </div>
                 </div>
                 <div className="mt-4 pt-4 border-t border-border/50">
@@ -308,7 +308,7 @@ export function SessionDetailPage() {
                   <Terminal className="h-4 w-4 text-muted-foreground" />
                   <div className="flex-1">
                     <code className="text-sm">{cmd.command}</code>
-                    <p className="text-xs text-muted-foreground">{cmd.workingDirectory?.String || ''}</p>
+                    <p className="text-xs text-muted-foreground">{getNullableString(cmd.workingDirectory)}</p>
                   </div>
                   <p className="text-sm text-muted-foreground">
                     {formatTimestamp(cmd.timestamp)}
@@ -328,8 +328,8 @@ export function SessionDetailPage() {
                     </p>
                   </div>
                   <div className="text-xs text-muted-foreground text-right">
-                    <span className="text-green-500">+{commit.insertions?.Int64 ?? 0}</span>{' '}
-                    <span className="text-red-500">-{commit.deletions?.Int64 ?? 0}</span>
+                    <span className="text-green-500">+{getNullableInt(commit.insertions, 0)}</span>{' '}
+                    <span className="text-red-500">-{getNullableInt(commit.deletions, 0)}</span>
                   </div>
                 </div>
               ))}
@@ -355,7 +355,7 @@ export function SessionDetailPage() {
                 <div key={visit.id} className="flex items-center gap-3 p-2 rounded-lg border">
                   <Globe className="h-4 w-4 text-muted-foreground" />
                   <div className="flex-1">
-                    <p className="font-medium text-sm truncate">{visit.title?.String || visit.url}</p>
+                    <p className="font-medium text-sm truncate">{getNullableString(visit.title, visit.url)}</p>
                     <p className="text-xs text-muted-foreground">{visit.domain}</p>
                   </div>
                   <p className="text-sm text-muted-foreground">

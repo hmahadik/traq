@@ -1633,7 +1633,7 @@
       "Step 3: Verify friendly message is shown",
       "Step 4: Verify helpful action is suggested"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -1666,6 +1666,6 @@
       "Step 3: Click previous/next month buttons",
       "Step 4: Verify calendar navigates correctly"
     ],
-    "passes": false
+    "passes": true
   }
 ]

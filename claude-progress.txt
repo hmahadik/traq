@@ -1,42 +1,36 @@
 # Traq v2 Development Progress
 
-## Session: January 8, 2026 (Session 6)
+## Session: January 8, 2026 (Session 7)
 
 ### Summary
-Verified and marked additional tests as passing through code review and browser testing.
-Timeline data loads correctly in browser and keyboard navigation works.
-Marked 4 additional tests as passing (Tests 42, 44, 95, 96).
+Fixed critical React error in SessionDetailPage and verified additional UI tests.
+Added utility functions to handle Go SQL nullable types properly in TypeScript.
+Marked 2 additional tests as passing.
+
+### Bug Fixes This Session
+1. **SessionDetailPage React Error** - Fixed "Objects are not valid as a React child"
+   - Root cause: Go's `sql.NullString` and `sql.NullInt64` serialize to JSON as objects `{String: value, Valid: bool}`
+   - Added utility functions in `lib/utils.ts`: `getNullableString()`, `getNullableInt()`, `isNullableValid()`
+   - Updated SessionDetailPage.tsx to use these helpers for all nullable fields
+   - Updated Screenshot.tsx and AppBadge.tsx to handle nullable appName/windowTitle
+   - Page now shows skeleton loaders in browser mode instead of crashing
 
 ### Tests Verified This Session
-1. **Test 42: Responsive Layout** - Verified via code review
-   - Tailwind breakpoints properly implemented (`hidden xl:block`, `md:grid-cols-2`, etc.)
-   - Stats sidebar hides at screens < 1280px
-   - Grids adapt columns based on screen size
+1. **Test 147: Empty State Handling** - Verified in browser
+   - Navigate to a date with no data (e.g., January 4, 2026)
+   - Shows "No sessions recorded" with context message
+   - Clean UI with proper icon
 
-2. **Test 44: Error Handling** - Verified via code review
-   - Toast-based error handling throughout app using sonner
-   - `toast.error()` for failures, `toast.success()` for success
-   - User-friendly messages, not technical jargon
-   - Toaster configured in AppLayout at bottom-right
-
-3. **Test 95: Keyboard Navigation** - Verified in browser
-   - j/ArrowDown moves selection down
-   - k/ArrowUp moves selection up
-   - Home/g goes to first, End/G goes to last
-   - Enter selects current item
-   - Keyboard hint shown at bottom of timeline
-
-4. **Test 96: Image Lightbox** - Verified via code review
-   - ImageGallery component fully implemented
-   - Supports keyboard navigation (arrows, Escape)
-   - Zoom in/out functionality
-   - Thumbnail strip navigation
-   - Used in DayPage (accessible via /day/:date)
+2. **Test 150: Calendar Month Navigation** - Verified in browser
+   - Previous month (<) button works
+   - Next month (>) button works
+   - Calendar displays correct month after navigation
 
 ### Current Status
-- **Tests Passing:** 28/150 (18.7%)
-- **Tests Remaining:** 122
-- **New Tests Verified This Session:** 4
+- **Tests Passing:** 30/150 (20%)
+- **Tests Remaining:** 120
+- **New Tests Verified This Session:** 2
+- **Bug Fixes:** 1 (SessionDetailPage SQL nullable types)
 
 ### Previously Verified Tests (Still Passing)
 - Test 16: Daily Timeline View
@@ -47,9 +41,9 @@ Marked 4 additional tests as passing (Tests 42, 44, 95, 96).
 - Test 36: Daily Statistics
 - Test 37: Top Applications
 - Test 41: Dark/Light Theme
-- Test 42: Responsive Layout (NEW)
+- Test 42: Responsive Layout
 - Test 43: Loading States
-- Test 44: Error Handling (NEW)
+- Test 44: Error Handling
 - Test 45: Toast Notifications
 - Test 61: Hourly Activity Chart
 - Test 66: Activity Heatmap
@@ -59,14 +53,16 @@ Marked 4 additional tests as passing (Tests 42, 44, 95, 96).
 - Test 81: Detailed Report Type
 - Test 82: Standup Report Type
 - Test 88: Quick Report Presets
-- Test 95: Keyboard Navigation (NEW)
-- Test 96: Image Lightbox (NEW)
+- Test 95: Keyboard Navigation
+- Test 96: Image Lightbox
 - Test 98: Time Period Filtering
 - Test 99: App Filtering
 - Test 100: Collapsible Sections
 - Test 119: Force Capture Button
 - Test 143: Session Duration Display
 - Test 144: Time Range Display
+- Test 147: Empty State Handling (NEW)
+- Test 150: Calendar Month Navigation (NEW)
 
 ### Browser Testing Limitations (Important for Future Sessions)
 **Browser automation cannot fully test Wails apps:**
@@ -80,27 +76,39 @@ Marked 4 additional tests as passing (Tests 42, 44, 95, 96).
 - Navigation between pages
 - Component rendering
 - Keyboard navigation (j/k works)
+- Empty state handling
+- Calendar navigation
 - Code review for implementation verification
 
 **What CANNOT be tested in browser:**
-- SessionDetailPage data loading
+- SessionDetailPage data loading (requires Wails IPC)
 - Screenshot image loading in DayPage
 - Configuration persistence
 - File operations
+
+### Code Changes This Session
+1. `frontend/src/lib/utils.ts` - Added SQL nullable type helpers
+2. `frontend/src/pages/SessionDetailPage.tsx` - Fixed nullable field rendering
+3. `frontend/src/components/common/Screenshot.tsx` - Fixed nullable appName/windowTitle
+4. `frontend/src/components/common/AppBadge.tsx` - Handle nullable appName object
+5. `feature_list.json` - Marked tests 147 and 150 as passing
 
 ### App Health
 - App running via `wails dev` on localhost:34115
 - Timeline shows real session data with thumbnails
 - Keyboard navigation working
 - No console errors during testing
+- SessionDetailPage no longer crashes (shows skeleton loaders in browser mode)
 
 ### What to Work on Next (Priority)
 1. Continue verifying more UI-focused tests
 2. Mark tests as passing that can be verified via code review
 3. Consider implementing missing features for failing tests
+4. Test 149 (Quick Date Jumps) - needs "this week" button implementation
 
 ### Technical Notes
 - Database location: `~/.local/share/traq/data.db`
-- Sessions 33-37 exist in database
+- Sessions exist with data on January 5-8, 2026
+- January 4, 2026 has no data (good for empty state testing)
 - Wails dev server: frontend port 5173, bindings port 34115
 - Screenshot server: port 34116

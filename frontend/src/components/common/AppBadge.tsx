@@ -28,7 +28,11 @@ export function AppBadge({
   showName = true,
   className,
 }: AppBadgeProps) {
-  const name = appName || 'Unknown';
+  // Handle both string and SQL nullable object formats
+  const rawName = typeof appName === 'object' && appName !== null
+    ? (appName as { String?: string; Valid?: boolean })?.String
+    : appName;
+  const name = rawName || 'Unknown';
   const color = APP_COLORS[name] || APP_COLORS.default;
 
   const sizeClasses = {

@@ -51,21 +51,21 @@ export function Screenshot({
     >
       <img
         src={imageUrl}
-        alt={screenshot.windowTitle || 'Screenshot'}
+        alt={typeof screenshot.windowTitle === 'object' ? (screenshot.windowTitle?.String || 'Screenshot') : (screenshot.windowTitle || 'Screenshot')}
         className="w-full h-full object-cover"
         loading="lazy"
       />
       {showOverlay && (
         <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent p-2 opacity-0 group-hover:opacity-100 transition-opacity">
           <div className="flex items-center justify-between">
-            <AppBadge appName={screenshot.appName} size="sm" />
+            <AppBadge appName={typeof screenshot.appName === 'object' ? screenshot.appName?.String : screenshot.appName} size="sm" />
             <span className="text-xs text-white/80">
               {formatTimestamp(screenshot.timestamp)}
             </span>
           </div>
-          {screenshot.windowTitle && (
+          {(typeof screenshot.windowTitle === 'object' ? screenshot.windowTitle?.Valid : screenshot.windowTitle) && (
             <p className="text-xs text-white/70 truncate mt-1">
-              {screenshot.windowTitle}
+              {typeof screenshot.windowTitle === 'object' ? screenshot.windowTitle?.String : screenshot.windowTitle}
             </p>
           )}
         </div>
