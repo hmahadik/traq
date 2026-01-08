@@ -803,7 +803,7 @@
       "Step 3: Verify apps are categorized",
       "Step 4: Verify categories can be customized"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -814,7 +814,7 @@
       "Step 3: Locate productive time metric",
       "Step 4: Verify time matches actual usage"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -825,7 +825,7 @@
       "Step 3: Locate distraction time metric",
       "Step 4: Verify time matches actual usage"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",

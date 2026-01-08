@@ -1,46 +1,35 @@
 # Traq v2 Development Progress
 
-## Session: January 8, 2026 (Session 14)
+## Session: January 8, 2026 (Session 15)
 
 ### Summary
-Implemented Date Range Selection feature (Test 148) for the Analytics page. Users can now select custom date ranges to filter analytics data, with a new DateRangePicker component and "Custom" view mode.
+Verified and marked App Categorization and Productivity Time Tracking features (Tests 72-74) as passing. These features were already fully implemented in previous sessions.
 
-### Features Implemented This Session
+### Features Verified This Session
 
-**Date Range Selection (Test 148):**
-- Created new `DateRangePicker` component (`frontend/src/components/common/DateRangePicker.tsx`)
-  - Calendar-based date selection with start/end date picking
-  - Visual range highlighting
-  - Quick select buttons: "Last 7 days", "Last 14 days", "Last 30 days"
-  - Cancel/Apply buttons
-  - maxDate support to prevent selecting future dates
-- Added "Custom" view mode to Analytics page
-  - New tab in Day/Week/Month/Custom toggle
-  - Shows DateRangePicker button when Custom is selected
-  - Displays "Custom Date Range" summary card with days count and date range
-  - Filters App Usage and Data Sources data for selected range
-- Updated hooks imports to use `useAppUsageRange` and `useDataSourceStatsRange`
-- Exported DateRangePicker and DateRange type from common components
+**App Categorization (Test 72):**
+- `CategoriesTab.tsx` provides UI for viewing/editing app categories in Settings
+- Shows stats grid with counts for Productive/Neutral/Distracting/Uncategorized apps
+- Search functionality for filtering apps
+- Dropdown selector to change category for each app
+- Backend `GetAllApps()` and `SaveAppCategory()` handle persistence
 
-**Files Created:**
-1. `frontend/src/components/common/DateRangePicker.tsx` - New date range picker component
+**Productive Time Tracking (Test 73):**
+- `ProductivityScoreCard.tsx` displays productive time with green styling
+- Shows `productiveMinutes` formatted as hours/minutes
+- Backend `GetProductivityScore()` calculates from focus events using app categories
 
-**Files Modified:**
-1. `frontend/src/components/common/index.ts` - Added DateRangePicker export
-2. `frontend/src/pages/AnalyticsPage.tsx`
-   - Added 'custom' to ViewMode type
-   - Added customRange state and timestamp calculations
-   - Added Custom tab trigger
-   - Added DateRangePicker for custom view
-   - Added custom range analytics content section
-   - Updated subtitle to show custom range when active
+**Distraction Time Tracking (Test 74):**
+- `ProductivityScoreCard.tsx` displays distracting time with red styling
+- Shows `distractingMinutes` formatted as hours/minutes
+- Backend uses `categorizeApp()` which checks user-defined categories first, then falls back to defaults
 
 ### Current Status
-- **Tests Passing:** 68/150 (45.3%)
-- **Tests Remaining:** 82
-- **New Tests Passing:** 1 (Test 148)
+- **Tests Passing:** 71/150 (47.3%)
+- **Tests Remaining:** 79
+- **New Tests Passing:** 3 (Tests 72, 73, 74)
 
-### All Passing Tests (68 total)
+### All Passing Tests (71 total)
 - Test 16: Daily Timeline View
 - Test 17: Session Cards
 - Test 18: Screenshot Thumbnails
@@ -60,6 +49,9 @@ Implemented Date Range Selection feature (Test 148) for the Analytics page. User
 - Test 65: App Usage Table
 - Test 66: Activity Heatmap
 - Test 71: Productivity Score
+- Test 72: App Categorization (NEW)
+- Test 73: Productive Time Tracking (NEW)
+- Test 74: Distraction Time Tracking (NEW)
 - Test 75: Focus Distribution
 - Test 76: Top Windows Analysis
 - Test 77: Time Distribution Chart
@@ -106,7 +98,7 @@ Implemented Date Range Selection feature (Test 148) for the Analytics page. User
 - Test 145: Top Apps in Session
 - Test 146: Data Source Indicators
 - Test 147: Empty State Handling
-- Test 148: Date Range Selection (NEW)
+- Test 148: Date Range Selection
 - Test 149: Quick Date Jumps
 - Test 150: Calendar Month Navigation
 
@@ -127,8 +119,8 @@ Implemented Date Range Selection feature (Test 148) for the Analytics page. User
 - Date range picker UI
 
 ### What to Work on Next (Priority)
-1. App Categorization (Tests 72-74) - Productivity tracking features
-2. Custom API Endpoints (Test 107) - AI configuration
+1. Custom API Endpoints (Test 107) - AI configuration
+2. Screenshot Quality Presets (Test 111) - Capture settings
 3. Many remaining tests require backend functionality (capture, AFK detection, etc.)
 4. Tests requiring native Wails app:
    - Screenshot capture tests (1-10)
