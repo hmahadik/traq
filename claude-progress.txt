@@ -14,12 +14,15 @@ All features were already implemented in SettingsDrawer.tsx - just needed verifi
 3. **Test 103: Model Selection** - Bundled model selection dropdown implemented (SettingsDrawer.tsx lines 177-225)
 4. **Test 108: API Key Management** - API key input with password type for secure entry (SettingsDrawer.tsx lines 290-304)
 
-### Current Status
-- **Tests Passing:** 63/150 (42.0%)
-- **Tests Remaining:** 87
-- **New Tests Passing This Session:** 4
+**Caching Feature (Test 139):**
+5. **Test 139: Background Refresh** - refetchInterval: 30_000 in hooks.ts provides background refresh for inference status
 
-### All Passing Tests (63 total)
+### Current Status
+- **Tests Passing:** 64/150 (42.7%)
+- **Tests Remaining:** 86
+- **New Tests Passing This Session:** 5
+
+### All Passing Tests (64 total)
 - Test 16: Daily Timeline View
 - Test 17: Session Cards
 - Test 18: Screenshot Thumbnails
@@ -75,6 +78,7 @@ All features were already implemented in SettingsDrawer.tsx - just needed verifi
 - Test 133: Open Data Directory
 - Test 136: Lazy Image Loading
 - Test 138: Query Caching
+- Test 139: Background Refresh (NEW)
 - Test 140: Stale Time Configuration
 - Test 141: Hour Groups
 - Test 142: Timeline Bands
