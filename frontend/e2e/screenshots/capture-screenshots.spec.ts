@@ -14,7 +14,10 @@ import { test } from '@playwright/test';
 import { BasePage } from '../pages/base.page';
 import { SettingsDrawer } from '../pages/settings-drawer';
 import path from 'path';
+import { fileURLToPath } from 'url';
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 const SCREENSHOT_DIR = path.join(__dirname, '../../../docs/public/screenshots');
 
 // Screenshot configurations
