@@ -924,7 +924,7 @@
       "Step 3: Download/save the file",
       "Step 4: Verify file is valid Markdown"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -935,7 +935,7 @@
       "Step 3: Download/save the file",
       "Step 4: Verify file is valid HTML with styling"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -946,7 +946,7 @@
       "Step 3: Download/save the file",
       "Step 4: Verify file is valid PDF"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -957,7 +957,7 @@
       "Step 3: Download/save the file",
       "Step 4: Verify file is valid JSON with expected structure"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -968,7 +968,7 @@
       "Step 3: Verify previous reports are listed",
       "Step 4: Verify reports can be viewed/deleted"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -990,7 +990,7 @@
       "Step 3: Verify dedicated detail page opens",
       "Step 4: Verify all session information is displayed"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "style",
@@ -1001,7 +1001,7 @@
       "Step 3: Verify all session screenshots are displayed",
       "Step 4: Verify gallery is navigable"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -1012,7 +1012,7 @@
       "Step 3: Verify focus events are listed chronologically",
       "Step 4: Verify timestamps and durations are shown"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -1023,7 +1023,7 @@
       "Step 3: Verify shell commands are shown if any",
       "Step 4: Verify git commits and file changes are shown"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -1035,7 +1035,7 @@
       "Step 4: Verify session is removed from timeline",
       "Step 5: Verify associated screenshots are deleted"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -1079,7 +1079,7 @@
       "Step 3: Select a tag to filter by",
       "Step 4: Verify only sessions with that tag are shown"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
