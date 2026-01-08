@@ -1,37 +1,42 @@
 # Traq v2 Development Progress
 
-## Session: January 8, 2026 (Session 12)
+## Session: January 8, 2026 (Session 13)
 
 ### Summary
-Implemented Screenshot Deletion feature (Test 94) - users can now delete individual screenshots from a session.
+Implemented two timeline features: Top Apps in Session (Test 145) and Data Source Indicators (Test 146). Session cards now display app badges showing top used applications and colored icons indicating available data sources.
 
-### Feature Implemented This Session
+### Features Implemented This Session
 
-**Screenshot Deletion (Test 94):**
-- Added `onDelete` and `isDeleting` props to Screenshot component
-- Added red trash icon button that appears on hover over screenshots
-- Button is positioned in top-right corner with proper z-index
-- Clicking the button triggers the delete handler
-- Loading state shown while deletion is in progress
+**Top Apps in Session (Test 145):**
+- Added AppBadge import to SessionCard component
+- Display up to 3 top apps as colored letter badges below session time
+- Shows "+N more" indicator when session has more than 3 apps
+- Apps shown with size="sm" and showName={false} for compact display
+
+**Data Source Indicators (Test 146):**
+- Added Terminal, GitBranch, FileText, Globe icons from lucide-react
+- Added TooltipProvider wrapper for data source icons
+- Display colored icons for each data source with tooltips:
+  - Shell commands: cyan terminal icon
+  - Git activity: orange git branch icon
+  - File events: green file icon
+  - Browser history: blue globe icon
+- Icons only shown if session has data for that source
 
 **Files Modified:**
-1. `frontend/src/components/common/Screenshot.tsx`
-   - Added Button and Trash2 icon imports
-   - Added onDelete and isDeleting props to interface
-   - Added delete button that shows on hover (lines 79-92)
-
-2. `frontend/src/pages/SessionDetailPage.tsx`
-   - Added useDeleteScreenshot hook import
-   - Added deletingScreenshotId state
-   - Added handleDeleteScreenshot function (lines 51-63)
-   - Passed onDelete and isDeleting props to Screenshot components (lines 296-297)
+1. `frontend/src/components/timeline/SessionCard.tsx`
+   - Added AppBadge import (line 9)
+   - Added Terminal, GitBranch, FileText, Globe icons (lines 20-23)
+   - Added TooltipProvider import (line 29)
+   - Added top apps display section (lines 106-127)
+   - Added data source indicators section with tooltips (lines 141-187)
 
 ### Current Status
-- **Tests Passing:** 65/150 (43.3%)
-- **Tests Remaining:** 85
-- **New Tests Passing:** 1 (Test 94)
+- **Tests Passing:** 67/150 (44.7%)
+- **Tests Remaining:** 83
+- **New Tests Passing:** 2 (Tests 145, 146)
 
-### All Passing Tests (65 total)
+### All Passing Tests (67 total)
 - Test 16: Daily Timeline View
 - Test 17: Session Cards
 - Test 18: Screenshot Thumbnails
@@ -70,7 +75,7 @@ Implemented Screenshot Deletion feature (Test 94) - users can now delete individ
 - Test 91: Activity Log Table
 - Test 92: Session Context
 - Test 93: Session Deletion
-- Test 94: Screenshot Deletion (NEW)
+- Test 94: Screenshot Deletion
 - Test 95: Keyboard Navigation
 - Test 96: Image Lightbox
 - Test 97: Tag Filtering
@@ -94,6 +99,8 @@ Implemented Screenshot Deletion feature (Test 94) - users can now delete individ
 - Test 142: Timeline Bands
 - Test 143: Session Duration Display
 - Test 144: Time Range Display
+- Test 145: Top Apps in Session (NEW)
+- Test 146: Data Source Indicators (NEW)
 - Test 147: Empty State Handling
 - Test 149: Quick Date Jumps
 - Test 150: Calendar Month Navigation
@@ -114,8 +121,8 @@ Implemented Screenshot Deletion feature (Test 94) - users can now delete individ
 - Settings drawer UI elements
 
 ### What to Work on Next (Priority)
-1. Many remaining tests require backend functionality (capture, AFK detection, etc.)
-2. Tests 28, 30, 132 - Need native Wails app verification to mark passing
+1. Test 148: Date Range Selection - UI feature for custom date ranges
+2. Many remaining tests require backend functionality (capture, AFK detection, etc.)
 3. Tests requiring native Wails app:
    - Screenshot capture tests (1-10)
    - AI summary generation tests (11-15)

@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { TagList } from '@/components/common/TagBadge';
 import { ConfidenceBadge } from '@/components/common/ConfidenceBadge';
+import { AppBadge } from '@/components/common/AppBadge';
 import { formatTimeRange, formatDuration, cn } from '@/lib/utils';
 import { useThumbnail } from '@/api/hooks';
 import {
@@ -16,7 +17,17 @@ import {
   ExternalLink,
   Sparkles,
   Loader2,
+  Terminal,
+  GitBranch,
+  FileText,
+  Globe,
 } from 'lucide-react';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+  TooltipProvider,
+} from '@/components/ui/tooltip';
 import type { SessionSummary, Screenshot } from '@/types';
 
 // Small thumbnail component that loads via hook
@@ -102,6 +113,19 @@ export function SessionCard({
                 {session.summary.summary}
               </p>
             )}
+            {/* Top Apps */}
+            {session.topApps && session.topApps.length > 0 && (
+              <div className="flex items-center gap-2 mt-2 ml-8" data-testid="top-apps">
+                {session.topApps.slice(0, 3).map((app) => (
+                  <AppBadge key={app} appName={app} size="sm" showName={false} />
+                ))}
+                {session.topApps.length > 3 && (
+                  <span className="text-xs text-muted-foreground">
+                    +{session.topApps.length - 3} more
+                  </span>
+                )}
+              </div>
+            )}
           </div>
           <div className="flex flex-col items-end gap-2 flex-shrink-0">
             <div className="flex items-center gap-2">
@@ -114,6 +138,53 @@ export function SessionCard({
                 {formatDuration(session.durationSeconds ?? 0)}
               </Badge>
             </div>
+            {/* Data Source Indicators */}
+            {(session.hasShell || session.hasGit || session.hasFiles || session.hasBrowser) && (
+              <TooltipProvider>
+                <div className="flex items-center gap-1" data-testid="data-source-indicators">
+                  {session.hasShell && (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div className="p-1 rounded bg-primary/10 text-primary">
+                          <Terminal className="h-3 w-3" />
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent>Shell commands</TooltipContent>
+                    </Tooltip>
+                  )}
+                  {session.hasGit && (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div className="p-1 rounded bg-orange-500/10 text-orange-500">
+                          <GitBranch className="h-3 w-3" />
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent>Git activity</TooltipContent>
+                    </Tooltip>
+                  )}
+                  {session.hasFiles && (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div className="p-1 rounded bg-green-500/10 text-green-500">
+                          <FileText className="h-3 w-3" />
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent>File events</TooltipContent>
+                    </Tooltip>
+                  )}
+                  {session.hasBrowser && (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div className="p-1 rounded bg-blue-500/10 text-blue-500">
+                          <Globe className="h-3 w-3" />
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent>Browser history</TooltipContent>
+                    </Tooltip>
+                  )}
+                </div>
+              </TooltipProvider>
+            )}
             {session.summary && (
               <ConfidenceBadge confidence={session.summary.confidence} />
             )}

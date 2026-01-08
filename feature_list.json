@@ -1611,7 +1611,7 @@
       "Step 3: Verify apps are listed",
       "Step 4: Verify apps match actual session usage"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "style",
@@ -1622,7 +1622,7 @@
       "Step 3: Verify icons for shell, git, files, browser are shown",
       "Step 4: Verify only sources with data are highlighted"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "style",
