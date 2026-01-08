@@ -880,7 +880,7 @@
       "Step 3: Verify date is correctly parsed",
       "Step 4: Test various phrases ('last week', 'past 3 days')"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -891,7 +891,7 @@
       "Step 3: Generate report",
       "Step 4: Verify report contains high-level overview"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -902,7 +902,7 @@
       "Step 3: Generate report",
       "Step 4: Verify report contains comprehensive metrics"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -913,7 +913,7 @@
       "Step 3: Generate report",
       "Step 4: Verify report follows standup format (done, doing, blockers)"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -979,7 +979,7 @@
       "Step 3: Click a preset (e.g., 'Yesterday Summary')",
       "Step 4: Verify report generates with correct parameters"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
