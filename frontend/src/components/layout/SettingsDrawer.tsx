@@ -2,12 +2,12 @@ import { useState } from 'react';
 import { Database, FolderOpen, HardDrive, Image } from 'lucide-react';
 import { toast } from 'sonner';
 import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet';
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
 import { Slider } from '@/components/ui/slider';
@@ -53,14 +53,14 @@ export function SettingsDrawer({ open, onOpenChange }: SettingsDrawerProps) {
   };
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-[400px] sm:w-[540px] overflow-y-auto">
-        <SheetHeader>
-          <SheetTitle>Settings</SheetTitle>
-          <SheetDescription>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Settings</DialogTitle>
+          <DialogDescription>
             Configure Traq to match your workflow.
-          </SheetDescription>
-        </SheetHeader>
+          </DialogDescription>
+        </DialogHeader>
 
         {isLoading || !config ? (
           <div className="mt-6 flex items-center justify-center py-12">
@@ -68,12 +68,12 @@ export function SettingsDrawer({ open, onOpenChange }: SettingsDrawerProps) {
           </div>
         ) : (
         <Tabs defaultValue="capture" className="mt-6">
-          <TabsList className="grid w-full grid-cols-5">
-            <TabsTrigger value="capture">Capture</TabsTrigger>
-            <TabsTrigger value="ai">AI</TabsTrigger>
-            <TabsTrigger value="categories">Categories</TabsTrigger>
-            <TabsTrigger value="sources">Sources</TabsTrigger>
-            <TabsTrigger value="system">System</TabsTrigger>
+          <TabsList className="flex flex-wrap h-auto gap-1 p-1">
+            <TabsTrigger value="capture" className="flex-shrink-0">Capture</TabsTrigger>
+            <TabsTrigger value="ai" className="flex-shrink-0">AI</TabsTrigger>
+            <TabsTrigger value="categories" className="flex-shrink-0">Categories</TabsTrigger>
+            <TabsTrigger value="sources" className="flex-shrink-0">Sources</TabsTrigger>
+            <TabsTrigger value="system" className="flex-shrink-0">System</TabsTrigger>
           </TabsList>
 
           <TabsContent value="capture" className="space-y-6 mt-4">
@@ -622,7 +622,7 @@ export function SettingsDrawer({ open, onOpenChange }: SettingsDrawerProps) {
           </TabsContent>
         </Tabs>
         )}
-      </SheetContent>
-    </Sheet>
+      </DialogContent>
+    </Dialog>
   );
 }

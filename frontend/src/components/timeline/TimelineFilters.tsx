@@ -100,7 +100,7 @@ export function TimelineFilters({
             <Button
               variant={selectedApp ? 'default' : 'outline'}
               size="sm"
-              className="h-8"
+              className="h-8 whitespace-nowrap"
             >
               {selectedApp || 'Filter by App'}
             </Button>

@@ -1,4 +1,5 @@
 import { cn } from '@/lib/utils';
+import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
 
 // App icon mapping - you can expand this with actual icons
 const APP_COLORS: Record<string, string> = {
@@ -47,22 +48,42 @@ export function AppBadge({
     lg: 'text-base',
   };
 
+  const badge = (
+    <div
+      className={cn(
+        'rounded flex items-center justify-center text-white font-medium',
+        sizeClasses[size],
+        color
+      )}
+    >
+      {name.charAt(0).toUpperCase()}
+    </div>
+  );
+
+  // When name is hidden, wrap in tooltip to show full name on hover
+  if (!showName) {
+    return (
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <div className={cn('flex items-center gap-2', className)}>
+              {badge}
+            </div>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>{name}</p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    );
+  }
+
   return (
     <div className={cn('flex items-center gap-2', className)}>
-      <div
-        className={cn(
-          'rounded flex items-center justify-center text-white font-medium',
-          sizeClasses[size],
-          color
-        )}
-      >
-        {name.charAt(0).toUpperCase()}
-      </div>
-      {showName && (
-        <span className={cn('font-medium truncate', textSizes[size])}>
-          {name}
-        </span>
-      )}
+      {badge}
+      <span className={cn('font-medium truncate', textSizes[size])}>
+        {name}
+      </span>
     </div>
   );
 }

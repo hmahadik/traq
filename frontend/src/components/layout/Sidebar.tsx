@@ -66,7 +66,7 @@ export function Sidebar({ onSettingsClick }: SidebarProps) {
                   to={to}
                   onClick={() => setMobileMenuOpen(false)}
                   className={cn(
-                    'flex flex-col items-center gap-1 px-2 py-2 mx-2 rounded-lg text-xs font-medium transition-colors',
+                    'flex flex-col items-center gap-1 px-2 py-2 mx-2 rounded-lg text-xs font-medium transition-colors duration-75',
                     isActive
                       ? 'bg-primary/10 text-primary'
                       : 'text-muted-foreground hover:bg-muted hover:text-foreground'
@@ -88,7 +88,7 @@ export function Sidebar({ onSettingsClick }: SidebarProps) {
             <TooltipTrigger asChild>
               <Button
                 variant="ghost"
-                className="w-full flex flex-col items-center gap-1 h-auto py-2"
+                className="w-full flex flex-col items-center gap-1 h-auto py-2 transition-colors duration-75"
                 onClick={handleForceCapture}
                 disabled={isCapturing}
                 aria-label="Force Capture"
@@ -108,7 +108,7 @@ export function Sidebar({ onSettingsClick }: SidebarProps) {
         </TooltipProvider>
         <Button
           variant="ghost"
-          className="w-full flex flex-col items-center gap-1 h-auto py-2"
+          className="w-full flex flex-col items-center gap-1 h-auto py-2 transition-colors duration-75"
           onClick={() => {
             onSettingsClick();
             setMobileMenuOpen(false);
