@@ -56,6 +56,15 @@ jobs:
       - name: Install Wails
         run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
 
+      # Install frontend dependencies with platform-specific binaries
+      # This fixes npm's optional dependency bug with Rollup native bindings
+      - name: Install frontend dependencies
+        working-directory: frontend
+        shell: bash
+        run: |
+          rm -rf node_modules
+          npm install
+
       # Build
       - name: Build for Linux
         if: matrix.platform == 'linux'

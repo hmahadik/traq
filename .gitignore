@@ -35,6 +35,15 @@ activity-tracker-data/
 
 # Claude Code tooling
 .claude/
+claude-progress.txt
+frontend/claude-progress.txt
+
+# Development docs (local only)
+app_spec.txt
+init.sh
+TRAQ_DEV_PROTOCOL.md
+TRAQ_IMPLEMENTATION_PLAN.md
+TRAQ_PHASE1_IMPLEMENTATION.md
 
 # Playwright test artifacts
 .playwright-mcp/
