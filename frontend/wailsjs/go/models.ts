@@ -387,6 +387,7 @@ export namespace service {
 	}
 	export class ShellConfig {
 	    enabled: boolean;
+	    shellType: string;
 	    excludePatterns: string[];
 	
 	    static createFrom(source: any = {}) {
@@ -396,6 +397,7 @@ export namespace service {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.enabled = source["enabled"];
+	        this.shellType = source["shellType"];
 	        this.excludePatterns = source["excludePatterns"];
 	    }
 	}
@@ -527,6 +529,7 @@ export namespace service {
 	}
 	export class DaemonStatus {
 	    running: boolean;
+	    paused: boolean;
 	    isAFK: boolean;
 	    sessionId: number;
 	    sessionDuration: number;
@@ -539,6 +542,7 @@ export namespace service {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.running = source["running"];
+	        this.paused = source["paused"];
 	        this.isAFK = source["isAFK"];
 	        this.sessionId = source["sessionId"];
 	        this.sessionDuration = source["sessionDuration"];
@@ -942,6 +946,7 @@ export namespace service {
 	    page: number;
 	    perPage: number;
 	    totalPages: number;
+	    hasMore: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new ScreenshotPage(source);
@@ -954,6 +959,7 @@ export namespace service {
 	        this.page = source["page"];
 	        this.perPage = source["perPage"];
 	        this.totalPages = source["totalPages"];
+	        this.hasMore = source["hasMore"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -1517,6 +1523,7 @@ export namespace storage {
 	    dhash: string;
 	    windowTitle: sql.NullString;
 	    appName: sql.NullString;
+	    windowClass: sql.NullString;
 	    windowX: sql.NullInt64;
 	    windowY: sql.NullInt64;
 	    windowWidth: sql.NullInt64;
@@ -1539,6 +1546,7 @@ export namespace storage {
 	        this.dhash = source["dhash"];
 	        this.windowTitle = this.convertValues(source["windowTitle"], sql.NullString);
 	        this.appName = this.convertValues(source["appName"], sql.NullString);
+	        this.windowClass = this.convertValues(source["windowClass"], sql.NullString);
 	        this.windowX = this.convertValues(source["windowX"], sql.NullInt64);
 	        this.windowY = this.convertValues(source["windowY"], sql.NullInt64);
 	        this.windowWidth = this.convertValues(source["windowWidth"], sql.NullInt64);

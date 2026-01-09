@@ -339,6 +339,17 @@ export function useDataDir() {
   });
 }
 
+export function useOptimizeDatabase() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.config.optimizeDatabase(),
+    onSuccess: () => {
+      // Refresh storage stats after optimization
+      queryClient.invalidateQueries({ queryKey: ['config', 'storage'] });
+    },
+  });
+}
+
 // ============================================================================
 // Screenshot Hooks
 // ============================================================================

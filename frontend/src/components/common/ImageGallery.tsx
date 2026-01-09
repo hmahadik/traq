@@ -3,7 +3,7 @@ import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { ChevronLeft, ChevronRight, X, ZoomIn, ZoomOut } from 'lucide-react';
 import { useScreenshotImage, useThumbnail } from '@/api/hooks';
-import { formatTimestamp, formatDate } from '@/lib/utils';
+import { formatTimestamp, formatDate, isNullableValid, getNullableInt, getNullableString } from '@/lib/utils';
 import { useKeyboardNav } from '@/hooks/useKeyboardNav';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { Screenshot } from '@/types';
@@ -90,6 +90,19 @@ export function ImageGallery({
             <p className="text-xs text-white/70">
               {currentScreenshot.appName} - {currentScreenshot.windowTitle}
             </p>
+            {/* Window Class */}
+            {isNullableValid(currentScreenshot.windowClass) && (
+              <p className="text-xs text-white/60 mt-0.5">
+                Class: {getNullableString(currentScreenshot.windowClass)}
+              </p>
+            )}
+            {/* Window Geometry Metadata */}
+            {isNullableValid(currentScreenshot.windowX) && isNullableValid(currentScreenshot.windowY) && (
+              <p className="text-xs text-white/50 mt-1">
+                Position: ({getNullableInt(currentScreenshot.windowX)}, {getNullableInt(currentScreenshot.windowY)}) |
+                Size: {getNullableInt(currentScreenshot.windowWidth)} × {getNullableInt(currentScreenshot.windowHeight)}
+              </p>
+            )}
           </div>
           <div className="flex items-center gap-2">
             <span className="text-sm text-white/70">

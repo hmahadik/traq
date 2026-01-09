@@ -59,7 +59,7 @@ export function DataSourcesPanel({ data, isLoading }: DataSourcesPanelProps) {
                 </div>
                 <div className="space-y-2">
                   <h4 className="text-sm font-medium">Top Commands</h4>
-                  {data.shell.topCommands.map((cmd) => (
+                  {data.shell.topCommands?.map((cmd) => (
                     <div
                       key={cmd.command}
                       className="flex items-center justify-between p-2 rounded-lg border"
@@ -86,15 +86,15 @@ export function DataSourcesPanel({ data, isLoading }: DataSourcesPanelProps) {
                 </div>
                 <div className="space-y-2">
                   <h4 className="text-sm font-medium">Repositories</h4>
-                  {data.git.repositories.map((repo) => (
+                  {data.git.topRepos?.map((repo) => (
                     <div
-                      key={repo.name}
+                      key={repo.repoName}
                       className="flex items-center justify-between p-2 rounded-lg border"
                     >
                       <div>
-                        <p className="text-sm font-medium">{repo.name}</p>
+                        <p className="text-sm font-medium">{repo.repoName}</p>
                         <p className="text-xs text-muted-foreground">
-                          Last commit: {new Date(repo.lastCommit * 1000).toLocaleString()}
+                          +{repo.insertions} / -{repo.deletions} lines
                         </p>
                       </div>
                       <Badge variant="outline">{repo.commitCount} commits</Badge>
@@ -117,17 +117,31 @@ export function DataSourcesPanel({ data, isLoading }: DataSourcesPanelProps) {
                   <Badge variant="secondary">{data.files.totalEvents}</Badge>
                 </div>
                 <div className="space-y-2">
-                  <h4 className="text-sm font-medium">By Category</h4>
-                  {data.files.byCategory.map((cat) => (
+                  <h4 className="text-sm font-medium">By Event Type</h4>
+                  {data.files.eventsByType && Object.entries(data.files.eventsByType).map(([type, count]) => (
                     <div
-                      key={cat.category}
+                      key={type}
                       className="flex items-center justify-between p-2 rounded-lg border"
                     >
-                      <span className="text-sm capitalize">{cat.category}</span>
-                      <Badge variant="outline">{cat.count} files</Badge>
+                      <span className="text-sm capitalize">{type}</span>
+                      <Badge variant="outline">{count} events</Badge>
                     </div>
                   ))}
                 </div>
+                {data.files.topExtensions && Object.keys(data.files.topExtensions).length > 0 && (
+                  <div className="space-y-2">
+                    <h4 className="text-sm font-medium">Top Extensions</h4>
+                    {Object.entries(data.files.topExtensions).slice(0, 5).map(([ext, count]) => (
+                      <div
+                        key={ext}
+                        className="flex items-center justify-between p-2 rounded-lg border"
+                      >
+                        <code className="text-sm font-mono">{ext || '(no ext)'}</code>
+                        <Badge variant="outline">{count} files</Badge>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             ) : (
               <p className="text-sm text-muted-foreground text-center py-4">
@@ -143,15 +157,19 @@ export function DataSourcesPanel({ data, isLoading }: DataSourcesPanelProps) {
                   <span className="text-sm text-muted-foreground">Total Visits</span>
                   <Badge variant="secondary">{data.browser.totalVisits}</Badge>
                 </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Unique Domains</span>
+                  <Badge variant="secondary">{data.browser.uniqueDomains}</Badge>
+                </div>
                 <div className="space-y-2">
                   <h4 className="text-sm font-medium">Top Domains</h4>
-                  {data.browser.topDomains.map((domain) => (
+                  {data.browser.topDomains?.map((domain) => (
                     <div
                       key={domain.domain}
                       className="flex items-center justify-between p-2 rounded-lg border"
                     >
                       <span className="text-sm">{domain.domain}</span>
-                      <Badge variant="outline">{domain.visits} visits</Badge>
+                      <Badge variant="outline">{domain.visitCount} visits</Badge>
                     </div>
                   ))}
                 </div>

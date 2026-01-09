@@ -1,11 +1,12 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Calendar, BarChart3, FileText, Settings, Camera, Loader2, Menu, X } from 'lucide-react';
+import { Calendar, BarChart3, FileText, Settings, Camera, Loader2, Menu, X, Pause, Play } from 'lucide-react';
+import logoSrc from '@/assets/logo-minimal.svg';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
-import { system } from '@/api/client';
+import { system, api } from '@/api/client';
 
 const navItems = [
   { to: '/', label: 'Timeline', icon: Calendar },
@@ -20,7 +21,46 @@ interface SidebarProps {
 export function Sidebar({ onSettingsClick }: SidebarProps) {
   const location = useLocation();
   const [isCapturing, setIsCapturing] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  // Fetch initial pause state and poll for updates
+  useEffect(() => {
+    const fetchStatus = async () => {
+      try {
+        const status = await api.getDaemonStatus();
+        setIsPaused(status.paused);
+      } catch (error) {
+        // Ignore errors during status fetch
+      }
+    };
+
+    fetchStatus();
+    const interval = setInterval(fetchStatus, 5000); // Poll every 5 seconds
+    return () => clearInterval(interval);
+  }, []);
+
+  const handleTogglePause = async () => {
+    try {
+      if (isPaused) {
+        await api.config.resumeCapture();
+        setIsPaused(false);
+        toast.success('Capture resumed', {
+          description: 'Screenshot capture is now active',
+        });
+      } else {
+        await api.config.pauseCapture();
+        setIsPaused(true);
+        toast.success('Capture paused', {
+          description: 'Screenshot capture is temporarily paused',
+        });
+      }
+    } catch (error) {
+      toast.error('Failed to toggle pause', {
+        description: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  };
 
   const handleForceCapture = async () => {
     if (isCapturing) return;
@@ -50,8 +90,9 @@ export function Sidebar({ onSettingsClick }: SidebarProps) {
     <>
       {/* Logo */}
       <div className="py-4 border-b border-border">
-        <Link to="/" className="flex flex-col items-center">
-          <span className="font-bold text-lg">Traq</span>
+        <Link to="/" className="flex flex-col items-center gap-1">
+          <img src={logoSrc} alt="Traq" className="h-10 w-10" />
+          <span className="font-semibold text-xs text-muted-foreground">Traq</span>
         </Link>
       </div>
 
@@ -88,9 +129,32 @@ export function Sidebar({ onSettingsClick }: SidebarProps) {
             <TooltipTrigger asChild>
               <Button
                 variant="ghost"
+                className={cn(
+                  "w-full flex flex-col items-center gap-1 h-auto py-2 transition-colors duration-75",
+                  isPaused && "text-yellow-500 hover:text-yellow-600"
+                )}
+                onClick={handleTogglePause}
+                aria-label={isPaused ? 'Resume Capture' : 'Pause Capture'}
+              >
+                {isPaused ? (
+                  <Play className="h-5 w-5" />
+                ) : (
+                  <Pause className="h-5 w-5" />
+                )}
+                <span className="text-xs font-medium">{isPaused ? 'Resume' : 'Pause'}</span>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="right">
+              <p>{isPaused ? 'Resume screenshot capture' : 'Pause screenshot capture'}</p>
+            </TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
                 className="w-full flex flex-col items-center gap-1 h-auto py-2 transition-colors duration-75"
                 onClick={handleForceCapture}
-                disabled={isCapturing}
+                disabled={isCapturing || isPaused}
                 aria-label="Force Capture"
               >
                 {isCapturing ? (
@@ -102,7 +166,7 @@ export function Sidebar({ onSettingsClick }: SidebarProps) {
               </Button>
             </TooltipTrigger>
             <TooltipContent side="right">
-              <p>Capture screenshot now</p>
+              <p>{isPaused ? 'Resume capture first' : 'Capture screenshot now'}</p>
             </TooltipContent>
           </Tooltip>
         </TooltipProvider>

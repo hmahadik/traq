@@ -51,6 +51,7 @@ export interface DataSourcesConfig {
 
 export interface ShellConfig {
   enabled: boolean;
+  shellType: string; // "auto", "bash", "zsh", "fish", "powershell"
   excludePatterns: string[];
 }
 

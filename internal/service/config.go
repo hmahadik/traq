@@ -93,6 +93,7 @@ type DataSourcesConfig struct {
 // ShellConfig contains shell history settings.
 type ShellConfig struct {
 	Enabled         bool     `json:"enabled"`
+	ShellType       string   `json:"shellType"`       // "auto", "bash", "zsh", "fish", "powershell"
 	ExcludePatterns []string `json:"excludePatterns"`
 }
 
@@ -139,6 +140,7 @@ type SystemConfig struct {
 // DaemonStatus represents the current daemon status.
 type DaemonStatus struct {
 	Running         bool   `json:"running"`
+	Paused          bool   `json:"paused"`
 	IsAFK           bool   `json:"isAFK"`
 	SessionID       int64  `json:"sessionId"`
 	SessionDuration int64  `json:"sessionDuration"` // seconds
@@ -193,6 +195,9 @@ func (s *ConfigService) GetConfig() (*Config, error) {
 	}
 	if val, err := s.store.GetConfig("shell.enabled"); err == nil {
 		config.DataSources.Shell.Enabled = val == "true"
+	}
+	if val, err := s.store.GetConfig("shell.shellType"); err == nil && val != "" {
+		config.DataSources.Shell.ShellType = val
 	}
 	if val, err := s.store.GetConfig("git.enabled"); err == nil {
 		config.DataSources.Git.Enabled = val == "true"
@@ -323,6 +328,7 @@ func mapToStorageKey(frontendKey string) string {
 
 		// Data sources
 		"dataSources.shell.enabled":   "shell.enabled",
+		"dataSources.shell.shellType": "shell.shellType",
 		"dataSources.git.enabled":     "git.enabled",
 		"dataSources.git.searchPaths": "git.searchPaths",
 		"dataSources.files.enabled":   "files.enabled",
@@ -354,6 +360,7 @@ func (s *ConfigService) GetDaemonStatus() (*DaemonStatus, error) {
 	status := s.daemon.GetStatus()
 	daemonStatus := &DaemonStatus{
 		Running:      status.Running,
+		Paused:       status.Paused,
 		IsAFK:        status.IsAFK,
 		IdleDuration: int64(status.IdleDuration.Seconds()),
 	}
@@ -380,6 +387,22 @@ func (s *ConfigService) StopDaemon() error {
 		return nil
 	}
 	return s.daemon.Stop()
+}
+
+// PauseDaemon pauses screenshot capture without stopping the daemon.
+func (s *ConfigService) PauseDaemon() {
+	if s.daemon == nil {
+		return
+	}
+	s.daemon.Pause()
+}
+
+// ResumeDaemon resumes screenshot capture after a pause.
+func (s *ConfigService) ResumeDaemon() {
+	if s.daemon == nil {
+		return
+	}
+	s.daemon.Resume()
 }
 
 // RestartDaemon restarts the tracking daemon.
@@ -412,6 +435,11 @@ func (s *ConfigService) RestartDaemon() error {
 	}
 	s.daemon.UpdateConfig(daemonConfig)
 
+	// Apply shell type configuration
+	if config.DataSources != nil && config.DataSources.Shell != nil {
+		s.daemon.SetShellType(config.DataSources.Shell.ShellType)
+	}
+
 	// Start
 	return s.daemon.Start()
 }
@@ -433,6 +461,12 @@ func (s *ConfigService) GetStorageStats() (*StorageStats, error) {
 	stats.ScreenshotsSize = 0
 
 	return stats, nil
+}
+
+// OptimizeDatabase runs VACUUM and ANALYZE on the database to reclaim space and update statistics.
+// Returns the size reduction in bytes (positive if space was reclaimed).
+func (s *ConfigService) OptimizeDatabase() (int64, error) {
+	return s.store.Optimize()
 }
 
 // StorageStats contains database statistics.
@@ -468,6 +502,7 @@ func (s *ConfigService) getDefaultDataSourcesConfig() *DataSourcesConfig {
 	return &DataSourcesConfig{
 		Shell: &ShellConfig{
 			Enabled:         true,
+			ShellType:       "auto",
 			ExcludePatterns: []string{"^(ls|cd|pwd|clear)$"},
 		},
 		Git: &GitConfig{

@@ -573,7 +573,7 @@
       "Step 3: View session details",
       "Step 4: Verify commands are recorded with timestamps"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -584,7 +584,7 @@
       "Step 3: View session details",
       "Step 4: Verify git commits are recorded"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -595,7 +595,7 @@
       "Step 3: View session details",
       "Step 4: Verify file events are recorded"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -606,7 +606,7 @@
       "Step 3: View session details",
       "Step 4: Verify URLs and page titles are recorded"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -617,7 +617,7 @@
       "Step 3: Verify commands are captured from correct history file",
       "Step 4: Test with different shell types"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -639,7 +639,7 @@
       "Step 3: Add a repository path",
       "Step 4: Verify repository appears in tracked list"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -650,7 +650,7 @@
       "Step 3: Add directories to watch",
       "Step 4: Verify directories are monitored"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -660,7 +660,7 @@
       "Step 2: View shell command history in session",
       "Step 3: Verify sensitive commands are filtered or redacted"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -671,7 +671,7 @@
       "Step 3: View shell command history",
       "Step 4: Verify trivial commands are excluded"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "style",
@@ -748,7 +748,7 @@
       "Step 3: Verify counts for each data source type",
       "Step 4: Verify stats update with new data"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -759,7 +759,7 @@
       "Step 3: Verify commands are listed by frequency",
       "Step 4: Verify count is accurate"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -770,7 +770,7 @@
       "Step 3: Verify repos are listed by activity",
       "Step 4: Verify commit counts are accurate"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -781,7 +781,7 @@
       "Step 3: Verify domains are listed by visit count",
       "Step 4: Verify counts are accurate"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -1217,7 +1217,7 @@
       "Step 3: Verify inference time is displayed",
       "Step 4: Verify time is reasonable for model used"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -1227,7 +1227,7 @@
       "Step 2: View summary details",
       "Step 3: Verify model name is attributed to each summary"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -1250,7 +1250,7 @@
       "Step 3: Verify thumbnails are smaller than originals",
       "Step 4: Verify UI loads thumbnails quickly"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -1261,7 +1261,7 @@
       "Step 3: Verify files are in WebP format",
       "Step 4: Verify quality is acceptable"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -1283,7 +1283,7 @@
       "Step 2: View screenshot metadata",
       "Step 3: Verify window x, y, width, height are recorded"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -1315,7 +1315,7 @@
       "Step 2: View screenshot metadata",
       "Step 3: Verify window class is recorded"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -1338,7 +1338,7 @@
       "Step 4: Click resume",
       "Step 5: Verify captures resume"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -1491,7 +1491,7 @@
       "Step 3: Verify database size is reduced after optimization",
       "Step 4: Verify app continues to function correctly"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -1502,7 +1502,7 @@
       "Step 3: Verify query times are within acceptable limits",
       "Step 4: Inspect database indexes"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -1524,7 +1524,7 @@
       "Step 3: Verify pagination controls appear",
       "Step 4: Test navigating between pages"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",

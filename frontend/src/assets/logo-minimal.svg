@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" fill="none">
+  <!-- Traq Logo - Minimal Version (no background) -->
+
+  <!-- Stylized "T" with tracking nodes -->
+  <!-- Horizontal bar -->
+  <line x1="40" y1="60" x2="160" y2="60" stroke="url(#grad2)" stroke-width="12" stroke-linecap="round"/>
+
+  <!-- Vertical bar -->
+  <line x1="100" y1="60" x2="100" y2="160" stroke="url(#grad2)" stroke-width="12" stroke-linecap="round"/>
+
+  <!-- Timeline nodes -->
+  <circle cx="40" cy="60" r="10" fill="#6366f1"/>
+  <circle cx="100" cy="60" r="12" fill="#7c3aed"/>
+  <circle cx="160" cy="60" r="10" fill="#8b5cf6"/>
+  <circle cx="100" cy="110" r="7" fill="#a78bfa"/>
+  <circle cx="100" cy="160" r="10" fill="#8b5cf6"/>
+
+  <!-- Active pulse on main node -->
+  <circle cx="100" cy="60" r="20" stroke="#7c3aed" stroke-width="2" fill="none" opacity="0.4"/>
+  <circle cx="100" cy="60" r="28" stroke="#7c3aed" stroke-width="1" fill="none" opacity="0.2"/>
+
+  <defs>
+    <linearGradient id="grad2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#6366f1"/>
+      <stop offset="100%" stop-color="#8b5cf6"/>
+    </linearGradient>
+  </defs>
+</svg>

@@ -6,9 +6,10 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { useSessionContext, useRegenerateSummary, useDeleteSession, useDeleteScreenshot } from '@/api/hooks';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useSessionContext, useScreenshotsForSession, useRegenerateSummary, useDeleteSession, useDeleteScreenshot } from '@/api/hooks';
 import { formatTimeRange, formatDuration, formatTimestamp, getNullableInt, getNullableString, isNullableValid } from '@/lib/utils';
-import { Terminal, GitCommit, FileText, Globe, ArrowLeft, RefreshCw, Trash2 } from 'lucide-react';
+import { Terminal, GitCommit, FileText, Globe, ArrowLeft, RefreshCw, Trash2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Screenshot } from '@/components/common/Screenshot';
 import { ActivityLogTable } from '@/components/session/ActivityLogTable';
 import { CollapsibleSection } from '@/components/session/CollapsibleSection';
@@ -24,6 +25,15 @@ export function SessionDetailPage() {
   const deleteScreenshotMutation = useDeleteScreenshot();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingScreenshotId, setDeletingScreenshotId] = useState<number | null>(null);
+
+  // Pagination state for screenshots
+  const [screenshotPage, setScreenshotPage] = useState(1);
+  const [screenshotsPerPage, setScreenshotsPerPage] = useState(20);
+  const { data: screenshotData, isLoading: screenshotsLoading, refetch: refetchScreenshots } = useScreenshotsForSession(
+    sessionId,
+    screenshotPage,
+    screenshotsPerPage
+  );
 
   const handleRegenerateSummary = async () => {
     try {
@@ -53,13 +63,33 @@ export function SessionDetailPage() {
       setDeletingScreenshotId(screenshotId);
       await deleteScreenshotMutation.mutateAsync(screenshotId);
       toast.success('Screenshot deleted successfully');
-      refetch(); // Refetch the session context to update the screenshot list
+      refetch(); // Refetch the session context
+      refetchScreenshots(); // Refetch the paginated screenshots
     } catch (error) {
       toast.error('Failed to delete screenshot');
       console.error('Delete screenshot error:', error);
     } finally {
       setDeletingScreenshotId(null);
     }
+  };
+
+  // Pagination handlers
+  const handlePreviousPage = () => {
+    if (screenshotPage > 1) {
+      setScreenshotPage(screenshotPage - 1);
+    }
+  };
+
+  const handleNextPage = () => {
+    if (screenshotData && screenshotData.hasMore) {
+      setScreenshotPage(screenshotPage + 1);
+    }
+  };
+
+  const handlePerPageChange = (value: string) => {
+    const newPerPage = parseInt(value, 10);
+    setScreenshotsPerPage(newPerPage);
+    setScreenshotPage(1); // Reset to first page when changing items per page
   };
 
   if (isLoading) {
@@ -280,24 +310,88 @@ export function SessionDetailPage() {
         </>
       )}
 
-      {/* Screenshots */}
+      {/* Screenshots with Pagination */}
       <Card>
         <CardHeader>
-          <CardTitle>Screenshots ({safeScreenshots.length})</CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle>Screenshots ({screenshotData?.total ?? safeScreenshots.length})</CardTitle>
+            <div className="flex items-center gap-4">
+              {/* Per page selector */}
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">Per page:</span>
+                <Select value={screenshotsPerPage.toString()} onValueChange={handlePerPageChange}>
+                  <SelectTrigger className="w-[70px] h-8">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="10">10</SelectItem>
+                    <SelectItem value="20">20</SelectItem>
+                    <SelectItem value="50">50</SelectItem>
+                    <SelectItem value="100">100</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {/* Pagination controls */}
+              {screenshotData && screenshotData.total > screenshotsPerPage && (
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handlePreviousPage}
+                    disabled={screenshotPage === 1 || screenshotsLoading}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <span className="text-sm text-muted-foreground min-w-[80px] text-center">
+                    Page {screenshotPage} of {Math.ceil(screenshotData.total / screenshotsPerPage)}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleNextPage}
+                    disabled={!screenshotData.hasMore || screenshotsLoading}
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              )}
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-5 gap-2">
-            {safeScreenshots.map((screenshot) => (
-              <Screenshot
-                key={screenshot.id}
-                screenshot={screenshot}
-                size="thumbnail"
-                showOverlay={true}
-                onDelete={handleDeleteScreenshot}
-                isDeleting={deletingScreenshotId === screenshot.id}
-              />
-            ))}
-          </div>
+          {screenshotsLoading ? (
+            <div className="grid grid-cols-5 gap-2">
+              {Array.from({ length: screenshotsPerPage }).map((_, i) => (
+                <Skeleton key={i} className="aspect-video rounded-md" />
+              ))}
+            </div>
+          ) : (
+            <div className="grid grid-cols-5 gap-2">
+              {(screenshotData?.screenshots ?? safeScreenshots).map((screenshot) => (
+                <Screenshot
+                  key={screenshot.id}
+                  screenshot={screenshot}
+                  size="thumbnail"
+                  showOverlay={true}
+                  onDelete={handleDeleteScreenshot}
+                  isDeleting={deletingScreenshotId === screenshot.id}
+                />
+              ))}
+            </div>
+          )}
+          {/* Bottom pagination info */}
+          {screenshotData && screenshotData.total > 0 && (
+            <div className="flex items-center justify-between mt-4 pt-4 border-t text-sm text-muted-foreground">
+              <span>
+                Showing {((screenshotPage - 1) * screenshotsPerPage) + 1}-{Math.min(screenshotPage * screenshotsPerPage, screenshotData.total)} of {screenshotData.total} screenshots
+              </span>
+              {screenshotData.total > screenshotsPerPage && (
+                <span>
+                  {Math.ceil(screenshotData.total / screenshotsPerPage)} pages total
+                </span>
+              )}
+            </div>
+          )}
         </CardContent>
       </Card>
 

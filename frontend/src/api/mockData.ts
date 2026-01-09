@@ -110,6 +110,30 @@ const sessionTemplates = [
     confidence: 'high' as const,
     topApps: ['VS Code', 'Postman', 'Terminal'],
   },
+  {
+    summary: 'Design review with UX team. Walked through new onboarding flow mockups, discussed user research findings, and prioritized accessibility improvements.',
+    tags: ['meetings', 'design'],
+    confidence: 'high' as const,
+    topApps: ['Figma', 'Slack', 'Chrome'],
+  },
+  {
+    summary: 'Database optimization work. Analyzed slow query logs, added missing indexes, and refactored N+1 queries in the reporting module. Performance improved 3x.',
+    tags: ['coding', 'backend'],
+    confidence: 'high' as const,
+    topApps: ['VS Code', 'Terminal', 'DataGrip'],
+  },
+  {
+    summary: 'Sprint retrospective and planning. Celebrated shipped features, identified process improvements, and estimated stories for next sprint.',
+    tags: ['meetings', 'planning'],
+    confidence: 'medium' as const,
+    topApps: ['Miro', 'Slack', 'Jira'],
+  },
+  {
+    summary: 'Security audit follow-up. Addressed findings from penetration test, implemented CSP headers, and updated dependency versions with known vulnerabilities.',
+    tags: ['coding', 'security'],
+    confidence: 'high' as const,
+    topApps: ['VS Code', 'Terminal', 'Firefox'],
+  },
 ];
 
 // Generate mock session with rich, varied data
@@ -126,28 +150,25 @@ function generateSession(id: number, startTime: number, duration: number): Sessi
     screenshotCount,
     summaryId: id,
     createdAt: startTime,
-    summary: {
-      id,
-      sessionId: id,
-      summary: template.summary,
-      explanation: 'Analyzed window focus patterns and screenshot content to determine the primary activities during this session.',
-      confidence: template.confidence,
-      tags: template.tags,
-      modelUsed: 'gemma3n-e2b-q4',
-      inferenceTimeMs: 2500 + Math.random() * 1000,
-      screenshotIds: Array.from({ length: 5 }, (_, i) => id * 100 + i),
-      contextJson: null,
-      createdAt: endTime + 60,
-    },
+    isOngoing: false,
+    summary: template.summary,
+    explanation: 'Analyzed window focus patterns and screenshot content to determine the primary activities during this session.',
+    confidence: template.confidence,
+    tags: template.tags,
+    topApps: template.topApps,
+    hasShell: Math.random() > 0.3,
+    hasGit: Math.random() > 0.5,
+    hasFiles: Math.random() > 0.4,
+    hasBrowser: Math.random() > 0.3,
   };
 }
 
 export const mockData = {
   getDailyStats: (date: string): DailyStats => ({
     date,
-    totalScreenshots: 450,
+    totalScreenshots: 580,
     totalSessions: 8,
-    activeMinutes: 285,
+    activeMinutes: 420,
     topApps: [
       { appName: 'VS Code', durationSeconds: 8400, percentage: 49, sessionCount: 6 },
       { appName: 'Firefox', durationSeconds: 3600, percentage: 21, sessionCount: 8 },
@@ -263,11 +284,14 @@ export const mockData = {
     const dayStart = dateToTimestamp(date);
 
     return [
-      generateSession(1, dayStart + 9 * hour, 45 * 60),           // 9:00-9:45 - Standup & code review
-      generateSession(2, dayStart + 10 * hour, 2 * hour),         // 10:00-12:00 - Deep work coding
-      generateSession(3, dayStart + 13 * hour, hour + 30 * 60),   // 13:00-14:30 - Research & docs
-      generateSession(4, dayStart + 14 * hour + 45 * 60, 2 * hour), // 14:45-16:45 - Debugging
-      generateSession(5, dayStart + 17 * hour, 45 * 60),          // 17:00-17:45 - Wrap-up
+      generateSession(1, dayStart + 8 * hour + 30 * 60, 30 * 60),   // 8:30-9:00 - Early morning emails
+      generateSession(2, dayStart + 9 * hour, 45 * 60),             // 9:00-9:45 - Standup & code review
+      generateSession(3, dayStart + 10 * hour, 2 * hour),           // 10:00-12:00 - Deep work coding
+      generateSession(4, dayStart + 12 * hour + 15 * 60, 45 * 60),  // 12:15-13:00 - Design review
+      generateSession(5, dayStart + 13 * hour + 30 * 60, hour),     // 13:30-14:30 - Research & docs
+      generateSession(6, dayStart + 14 * hour + 45 * 60, 90 * 60),  // 14:45-16:15 - Debugging
+      generateSession(7, dayStart + 16 * hour + 30 * 60, 45 * 60),  // 16:30-17:15 - DB optimization
+      generateSession(8, dayStart + 17 * hour + 30 * 60, 30 * 60),  // 17:30-18:00 - Wrap-up
     ];
   },
 
@@ -406,11 +430,38 @@ export const mockData = {
       },
     ];
 
-    const session = generateSession(sessionId, startTime, endTime - startTime);
+    const sessionData = generateSession(sessionId, startTime, endTime - startTime);
+    const template = sessionTemplates[sessionId % sessionTemplates.length];
+
+    // Create Session object (base type without summary fields)
+    const session = {
+      id: sessionData.id,
+      startTime: sessionData.startTime,
+      endTime: sessionData.endTime,
+      durationSeconds: sessionData.durationSeconds,
+      screenshotCount: sessionData.screenshotCount,
+      summaryId: sessionData.summaryId,
+      createdAt: sessionData.createdAt,
+    };
+
+    // Create Summary object
+    const summary = {
+      id: sessionId,
+      sessionId,
+      summary: template.summary,
+      explanation: 'Analyzed window focus patterns and screenshot content to determine the primary activities during this session.',
+      confidence: template.confidence,
+      tags: template.tags,
+      modelUsed: 'gemma3n-e2b-q4',
+      inferenceTimeMs: 2500 + Math.random() * 1000,
+      screenshotIds: Array.from({ length: 5 }, (_, i) => sessionId * 100 + i),
+      contextJson: null,
+      createdAt: endTime + 60,
+    };
 
     return {
       session,
-      summary: session.summary,
+      summary,
       screenshots: generateScreenshots(sessionId, 10, startTime),
       focusEvents,
       shellCommands,

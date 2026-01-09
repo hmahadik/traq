@@ -5,6 +5,7 @@ export interface Screenshot {
   dhash: string;
   windowTitle: string | null;
   appName: string | null;
+  windowClass: string | null;
   windowX: number | null;
   windowY: number | null;
   windowWidth: number | null;

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Database, FolderOpen, HardDrive, Image } from 'lucide-react';
+import { Database, FolderOpen, HardDrive, Image, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   Dialog,
@@ -21,9 +21,11 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Progress } from '@/components/ui/progress';
-import { useConfig, useUpdateConfig, useInferenceStatus, useAvailableModels, useStorageStats, useOpenDataDir, useDataDir } from '@/api/hooks';
+import { useConfig, useUpdateConfig, useInferenceStatus, useAvailableModels, useStorageStats, useOpenDataDir, useDataDir, useOptimizeDatabase } from '@/api/hooks';
 import { formatBytes } from '@/lib/utils';
 import { CategoriesTab } from '@/components/settings/CategoriesTab';
+import { GitRepositoriesSection } from '@/components/settings/GitRepositoriesSection';
+import { FileWatchDirectoriesSection } from '@/components/settings/FileWatchDirectoriesSection';
 
 interface SettingsDrawerProps {
   open: boolean;
@@ -38,8 +40,28 @@ export function SettingsDrawer({ open, onOpenChange }: SettingsDrawerProps) {
   const { data: dataDir } = useDataDir();
   const updateConfig = useUpdateConfig();
   const openDataDir = useOpenDataDir();
+  const optimizeDatabase = useOptimizeDatabase();
 
   const [downloadProgress] = useState<number | null>(null);
+
+  const handleOptimizeDatabase = async () => {
+    try {
+      const bytesReclaimed = await optimizeDatabase.mutateAsync();
+      if (bytesReclaimed > 0) {
+        toast.success('Database optimized', {
+          description: `Reclaimed ${formatBytes(bytesReclaimed)} of space`,
+        });
+      } else {
+        toast.success('Database optimized', {
+          description: 'Database is already optimized',
+        });
+      }
+    } catch (error) {
+      toast.error('Failed to optimize database', {
+        description: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  };
 
   const handleOpenDataDir = async () => {
     try {
@@ -434,6 +456,36 @@ export function SettingsDrawer({ open, onOpenChange }: SettingsDrawerProps) {
               />
             </div>
 
+            {/* Shell Type Selection */}
+            {config.dataSources.shell.enabled && (
+              <div className="pl-4 border-l-2 border-muted space-y-3">
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">Shell Type</label>
+                  <select
+                    className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                    value={config.dataSources.shell.shellType || 'auto'}
+                    onChange={(e) =>
+                      updateConfig.mutate({
+                        dataSources: {
+                          ...config.dataSources,
+                          shell: { ...config.dataSources.shell, shellType: e.target.value },
+                        },
+                      })
+                    }
+                  >
+                    <option value="auto">Auto-detect</option>
+                    <option value="bash">Bash</option>
+                    <option value="zsh">Zsh</option>
+                    <option value="fish">Fish</option>
+                    <option value="powershell">PowerShell</option>
+                  </select>
+                  <p className="text-xs text-muted-foreground">
+                    Select your shell or use auto-detect
+                  </p>
+                </div>
+              </div>
+            )}
+
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">
                 <label className="text-sm font-medium">Git Activity</label>
@@ -454,6 +506,13 @@ export function SettingsDrawer({ open, onOpenChange }: SettingsDrawerProps) {
               />
             </div>
 
+            {/* Git Repository Management */}
+            {config.dataSources.git.enabled && (
+              <div className="pl-4 border-l-2 border-muted">
+                <GitRepositoriesSection />
+              </div>
+            )}
+
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">
                 <label className="text-sm font-medium">File Changes</label>
@@ -473,6 +532,13 @@ export function SettingsDrawer({ open, onOpenChange }: SettingsDrawerProps) {
                 }
               />
             </div>
+
+            {/* File Watch Directories Management */}
+            {config.dataSources.files.enabled && (
+              <div className="pl-4 border-l-2 border-muted">
+                <FileWatchDirectoriesSection />
+              </div>
+            )}
 
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">
@@ -545,15 +611,26 @@ export function SettingsDrawer({ open, onOpenChange }: SettingsDrawerProps) {
                   <p className="text-xs font-mono break-all">{dataDir}</p>
                 </div>
               )}
-              <Button
-                variant="outline"
-                className="w-full"
-                onClick={handleOpenDataDir}
-                disabled={openDataDir.isPending}
-              >
-                <FolderOpen className="h-4 w-4 mr-2" />
-                Open Data Directory
-              </Button>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={handleOpenDataDir}
+                  disabled={openDataDir.isPending}
+                >
+                  <FolderOpen className="h-4 w-4 mr-2" />
+                  Open Data Directory
+                </Button>
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={handleOptimizeDatabase}
+                  disabled={optimizeDatabase.isPending}
+                >
+                  <Sparkles className="h-4 w-4 mr-2" />
+                  {optimizeDatabase.isPending ? 'Optimizing...' : 'Optimize'}
+                </Button>
+              </div>
             </div>
 
             <div className="space-y-2">

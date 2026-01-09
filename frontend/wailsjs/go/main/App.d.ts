@@ -101,13 +101,19 @@ export function IsReady():Promise<boolean>;
 
 export function OpenDataDir():Promise<void>;
 
+export function OptimizeDatabase():Promise<number>;
+
 export function ParseTimeRange(arg1:string):Promise<service.TimeRange>;
+
+export function PauseCapture():Promise<void>;
 
 export function RegenerateSummary(arg1:number):Promise<storage.Summary>;
 
 export function RegisterGitRepository(arg1:string):Promise<storage.GitRepository>;
 
 export function RestartTracking():Promise<void>;
+
+export function ResumeCapture():Promise<void>;
 
 export function SaveAppCategory(arg1:string,arg2:string):Promise<void>;
 

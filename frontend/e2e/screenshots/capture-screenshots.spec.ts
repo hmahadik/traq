@@ -115,7 +115,7 @@ test.describe('Documentation Screenshots', () => {
           }
 
           // Extra wait for animations/data loading
-          await page.waitForTimeout(500);
+          await page.waitForTimeout(1500);
 
           // Close settings drawer if open before next screenshot
           if (shot.action === 'openSettings') {
@@ -155,7 +155,7 @@ test.describe('Documentation Screenshots', () => {
             }
           }
 
-          await page.waitForTimeout(500);
+          await page.waitForTimeout(1500);
           await captureScreenshot(page, shot.name, theme);
         }
       });

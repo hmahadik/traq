@@ -87,3 +87,40 @@ func (s *Store) Transaction(fn func(*sql.Tx) error) error {
 
 	return nil
 }
+
+// Optimize runs VACUUM and ANALYZE on the database to reclaim space and update statistics.
+// Returns the size reduction in bytes (positive if space was reclaimed).
+func (s *Store) Optimize() (int64, error) {
+	// Get size before optimization
+	sizeBefore, err := s.getDatabaseSize()
+	if err != nil {
+		return 0, fmt.Errorf("failed to get database size before optimization: %w", err)
+	}
+
+	// Run VACUUM to reclaim space and defragment the database
+	if _, err := s.db.Exec("VACUUM"); err != nil {
+		return 0, fmt.Errorf("failed to run VACUUM: %w", err)
+	}
+
+	// Run ANALYZE to update query planner statistics
+	if _, err := s.db.Exec("ANALYZE"); err != nil {
+		return 0, fmt.Errorf("failed to run ANALYZE: %w", err)
+	}
+
+	// Get size after optimization
+	sizeAfter, err := s.getDatabaseSize()
+	if err != nil {
+		return 0, fmt.Errorf("failed to get database size after optimization: %w", err)
+	}
+
+	return sizeBefore - sizeAfter, nil
+}
+
+// getDatabaseSize returns the current size of the database file in bytes.
+func (s *Store) getDatabaseSize() (int64, error) {
+	info, err := os.Stat(s.dbPath)
+	if err != nil {
+		return 0, err
+	}
+	return info.Size(), nil
+}

@@ -22,6 +22,7 @@ type ShellTracker struct {
 	store           *storage.Store
 	checkpointFile  string
 	excludePatterns []*regexp.Regexp
+	shellTypeOverride string // If set, overrides platform detection ("auto" means use platform)
 }
 
 // ShellCheckpoint stores the last read position for each history file.
@@ -52,6 +53,23 @@ func (t *ShellTracker) AddExcludePattern(pattern string) error {
 	return nil
 }
 
+// SetShellType sets the shell type to use. Use "auto" for auto-detection.
+func (t *ShellTracker) SetShellType(shellType string) {
+	if shellType == "" || shellType == "auto" {
+		t.shellTypeOverride = ""
+	} else {
+		t.shellTypeOverride = shellType
+	}
+}
+
+// GetShellType returns the configured or detected shell type.
+func (t *ShellTracker) GetShellType() string {
+	if t.shellTypeOverride != "" {
+		return t.shellTypeOverride
+	}
+	return t.platform.GetShellType()
+}
+
 // Poll reads new commands from history and saves them.
 func (t *ShellTracker) Poll(sessionID int64) ([]*storage.ShellCommand, error) {
 	histPath := t.platform.GetShellHistoryPath()
@@ -59,7 +77,7 @@ func (t *ShellTracker) Poll(sessionID int64) ([]*storage.ShellCommand, error) {
 		return nil, nil
 	}
 
-	shellType := t.platform.GetShellType()
+	shellType := t.GetShellType()
 
 	// Load checkpoint
 	checkpoint, err := t.loadCheckpoint()
@@ -299,10 +317,6 @@ func (t *ShellTracker) GetHistoryPath() string {
 	return t.platform.GetShellHistoryPath()
 }
 
-// GetShellType returns the shell type being tracked.
-func (t *ShellTracker) GetShellType() string {
-	return t.platform.GetShellType()
-}
 
 // ParsePowerShellHistory parses PowerShell history (Windows).
 func ParsePowerShellHistory(path string) ([]*storage.ShellCommand, error) {

@@ -18,6 +18,7 @@ import type {
 } from '@/types';
 
 // Check if mock mode is enabled via env var or URL param
+// This is checked dynamically on each API call to support navigation with mock param
 function isMockMode(): boolean {
   // Check environment variable
   if (import.meta.env.VITE_MOCK_DATA === 'true') {
@@ -38,7 +39,9 @@ function isMockMode(): boolean {
   return false;
 }
 
-export const MOCK_MODE = isMockMode();
+// Export function for dynamic checking - called on each API request
+// This supports navigation to URLs with ?mock=true after initial page load
+export { isMockMode as MOCK_MODE };
 
 // ============================================================================
 // Wails Runtime Utilities
@@ -150,49 +153,49 @@ export async function safeCall<T>(
  */
 export const analytics = {
   getDailyStats: async (date: string) => {
-    if (MOCK_MODE) return mockData.getDailyStats(date);
+    if (isMockMode()) return mockData.getDailyStats(date);
     await waitForReady();
     return withRetry(() => App.GetDailyStats(date));
   },
 
   getWeeklyStats: async (startDate: string) => {
-    if (MOCK_MODE) return mockData.getWeeklyStats(startDate);
+    if (isMockMode()) return mockData.getWeeklyStats(startDate);
     await waitForReady();
     return withRetry(() => App.GetWeeklyStats(startDate));
   },
 
   getMonthlyStats: async (year: number, month: number) => {
-    if (MOCK_MODE) return mockData.getWeeklyStats(`${year}-${String(month).padStart(2, '0')}-01`);
+    if (isMockMode()) return mockData.getWeeklyStats(`${year}-${String(month).padStart(2, '0')}-01`);
     await waitForReady();
     return withRetry(() => App.GetMonthlyStats(year, month));
   },
 
   getCalendarHeatmap: async (year: number, month: number) => {
-    if (MOCK_MODE) return mockData.getCalendarHeatmap(year, month);
+    if (isMockMode()) return mockData.getCalendarHeatmap(year, month);
     await waitForReady();
     return withRetry(() => App.GetCalendarHeatmap(year, month));
   },
 
   getAppUsage: async (start: number, end: number) => {
-    if (MOCK_MODE) return mockData.getAppUsage(start, end);
+    if (isMockMode()) return mockData.getAppUsage(start, end);
     await waitForReady();
     return withRetry(() => App.GetAppUsage(start, end));
   },
 
   getHourlyActivity: async (date: string) => {
-    if (MOCK_MODE) return mockData.getHourlyActivity(date);
+    if (isMockMode()) return mockData.getHourlyActivity(date);
     await waitForReady();
     return withRetry(() => App.GetHourlyActivity(date));
   },
 
   getDataSourceStats: async (start: number, end: number) => {
-    if (MOCK_MODE) return mockData.getDataSourceStats(start, end);
+    if (isMockMode()) return mockData.getDataSourceStats(start, end);
     await waitForReady();
     return withRetry(() => App.GetDataSourceStats(start, end));
   },
 
   getProductivityScore: async (date: string) => {
-    if (MOCK_MODE) return {
+    if (isMockMode()) return {
       score: 4,
       productiveMinutes: 240,
       neutralMinutes: 90,
@@ -205,7 +208,7 @@ export const analytics = {
   },
 
   getFocusDistribution: async (_date: string) => {
-    if (MOCK_MODE) {
+    if (isMockMode()) {
       // Return hourly focus data
       return Array.from({ length: 24 }, (_, hour) => {
         const isWorkHour = hour >= 9 && hour <= 18;
@@ -223,7 +226,7 @@ export const analytics = {
   },
 
   getActivityTags: async (date: string) => {
-    if (MOCK_MODE) return [
+    if (isMockMode()) return [
       { tag: 'coding', minutes: 180, percentage: 45 },
       { tag: 'research', minutes: 80, percentage: 20 },
       { tag: 'communication', minutes: 60, percentage: 15 },
@@ -234,7 +237,7 @@ export const analytics = {
   },
 
   getTopWindows: async (date: string, limit: number) => {
-    if (MOCK_MODE) return [
+    if (isMockMode()) return [
       { windowTitle: 'main.go - VS Code', appName: 'VS Code', durationSeconds: 3600 },
       { windowTitle: 'GitHub - Pull Request #42', appName: 'Firefox', durationSeconds: 1800 },
       { windowTitle: 'Terminal - ~/projects', appName: 'Terminal', durationSeconds: 1200 },
@@ -244,7 +247,7 @@ export const analytics = {
   },
 
   exportAnalytics: async (date: string, viewMode: string, format: string) => {
-    if (MOCK_MODE) return 'mock-export-path';
+    if (isMockMode()) return 'mock-export-path';
     await waitForReady();
     return withRetry(() => App.ExportAnalytics(date, viewMode, format));
   },
@@ -255,7 +258,7 @@ export const analytics = {
  */
 export const timeline = {
   getSessionsForDate: async (date: string) => {
-    if (MOCK_MODE) return mockData.getSessionsForDate(date);
+    if (isMockMode()) return mockData.getSessionsForDate(date);
     await waitForReady();
     return withRetry(() => App.GetSessionsForDate(date));
   },
@@ -265,25 +268,25 @@ export const timeline = {
     page: number,
     perPage: number
   ) => {
-    if (MOCK_MODE) return mockData.getScreenshotsForSession(sessionId, page, perPage);
+    if (isMockMode()) return mockData.getScreenshotsForSession(sessionId, page, perPage);
     await waitForReady();
     return withRetry(() => App.GetScreenshotsForSession(sessionId, page, perPage));
   },
 
   getScreenshotsForHour: async (date: string, hour: number) => {
-    if (MOCK_MODE) return mockData.getScreenshotsForHour(date, hour);
+    if (isMockMode()) return mockData.getScreenshotsForHour(date, hour);
     await waitForReady();
     return withRetry(() => App.GetScreenshotsForHour(date, hour));
   },
 
   getSessionContext: async (sessionId: number) => {
-    if (MOCK_MODE) return mockData.getSessionContext(sessionId);
+    if (isMockMode()) return mockData.getSessionContext(sessionId);
     await waitForReady();
     return withRetry(() => App.GetSessionContext(sessionId));
   },
 
   getRecentSessions: async (limit: number) => {
-    if (MOCK_MODE) {
+    if (isMockMode()) {
       const today = new Date().toISOString().split('T')[0];
       return mockData.getSessionsForDate(today).slice(0, limit);
     }
@@ -292,7 +295,7 @@ export const timeline = {
   },
 
   deleteSession: async (sessionId: number) => {
-    if (MOCK_MODE) return;
+    if (isMockMode()) return;
     await waitForReady();
     return App.DeleteSession(sessionId);
   },
@@ -303,37 +306,37 @@ export const timeline = {
  */
 export const reports = {
   generateReport: async (timeRange: string, reportType: string, _includeScreenshots: boolean) => {
-    if (MOCK_MODE) return mockData.generateReport(timeRange, reportType);
+    if (isMockMode()) return mockData.generateReport(timeRange, reportType);
     await waitForReady();
     return withRetry(() => App.GenerateReport(timeRange, reportType, _includeScreenshots));
   },
 
   getReport: async (id: number) => {
-    if (MOCK_MODE) return mockData.generateReport('today', 'summary');
+    if (isMockMode()) return mockData.generateReport('today', 'summary');
     await waitForReady();
     return withRetry(() => App.GetReport(id));
   },
 
   exportReport: async (reportId: number, format: string) => {
-    if (MOCK_MODE) return `mock-report-${reportId}.${format}`;
+    if (isMockMode()) return `mock-report-${reportId}.${format}`;
     await waitForReady();
     return withRetry(() => App.ExportReport(reportId, format));
   },
 
   getReportHistory: async () => {
-    if (MOCK_MODE) return mockData.getReportHistory();
+    if (isMockMode()) return mockData.getReportHistory();
     await waitForReady();
     return withRetry(() => App.GetReportHistory());
   },
 
   getDailySummaries: async (limit: number = 30) => {
-    if (MOCK_MODE) return mockData.getReportHistory().slice(0, limit);
+    if (isMockMode()) return mockData.getReportHistory().slice(0, limit);
     await waitForReady();
     return withRetry(() => App.GetDailySummaries(limit));
   },
 
   parseTimeRange: async (input: string) => {
-    if (MOCK_MODE) return mockData.parseTimeRange(input);
+    if (isMockMode()) return mockData.parseTimeRange(input);
     await waitForReady();
     return withRetry(() => App.ParseTimeRange(input));
   },
@@ -344,7 +347,7 @@ export const reports = {
  */
 export const config = {
   getConfig: async () => {
-    if (MOCK_MODE) return mockData.getConfig();
+    if (isMockMode()) return mockData.getConfig();
     await waitForReady();
     return withRetry(() => App.GetConfig());
   },
@@ -374,17 +377,33 @@ export const config = {
     return App.StopTracking();
   },
 
+  pauseCapture: async () => {
+    await waitForReady();
+    return App.PauseCapture();
+  },
+
+  resumeCapture: async () => {
+    await waitForReady();
+    return App.ResumeCapture();
+  },
+
   getStorageStats: async () => {
     await waitForReady();
     return withRetry(() => App.GetStorageStats());
   },
 
-  // These are stubs - inference not implemented yet
+  optimizeDatabase: async (): Promise<number> => {
+    await waitForReady();
+    return App.OptimizeDatabase();
+  },
+
   getInferenceStatus: async (): Promise<InferenceStatus> => {
+    await waitForReady();
+    const status = await withRetry(() => App.GetInferenceStatus());
     return {
-      type: 'bundled',
-      available: false,
-      model: '',
+      type: (status.engine || 'bundled') as 'bundled' | 'ollama' | 'cloud',
+      available: status.available,
+      model: status.modelName || '',
       error: null,
     };
   },
@@ -406,27 +425,27 @@ export const config = {
  */
 export const screenshots = {
   getScreenshot: async (id: number) => {
-    if (MOCK_MODE) return mockData.getScreenshot(id);
+    if (isMockMode()) return mockData.getScreenshot(id);
     await waitForReady();
     return withRetry(() => App.GetScreenshot(id));
   },
 
   getScreenshotImage: async (id: number) => {
     // Returns the file:// path to the screenshot
-    if (MOCK_MODE) return mockData.getScreenshotImageUrl(id);
+    if (isMockMode()) return mockData.getScreenshotImageUrl(id);
     await waitForReady();
     return withRetry(() => App.GetScreenshotPath(id));
   },
 
   getThumbnail: async (id: number) => {
     // Returns the file:// path to the thumbnail
-    if (MOCK_MODE) return mockData.getThumbnailUrl(id);
+    if (isMockMode()) return mockData.getThumbnailUrl(id);
     await waitForReady();
     return withRetry(() => App.GetThumbnailPath(id));
   },
 
   deleteScreenshot: async (id: number) => {
-    if (MOCK_MODE) return;
+    if (isMockMode()) return;
     await waitForReady();
     return App.DeleteScreenshot(id);
   },
@@ -482,6 +501,58 @@ export const summaries = {
   },
 };
 
+/**
+ * Git Repository API - Manage tracked git repositories
+ */
+export interface GitRepository {
+  id: number;
+  path: string;
+  name: string;
+  remoteUrl: { String: string; Valid: boolean } | null;
+  lastScanned: { Int64: number; Valid: boolean } | null;
+  isActive: boolean;
+  createdAt: number;
+}
+
+export const git = {
+  getTrackedRepositories: async (): Promise<GitRepository[]> => {
+    await waitForReady();
+    const repos = await withRetry(() => App.GetTrackedRepositories());
+    return repos || [];
+  },
+
+  registerRepository: async (path: string): Promise<GitRepository> => {
+    await waitForReady();
+    return App.RegisterGitRepository(path);
+  },
+
+  unregisterRepository: async (repoId: number): Promise<void> => {
+    await waitForReady();
+    return App.UnregisterGitRepository(repoId);
+  },
+};
+
+/**
+ * File Watch API - Manage watched directories for file event tracking
+ */
+export const fileWatch = {
+  getWatchedDirectories: async (): Promise<string[]> => {
+    await waitForReady();
+    const dirs = await withRetry(() => App.GetWatchedDirectories());
+    return dirs || [];
+  },
+
+  watchDirectory: async (path: string): Promise<void> => {
+    await waitForReady();
+    return App.WatchDirectory(path);
+  },
+
+  unwatchDirectory: async (path: string): Promise<void> => {
+    await waitForReady();
+    return App.UnwatchDirectory(path);
+  },
+};
+
 // Unified API export
 export const api = {
   analytics,
@@ -491,4 +562,6 @@ export const api = {
   screenshots,
   system,
   summaries,
+  git,
+  fileWatch,
 };

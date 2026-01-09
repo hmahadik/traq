@@ -194,8 +194,16 @@ export function OpenDataDir() {
   return window['go']['main']['App']['OpenDataDir']();
 }
 
+export function OptimizeDatabase() {
+  return window['go']['main']['App']['OptimizeDatabase']();
+}
+
 export function ParseTimeRange(arg1) {
   return window['go']['main']['App']['ParseTimeRange'](arg1);
+}
+
+export function PauseCapture() {
+  return window['go']['main']['App']['PauseCapture']();
 }
 
 export function RegenerateSummary(arg1) {
@@ -208,6 +216,10 @@ export function RegisterGitRepository(arg1) {
 
 export function RestartTracking() {
   return window['go']['main']['App']['RestartTracking']();
+}
+
+export function ResumeCapture() {
+  return window['go']['main']['App']['ResumeCapture']();
 }
 
 export function SaveAppCategory(arg1, arg2) {

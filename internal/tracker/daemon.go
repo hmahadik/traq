@@ -49,6 +49,7 @@ type Daemon struct {
 	browser *BrowserTracker
 
 	running   bool
+	paused    bool
 	stopCh    chan struct{}
 	mu        sync.RWMutex
 	lastDHash string
@@ -155,6 +156,28 @@ func (d *Daemon) IsRunning() bool {
 	return d.running
 }
 
+// IsPaused returns whether capture is paused.
+func (d *Daemon) IsPaused() bool {
+	d.mu.RLock()
+	defer d.mu.RUnlock()
+	return d.paused
+}
+
+// Pause pauses screenshot capture without stopping the daemon.
+// The daemon continues running but skips capture operations.
+func (d *Daemon) Pause() {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.paused = true
+}
+
+// Resume resumes screenshot capture after a pause.
+func (d *Daemon) Resume() {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.paused = false
+}
+
 // GetStatus returns the current daemon status.
 func (d *Daemon) GetStatus() *DaemonStatus {
 	d.mu.RLock()
@@ -162,6 +185,7 @@ func (d *Daemon) GetStatus() *DaemonStatus {
 
 	return &DaemonStatus{
 		Running:         d.running,
+		Paused:          d.paused,
 		IsAFK:           d.afk.IsAFK(),
 		CurrentSession:  d.session.GetCurrentSession(),
 		SessionDuration: d.session.GetSessionDuration(),
@@ -172,6 +196,7 @@ func (d *Daemon) GetStatus() *DaemonStatus {
 // DaemonStatus represents the current status of the daemon.
 type DaemonStatus struct {
 	Running         bool
+	Paused          bool
 	IsAFK           bool
 	CurrentSession  *storage.Session
 	SessionDuration time.Duration
@@ -205,6 +230,14 @@ func (d *Daemon) tick() {
 
 	// Don't capture if AFK
 	if d.afk.IsAFK() {
+		return
+	}
+
+	// Don't capture if paused
+	d.mu.RLock()
+	paused := d.paused
+	d.mu.RUnlock()
+	if paused {
 		return
 	}
 
@@ -257,6 +290,7 @@ func (d *Daemon) tick() {
 	if windowInfo != nil {
 		sc.WindowTitle = sql.NullString{String: windowInfo.Title, Valid: windowInfo.Title != ""}
 		sc.AppName = sql.NullString{String: windowInfo.AppName, Valid: windowInfo.AppName != ""}
+		sc.WindowClass = sql.NullString{String: windowInfo.Class, Valid: windowInfo.Class != ""}
 		sc.WindowX = sql.NullInt64{Int64: int64(windowInfo.X), Valid: true}
 		sc.WindowY = sql.NullInt64{Int64: int64(windowInfo.Y), Valid: true}
 		sc.WindowWidth = sql.NullInt64{Int64: int64(windowInfo.Width), Valid: true}
@@ -314,6 +348,16 @@ func (d *Daemon) UpdateConfig(config *DaemonConfig) {
 	if config.ResumeWindow > 0 {
 		d.session.SetResumeWindow(config.ResumeWindow)
 	}
+}
+
+// SetShellType sets the shell type for tracking.
+func (d *Daemon) SetShellType(shellType string) {
+	d.shell.SetShellType(shellType)
+}
+
+// GetShellType returns the current shell type being tracked.
+func (d *Daemon) GetShellType() string {
+	return d.shell.GetShellType()
 }
 
 // ForceCapture forces an immediate screenshot capture.

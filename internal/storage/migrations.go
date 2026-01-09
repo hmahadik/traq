@@ -4,7 +4,7 @@ import (
 	"fmt"
 )
 
-const schemaVersion = 1
+const schemaVersion = 2
 
 const schema = `
 -- ============================================================================
@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS screenshots (
     dhash TEXT NOT NULL,
     window_title TEXT,
     app_name TEXT,
+    window_class TEXT,
     window_x INTEGER,
     window_y INTEGER,
     window_width INTEGER,
@@ -32,6 +33,7 @@ CREATE TABLE IF NOT EXISTS screenshots (
 CREATE INDEX IF NOT EXISTS idx_screenshots_timestamp ON screenshots(timestamp);
 CREATE INDEX IF NOT EXISTS idx_screenshots_session ON screenshots(session_id);
 CREATE INDEX IF NOT EXISTS idx_screenshots_dhash ON screenshots(dhash);
+CREATE INDEX IF NOT EXISTS idx_screenshots_session_ts ON screenshots(session_id, timestamp);
 
 CREATE TABLE IF NOT EXISTS sessions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -45,6 +47,7 @@ CREATE TABLE IF NOT EXISTS sessions (
 
 CREATE INDEX IF NOT EXISTS idx_sessions_start ON sessions(start_time);
 CREATE INDEX IF NOT EXISTS idx_sessions_end ON sessions(end_time);
+CREATE INDEX IF NOT EXISTS idx_sessions_time_range ON sessions(start_time, end_time);
 
 CREATE TABLE IF NOT EXISTS summaries (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -76,6 +79,8 @@ CREATE TABLE IF NOT EXISTS window_focus_events (
 
 CREATE INDEX IF NOT EXISTS idx_focus_session ON window_focus_events(session_id);
 CREATE INDEX IF NOT EXISTS idx_focus_start ON window_focus_events(start_time);
+CREATE INDEX IF NOT EXISTS idx_focus_app ON window_focus_events(app_name);
+CREATE INDEX IF NOT EXISTS idx_focus_end ON window_focus_events(end_time);
 
 -- ============================================================================
 -- Extended Data Sources
@@ -149,6 +154,8 @@ CREATE TABLE IF NOT EXISTS file_events (
 CREATE INDEX IF NOT EXISTS idx_files_timestamp ON file_events(timestamp);
 CREATE INDEX IF NOT EXISTS idx_files_session ON file_events(session_id);
 CREATE INDEX IF NOT EXISTS idx_files_category ON file_events(watch_category);
+CREATE INDEX IF NOT EXISTS idx_files_extension ON file_events(file_extension);
+CREATE INDEX IF NOT EXISTS idx_files_event_type ON file_events(event_type);
 
 CREATE TABLE IF NOT EXISTS browser_history (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -166,6 +173,7 @@ CREATE TABLE IF NOT EXISTS browser_history (
 CREATE INDEX IF NOT EXISTS idx_browser_timestamp ON browser_history(timestamp);
 CREATE INDEX IF NOT EXISTS idx_browser_session ON browser_history(session_id);
 CREATE INDEX IF NOT EXISTS idx_browser_domain ON browser_history(domain);
+CREATE INDEX IF NOT EXISTS idx_browser_domain_ts ON browser_history(domain, timestamp);
 
 -- ============================================================================
 -- Reports & Configuration
@@ -230,6 +238,14 @@ func (s *Store) Migrate() error {
 		return fmt.Errorf("failed to apply schema: %w", err)
 	}
 
+	// Apply incremental migrations
+	if currentVersion < 2 {
+		// Migration v2: Add window_class column to screenshots table
+		if err := s.applyMigration2(); err != nil {
+			return fmt.Errorf("failed to apply migration 2: %w", err)
+		}
+	}
+
 	// Record schema version
 	if currentVersion == 0 {
 		_, err = s.db.Exec("INSERT OR REPLACE INTO schema_version (version) VALUES (?)", schemaVersion)
@@ -240,6 +256,28 @@ func (s *Store) Migrate() error {
 		return fmt.Errorf("failed to update schema version: %w", err)
 	}
 
+	return nil
+}
+
+// applyMigration2 adds window_class column to screenshots table.
+func (s *Store) applyMigration2() error {
+	// Check if column already exists
+	var count int
+	err := s.db.QueryRow(`
+		SELECT COUNT(*) FROM pragma_table_info('screenshots') WHERE name = 'window_class'
+	`).Scan(&count)
+	if err != nil {
+		return fmt.Errorf("failed to check column existence: %w", err)
+	}
+	if count > 0 {
+		return nil // Column already exists
+	}
+
+	// Add the window_class column
+	_, err = s.db.Exec(`ALTER TABLE screenshots ADD COLUMN window_class TEXT`)
+	if err != nil {
+		return fmt.Errorf("failed to add window_class column: %w", err)
+	}
 	return nil
 }
 

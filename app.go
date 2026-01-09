@@ -232,6 +232,22 @@ func (a *App) RestartTracking() error {
 	return a.Config.RestartDaemon()
 }
 
+// PauseCapture pauses screenshot capture without stopping the daemon.
+func (a *App) PauseCapture() {
+	if a.Config == nil {
+		return
+	}
+	a.Config.PauseDaemon()
+}
+
+// ResumeCapture resumes screenshot capture after a pause.
+func (a *App) ResumeCapture() {
+	if a.Config == nil {
+		return
+	}
+	a.Config.ResumeDaemon()
+}
+
 // ForceCapture forces an immediate screenshot capture.
 func (a *App) ForceCapture() (string, error) {
 	if a.daemon == nil {
@@ -620,6 +636,15 @@ func (a *App) GetStorageStats() (*service.StorageStats, error) {
 		return nil, nil
 	}
 	return a.Config.GetStorageStats()
+}
+
+// OptimizeDatabase runs VACUUM and ANALYZE to reclaim space and optimize the database.
+// Returns the size reduction in bytes (positive if space was reclaimed).
+func (a *App) OptimizeDatabase() (int64, error) {
+	if a.Config == nil {
+		return 0, fmt.Errorf("config service not initialized")
+	}
+	return a.Config.OptimizeDatabase()
 }
 
 // ============================================================================

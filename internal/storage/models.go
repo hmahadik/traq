@@ -13,6 +13,7 @@ type Screenshot struct {
 	DHash         string         `json:"dhash"`
 	WindowTitle   sql.NullString `json:"windowTitle"`
 	AppName       sql.NullString `json:"appName"`
+	WindowClass   sql.NullString `json:"windowClass"`
 	WindowX       sql.NullInt64  `json:"windowX"`
 	WindowY       sql.NullInt64  `json:"windowY"`
 	WindowWidth   sql.NullInt64  `json:"windowWidth"`

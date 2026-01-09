@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" fill="none">
+  <!-- Traq Logo - Timeline Track Concept -->
+
+  <!-- Background circle (optional, can be removed) -->
+  <circle cx="100" cy="100" r="90" fill="url(#gradient1)" />
+
+  <!-- Track/Path element -->
+  <path
+    d="M 50 100 Q 75 60 100 100 Q 125 140 150 100"
+    stroke="white"
+    stroke-width="8"
+    stroke-linecap="round"
+    fill="none"
+    opacity="0.3"
+  />
+
+  <!-- Stylized "T" made of timeline nodes -->
+  <!-- Horizontal bar of T -->
+  <line x1="55" y1="70" x2="145" y2="70" stroke="white" stroke-width="10" stroke-linecap="round"/>
+
+  <!-- Vertical bar of T -->
+  <line x1="100" y1="70" x2="100" y2="145" stroke="white" stroke-width="10" stroke-linecap="round"/>
+
+  <!-- Timeline nodes on the T -->
+  <circle cx="55" cy="70" r="8" fill="white"/>
+  <circle cx="100" cy="70" r="10" fill="white"/>
+  <circle cx="145" cy="70" r="8" fill="white"/>
+  <circle cx="100" cy="107" r="6" fill="white" opacity="0.7"/>
+  <circle cx="100" cy="145" r="8" fill="white"/>
+
+  <!-- Pulse ring on center node -->
+  <circle cx="100" cy="70" r="16" stroke="white" stroke-width="2" fill="none" opacity="0.5"/>
+
+  <defs>
+    <linearGradient id="gradient1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#6366f1"/>
+      <stop offset="100%" stop-color="#8b5cf6"/>
+    </linearGradient>
+  </defs>
+</svg>

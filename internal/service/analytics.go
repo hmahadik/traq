@@ -504,9 +504,26 @@ func (s *AnalyticsService) GetDataSourceStats(start, end int64) (*DataSourceStat
 			repoCounts[commit.RepositoryID] = &RepoUsage{}
 		}
 		repoCounts[commit.RepositoryID].CommitCount++
+		if commit.Insertions.Valid {
+			repoCounts[commit.RepositoryID].Insertions += commit.Insertions.Int64
+		}
+		if commit.Deletions.Valid {
+			repoCounts[commit.RepositoryID].Deletions += commit.Deletions.Int64
+		}
 	}
 	repos, _ := s.store.GetAllGitRepositories()
 	gitStats.TotalRepos = int64(len(repos))
+	// Build TopRepos by matching repo IDs to names
+	repoNameMap := make(map[int64]string)
+	for _, repo := range repos {
+		repoNameMap[repo.ID] = repo.Name
+	}
+	for repoID, usage := range repoCounts {
+		if name, ok := repoNameMap[repoID]; ok {
+			usage.RepoName = name
+			gitStats.TopRepos = append(gitStats.TopRepos, usage)
+		}
+	}
 	stats.Git = gitStats
 
 	// File stats

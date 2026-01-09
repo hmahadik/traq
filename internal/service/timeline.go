@@ -42,6 +42,7 @@ type ScreenshotPage struct {
 	Page        int                   `json:"page"`
 	PerPage     int                   `json:"perPage"`
 	TotalPages  int                   `json:"totalPages"`
+	HasMore     bool                  `json:"hasMore"`
 }
 
 // SessionContext contains all data for a session.
@@ -170,6 +171,7 @@ func (s *TimelineService) GetScreenshotsForSession(sessionID int64, page, perPag
 			Page:        page,
 			PerPage:     perPage,
 			TotalPages:  totalPages,
+			HasMore:     false,
 		}, nil
 	}
 	if end > len(screenshots) {
@@ -182,6 +184,7 @@ func (s *TimelineService) GetScreenshotsForSession(sessionID int64, page, perPag
 		Page:        page,
 		PerPage:     perPage,
 		TotalPages:  totalPages,
+		HasMore:     page < totalPages,
 	}, nil
 }
 
