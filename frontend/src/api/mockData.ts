@@ -60,6 +60,8 @@ function generateScreenshots(sessionId: number, count: number, startTime: number
     dhash: `hash_${sessionId}_${i}`,
     windowTitle: titles[i % titles.length],
     appName: apps[i % apps.length],
+    windowClass: null,
+    processPid: 1234 + i,
     windowX: 0,
     windowY: 0,
     windowWidth: 1920,
@@ -542,6 +544,8 @@ export const mockData = {
       intervalSeconds: 30,
       quality: 80,
       duplicateThreshold: 3,
+      monitorMode: 'active_window',
+      monitorIndex: 0,
     },
     afk: {
       timeoutSeconds: 180,
@@ -560,11 +564,14 @@ export const mockData = {
         provider: 'anthropic',
         apiKey: '',
         model: 'claude-sonnet-4-20250514',
+        endpoint: '',
       },
     },
     dataSources: {
       shell: {
         enabled: true,
+        shellType: 'auto',
+        historyPath: '',
         excludePatterns: ['^(ls|cd|pwd|clear)$'],
       },
       git: {
@@ -578,10 +585,14 @@ export const mockData = {
           { path: '~/Downloads', category: 'downloads', recursive: false },
           { path: '~/projects', category: 'projects', recursive: true },
         ],
+        excludePatterns: [],
+        allowedExtensions: [],
       },
       browser: {
         enabled: true,
         browsers: ['chrome', 'firefox'],
+        excludedDomains: [],
+        historyLimitDays: 7,
       },
     },
     ui: {
@@ -628,6 +639,8 @@ export const mockData = {
     dhash: `hash_${id}`,
     windowTitle: 'VS Code - main.go',
     appName: 'VS Code',
+    windowClass: null,
+    processPid: 1234,
     windowX: 0,
     windowY: 0,
     windowWidth: 1920,

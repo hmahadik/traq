@@ -5,7 +5,9 @@
  * background refetching, and optimistic updates.
  */
 
+import { useEffect, useState, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { EventsOn, EventsOff } from '@wailsjs/runtime/runtime';
 import { api } from './client';
 import type { Config } from '@/types';
 
@@ -302,19 +304,105 @@ export function useAvailableModels() {
 
 export function useDownloadModel() {
   const queryClient = useQueryClient();
+  const [progress, setProgress] = useState<number | null>(null);
+  const [downloadingModelId, setDownloadingModelId] = useState<string | null>(null);
 
-  return useMutation({
-    mutationFn: ({
-      modelId,
-      onProgress,
-    }: {
-      modelId: string;
-      onProgress: (progress: number) => void;
-    }) => api.config.downloadModel(modelId, onProgress),
-    onSuccess: () => {
+  useEffect(() => {
+    // Listen for download progress events
+    const cancelProgress = EventsOn('model:download:progress', (data: { modelId: string; percent: number }) => {
+      setProgress(data.percent);
+    });
+
+    const cancelComplete = EventsOn('model:download:complete', (data: { modelId: string }) => {
+      setProgress(null);
+      setDownloadingModelId(null);
+      // Refresh the models list to show the newly downloaded model
       queryClient.invalidateQueries({ queryKey: queryKeys.config.models() });
-    },
+    });
+
+    const cancelError = EventsOn('model:download:error', (data: { modelId: string; error: string }) => {
+      setProgress(null);
+      setDownloadingModelId(null);
+      console.error('Model download failed:', data.error);
+    });
+
+    return () => {
+      cancelProgress();
+      cancelComplete();
+      cancelError();
+    };
+  }, [queryClient]);
+
+  const download = useCallback(async (modelId: string) => {
+    setDownloadingModelId(modelId);
+    setProgress(0);
+    await api.config.downloadModel(modelId, () => {});
+  }, []);
+
+  return {
+    download,
+    progress,
+    downloadingModelId,
+    isDownloading: downloadingModelId !== null,
+  };
+}
+
+export function useServerStatus() {
+  return useQuery({
+    queryKey: ['config', 'server'],
+    queryFn: () => api.config.getServerStatus(),
+    staleTime: 30_000,
   });
+}
+
+export function useDownloadServer() {
+  const queryClient = useQueryClient();
+  const [progress, setProgress] = useState<number | null>(null);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Listen for download progress events
+    const cancelProgress = EventsOn('server:download:progress', (data: { percent: number }) => {
+      setProgress(data.percent);
+    });
+
+    const cancelComplete = EventsOn('server:download:complete', () => {
+      setProgress(null);
+      setIsDownloading(false);
+      setError(null);
+      // Refresh the server status to show it's installed
+      queryClient.invalidateQueries({ queryKey: ['config', 'server'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.config.inference() });
+    });
+
+    const cancelError = EventsOn('server:download:error', (data: { error: string }) => {
+      setProgress(null);
+      setIsDownloading(false);
+      setError(data.error);
+      console.error('Server download failed:', data.error);
+    });
+
+    return () => {
+      cancelProgress();
+      cancelComplete();
+      cancelError();
+    };
+  }, [queryClient]);
+
+  const download = useCallback(async () => {
+    setIsDownloading(true);
+    setProgress(0);
+    setError(null);
+    await api.config.downloadServer();
+  }, []);
+
+  return {
+    download,
+    progress,
+    isDownloading,
+    error,
+  };
 }
 
 export function useStorageStats() {
@@ -336,6 +424,14 @@ export function useDataDir() {
     queryKey: ['system', 'dataDir'],
     queryFn: () => api.system.getDataDir(),
     staleTime: Infinity, // Data directory doesn't change
+  });
+}
+
+export function useAvailableMonitors() {
+  return useQuery({
+    queryKey: ['system', 'monitors'],
+    queryFn: () => api.system.getAvailableMonitors(),
+    staleTime: 30_000, // 30 seconds - monitors can change on hot-plug
   });
 }
 

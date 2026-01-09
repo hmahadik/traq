@@ -15,6 +15,8 @@ import { mockData } from './mockData';
 import type {
   InferenceStatus,
   ModelInfo,
+  MonitorInfo,
+  ServerStatus,
 } from '@/types';
 
 // Check if mock mode is enabled via env var or URL param
@@ -409,14 +411,66 @@ export const config = {
   },
 
   getAvailableModels: async (): Promise<ModelInfo[]> => {
-    return [];
+    if (isMockMode()) return mockData.getAvailableModels();
+    await waitForReady();
+    const models = await withRetry(() => App.GetAvailableModels());
+    return models.map((m) => ({
+      id: m.id,
+      name: m.name,
+      size: m.size,
+      description: m.description,
+      downloaded: m.downloaded,
+      downloadUrl: m.downloadUrl,
+      filename: m.filename,
+    }));
   },
 
   downloadModel: async (
-    _modelId: string,
+    modelId: string,
     _onProgress: (progress: number) => void
   ): Promise<void> => {
-    console.warn('Model download not implemented');
+    if (isMockMode()) {
+      console.warn('Model download not available in mock mode');
+      return;
+    }
+    await waitForReady();
+    // Start the download - progress will come via events
+    await withRetry(() => App.DownloadModel(modelId));
+  },
+
+  deleteModel: async (modelId: string): Promise<void> => {
+    if (isMockMode()) return;
+    await waitForReady();
+    await withRetry(() => App.DeleteModel(modelId));
+  },
+
+  getServerStatus: async (): Promise<ServerStatus> => {
+    if (isMockMode()) {
+      return {
+        installed: false,
+        serverPath: '/home/user/.local/share/traq/bin/llama-server',
+        version: 'b4547',
+      };
+    }
+    await waitForReady();
+    const status = await withRetry(() => App.GetServerStatus());
+    return {
+      installed: status.installed,
+      serverPath: status.serverPath,
+      version: status.version,
+      downloadUrl: status.downloadUrl,
+      size: status.size,
+    };
+  },
+
+  downloadServer: async (): Promise<void> => {
+    if (isMockMode()) {
+      console.warn('Server download not available in mock mode');
+      return;
+    }
+    await waitForReady();
+    // Start the download - progress will come via events
+    await withRetry(() => App.DownloadServer());
   },
 };
 
@@ -484,6 +538,19 @@ export const system = {
     await waitForReady();
     return App.ForceCapture();
   },
+
+  getAvailableMonitors: async (): Promise<MonitorInfo[]> => {
+    if (isMockMode()) {
+      // Return mock monitor data for development
+      return [
+        { index: 0, name: 'Display 1', width: 1920, height: 1080, x: 0, y: 0, isPrimary: true },
+        { index: 1, name: 'Display 2', width: 2560, height: 1440, x: 1920, y: 0, isPrimary: false },
+      ];
+    }
+    await waitForReady();
+    const monitors = await withRetry(() => App.GetAvailableMonitors());
+    return monitors || [];
+  },
 };
 
 /**
@@ -530,6 +597,12 @@ export const git = {
     await waitForReady();
     return App.UnregisterGitRepository(repoId);
   },
+
+  discoverRepositories: async (searchPaths: string[], maxDepth: number): Promise<GitRepository[]> => {
+    await waitForReady();
+    const repos = await App.DiscoverGitRepositories(searchPaths, maxDepth);
+    return repos || [];
+  },
 };
 
 /**
@@ -550,6 +623,17 @@ export const fileWatch = {
   unwatchDirectory: async (path: string): Promise<void> => {
     await waitForReady();
     return App.UnwatchDirectory(path);
+  },
+
+  getAllowedExtensions: async (): Promise<string[]> => {
+    await waitForReady();
+    const exts = await withRetry(() => App.GetFileAllowedExtensions());
+    return exts || [];
+  },
+
+  setAllowedExtensions: async (extensions: string[]): Promise<void> => {
+    await waitForReady();
+    return App.SetFileAllowedExtensions(extensions);
   },
 };
 

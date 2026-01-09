@@ -1,16 +1,21 @@
 import { useState, useEffect } from 'react';
-import { GitBranch, Plus, Trash2, FolderGit, ExternalLink } from 'lucide-react';
+import { GitBranch, Plus, Trash2, FolderGit, ExternalLink, Search, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { git, type GitRepository } from '@/api/client';
+import { useConfig, useUpdateConfig } from '@/api/hooks';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Slider } from '@/components/ui/slider';
 
 export function GitRepositoriesSection() {
+  const { data: config } = useConfig();
+  const updateConfig = useUpdateConfig();
   const [repos, setRepos] = useState<GitRepository[]>([]);
   const [loading, setLoading] = useState(true);
   const [newPath, setNewPath] = useState('');
   const [adding, setAdding] = useState(false);
+  const [discovering, setDiscovering] = useState(false);
 
   const loadRepos = async () => {
     try {
@@ -62,6 +67,38 @@ export function GitRepositoriesSection() {
     }
   };
 
+  const handleDiscover = async () => {
+    if (!config?.dataSources.git.searchPaths?.length) {
+      toast.error('No search paths configured', {
+        description: 'Add at least one search path below before discovering',
+      });
+      return;
+    }
+
+    try {
+      setDiscovering(true);
+      const maxDepth = config?.dataSources.git.maxDepth || 3;
+      const discovered = await git.discoverRepositories(
+        config.dataSources.git.searchPaths,
+        maxDepth
+      );
+
+      if (discovered.length > 0) {
+        setRepos((prev) => [...prev, ...discovered]);
+        toast.success(`Discovered ${discovered.length} new repositories`);
+      } else {
+        toast.info('No new repositories found', {
+          description: 'All repositories in search paths are already tracked',
+        });
+      }
+    } catch (error) {
+      console.error('Failed to discover repositories:', error);
+      toast.error('Failed to discover repositories');
+    } finally {
+      setDiscovering(false);
+    }
+  };
+
   const formatLastScanned = (lastScanned: GitRepository['lastScanned']) => {
     if (!lastScanned?.Valid) return 'Never';
     const date = new Date(lastScanned.Int64 * 1000);
@@ -96,7 +133,75 @@ export function GitRepositoriesSection() {
         <h4 className="text-sm font-medium">Git Repositories</h4>
       </div>
 
-      {/* Add new repository */}
+      {/* Search Paths Configuration */}
+      <div className="space-y-2 p-3 rounded-lg border bg-muted/30">
+        <label className="text-sm font-medium">Search Paths</label>
+        <p className="text-xs text-muted-foreground">
+          Directories to search for git repositories (one per line)
+        </p>
+        <textarea
+          className="w-full min-h-[60px] px-3 py-2 text-sm rounded-md border border-input bg-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 font-mono resize-none"
+          value={(config?.dataSources.git.searchPaths || []).join('\n')}
+          onChange={(e) => {
+            const paths = e.target.value
+              .split('\n')
+              .map((p) => p.trim())
+              .filter((p) => p.length > 0);
+            updateConfig.mutate({
+              dataSources: {
+                ...config?.dataSources,
+                git: { ...config?.dataSources.git, searchPaths: paths },
+              },
+            });
+          }}
+          placeholder="~/projects&#10;~/code&#10;~/Developer"
+        />
+
+        {/* Max Depth Slider */}
+        <div className="flex items-center justify-between pt-2">
+          <label className="text-sm text-muted-foreground">Search Depth</label>
+          <span className="text-sm font-medium">{config?.dataSources.git.maxDepth || 3}</span>
+        </div>
+        <Slider
+          value={[config?.dataSources.git.maxDepth || 3]}
+          min={1}
+          max={5}
+          step={1}
+          onValueChange={([value]) =>
+            updateConfig.mutate({
+              dataSources: {
+                ...config?.dataSources,
+                git: { ...config?.dataSources.git, maxDepth: value },
+              },
+            })
+          }
+        />
+        <p className="text-xs text-muted-foreground">
+          How many directory levels deep to search (1-5)
+        </p>
+
+        {/* Auto-discover button */}
+        <Button
+          onClick={handleDiscover}
+          disabled={discovering || !config?.dataSources.git.searchPaths?.length}
+          variant="secondary"
+          className="w-full mt-2"
+        >
+          {discovering ? (
+            <>
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              Discovering...
+            </>
+          ) : (
+            <>
+              <Search className="h-4 w-4 mr-2" />
+              Auto-Discover Repositories
+            </>
+          )}
+        </Button>
+      </div>
+
+      {/* Add new repository manually */}
       <div className="flex gap-2">
         <Input
           placeholder="/path/to/repository"
@@ -125,7 +230,7 @@ export function GitRepositoriesSection() {
           <div className="text-center py-4 text-sm text-muted-foreground">
             <GitBranch className="h-8 w-8 mx-auto mb-2 opacity-50" />
             <p>No repositories tracked</p>
-            <p className="text-xs">Add a repository path above to start tracking commits</p>
+            <p className="text-xs">Add search paths and click "Auto-Discover" or add manually</p>
           </div>
         ) : (
           repos.map((repo) => (

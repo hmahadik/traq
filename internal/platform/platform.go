@@ -27,6 +27,10 @@ type Platform interface {
 	// System
 	OpenURL(url string) error
 	ShowNotification(title, body string) error
+
+	// Autostart
+	SetAutoStart(enabled bool) error
+	IsAutoStartEnabled() (bool, error)
 }
 
 // WindowInfo contains information about a window.

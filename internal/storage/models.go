@@ -14,6 +14,7 @@ type Screenshot struct {
 	WindowTitle   sql.NullString `json:"windowTitle"`
 	AppName       sql.NullString `json:"appName"`
 	WindowClass   sql.NullString `json:"windowClass"`
+	ProcessPID    sql.NullInt64  `json:"processPid"`
 	WindowX       sql.NullInt64  `json:"windowX"`
 	WindowY       sql.NullInt64  `json:"windowY"`
 	WindowWidth   sql.NullInt64  `json:"windowWidth"`

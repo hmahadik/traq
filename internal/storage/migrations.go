@@ -4,7 +4,7 @@ import (
 	"fmt"
 )
 
-const schemaVersion = 2
+const schemaVersion = 3
 
 const schema = `
 -- ============================================================================
@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS screenshots (
     window_title TEXT,
     app_name TEXT,
     window_class TEXT,
+    process_pid INTEGER,
     window_x INTEGER,
     window_y INTEGER,
     window_width INTEGER,
@@ -245,6 +246,12 @@ func (s *Store) Migrate() error {
 			return fmt.Errorf("failed to apply migration 2: %w", err)
 		}
 	}
+	if currentVersion < 3 {
+		// Migration v3: Add process_pid column to screenshots table
+		if err := s.applyMigration3(); err != nil {
+			return fmt.Errorf("failed to apply migration 3: %w", err)
+		}
+	}
 
 	// Record schema version
 	if currentVersion == 0 {
@@ -277,6 +284,28 @@ func (s *Store) applyMigration2() error {
 	_, err = s.db.Exec(`ALTER TABLE screenshots ADD COLUMN window_class TEXT`)
 	if err != nil {
 		return fmt.Errorf("failed to add window_class column: %w", err)
+	}
+	return nil
+}
+
+// applyMigration3 adds process_pid column to screenshots table.
+func (s *Store) applyMigration3() error {
+	// Check if column already exists
+	var count int
+	err := s.db.QueryRow(`
+		SELECT COUNT(*) FROM pragma_table_info('screenshots') WHERE name = 'process_pid'
+	`).Scan(&count)
+	if err != nil {
+		return fmt.Errorf("failed to check column existence: %w", err)
+	}
+	if count > 0 {
+		return nil // Column already exists
+	}
+
+	// Add the process_pid column
+	_, err = s.db.Exec(`ALTER TABLE screenshots ADD COLUMN process_pid INTEGER`)
+	if err != nil {
+		return fmt.Errorf("failed to add process_pid column: %w", err)
 	}
 	return nil
 }

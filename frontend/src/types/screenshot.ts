@@ -6,6 +6,7 @@ export interface Screenshot {
   windowTitle: string | null;
   appName: string | null;
   windowClass: string | null;
+  processPid: number | null;
   windowX: number | null;
   windowY: number | null;
   windowWidth: number | null;

@@ -29,6 +29,8 @@ func (m *MockBrowserPlatform) GetBrowserHistoryPaths() map[string]string {
 }
 func (m *MockBrowserPlatform) OpenURL(url string) error                  { return nil }
 func (m *MockBrowserPlatform) ShowNotification(title, body string) error { return nil }
+func (m *MockBrowserPlatform) SetAutoStart(enabled bool) error           { return nil }
+func (m *MockBrowserPlatform) IsAutoStartEnabled() (bool, error)         { return false, nil }
 
 // setupBrowserTestStore creates a test store for browser tests.
 func setupBrowserTestStore(t *testing.T) (*storage.Store, func()) {
@@ -708,5 +710,75 @@ func TestExtractDomain(t *testing.T) {
 		if result != tt.expected {
 			t.Errorf("extractDomain(%q) = %q, expected %q", tt.url, result, tt.expected)
 		}
+	}
+}
+
+func TestBrowserTracker_DomainExclusion(t *testing.T) {
+	store, cleanup := setupBrowserTestStore(t)
+	defer cleanup()
+
+	tracker := NewBrowserTracker(&MockBrowserPlatform{}, store, t.TempDir())
+
+	// Test with no exclusions
+	tracker.SetExcludedDomains(nil)
+	if tracker.shouldExcludeDomain("example.com") {
+		t.Error("Domain should not be excluded with no exclusion list")
+	}
+
+	// Set exclusions
+	tracker.SetExcludedDomains([]string{"facebook.com", "twitter.com"})
+
+	// Test exact match
+	if !tracker.shouldExcludeDomain("facebook.com") {
+		t.Error("facebook.com should be excluded")
+	}
+	if !tracker.shouldExcludeDomain("twitter.com") {
+		t.Error("twitter.com should be excluded")
+	}
+
+	// Test subdomain match
+	if !tracker.shouldExcludeDomain("www.facebook.com") {
+		t.Error("www.facebook.com should be excluded as subdomain")
+	}
+	if !tracker.shouldExcludeDomain("m.facebook.com") {
+		t.Error("m.facebook.com should be excluded as subdomain")
+	}
+
+	// Test non-excluded domains
+	if tracker.shouldExcludeDomain("google.com") {
+		t.Error("google.com should not be excluded")
+	}
+	if tracker.shouldExcludeDomain("myfacebook.com") {
+		t.Error("myfacebook.com should not be excluded (not a subdomain)")
+	}
+
+	// Test GetExcludedDomains
+	domains := tracker.GetExcludedDomains()
+	if len(domains) != 2 {
+		t.Errorf("Expected 2 excluded domains, got %d", len(domains))
+	}
+}
+
+func TestBrowserTracker_HistoryLimit(t *testing.T) {
+	store, cleanup := setupBrowserTestStore(t)
+	defer cleanup()
+
+	tracker := NewBrowserTracker(&MockBrowserPlatform{}, store, t.TempDir())
+
+	// Test default value (0 = unlimited)
+	if tracker.GetHistoryLimitDays() != 0 {
+		t.Errorf("Expected default history limit to be 0, got %d", tracker.GetHistoryLimitDays())
+	}
+
+	// Test setting limit
+	tracker.SetHistoryLimitDays(7)
+	if tracker.GetHistoryLimitDays() != 7 {
+		t.Errorf("Expected history limit to be 7, got %d", tracker.GetHistoryLimitDays())
+	}
+
+	// Test setting to unlimited
+	tracker.SetHistoryLimitDays(0)
+	if tracker.GetHistoryLimitDays() != 0 {
+		t.Errorf("Expected history limit to be 0, got %d", tracker.GetHistoryLimitDays())
 	}
 }

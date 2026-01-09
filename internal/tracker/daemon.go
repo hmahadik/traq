@@ -20,6 +20,8 @@ type DaemonConfig struct {
 	Quality            int
 	DuplicateThreshold int
 	DataDir            string
+	MonitorMode        string // "active_window", "primary", "specific"
+	MonitorIndex       int    // Only used when MonitorMode is "specific"
 }
 
 // DefaultDaemonConfig returns a default configuration.
@@ -31,6 +33,8 @@ func DefaultDaemonConfig(dataDir string) *DaemonConfig {
 		Quality:            80,
 		DuplicateThreshold: 3,
 		DataDir:            dataDir,
+		MonitorMode:        "active_window",
+		MonitorIndex:       0,
 	}
 }
 
@@ -254,8 +258,10 @@ func (d *Daemon) tick() {
 		d.window.RecordFocusChange(windowInfo, session.ID)
 	}
 
-	// Capture screenshot
-	result, err := d.capture.Capture()
+	// Capture screenshot based on monitor mode configuration
+	var result *CaptureResult
+	monitorIndex := d.getMonitorIndexForCapture(windowInfo)
+	result, err = d.capture.CaptureMonitor(monitorIndex)
 	if err != nil {
 		// Log error but continue
 		return
@@ -291,6 +297,7 @@ func (d *Daemon) tick() {
 		sc.WindowTitle = sql.NullString{String: windowInfo.Title, Valid: windowInfo.Title != ""}
 		sc.AppName = sql.NullString{String: windowInfo.AppName, Valid: windowInfo.AppName != ""}
 		sc.WindowClass = sql.NullString{String: windowInfo.Class, Valid: windowInfo.Class != ""}
+		sc.ProcessPID = sql.NullInt64{Int64: int64(windowInfo.PID), Valid: windowInfo.PID > 0}
 		sc.WindowX = sql.NullInt64{Int64: int64(windowInfo.X), Valid: true}
 		sc.WindowY = sql.NullInt64{Int64: int64(windowInfo.Y), Valid: true}
 		sc.WindowWidth = sql.NullInt64{Int64: int64(windowInfo.Width), Valid: true}
@@ -336,6 +343,34 @@ func (d *Daemon) onReturn() {
 	}
 }
 
+// getMonitorIndexForCapture returns the monitor index to capture based on config.
+func (d *Daemon) getMonitorIndexForCapture(windowInfo *platform.WindowInfo) int {
+	d.mu.RLock()
+	mode := d.config.MonitorMode
+	configuredIndex := d.config.MonitorIndex
+	d.mu.RUnlock()
+
+	switch mode {
+	case "primary":
+		return 0
+	case "specific":
+		// Validate the configured index
+		n := GetMonitorCount()
+		if configuredIndex >= 0 && configuredIndex < n {
+			return configuredIndex
+		}
+		// Fall back to primary if configured monitor not available
+		return 0
+	default: // "active_window" or empty (default)
+		// Use the window's location to determine monitor
+		if windowInfo != nil && (windowInfo.Width > 0 || windowInfo.Height > 0) {
+			return GetMonitorForWindow(windowInfo.X, windowInfo.Y, windowInfo.Width, windowInfo.Height)
+		}
+		// Fall back to primary monitor if no window info
+		return 0
+	}
+}
+
 // UpdateConfig updates the daemon configuration.
 func (d *Daemon) UpdateConfig(config *DaemonConfig) {
 	d.mu.Lock()
@@ -350,6 +385,41 @@ func (d *Daemon) UpdateConfig(config *DaemonConfig) {
 	}
 }
 
+// SetMonitorMode sets the monitor selection mode.
+// mode can be "active_window", "primary", or "specific".
+func (d *Daemon) SetMonitorMode(mode string) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.config.MonitorMode = mode
+}
+
+// GetMonitorMode returns the current monitor selection mode.
+func (d *Daemon) GetMonitorMode() string {
+	d.mu.RLock()
+	defer d.mu.RUnlock()
+	return d.config.MonitorMode
+}
+
+// SetMonitorIndex sets the specific monitor index to capture.
+// Only used when MonitorMode is "specific".
+func (d *Daemon) SetMonitorIndex(index int) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.config.MonitorIndex = index
+}
+
+// GetMonitorIndex returns the currently configured monitor index.
+func (d *Daemon) GetMonitorIndex() int {
+	d.mu.RLock()
+	defer d.mu.RUnlock()
+	return d.config.MonitorIndex
+}
+
+// GetAvailableMonitors returns info about all connected monitors.
+func (d *Daemon) GetAvailableMonitors() []MonitorInfo {
+	return GetAvailableMonitors()
+}
+
 // SetShellType sets the shell type for tracking.
 func (d *Daemon) SetShellType(shellType string) {
 	d.shell.SetShellType(shellType)
@@ -360,9 +430,37 @@ func (d *Daemon) GetShellType() string {
 	return d.shell.GetShellType()
 }
 
+// SetShellHistoryPath sets a custom path to the shell history file.
+// Pass empty string to use the default platform-detected path.
+func (d *Daemon) SetShellHistoryPath(path string) {
+	d.shell.SetHistoryPath(path)
+}
+
+// GetShellHistoryPath returns the current shell history path being tracked.
+func (d *Daemon) GetShellHistoryPath() string {
+	return d.shell.GetHistoryPath()
+}
+
+// GetShellHistoryPathOverride returns the custom history path if set, or empty if using default.
+func (d *Daemon) GetShellHistoryPathOverride() string {
+	return d.shell.GetHistoryPathOverride()
+}
+
+// SetShellExcludePatterns sets the exclude patterns for shell command filtering.
+func (d *Daemon) SetShellExcludePatterns(patterns []string) error {
+	return d.shell.SetExcludePatterns(patterns)
+}
+
+// GetShellExcludePatterns returns the current user-defined exclude patterns.
+func (d *Daemon) GetShellExcludePatterns() []string {
+	return d.shell.GetExcludePatterns()
+}
+
 // ForceCapture forces an immediate screenshot capture.
 func (d *Daemon) ForceCapture() (*CaptureResult, error) {
-	return d.capture.Capture()
+	windowInfo, _, _ := d.window.Poll()
+	monitorIndex := d.getMonitorIndexForCapture(windowInfo)
+	return d.capture.CaptureMonitor(monitorIndex)
 }
 
 // RegisterGitRepository adds a git repository for tracking.
@@ -378,6 +476,11 @@ func (d *Daemon) UnregisterGitRepository(repoID int64) error {
 // GetTrackedRepositories returns all tracked git repositories.
 func (d *Daemon) GetTrackedRepositories() ([]*storage.GitRepository, error) {
 	return d.git.GetRepositories()
+}
+
+// DiscoverGitRepositories searches for git repositories in the given paths.
+func (d *Daemon) DiscoverGitRepositories(searchPaths []string, maxDepth int) ([]*storage.GitRepository, error) {
+	return d.git.DiscoverRepositories(searchPaths, maxDepth)
 }
 
 // AutoRegisterGitRepo attempts to register the current working directory if it's a git repo.
@@ -429,6 +532,37 @@ func (d *Daemon) AutoWatchDownloads() {
 	}
 }
 
+// SetFileExcludePatterns sets directory patterns to exclude from file tracking.
+func (d *Daemon) SetFileExcludePatterns(patterns []string) {
+	if d.files == nil {
+		return
+	}
+	// Clear existing patterns and add new ones
+	// Note: The FileTracker already has default patterns, we're adding user-defined ones
+	for _, pattern := range patterns {
+		if pattern != "" {
+			d.files.AddExcludePattern(pattern)
+		}
+	}
+}
+
+// SetFileAllowedExtensions sets which file extensions to track.
+// If empty, all extensions are tracked (default behavior).
+func (d *Daemon) SetFileAllowedExtensions(extensions []string) {
+	if d.files == nil {
+		return
+	}
+	d.files.SetAllowedExtensions(extensions)
+}
+
+// GetFileAllowedExtensions returns the list of allowed file extensions.
+func (d *Daemon) GetFileAllowedExtensions() []string {
+	if d.files == nil {
+		return nil
+	}
+	return d.files.GetAllowedExtensions()
+}
+
 // GetAvailableBrowsers returns browsers that have history files available.
 func (d *Daemon) GetAvailableBrowsers() []string {
 	if d.browser == nil {
@@ -443,4 +577,37 @@ func (d *Daemon) SetEnabledBrowsers(browsers []string) {
 		return
 	}
 	d.browser.SetEnabledBrowsers(browsers)
+}
+
+// SetExcludedDomains sets which domains to exclude from browser tracking.
+func (d *Daemon) SetExcludedDomains(domains []string) {
+	if d.browser == nil {
+		return
+	}
+	d.browser.SetExcludedDomains(domains)
+}
+
+// GetExcludedDomains returns the list of excluded domains.
+func (d *Daemon) GetExcludedDomains() []string {
+	if d.browser == nil {
+		return nil
+	}
+	return d.browser.GetExcludedDomains()
+}
+
+// SetBrowserHistoryLimit sets the limit for how far back to read browser history.
+// A value of 0 means no limit (read all available history).
+func (d *Daemon) SetBrowserHistoryLimit(days int) {
+	if d.browser == nil {
+		return
+	}
+	d.browser.SetHistoryLimitDays(days)
+}
+
+// GetBrowserHistoryLimit returns the current browser history limit in days.
+func (d *Daemon) GetBrowserHistoryLimit() int {
+	if d.browser == nil {
+		return 0
+	}
+	return d.browser.GetHistoryLimitDays()
 }

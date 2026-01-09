@@ -20,6 +20,7 @@ type MockPlatform struct {
 	browserPaths      map[string]string
 	openURLCalled     bool
 	notificationCalls []struct{ Title, Body string }
+	autoStartEnabled  bool
 }
 
 func NewMockPlatform() *MockPlatform {
@@ -95,4 +96,15 @@ func (m *MockPlatform) SetLastInputTime(t time.Time) {
 // SetLastInputError sets an error to return from GetLastInputTime.
 func (m *MockPlatform) SetLastInputError(err error) {
 	m.lastInputErr = err
+}
+
+// SetAutoStart enables or disables auto-start for testing.
+func (m *MockPlatform) SetAutoStart(enabled bool) error {
+	m.autoStartEnabled = enabled
+	return nil
+}
+
+// IsAutoStartEnabled returns the auto-start state for testing.
+func (m *MockPlatform) IsAutoStartEnabled() (bool, error) {
+	return m.autoStartEnabled, nil
 }

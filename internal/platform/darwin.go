@@ -163,6 +163,18 @@ func (d *Darwin) GetBrowserHistoryPaths() map[string]string {
 		}
 	}
 
+	// Brave
+	bravePath := filepath.Join(home, "Library", "Application Support", "BraveSoftware", "Brave-Browser", "Default", "History")
+	if _, err := os.Stat(bravePath); err == nil {
+		paths["brave"] = bravePath
+	}
+
+	// Microsoft Edge
+	edgePath := filepath.Join(home, "Library", "Application Support", "Microsoft Edge", "Default", "History")
+	if _, err := os.Stat(edgePath); err == nil {
+		paths["edge"] = edgePath
+	}
+
 	return paths
 }
 
@@ -177,4 +189,83 @@ func (d *Darwin) ShowNotification(title, body string) error {
 	script := `display notification "` + body + `" with title "` + title + `"`
 	cmd := exec.Command("osascript", "-e", script)
 	return cmd.Run()
+}
+
+// launchAgentPath returns the path to the LaunchAgent plist file.
+func (d *Darwin) launchAgentPath() string {
+	home, _ := os.UserHomeDir()
+	return filepath.Join(home, "Library", "LaunchAgents", "com.traq.app.plist")
+}
+
+// SetAutoStart enables or disables autostart on login via LaunchAgent.
+func (d *Darwin) SetAutoStart(enabled bool) error {
+	plistPath := d.launchAgentPath()
+
+	if !enabled {
+		// Remove the plist file if it exists
+		if _, err := os.Stat(plistPath); err == nil {
+			// Unload the agent first
+			exec.Command("launchctl", "unload", plistPath).Run()
+			return os.Remove(plistPath)
+		}
+		return nil
+	}
+
+	// Find the executable path
+	execPath, err := os.Executable()
+	if err != nil {
+		return fmt.Errorf("failed to get executable path: %w", err)
+	}
+
+	// Ensure the LaunchAgents directory exists
+	launchAgentsDir := filepath.Dir(plistPath)
+	if err := os.MkdirAll(launchAgentsDir, 0755); err != nil {
+		return fmt.Errorf("failed to create LaunchAgents directory: %w", err)
+	}
+
+	// Create the plist content
+	plistContent := fmt.Sprintf(`<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.traq.app</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>%s</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <false/>
+</dict>
+</plist>
+`, execPath)
+
+	// Write the plist file
+	if err := os.WriteFile(plistPath, []byte(plistContent), 0644); err != nil {
+		return fmt.Errorf("failed to write LaunchAgent plist: %w", err)
+	}
+
+	// Load the agent
+	cmd := exec.Command("launchctl", "load", plistPath)
+	if err := cmd.Run(); err != nil {
+		// Don't fail if launchctl load fails - the agent will load on next login
+		// This commonly happens when the agent is already loaded
+	}
+
+	return nil
+}
+
+// IsAutoStartEnabled checks if autostart is currently enabled.
+func (d *Darwin) IsAutoStartEnabled() (bool, error) {
+	plistPath := d.launchAgentPath()
+	_, err := os.Stat(plistPath)
+	if os.IsNotExist(err) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return true, nil
 }

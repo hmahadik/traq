@@ -19,6 +19,7 @@ type FileTracker struct {
 	watchedDirs     map[string]bool
 	excludePatterns []string
 	excludeExts     map[string]bool
+	allowedExts     map[string]bool // If non-empty, only track these extensions
 	eventBuffer     []*storage.FileEvent
 	bufferMu        sync.Mutex
 	flushInterval   time.Duration
@@ -55,17 +56,18 @@ func NewFileTracker(store *storage.Store) (*FileTracker, error) {
 			".next",
 		},
 		excludeExts: map[string]bool{
-			".swp":  true,
-			".swo":  true,
-			".tmp":  true,
-			".pyc":  true,
-			".pyo":  true,
-			".o":    true,
-			".a":    true,
-			".so":   true,
+			".swp":   true,
+			".swo":   true,
+			".tmp":   true,
+			".pyc":   true,
+			".pyo":   true,
+			".o":     true,
+			".a":     true,
+			".so":    true,
 			".dylib": true,
-			".lock": true,
+			".lock":  true,
 		},
+		allowedExts:   make(map[string]bool),
 		flushInterval: 5 * time.Second,
 		stopCh:        make(chan struct{}),
 	}, nil
@@ -82,6 +84,35 @@ func (t *FileTracker) AddExcludeExtension(ext string) {
 		ext = "." + ext
 	}
 	t.excludeExts[ext] = true
+}
+
+// SetAllowedExtensions sets the list of allowed file extensions.
+// If the list is empty, all extensions are allowed (default behavior).
+// Extensions should include the leading dot (e.g., ".go", ".ts").
+func (t *FileTracker) SetAllowedExtensions(extensions []string) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.allowedExts = make(map[string]bool)
+	for _, ext := range extensions {
+		if ext == "" {
+			continue
+		}
+		if !strings.HasPrefix(ext, ".") {
+			ext = "." + ext
+		}
+		t.allowedExts[strings.ToLower(ext)] = true
+	}
+}
+
+// GetAllowedExtensions returns the current list of allowed extensions.
+func (t *FileTracker) GetAllowedExtensions() []string {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+	exts := make([]string, 0, len(t.allowedExts))
+	for ext := range t.allowedExts {
+		exts = append(exts, ext)
+	}
+	return exts
 }
 
 // SetFlushInterval sets the interval for flushing buffered events.
@@ -223,6 +254,21 @@ func (t *FileTracker) handleEvent(event fsnotify.Event) {
 	ext := strings.ToLower(filepath.Ext(event.Name))
 	if t.excludeExts[ext] {
 		return
+	}
+
+	// If allowed extensions are configured, only track those
+	t.mu.RLock()
+	hasAllowedExts := len(t.allowedExts) > 0
+	isAllowed := t.allowedExts[ext]
+	t.mu.RUnlock()
+
+	if hasAllowedExts && !isAllowed {
+		// Check if it's a directory event - directories should still be processed
+		// for create/delete events even with extension filtering
+		info, err := os.Stat(event.Name)
+		if err != nil || !info.IsDir() {
+			return // Skip files with extensions not in allowed list
+		}
 	}
 
 	// Skip excluded directories

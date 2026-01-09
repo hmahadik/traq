@@ -12,6 +12,18 @@ export interface CaptureConfig {
   intervalSeconds: number;
   quality: number;
   duplicateThreshold: number;
+  monitorMode: 'active_window' | 'primary' | 'specific';
+  monitorIndex: number;
+}
+
+export interface MonitorInfo {
+  index: number;
+  name: string;
+  width: number;
+  height: number;
+  x: number;
+  y: number;
+  isPrimary: boolean;
 }
 
 export interface AFKConfig {
@@ -52,6 +64,7 @@ export interface DataSourcesConfig {
 export interface ShellConfig {
   enabled: boolean;
   shellType: string; // "auto", "bash", "zsh", "fish", "powershell"
+  historyPath: string; // Custom path to history file (empty = auto-detect)
   excludePatterns: string[];
 }
 
@@ -64,6 +77,8 @@ export interface GitConfig {
 export interface FilesConfig {
   enabled: boolean;
   watches: FileWatch[];
+  excludePatterns: string[]; // Directory patterns to exclude (e.g., node_modules, .git)
+  allowedExtensions: string[]; // File extensions to track (empty = all, e.g., [".ts", ".go", ".py"])
 }
 
 export interface FileWatch {
@@ -75,6 +90,8 @@ export interface FileWatch {
 export interface BrowserConfig {
   enabled: boolean;
   browsers: string[];
+  excludedDomains: string[];
+  historyLimitDays: number; // Limit how far back to read browser history (0 = unlimited)
 }
 
 export interface UIConfig {
@@ -101,5 +118,14 @@ export interface ModelInfo {
   size: number;
   description: string;
   downloaded: boolean;
-  path: string | null;
+  downloadUrl: string;
+  filename: string;
+}
+
+export interface ServerStatus {
+  installed: boolean;
+  serverPath: string;
+  version: string;
+  downloadUrl?: string;
+  size?: number;
 }

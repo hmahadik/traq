@@ -2,6 +2,9 @@ package service
 
 import (
 	"encoding/json"
+	"fmt"
+	"os"
+	"path/filepath"
 	"strconv"
 	"time"
 
@@ -70,10 +73,12 @@ type CloudConfig struct {
 
 // CaptureConfig contains screenshot capture settings.
 type CaptureConfig struct {
-	Enabled            bool `json:"enabled"`
-	IntervalSeconds    int  `json:"intervalSeconds"`
-	Quality            int  `json:"quality"`
-	DuplicateThreshold int  `json:"duplicateThreshold"`
+	Enabled            bool   `json:"enabled"`
+	IntervalSeconds    int    `json:"intervalSeconds"`
+	Quality            int    `json:"quality"`
+	DuplicateThreshold int    `json:"duplicateThreshold"`
+	MonitorMode        string `json:"monitorMode"`  // "active_window", "primary", "specific"
+	MonitorIndex       int    `json:"monitorIndex"` // Only used when MonitorMode is "specific"
 }
 
 // AFKConfig contains AFK detection settings.
@@ -94,6 +99,7 @@ type DataSourcesConfig struct {
 type ShellConfig struct {
 	Enabled         bool     `json:"enabled"`
 	ShellType       string   `json:"shellType"`       // "auto", "bash", "zsh", "fish", "powershell"
+	HistoryPath     string   `json:"historyPath"`     // Custom path to history file (empty = auto-detect)
 	ExcludePatterns []string `json:"excludePatterns"`
 }
 
@@ -106,8 +112,10 @@ type GitConfig struct {
 
 // FilesConfig contains file watching settings.
 type FilesConfig struct {
-	Enabled bool          `json:"enabled"`
-	Watches []*WatchPath  `json:"watches"`
+	Enabled           bool          `json:"enabled"`
+	Watches           []*WatchPath  `json:"watches"`
+	ExcludePatterns   []string      `json:"excludePatterns"`   // Directory patterns to exclude
+	AllowedExtensions []string      `json:"allowedExtensions"` // File extensions to track (empty = all)
 }
 
 // WatchPath represents a path to watch.
@@ -119,8 +127,10 @@ type WatchPath struct {
 
 // BrowserConfig contains browser history settings.
 type BrowserConfig struct {
-	Enabled  bool     `json:"enabled"`
-	Browsers []string `json:"browsers"`
+	Enabled          bool     `json:"enabled"`
+	Browsers         []string `json:"browsers"`
+	ExcludedDomains  []string `json:"excludedDomains"`
+	HistoryLimitDays int      `json:"historyLimitDays"` // Limit how far back to read browser history (0 = unlimited)
 }
 
 // UIConfig contains UI settings.
@@ -177,6 +187,14 @@ func (s *ConfigService) GetConfig() (*Config, error) {
 			config.Capture.DuplicateThreshold = v
 		}
 	}
+	if val, err := s.store.GetConfig("capture.monitorMode"); err == nil && val != "" {
+		config.Capture.MonitorMode = val
+	}
+	if val, err := s.store.GetConfig("capture.monitorIndex"); err == nil {
+		if v, e := strconv.Atoi(val); e == nil {
+			config.Capture.MonitorIndex = v
+		}
+	}
 	if val, err := s.store.GetConfig("afk.timeout"); err == nil {
 		if v, e := strconv.Atoi(val); e == nil {
 			config.AFK.TimeoutSeconds = v
@@ -199,20 +217,42 @@ func (s *ConfigService) GetConfig() (*Config, error) {
 	if val, err := s.store.GetConfig("shell.shellType"); err == nil && val != "" {
 		config.DataSources.Shell.ShellType = val
 	}
+	if val, err := s.store.GetConfig("shell.historyPath"); err == nil && val != "" {
+		config.DataSources.Shell.HistoryPath = val
+	}
+	if val, err := s.store.GetConfig("shell.excludePatterns"); err == nil && val != "" {
+		json.Unmarshal([]byte(val), &config.DataSources.Shell.ExcludePatterns)
+	}
 	if val, err := s.store.GetConfig("git.enabled"); err == nil {
 		config.DataSources.Git.Enabled = val == "true"
 	}
 	if val, err := s.store.GetConfig("git.searchPaths"); err == nil {
 		json.Unmarshal([]byte(val), &config.DataSources.Git.SearchPaths)
 	}
+	if val, err := s.store.GetConfig("git.maxDepth"); err == nil {
+		if v, e := strconv.Atoi(val); e == nil {
+			config.DataSources.Git.MaxDepth = v
+		}
+	}
 	if val, err := s.store.GetConfig("files.enabled"); err == nil {
 		config.DataSources.Files.Enabled = val == "true"
+	}
+	if val, err := s.store.GetConfig("files.excludePatterns"); err == nil && val != "" {
+		json.Unmarshal([]byte(val), &config.DataSources.Files.ExcludePatterns)
 	}
 	if val, err := s.store.GetConfig("browser.enabled"); err == nil {
 		config.DataSources.Browser.Enabled = val == "true"
 	}
 	if val, err := s.store.GetConfig("browser.browsers"); err == nil {
 		json.Unmarshal([]byte(val), &config.DataSources.Browser.Browsers)
+	}
+	if val, err := s.store.GetConfig("browser.excludedDomains"); err == nil && val != "" {
+		json.Unmarshal([]byte(val), &config.DataSources.Browser.ExcludedDomains)
+	}
+	if val, err := s.store.GetConfig("browser.historyLimitDays"); err == nil && val != "" {
+		if v, e := strconv.Atoi(val); e == nil {
+			config.DataSources.Browser.HistoryLimitDays = v
+		}
 	}
 
 	// Inference settings
@@ -282,8 +322,28 @@ func (s *ConfigService) UpdateConfig(updates map[string]interface{}) error {
 		if err := s.store.SetConfig(storageKey, strVal); err != nil {
 			return err
 		}
+
+		// Handle side effects for specific settings
+		if err := s.handleConfigSideEffect(storageKey, value); err != nil {
+			return err
+		}
 	}
 
+	return nil
+}
+
+// handleConfigSideEffect handles side effects when certain config values change.
+func (s *ConfigService) handleConfigSideEffect(key string, value interface{}) error {
+	switch key {
+	case "system.startOnLogin":
+		enabled, ok := value.(bool)
+		if !ok {
+			return nil
+		}
+		if err := s.platform.SetAutoStart(enabled); err != nil {
+			return fmt.Errorf("failed to set autostart: %w", err)
+		}
+	}
 	return nil
 }
 
@@ -312,6 +372,8 @@ func mapToStorageKey(frontendKey string) string {
 		"capture.intervalSeconds":    "capture.interval",
 		"capture.quality":            "capture.quality",
 		"capture.duplicateThreshold": "capture.duplicateThreshold",
+		"capture.monitorMode":        "capture.monitorMode",
+		"capture.monitorIndex":       "capture.monitorIndex",
 
 		// AFK settings
 		"afk.timeoutSeconds":    "afk.timeout",
@@ -327,12 +389,19 @@ func mapToStorageKey(frontendKey string) string {
 		"system.autoStart":    "system.autoStart",
 
 		// Data sources
-		"dataSources.shell.enabled":   "shell.enabled",
-		"dataSources.shell.shellType": "shell.shellType",
-		"dataSources.git.enabled":     "git.enabled",
-		"dataSources.git.searchPaths": "git.searchPaths",
-		"dataSources.files.enabled":   "files.enabled",
-		"dataSources.browser.enabled": "browser.enabled",
+		"dataSources.shell.enabled":     "shell.enabled",
+		"dataSources.shell.shellType":   "shell.shellType",
+		"dataSources.shell.historyPath":     "shell.historyPath",
+		"dataSources.shell.excludePatterns": "shell.excludePatterns",
+		"dataSources.git.enabled":           "git.enabled",
+		"dataSources.git.searchPaths":       "git.searchPaths",
+		"dataSources.git.maxDepth":          "git.maxDepth",
+		"dataSources.files.enabled":         "files.enabled",
+		"dataSources.files.excludePatterns": "files.excludePatterns",
+		"dataSources.browser.enabled":          "browser.enabled",
+		"dataSources.browser.browsers":         "browser.browsers",
+		"dataSources.browser.excludedDomains":  "browser.excludedDomains",
+		"dataSources.browser.historyLimitDays": "browser.historyLimitDays",
 
 		// Inference settings
 		"inference.engine":         "inference.engine",
@@ -432,12 +501,27 @@ func (s *ConfigService) RestartDaemon() error {
 		Quality:            config.Capture.Quality,
 		DuplicateThreshold: config.Capture.DuplicateThreshold,
 		DataDir:            s.platform.DataDir(),
+		MonitorMode:        config.Capture.MonitorMode,
+		MonitorIndex:       config.Capture.MonitorIndex,
 	}
 	s.daemon.UpdateConfig(daemonConfig)
 
-	// Apply shell type configuration
+	// Apply shell configuration
 	if config.DataSources != nil && config.DataSources.Shell != nil {
 		s.daemon.SetShellType(config.DataSources.Shell.ShellType)
+		s.daemon.SetShellHistoryPath(config.DataSources.Shell.HistoryPath)
+		s.daemon.SetShellExcludePatterns(config.DataSources.Shell.ExcludePatterns)
+	}
+
+	// Apply file tracking configuration
+	if config.DataSources != nil && config.DataSources.Files != nil {
+		s.daemon.SetFileExcludePatterns(config.DataSources.Files.ExcludePatterns)
+	}
+
+	// Apply browser configuration
+	if config.DataSources != nil && config.DataSources.Browser != nil {
+		s.daemon.SetExcludedDomains(config.DataSources.Browser.ExcludedDomains)
+		s.daemon.SetBrowserHistoryLimit(config.DataSources.Browser.HistoryLimitDays)
 	}
 
 	// Start
@@ -456,11 +540,43 @@ func (s *ConfigService) GetStorageStats() (*StorageStats, error) {
 	stats.FileEventCount, _ = s.store.CountFileEvents()
 	stats.BrowserVisitCount, _ = s.store.CountBrowserVisits()
 
-	// TODO: Calculate actual storage size
-	stats.DatabaseSize = 0
-	stats.ScreenshotsSize = 0
+	// Calculate actual storage sizes
+	dataDir := s.platform.DataDir()
+
+	// Database size (includes WAL and SHM files)
+	dbPath := filepath.Join(dataDir, "data.db")
+	if info, err := os.Stat(dbPath); err == nil {
+		stats.DatabaseSize = info.Size()
+	}
+	// Add WAL file size
+	if info, err := os.Stat(dbPath + "-wal"); err == nil {
+		stats.DatabaseSize += info.Size()
+	}
+	// Add SHM file size
+	if info, err := os.Stat(dbPath + "-shm"); err == nil {
+		stats.DatabaseSize += info.Size()
+	}
+
+	// Screenshots directory size
+	screenshotsDir := filepath.Join(dataDir, "screenshots")
+	stats.ScreenshotsSize = calculateDirSize(screenshotsDir)
 
 	return stats, nil
+}
+
+// calculateDirSize recursively calculates the total size of a directory.
+func calculateDirSize(path string) int64 {
+	var size int64
+	filepath.Walk(path, func(_ string, info os.FileInfo, err error) error {
+		if err != nil {
+			return nil // Skip files we can't access
+		}
+		if !info.IsDir() {
+			size += info.Size()
+		}
+		return nil
+	})
+	return size
 }
 
 // OptimizeDatabase runs VACUUM and ANALYZE on the database to reclaim space and update statistics.
@@ -488,6 +604,8 @@ func (s *ConfigService) getDefaultCaptureConfig() *CaptureConfig {
 		IntervalSeconds:    30,
 		Quality:            80,
 		DuplicateThreshold: 3,
+		MonitorMode:        "active_window", // Default: follow active window
+		MonitorIndex:       0,
 	}
 }
 
@@ -515,10 +633,12 @@ func (s *ConfigService) getDefaultDataSourcesConfig() *DataSourcesConfig {
 			Watches: []*WatchPath{
 				{Path: "~/Downloads", Category: "downloads", Recursive: false},
 			},
+			AllowedExtensions: []string{}, // Empty = track all extensions
 		},
 		Browser: &BrowserConfig{
-			Enabled:  true,
-			Browsers: []string{"chrome", "firefox"},
+			Enabled:          true,
+			Browsers:         []string{"chrome", "firefox"},
+			HistoryLimitDays: 7, // Default to 7 days of history
 		},
 	}
 }

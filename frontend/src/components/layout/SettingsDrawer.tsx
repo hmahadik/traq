@@ -1,5 +1,4 @@
-import { useState } from 'react';
-import { Database, FolderOpen, HardDrive, Image, Sparkles } from 'lucide-react';
+import { Database, FolderOpen, HardDrive, Image, Monitor, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   Dialog,
@@ -21,11 +20,12 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Progress } from '@/components/ui/progress';
-import { useConfig, useUpdateConfig, useInferenceStatus, useAvailableModels, useStorageStats, useOpenDataDir, useDataDir, useOptimizeDatabase } from '@/api/hooks';
+import { useConfig, useUpdateConfig, useInferenceStatus, useAvailableModels, useDownloadModel, useServerStatus, useDownloadServer, useStorageStats, useOpenDataDir, useDataDir, useOptimizeDatabase, useAvailableMonitors } from '@/api/hooks';
 import { formatBytes } from '@/lib/utils';
 import { CategoriesTab } from '@/components/settings/CategoriesTab';
 import { GitRepositoriesSection } from '@/components/settings/GitRepositoriesSection';
 import { FileWatchDirectoriesSection } from '@/components/settings/FileWatchDirectoriesSection';
+import { FileExtensionFilterSection } from '@/components/settings/FileExtensionFilterSection';
 
 interface SettingsDrawerProps {
   open: boolean;
@@ -36,13 +36,15 @@ export function SettingsDrawer({ open, onOpenChange }: SettingsDrawerProps) {
   const { data: config, isLoading } = useConfig();
   const { data: inferenceStatus } = useInferenceStatus();
   const { data: models } = useAvailableModels();
+  const { download: downloadModel, progress: downloadProgress, isDownloading } = useDownloadModel();
+  const { data: serverStatus } = useServerStatus();
+  const { download: downloadServer, progress: serverDownloadProgress, isDownloading: isDownloadingServer, error: serverDownloadError } = useDownloadServer();
   const { data: storageStats } = useStorageStats();
   const { data: dataDir } = useDataDir();
+  const { data: monitors } = useAvailableMonitors();
   const updateConfig = useUpdateConfig();
   const openDataDir = useOpenDataDir();
   const optimizeDatabase = useOptimizeDatabase();
-
-  const [downloadProgress] = useState<number | null>(null);
 
   const handleOptimizeDatabase = async () => {
     try {
@@ -260,6 +262,68 @@ export function SettingsDrawer({ open, onOpenChange }: SettingsDrawerProps) {
                 }
               />
             </div>
+
+            {/* Monitor Selection */}
+            <div className="space-y-3 pt-4 border-t">
+              <div className="flex items-center gap-2">
+                <Monitor className="h-4 w-4" />
+                <label className="text-sm font-medium">Monitor Selection</label>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Choose which monitor to capture for screenshots
+              </p>
+              <Select
+                value={config.capture.monitorMode || 'active_window'}
+                onValueChange={(value: 'active_window' | 'primary' | 'specific') => {
+                  updateConfig.mutate({
+                    capture: { ...config.capture, monitorMode: value },
+                  });
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="active_window">Follow Active Window</SelectItem>
+                  <SelectItem value="primary">Always Primary Monitor</SelectItem>
+                  <SelectItem value="specific">Specific Monitor</SelectItem>
+                </SelectContent>
+              </Select>
+
+              {/* Show monitor picker when "specific" is selected */}
+              {config.capture.monitorMode === 'specific' && monitors && monitors.length > 0 && (
+                <div className="space-y-2 pl-4 border-l-2 border-muted">
+                  <label className="text-sm font-medium">Select Monitor</label>
+                  <Select
+                    value={String(config.capture.monitorIndex || 0)}
+                    onValueChange={(value) => {
+                      updateConfig.mutate({
+                        capture: { ...config.capture, monitorIndex: parseInt(value) },
+                      });
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {monitors.map((monitor) => (
+                        <SelectItem key={monitor.index} value={String(monitor.index)}>
+                          {monitor.name} ({monitor.width}x{monitor.height})
+                          {monitor.isPrimary && ' - Primary'}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              {/* Show detected monitors count */}
+              {monitors && monitors.length > 0 && (
+                <p className="text-xs text-muted-foreground">
+                  {monitors.length} monitor{monitors.length !== 1 ? 's' : ''} detected
+                </p>
+              )}
+            </div>
           </TabsContent>
 
           <TabsContent value="ai" className="space-y-6 mt-4">
@@ -286,6 +350,43 @@ export function SettingsDrawer({ open, onOpenChange }: SettingsDrawerProps) {
 
             {config.inference.engine === 'bundled' && (
               <div className="space-y-4">
+                {/* Server Binary Status */}
+                <div className="rounded-lg border p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium">Inference Server</p>
+                      <p className="text-xs text-muted-foreground">
+                        llama.cpp server {serverStatus?.version || ''}
+                      </p>
+                    </div>
+                    {serverStatus?.installed ? (
+                      <span className="text-xs text-green-600 dark:text-green-400 font-medium">
+                        Installed
+                      </span>
+                    ) : (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={isDownloadingServer}
+                        onClick={downloadServer}
+                      >
+                        {isDownloadingServer ? 'Installing...' : 'Install Server'}
+                      </Button>
+                    )}
+                  </div>
+                  {serverDownloadProgress !== null && (
+                    <div className="space-y-1">
+                      <Progress value={serverDownloadProgress} />
+                      <p className="text-xs text-muted-foreground">
+                        Downloading server... {serverDownloadProgress}%
+                      </p>
+                    </div>
+                  )}
+                  {serverDownloadError && (
+                    <p className="text-xs text-red-500">{serverDownloadError}</p>
+                  )}
+                </div>
+
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Model</label>
                   <Select
@@ -303,12 +404,17 @@ export function SettingsDrawer({ open, onOpenChange }: SettingsDrawerProps) {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {models?.map((model) => (
-                        <SelectItem key={model.id} value={model.id}>
-                          {model.name} ({formatBytes(model.size)})
-                          {model.downloaded && ' - Downloaded'}
+                      {models?.filter((m) => m.downloaded).length === 0 ? (
+                        <SelectItem value="none" disabled>
+                          No models downloaded - download one below
                         </SelectItem>
-                      ))}
+                      ) : (
+                        models?.filter((m) => m.downloaded).map((model) => (
+                          <SelectItem key={model.id} value={model.id}>
+                            {model.name} ({formatBytes(model.size)})
+                          </SelectItem>
+                        ))
+                      )}
                     </SelectContent>
                   </Select>
                 </div>
@@ -322,12 +428,53 @@ export function SettingsDrawer({ open, onOpenChange }: SettingsDrawerProps) {
                   </div>
                 )}
 
+                {/* Available Models for Download */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Available Models</label>
+                  <div className="space-y-2">
+                    {models?.map((model) => (
+                      <div
+                        key={model.id}
+                        className="flex items-center justify-between rounded-lg border p-3"
+                      >
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">{model.name}</p>
+                          <p className="text-xs text-muted-foreground truncate">
+                            {model.description}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {formatBytes(model.size)}
+                          </p>
+                        </div>
+                        <div className="ml-3">
+                          {model.downloaded ? (
+                            <span className="text-xs text-green-600 dark:text-green-400">
+                              Downloaded
+                            </span>
+                          ) : (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={isDownloading}
+                              onClick={() => downloadModel(model.id)}
+                            >
+                              Download
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
                 {inferenceStatus && (
                   <div className="rounded-lg bg-muted p-4">
                     <p className="text-sm font-medium">Status</p>
                     <p className="text-sm text-muted-foreground">
                       {inferenceStatus.available
                         ? `Running: ${inferenceStatus.model}`
+                        : !serverStatus?.installed
+                        ? 'Server not installed - click Install Server above'
                         : inferenceStatus.error || 'Not available'}
                     </p>
                   </div>
@@ -483,6 +630,47 @@ export function SettingsDrawer({ open, onOpenChange }: SettingsDrawerProps) {
                     Select your shell or use auto-detect
                   </p>
                 </div>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">Custom History Path</label>
+                  <Input
+                    value={config.dataSources.shell.historyPath || ''}
+                    onChange={(e) =>
+                      updateConfig.mutate({
+                        dataSources: {
+                          ...config.dataSources,
+                          shell: { ...config.dataSources.shell, historyPath: e.target.value },
+                        },
+                      })
+                    }
+                    placeholder="Leave empty for auto-detect"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Override the default history file path (e.g., ~/.bash_history)
+                  </p>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">Exclude Patterns</label>
+                  <textarea
+                    className="w-full min-h-[80px] px-3 py-2 text-sm rounded-md border border-input bg-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 font-mono"
+                    value={(config.dataSources.shell.excludePatterns || []).join('\n')}
+                    onChange={(e) => {
+                      const patterns = e.target.value
+                        .split('\n')
+                        .map((p) => p.trim())
+                        .filter((p) => p.length > 0);
+                      updateConfig.mutate({
+                        dataSources: {
+                          ...config.dataSources,
+                          shell: { ...config.dataSources.shell, excludePatterns: patterns },
+                        },
+                      });
+                    }}
+                    placeholder="^npm (install|run)$&#10;^git (status|diff)$&#10;^(cat|less|more) "
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Regex patterns to exclude commands (one per line). Sensitive commands are always filtered.
+                  </p>
+                </div>
               </div>
             )}
 
@@ -535,8 +723,39 @@ export function SettingsDrawer({ open, onOpenChange }: SettingsDrawerProps) {
 
             {/* File Watch Directories Management */}
             {config.dataSources.files.enabled && (
-              <div className="pl-4 border-l-2 border-muted">
+              <div className="pl-4 border-l-2 border-muted space-y-3">
                 <FileWatchDirectoriesSection />
+
+                {/* File Extension Filter */}
+                <FileExtensionFilterSection />
+
+                {/* Exclude Patterns */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Exclude Patterns</label>
+                  <p className="text-xs text-muted-foreground">
+                    Directory patterns to exclude from file tracking (one per line)
+                  </p>
+                  <textarea
+                    className="w-full h-24 text-sm p-2 border rounded-md bg-background font-mono resize-none"
+                    placeholder="node_modules&#10;.git&#10;__pycache__&#10;.venv"
+                    value={(config.dataSources.files.excludePatterns || []).join('\n')}
+                    onChange={(e) => {
+                      const patterns = e.target.value
+                        .split('\n')
+                        .map((p) => p.trim())
+                        .filter((p) => p.length > 0);
+                      updateConfig.mutate({
+                        dataSources: {
+                          ...config.dataSources,
+                          files: { ...config.dataSources.files, excludePatterns: patterns },
+                        },
+                      });
+                    }}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Default patterns (node_modules, .git, .cache, etc.) are always excluded.
+                  </p>
+                </div>
               </div>
             )}
 
@@ -559,6 +778,107 @@ export function SettingsDrawer({ open, onOpenChange }: SettingsDrawerProps) {
                 }
               />
             </div>
+
+            {/* Browser Selection */}
+            {config.dataSources.browser.enabled && (
+              <div className="pl-4 border-l-2 border-muted space-y-3">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Browsers to Track</label>
+                  <p className="text-xs text-muted-foreground">
+                    Select which browsers to monitor for history
+                  </p>
+                  <div className="space-y-2">
+                    {[
+                      { id: 'chrome', label: 'Google Chrome' },
+                      { id: 'firefox', label: 'Mozilla Firefox' },
+                      { id: 'brave', label: 'Brave' },
+                      { id: 'edge', label: 'Microsoft Edge' },
+                      { id: 'safari', label: 'Safari' },
+                    ].map((browser) => (
+                      <label
+                        key={browser.id}
+                        className="flex items-center gap-2 cursor-pointer"
+                      >
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4 rounded border-input"
+                          checked={(config.dataSources.browser.browsers || []).includes(browser.id)}
+                          onChange={(e) => {
+                            const currentBrowsers = config.dataSources.browser.browsers || [];
+                            const newBrowsers = e.target.checked
+                              ? [...currentBrowsers, browser.id]
+                              : currentBrowsers.filter((b) => b !== browser.id);
+                            updateConfig.mutate({
+                              dataSources: {
+                                ...config.dataSources,
+                                browser: { ...config.dataSources.browser, browsers: newBrowsers },
+                              },
+                            });
+                          }}
+                        />
+                        <span className="text-sm">{browser.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                {/* History Limit */}
+                <div className="space-y-2 pt-2 border-t">
+                  <label className="text-sm font-medium">History Limit</label>
+                  <p className="text-xs text-muted-foreground">
+                    How far back to read browser history (in days). Set to 0 for unlimited.
+                  </p>
+                  <select
+                    value={config.dataSources.browser.historyLimitDays || 7}
+                    onChange={(e) => {
+                      updateConfig.mutate({
+                        dataSources: {
+                          ...config.dataSources,
+                          browser: { ...config.dataSources.browser, historyLimitDays: parseInt(e.target.value) },
+                        },
+                      });
+                    }}
+                    className="w-full p-2 text-sm rounded-md border bg-background"
+                  >
+                    <option value={0}>Unlimited</option>
+                    <option value={1}>1 day</option>
+                    <option value={3}>3 days</option>
+                    <option value={7}>7 days</option>
+                    <option value={14}>14 days</option>
+                    <option value={30}>30 days</option>
+                    <option value={90}>90 days</option>
+                  </select>
+                </div>
+
+                {/* Excluded Domains */}
+                <div className="space-y-2 pt-2 border-t">
+                  <label className="text-sm font-medium">Excluded Domains</label>
+                  <p className="text-xs text-muted-foreground">
+                    Domains to exclude from tracking (one per line)
+                  </p>
+                  <textarea
+                    className="w-full min-h-[80px] text-sm p-2 border rounded-md bg-background font-mono"
+                    placeholder="facebook.com&#10;twitter.com&#10;instagram.com"
+                    value={(config.dataSources.browser.excludedDomains || []).join('\n')}
+                    onChange={(e) => {
+                      const domains = e.target.value
+                        .split('\n')
+                        .map((d) => d.trim())
+                        .filter((d) => d.length > 0);
+                      updateConfig.mutate({
+                        dataSources: {
+                          ...config.dataSources,
+                          browser: { ...config.dataSources.browser, excludedDomains: domains },
+                        },
+                      });
+                    }}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Also excludes subdomains (e.g., "example.com" excludes "www.example.com")
+                  </p>
+                </div>
+              </div>
+            )}
           </TabsContent>
 
           <TabsContent value="categories" className="space-y-6 mt-4">

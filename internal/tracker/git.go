@@ -307,3 +307,104 @@ func (t *GitTracker) GetRecentCommits(limit int) ([]*storage.GitCommit, error) {
 	// Get commits from all time with a limit
 	return t.store.GetGitCommitsByTimeRange(0, time.Now().Unix())
 }
+
+// DiscoverRepositories searches for git repositories in the given paths up to maxDepth.
+// It returns a list of newly discovered repositories (excluding already tracked ones).
+func (t *GitTracker) DiscoverRepositories(searchPaths []string, maxDepth int) ([]*storage.GitRepository, error) {
+	if maxDepth <= 0 {
+		maxDepth = 3 // Default depth
+	}
+
+	var discovered []*storage.GitRepository
+
+	for _, searchPath := range searchPaths {
+		// Expand ~ to home directory
+		expandedPath := expandPath(searchPath)
+
+		// Check if the path exists
+		info, err := os.Stat(expandedPath)
+		if err != nil || !info.IsDir() {
+			continue
+		}
+
+		// Walk the directory tree up to maxDepth
+		repos, err := t.findGitReposInPath(expandedPath, maxDepth)
+		if err != nil {
+			continue
+		}
+
+		for _, repoPath := range repos {
+			// Check if already tracked
+			existing, err := t.store.GetGitRepositoryByPath(repoPath)
+			if err == nil && existing != nil {
+				continue // Skip already tracked repos
+			}
+
+			// Register the new repository
+			repo, err := t.RegisterRepository(repoPath)
+			if err != nil {
+				continue
+			}
+			discovered = append(discovered, repo)
+		}
+	}
+
+	return discovered, nil
+}
+
+// findGitReposInPath recursively finds git repositories up to maxDepth.
+func (t *GitTracker) findGitReposInPath(rootPath string, maxDepth int) ([]string, error) {
+	var repos []string
+
+	err := filepath.WalkDir(rootPath, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return nil // Skip inaccessible directories
+		}
+
+		if !d.IsDir() {
+			return nil
+		}
+
+		// Calculate current depth relative to root
+		relPath, _ := filepath.Rel(rootPath, path)
+		depth := 0
+		if relPath != "." {
+			depth = len(strings.Split(relPath, string(os.PathSeparator)))
+		}
+
+		// Check depth limit
+		if depth > maxDepth {
+			return filepath.SkipDir
+		}
+
+		// Skip common non-repo directories for performance
+		baseName := d.Name()
+		if baseName == "node_modules" || baseName == ".cache" || baseName == "vendor" ||
+			baseName == "__pycache__" || baseName == ".venv" || baseName == "venv" ||
+			baseName == ".npm" || baseName == ".cargo" || baseName == "target" {
+			return filepath.SkipDir
+		}
+
+		// Check if this directory is a git repository
+		gitDir := filepath.Join(path, ".git")
+		if info, err := os.Stat(gitDir); err == nil && info.IsDir() {
+			repos = append(repos, path)
+			return filepath.SkipDir // Don't descend into git repos (no nested repos)
+		}
+
+		return nil
+	})
+
+	return repos, err
+}
+
+// expandPath expands ~ to home directory.
+func expandPath(path string) string {
+	if strings.HasPrefix(path, "~/") {
+		home, err := os.UserHomeDir()
+		if err == nil {
+			return filepath.Join(home, path[2:])
+		}
+	}
+	return path
+}

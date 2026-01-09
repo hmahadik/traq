@@ -26,6 +26,8 @@ func (m *mockPlatformShell) GetShellType() string                        { retur
 func (m *mockPlatformShell) GetBrowserHistoryPaths() map[string]string   { return nil }
 func (m *mockPlatformShell) OpenURL(url string) error                    { return nil }
 func (m *mockPlatformShell) ShowNotification(title, body string) error   { return nil }
+func (m *mockPlatformShell) SetAutoStart(enabled bool) error             { return nil }
+func (m *mockPlatformShell) IsAutoStartEnabled() (bool, error)           { return false, nil }
 
 func setupShellTestDB(t *testing.T) (*storage.Store, string) {
 	tmpDir, err := os.MkdirTemp("", "traq-shell-test-*")

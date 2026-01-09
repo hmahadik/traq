@@ -64,8 +64,8 @@ func (c *ScreenCapture) Capture() (*CaptureResult, error) {
 		return nil, fmt.Errorf("no active displays found")
 	}
 
-	// For now, capture the primary display (index 0)
-	// TODO: Capture the display where the active window is located
+	// Capture the primary display (index 0)
+	// Note: The daemon uses CaptureMonitor() with GetMonitorForWindow() for active window detection
 	monitorIndex := 0
 	bounds := screenshot.GetDisplayBounds(monitorIndex)
 
@@ -266,6 +266,63 @@ func GetMonitorCount() int {
 // GetMonitorBounds returns the bounds of a specific monitor.
 func GetMonitorBounds(index int) image.Rectangle {
 	return screenshot.GetDisplayBounds(index)
+}
+
+// GetMonitorForPoint returns the monitor index that contains the given point.
+// If the point is outside all monitors, returns 0 (primary monitor).
+func GetMonitorForPoint(x, y int) int {
+	n := screenshot.NumActiveDisplays()
+	point := image.Point{X: x, Y: y}
+
+	for i := 0; i < n; i++ {
+		bounds := screenshot.GetDisplayBounds(i)
+		if point.In(bounds) {
+			return i
+		}
+	}
+
+	// Point outside all monitors, use primary
+	return 0
+}
+
+// GetMonitorForWindow returns the monitor index that contains the center of the window.
+func GetMonitorForWindow(windowX, windowY, windowWidth, windowHeight int) int {
+	// Calculate window center
+	centerX := windowX + windowWidth/2
+	centerY := windowY + windowHeight/2
+	return GetMonitorForPoint(centerX, centerY)
+}
+
+// MonitorInfo contains information about a display monitor.
+type MonitorInfo struct {
+	Index     int    `json:"index"`
+	Name      string `json:"name"`
+	Width     int    `json:"width"`
+	Height    int    `json:"height"`
+	X         int    `json:"x"`
+	Y         int    `json:"y"`
+	IsPrimary bool   `json:"isPrimary"`
+}
+
+// GetAvailableMonitors returns information about all active monitors.
+func GetAvailableMonitors() []MonitorInfo {
+	n := screenshot.NumActiveDisplays()
+	monitors := make([]MonitorInfo, n)
+
+	for i := 0; i < n; i++ {
+		bounds := screenshot.GetDisplayBounds(i)
+		monitors[i] = MonitorInfo{
+			Index:     i,
+			Name:      fmt.Sprintf("Display %d", i+1),
+			Width:     bounds.Dx(),
+			Height:    bounds.Dy(),
+			X:         bounds.Min.X,
+			Y:         bounds.Min.Y,
+			IsPrimary: i == 0, // First display is typically primary
+		}
+	}
+
+	return monitors
 }
 
 // SavePNG saves an image as PNG (for debugging).

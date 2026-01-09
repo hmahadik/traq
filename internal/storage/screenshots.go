@@ -9,11 +9,11 @@ import (
 func (s *Store) SaveScreenshot(sc *Screenshot) (int64, error) {
 	result, err := s.db.Exec(`
 		INSERT INTO screenshots (
-			timestamp, filepath, dhash, window_title, app_name, window_class,
+			timestamp, filepath, dhash, window_title, app_name, window_class, process_pid,
 			window_x, window_y, window_width, window_height,
 			monitor_name, monitor_width, monitor_height, session_id
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		sc.Timestamp, sc.Filepath, sc.DHash, sc.WindowTitle, sc.AppName, sc.WindowClass,
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		sc.Timestamp, sc.Filepath, sc.DHash, sc.WindowTitle, sc.AppName, sc.WindowClass, sc.ProcessPID,
 		sc.WindowX, sc.WindowY, sc.WindowWidth, sc.WindowHeight,
 		sc.MonitorName, sc.MonitorWidth, sc.MonitorHeight, sc.SessionID,
 	)
@@ -44,11 +44,11 @@ func (s *Store) SaveScreenshot(sc *Screenshot) (int64, error) {
 func (s *Store) GetScreenshot(id int64) (*Screenshot, error) {
 	sc := &Screenshot{}
 	err := s.db.QueryRow(`
-		SELECT id, timestamp, filepath, dhash, window_title, app_name, window_class,
+		SELECT id, timestamp, filepath, dhash, window_title, app_name, window_class, process_pid,
 		       window_x, window_y, window_width, window_height,
 		       monitor_name, monitor_width, monitor_height, session_id, created_at
 		FROM screenshots WHERE id = ?`, id).Scan(
-		&sc.ID, &sc.Timestamp, &sc.Filepath, &sc.DHash, &sc.WindowTitle, &sc.AppName, &sc.WindowClass,
+		&sc.ID, &sc.Timestamp, &sc.Filepath, &sc.DHash, &sc.WindowTitle, &sc.AppName, &sc.WindowClass, &sc.ProcessPID,
 		&sc.WindowX, &sc.WindowY, &sc.WindowWidth, &sc.WindowHeight,
 		&sc.MonitorName, &sc.MonitorWidth, &sc.MonitorHeight, &sc.SessionID, &sc.CreatedAt,
 	)
@@ -64,7 +64,7 @@ func (s *Store) GetScreenshot(id int64) (*Screenshot, error) {
 // GetScreenshots retrieves screenshots within a time range.
 func (s *Store) GetScreenshots(start, end int64) ([]*Screenshot, error) {
 	rows, err := s.db.Query(`
-		SELECT id, timestamp, filepath, dhash, window_title, app_name, window_class,
+		SELECT id, timestamp, filepath, dhash, window_title, app_name, window_class, process_pid,
 		       window_x, window_y, window_width, window_height,
 		       monitor_name, monitor_width, monitor_height, session_id, created_at
 		FROM screenshots
@@ -81,7 +81,7 @@ func (s *Store) GetScreenshots(start, end int64) ([]*Screenshot, error) {
 // GetScreenshotsBySession retrieves all screenshots for a session.
 func (s *Store) GetScreenshotsBySession(sessionID int64) ([]*Screenshot, error) {
 	rows, err := s.db.Query(`
-		SELECT id, timestamp, filepath, dhash, window_title, app_name, window_class,
+		SELECT id, timestamp, filepath, dhash, window_title, app_name, window_class, process_pid,
 		       window_x, window_y, window_width, window_height,
 		       monitor_name, monitor_width, monitor_height, session_id, created_at
 		FROM screenshots
@@ -101,7 +101,7 @@ func (s *Store) GetScreenshotsByDate(year, month, day int) ([]*Screenshot, error
 	// This is a simplified approach - proper timezone handling would use time.Location
 	dateStr := fmt.Sprintf("%04d-%02d-%02d", year, month, day)
 	rows, err := s.db.Query(`
-		SELECT id, timestamp, filepath, dhash, window_title, app_name, window_class,
+		SELECT id, timestamp, filepath, dhash, window_title, app_name, window_class, process_pid,
 		       window_x, window_y, window_width, window_height,
 		       monitor_name, monitor_width, monitor_height, session_id, created_at
 		FROM screenshots
@@ -119,13 +119,13 @@ func (s *Store) GetScreenshotsByDate(year, month, day int) ([]*Screenshot, error
 func (s *Store) GetLatestScreenshot() (*Screenshot, error) {
 	sc := &Screenshot{}
 	err := s.db.QueryRow(`
-		SELECT id, timestamp, filepath, dhash, window_title, app_name, window_class,
+		SELECT id, timestamp, filepath, dhash, window_title, app_name, window_class, process_pid,
 		       window_x, window_y, window_width, window_height,
 		       monitor_name, monitor_width, monitor_height, session_id, created_at
 		FROM screenshots
 		ORDER BY timestamp DESC
 		LIMIT 1`).Scan(
-		&sc.ID, &sc.Timestamp, &sc.Filepath, &sc.DHash, &sc.WindowTitle, &sc.AppName, &sc.WindowClass,
+		&sc.ID, &sc.Timestamp, &sc.Filepath, &sc.DHash, &sc.WindowTitle, &sc.AppName, &sc.WindowClass, &sc.ProcessPID,
 		&sc.WindowX, &sc.WindowY, &sc.WindowWidth, &sc.WindowHeight,
 		&sc.MonitorName, &sc.MonitorWidth, &sc.MonitorHeight, &sc.SessionID, &sc.CreatedAt,
 	)
@@ -183,7 +183,7 @@ func scanScreenshots(rows *sql.Rows) ([]*Screenshot, error) {
 	for rows.Next() {
 		sc := &Screenshot{}
 		err := rows.Scan(
-			&sc.ID, &sc.Timestamp, &sc.Filepath, &sc.DHash, &sc.WindowTitle, &sc.AppName, &sc.WindowClass,
+			&sc.ID, &sc.Timestamp, &sc.Filepath, &sc.DHash, &sc.WindowTitle, &sc.AppName, &sc.WindowClass, &sc.ProcessPID,
 			&sc.WindowX, &sc.WindowY, &sc.WindowWidth, &sc.WindowHeight,
 			&sc.MonitorName, &sc.MonitorWidth, &sc.MonitorHeight, &sc.SessionID, &sc.CreatedAt,
 		)

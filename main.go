@@ -3,14 +3,18 @@ package main
 import (
 	"context"
 	"embed"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
 
+	"traq/internal/tray"
+
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
+	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 //go:embed all:frontend/dist
@@ -64,22 +68,68 @@ func main() {
 	// This is a temporary handler that gets replaced after startup
 	handler := &screenshotHandler{}
 
+	// Wails context (set during OnStartup)
+	var wailsCtx context.Context
+
+	// System tray instance
+	var sysTray *tray.Tray
+
 	// Create application with options
 	err := wails.Run(&options.App{
-		Title:  "Traq",
-		Width:  1680,
-		Height: 1050,
+		Title:             "Traq",
+		Width:             1680,
+		Height:            1050,
+		HideWindowOnClose: true, // Keep app running in tray when window is closed
 		AssetServer: &assetserver.Options{
 			Assets:  assets,
 			Handler: handler,
 		},
 		BackgroundColour: &options.RGBA{R: 27, G: 38, B: 54, A: 1},
 		OnStartup: func(ctx context.Context) {
+			wailsCtx = ctx
 			app.startup(ctx)
 			// Now that app is initialized, set the data directory
 			handler.dataDir = app.platform.DataDir()
+
+			// Initialize and start system tray
+			sysTray = tray.New(tray.Config{
+				OnShowWindow: func() {
+					runtime.WindowShow(wailsCtx)
+					runtime.WindowSetAlwaysOnTop(wailsCtx, true)
+					runtime.WindowSetAlwaysOnTop(wailsCtx, false)
+				},
+				OnQuit: func() {
+					runtime.Quit(wailsCtx)
+				},
+				OnPause: func() {
+					app.PauseCapture()
+					if sysTray != nil {
+						sysTray.SetPaused(true)
+						sysTray.SetCapturing(false)
+					}
+				},
+				OnResume: func() {
+					app.ResumeCapture()
+					if sysTray != nil {
+						sysTray.SetPaused(false)
+						sysTray.SetCapturing(true)
+					}
+				},
+				OnForce: func() {
+					if _, err := app.ForceCapture(); err != nil {
+						log.Printf("Force capture failed: %v", err)
+					}
+				},
+			})
+			go sysTray.Run()
 		},
-		OnShutdown:    app.shutdown,
+		OnShutdown: func(ctx context.Context) {
+			// Quit the system tray
+			if sysTray != nil {
+				sysTray.Quit()
+			}
+			app.shutdown(ctx)
+		},
 		OnBeforeClose: app.beforeClose,
 		Bind: []interface{}{
 			app,

@@ -275,6 +275,12 @@ func (l *Linux) GetBrowserHistoryPaths() map[string]string {
 		paths["brave"] = bravePath
 	}
 
+	// Microsoft Edge
+	edgePath := filepath.Join(home, ".config", "microsoft-edge", "Default", "History")
+	if _, err := os.Stat(edgePath); err == nil {
+		paths["edge"] = edgePath
+	}
+
 	return paths
 }
 
@@ -293,4 +299,73 @@ func (l *Linux) ShowNotification(title, body string) error {
 		return fmt.Errorf("notify-send failed: %w: %s", err, stderr.String())
 	}
 	return nil
+}
+
+// autostartDesktopPath returns the path to the autostart .desktop file.
+func (l *Linux) autostartDesktopPath() string {
+	autostartDir := filepath.Join(l.ConfigDir(), "..", "..", "autostart")
+	if dir := os.Getenv("XDG_CONFIG_HOME"); dir != "" {
+		autostartDir = filepath.Join(dir, "autostart")
+	} else {
+		home, _ := os.UserHomeDir()
+		autostartDir = filepath.Join(home, ".config", "autostart")
+	}
+	return filepath.Join(autostartDir, "traq.desktop")
+}
+
+// SetAutoStart enables or disables autostart on login.
+func (l *Linux) SetAutoStart(enabled bool) error {
+	desktopPath := l.autostartDesktopPath()
+
+	if !enabled {
+		// Remove the desktop file if it exists
+		if _, err := os.Stat(desktopPath); err == nil {
+			return os.Remove(desktopPath)
+		}
+		return nil
+	}
+
+	// Find the executable path
+	execPath, err := os.Executable()
+	if err != nil {
+		return fmt.Errorf("failed to get executable path: %w", err)
+	}
+
+	// Ensure the autostart directory exists
+	autostartDir := filepath.Dir(desktopPath)
+	if err := os.MkdirAll(autostartDir, 0755); err != nil {
+		return fmt.Errorf("failed to create autostart directory: %w", err)
+	}
+
+	// Create the .desktop file content
+	desktopContent := fmt.Sprintf(`[Desktop Entry]
+Type=Application
+Name=Traq
+Comment=Track your work sessions and productivity
+Exec=%s
+Icon=traq
+Terminal=false
+Categories=Utility;
+X-GNOME-Autostart-enabled=true
+`, execPath)
+
+	// Write the .desktop file
+	if err := os.WriteFile(desktopPath, []byte(desktopContent), 0644); err != nil {
+		return fmt.Errorf("failed to write autostart desktop file: %w", err)
+	}
+
+	return nil
+}
+
+// IsAutoStartEnabled checks if autostart is currently enabled.
+func (l *Linux) IsAutoStartEnabled() (bool, error) {
+	desktopPath := l.autostartDesktopPath()
+	_, err := os.Stat(desktopPath)
+	if os.IsNotExist(err) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return true, nil
 }

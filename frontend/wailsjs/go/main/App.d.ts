@@ -4,12 +4,21 @@ import {storage} from '../models';
 import {service} from '../models';
 import {main} from '../models';
 import {inference} from '../models';
+import {tracker} from '../models';
 
 export function DeleteAppCategory(arg1:string):Promise<void>;
+
+export function DeleteModel(arg1:string):Promise<void>;
 
 export function DeleteScreenshot(arg1:number):Promise<void>;
 
 export function DeleteSession(arg1:number):Promise<void>;
+
+export function DiscoverGitRepositories(arg1:Array<string>,arg2:number):Promise<Array<storage.GitRepository>>;
+
+export function DownloadModel(arg1:string):Promise<void>;
+
+export function DownloadServer():Promise<void>;
 
 export function ExportAnalytics(arg1:string,arg2:string,arg3:string):Promise<string>;
 
@@ -29,6 +38,10 @@ export function GetAppCategories():Promise<Array<storage.AppCategoryRecord>>;
 
 export function GetAppUsage(arg1:number,arg2:number):Promise<Array<service.AppUsage>>;
 
+export function GetAvailableModels():Promise<Array<inference.ModelInfo>>;
+
+export function GetAvailableMonitors():Promise<Array<tracker.MonitorInfo>>;
+
 export function GetBundledStatus():Promise<inference.BundledStatus>;
 
 export function GetCalendarHeatmap(arg1:number,arg2:number):Promise<service.CalendarData>;
@@ -46,6 +59,8 @@ export function GetDailySummaries(arg1:number):Promise<Array<service.DailySummar
 export function GetDataDir():Promise<string>;
 
 export function GetDataSourceStats(arg1:number,arg2:number):Promise<service.DataSourceStats>;
+
+export function GetFileAllowedExtensions():Promise<Array<string>>;
 
 export function GetFocusDistribution(arg1:string):Promise<Array<service.HourlyFocus>>;
 
@@ -72,6 +87,8 @@ export function GetScreenshotPath(arg1:number):Promise<string>;
 export function GetScreenshotsForHour(arg1:string,arg2:number):Promise<Array<storage.Screenshot>>;
 
 export function GetScreenshotsForSession(arg1:number,arg2:number,arg3:number):Promise<service.ScreenshotPage>;
+
+export function GetServerStatus():Promise<inference.ServerDownloadStatus>;
 
 export function GetSessionContext(arg1:number):Promise<service.SessionContext>;
 
@@ -116,6 +133,8 @@ export function RestartTracking():Promise<void>;
 export function ResumeCapture():Promise<void>;
 
 export function SaveAppCategory(arg1:string,arg2:string):Promise<void>;
+
+export function SetFileAllowedExtensions(arg1:Array<string>):Promise<void>;
 
 export function StartTracking():Promise<void>;
 

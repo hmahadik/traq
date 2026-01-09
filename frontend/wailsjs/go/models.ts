@@ -48,6 +48,50 @@ export namespace inference {
 	        this.cloudConfigured = source["cloudConfigured"];
 	    }
 	}
+	export class ModelInfo {
+	    id: string;
+	    name: string;
+	    description: string;
+	    size: number;
+	    downloaded: boolean;
+	    downloadUrl: string;
+	    filename: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ModelInfo(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.name = source["name"];
+	        this.description = source["description"];
+	        this.size = source["size"];
+	        this.downloaded = source["downloaded"];
+	        this.downloadUrl = source["downloadUrl"];
+	        this.filename = source["filename"];
+	    }
+	}
+	export class ServerDownloadStatus {
+	    installed: boolean;
+	    serverPath: string;
+	    version: string;
+	    downloadUrl?: string;
+	    size?: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new ServerDownloadStatus(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.installed = source["installed"];
+	        this.serverPath = source["serverPath"];
+	        this.version = source["version"];
+	        this.downloadUrl = source["downloadUrl"];
+	        this.size = source["size"];
+	    }
+	}
 
 }
 
@@ -107,6 +151,8 @@ export namespace service {
 	export class BrowserConfig {
 	    enabled: boolean;
 	    browsers: string[];
+	    excludedDomains: string[];
+	    historyLimitDays: number;
 	
 	    static createFrom(source: any = {}) {
 	        return new BrowserConfig(source);
@@ -116,6 +162,8 @@ export namespace service {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.enabled = source["enabled"];
 	        this.browsers = source["browsers"];
+	        this.excludedDomains = source["excludedDomains"];
+	        this.historyLimitDays = source["historyLimitDays"];
 	    }
 	}
 	export class DomainUsage {
@@ -244,6 +292,8 @@ export namespace service {
 	    intervalSeconds: number;
 	    quality: number;
 	    duplicateThreshold: number;
+	    monitorMode: string;
+	    monitorIndex: number;
 	
 	    static createFrom(source: any = {}) {
 	        return new CaptureConfig(source);
@@ -255,6 +305,8 @@ export namespace service {
 	        this.intervalSeconds = source["intervalSeconds"];
 	        this.quality = source["quality"];
 	        this.duplicateThreshold = source["duplicateThreshold"];
+	        this.monitorMode = source["monitorMode"];
+	        this.monitorIndex = source["monitorIndex"];
 	    }
 	}
 	export class CloudConfig {
@@ -340,6 +392,8 @@ export namespace service {
 	export class FilesConfig {
 	    enabled: boolean;
 	    watches: WatchPath[];
+	    excludePatterns: string[];
+	    allowedExtensions: string[];
 	
 	    static createFrom(source: any = {}) {
 	        return new FilesConfig(source);
@@ -349,6 +403,8 @@ export namespace service {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.enabled = source["enabled"];
 	        this.watches = this.convertValues(source["watches"], WatchPath);
+	        this.excludePatterns = source["excludePatterns"];
+	        this.allowedExtensions = source["allowedExtensions"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -388,6 +444,7 @@ export namespace service {
 	export class ShellConfig {
 	    enabled: boolean;
 	    shellType: string;
+	    historyPath: string;
 	    excludePatterns: string[];
 	
 	    static createFrom(source: any = {}) {
@@ -398,6 +455,7 @@ export namespace service {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.enabled = source["enabled"];
 	        this.shellType = source["shellType"];
+	        this.historyPath = source["historyPath"];
 	        this.excludePatterns = source["excludePatterns"];
 	    }
 	}
@@ -1524,6 +1582,7 @@ export namespace storage {
 	    windowTitle: sql.NullString;
 	    appName: sql.NullString;
 	    windowClass: sql.NullString;
+	    processPid: sql.NullInt64;
 	    windowX: sql.NullInt64;
 	    windowY: sql.NullInt64;
 	    windowWidth: sql.NullInt64;
@@ -1547,6 +1606,7 @@ export namespace storage {
 	        this.windowTitle = this.convertValues(source["windowTitle"], sql.NullString);
 	        this.appName = this.convertValues(source["appName"], sql.NullString);
 	        this.windowClass = this.convertValues(source["windowClass"], sql.NullString);
+	        this.processPid = this.convertValues(source["processPid"], sql.NullInt64);
 	        this.windowX = this.convertValues(source["windowX"], sql.NullInt64);
 	        this.windowY = this.convertValues(source["windowY"], sql.NullInt64);
 	        this.windowWidth = this.convertValues(source["windowWidth"], sql.NullInt64);
@@ -1761,6 +1821,35 @@ export namespace storage {
 		    }
 		    return a;
 		}
+	}
+
+}
+
+export namespace tracker {
+	
+	export class MonitorInfo {
+	    index: number;
+	    name: string;
+	    width: number;
+	    height: number;
+	    x: number;
+	    y: number;
+	    isPrimary: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new MonitorInfo(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.index = source["index"];
+	        this.name = source["name"];
+	        this.width = source["width"];
+	        this.height = source["height"];
+	        this.x = source["x"];
+	        this.y = source["y"];
+	        this.isPrimary = source["isPrimary"];
+	    }
 	}
 
 }

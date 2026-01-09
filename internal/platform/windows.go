@@ -106,6 +106,12 @@ func (w *Windows) GetBrowserHistoryPaths() map[string]string {
 		}
 	}
 
+	// Brave
+	bravePath := filepath.Join(localAppData, "BraveSoftware", "Brave-Browser", "User Data", "Default", "History")
+	if _, err := os.Stat(bravePath); err == nil {
+		paths["brave"] = bravePath
+	}
+
 	return paths
 }
 
@@ -119,4 +125,38 @@ func (w *Windows) OpenURL(url string) error {
 func (w *Windows) ShowNotification(title, body string) error {
 	// TODO: Use Windows toast notifications
 	return nil
+}
+
+// startupShortcutPath returns the path to the startup shortcut.
+func (w *Windows) startupShortcutPath() string {
+	startupDir := os.Getenv("APPDATA")
+	if startupDir == "" {
+		home, _ := os.UserHomeDir()
+		startupDir = filepath.Join(home, "AppData", "Roaming")
+	}
+	return filepath.Join(startupDir, "Microsoft", "Windows", "Start Menu", "Programs", "Startup", "Traq.lnk")
+}
+
+// SetAutoStart enables or disables autostart on login.
+// On Windows, this creates/removes a shortcut in the Startup folder.
+// Note: Full implementation would use Windows registry or create a proper .lnk file.
+func (w *Windows) SetAutoStart(enabled bool) error {
+	// TODO: Implement Windows autostart using registry key
+	// HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Run
+	// or create .lnk shortcut in Startup folder
+	return nil
+}
+
+// IsAutoStartEnabled checks if autostart is currently enabled.
+func (w *Windows) IsAutoStartEnabled() (bool, error) {
+	// TODO: Check Windows registry or Startup folder
+	shortcutPath := w.startupShortcutPath()
+	_, err := os.Stat(shortcutPath)
+	if os.IsNotExist(err) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return true, nil
 }

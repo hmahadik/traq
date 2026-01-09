@@ -15,6 +15,8 @@ import (
 	"traq/internal/service"
 	"traq/internal/storage"
 	"traq/internal/tracker"
+
+	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 // App struct holds the application state and services
@@ -258,6 +260,11 @@ func (a *App) ForceCapture() (string, error) {
 		return "", err
 	}
 	return result.Filepath, nil
+}
+
+// GetAvailableMonitors returns information about all connected monitors.
+func (a *App) GetAvailableMonitors() []tracker.MonitorInfo {
+	return tracker.GetAvailableMonitors()
 }
 
 // ============================================================================
@@ -717,6 +724,15 @@ func (a *App) GetTrackedRepositories() ([]*storage.GitRepository, error) {
 	return a.daemon.GetTrackedRepositories()
 }
 
+// DiscoverGitRepositories searches for git repositories in the given paths up to maxDepth.
+// Returns a list of newly discovered repositories.
+func (a *App) DiscoverGitRepositories(searchPaths []string, maxDepth int) ([]*storage.GitRepository, error) {
+	if a.daemon == nil {
+		return nil, nil
+	}
+	return a.daemon.DiscoverGitRepositories(searchPaths, maxDepth)
+}
+
 // ============================================================================
 // File Tracking Methods (exposed to frontend)
 // ============================================================================
@@ -743,6 +759,23 @@ func (a *App) GetWatchedDirectories() []string {
 		return nil
 	}
 	return a.daemon.GetWatchedDirectories()
+}
+
+// SetFileAllowedExtensions sets which file extensions to track.
+// If empty, all extensions are tracked (default behavior).
+func (a *App) SetFileAllowedExtensions(extensions []string) {
+	if a.daemon == nil {
+		return
+	}
+	a.daemon.SetFileAllowedExtensions(extensions)
+}
+
+// GetFileAllowedExtensions returns the list of allowed file extensions.
+func (a *App) GetFileAllowedExtensions() []string {
+	if a.daemon == nil {
+		return nil
+	}
+	return a.daemon.GetFileAllowedExtensions()
 }
 
 // ============================================================================
@@ -826,6 +859,90 @@ func (a *App) GetBundledStatus() *inference.BundledStatus {
 		}
 	}
 	return a.inference.GetBundledStatus()
+}
+
+// GetAvailableModels returns the list of available AI models for the bundled engine.
+func (a *App) GetAvailableModels() []*inference.ModelInfo {
+	models := inference.GetAvailableModels()
+	result := make([]*inference.ModelInfo, len(models))
+	for i := range models {
+		result[i] = &models[i]
+	}
+	return result
+}
+
+// DownloadModel downloads an AI model file. Progress is reported via Wails events.
+func (a *App) DownloadModel(modelID string) error {
+	// Send progress updates via Wails runtime events
+	progress := func(downloaded, total int64) {
+		if total > 0 {
+			pct := int(float64(downloaded) / float64(total) * 100)
+			// Emit event to frontend
+			wailsRuntime.EventsEmit(a.ctx, "model:download:progress", map[string]interface{}{
+				"modelId":    modelID,
+				"downloaded": downloaded,
+				"total":      total,
+				"percent":    pct,
+			})
+		}
+	}
+
+	// Start download in goroutine so it doesn't block
+	go func() {
+		err := inference.DownloadModel(modelID, progress)
+		if err != nil {
+			wailsRuntime.EventsEmit(a.ctx, "model:download:error", map[string]interface{}{
+				"modelId": modelID,
+				"error":   err.Error(),
+			})
+		} else {
+			wailsRuntime.EventsEmit(a.ctx, "model:download:complete", map[string]interface{}{
+				"modelId": modelID,
+			})
+		}
+	}()
+
+	return nil
+}
+
+// DeleteModel deletes a downloaded AI model file.
+func (a *App) DeleteModel(modelID string) error {
+	return inference.DeleteModel(modelID)
+}
+
+// GetServerStatus returns the installation status of the llama-server binary.
+func (a *App) GetServerStatus() *inference.ServerDownloadStatus {
+	return inference.GetServerStatus()
+}
+
+// DownloadServer downloads the llama-server binary. Progress is reported via Wails events.
+func (a *App) DownloadServer() error {
+	// Send progress updates via Wails runtime events
+	progress := func(downloaded, total int64) {
+		if total > 0 {
+			pct := int(float64(downloaded) / float64(total) * 100)
+			// Emit event to frontend
+			wailsRuntime.EventsEmit(a.ctx, "server:download:progress", map[string]interface{}{
+				"downloaded": downloaded,
+				"total":      total,
+				"percent":    pct,
+			})
+		}
+	}
+
+	// Start download in goroutine so it doesn't block
+	go func() {
+		err := inference.DownloadServer(progress)
+		if err != nil {
+			wailsRuntime.EventsEmit(a.ctx, "server:download:error", map[string]interface{}{
+				"error": err.Error(),
+			})
+		} else {
+			wailsRuntime.EventsEmit(a.ctx, "server:download:complete", map[string]interface{}{})
+		}
+	}()
+
+	return nil
 }
 
 // ============================================================================

@@ -130,7 +130,7 @@
       "Step 3: Verify summary is generated using local model",
       "Step 4: Check AI status shows bundled model active"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -263,7 +263,7 @@
       "Step 3: Run without installing dependencies",
       "Step 4: Verify application launches and functions"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -515,7 +515,7 @@
       "Step 3: Close main window",
       "Step 4: Verify app continues running in tray"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -526,7 +526,7 @@
       "Step 3: Verify common actions are available (pause, settings, quit)",
       "Step 4: Test menu actions work correctly"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -538,7 +538,7 @@
       "Step 4: Restart system",
       "Step 5: Verify app launches automatically"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -550,7 +550,7 @@
       "Step 4: Reopen main window",
       "Step 5: Verify screenshots were captured while window was closed"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -562,7 +562,7 @@
       "Step 4: Verify daemon continues running",
       "Step 5: Verify capture continues without UI"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -628,7 +628,7 @@
       "Step 3: Verify history is captured",
       "Step 4: Test with multiple browsers"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -1160,7 +1160,7 @@
       "Step 4: Download a model",
       "Step 5: Verify model appears in selection list"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "style",
@@ -1273,7 +1273,7 @@
       "Step 4: Select specific monitor",
       "Step 5: Verify captures are from selected monitor"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -1294,7 +1294,7 @@
       "Step 3: View screenshot metadata",
       "Step 4: Verify monitor identifier is recorded"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -1305,7 +1305,7 @@
       "Step 3: Verify process ID is recorded",
       "Step 4: Verify PID matches actual process"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -1349,7 +1349,7 @@
       "Step 3: Enter custom history file path",
       "Step 4: Verify commands are read from custom path"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -1360,7 +1360,7 @@
       "Step 3: Execute commands matching patterns",
       "Step 4: Verify matching commands are excluded"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -1371,7 +1371,7 @@
       "Step 3: Run repository discovery",
       "Step 4: Verify repos in configured paths are found"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -1382,7 +1382,7 @@
       "Step 3: Verify repositories are automatically detected",
       "Step 4: Verify new repos are tracked"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -1393,7 +1393,7 @@
       "Step 3: Create nested repo structure",
       "Step 4: Verify search respects depth limit"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -1404,7 +1404,7 @@
       "Step 3: Create files matching and not matching patterns",
       "Step 4: Verify only matching files are tracked"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -1415,7 +1415,7 @@
       "Step 3: Create files with various extensions",
       "Step 4: Verify only configured extensions are tracked"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -1426,7 +1426,7 @@
       "Step 3: Enable/disable specific browsers",
       "Step 4: Verify only selected browsers are tracked"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -1436,7 +1436,7 @@
       "Step 2: Configure history limit (e.g., 7 days)",
       "Step 3: Verify only recent history within limit is read"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -1447,7 +1447,7 @@
       "Step 3: Visit excluded domains",
       "Step 4: Verify visits to excluded domains are not tracked"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",

@@ -5,6 +5,7 @@ go 1.22.0
 toolchain go1.24.6
 
 require (
+	fyne.io/systray v1.12.0
 	github.com/chai2010/webp v1.4.0
 	github.com/corona10/goimagehash v1.1.0
 	github.com/disintegration/imaging v1.6.2

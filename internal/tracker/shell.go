@@ -18,11 +18,12 @@ import (
 
 // ShellTracker tracks shell command history.
 type ShellTracker struct {
-	platform        platform.Platform
-	store           *storage.Store
-	checkpointFile  string
-	excludePatterns []*regexp.Regexp
+	platform          platform.Platform
+	store             *storage.Store
+	checkpointFile    string
+	excludePatterns   []*regexp.Regexp
 	shellTypeOverride string // If set, overrides platform detection ("auto" means use platform)
+	historyPathOverride string // If set, overrides platform's default history path
 }
 
 // ShellCheckpoint stores the last read position for each history file.
@@ -53,6 +54,37 @@ func (t *ShellTracker) AddExcludePattern(pattern string) error {
 	return nil
 }
 
+// SetExcludePatterns replaces all user-defined exclude patterns with the given list.
+// The default sensitive data patterns are always retained.
+func (t *ShellTracker) SetExcludePatterns(patterns []string) error {
+	// Keep only the default patterns (first 2)
+	t.excludePatterns = []*regexp.Regexp{
+		regexp.MustCompile(`(?i)(password|passwd|secret|token|key=|api_key|apikey|auth)`),
+		regexp.MustCompile(`^(ls|cd|pwd|clear|exit|history)$`),
+	}
+	// Add user-defined patterns
+	for _, pattern := range patterns {
+		if pattern == "" {
+			continue
+		}
+		if err := t.AddExcludePattern(pattern); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// GetExcludePatterns returns the current user-defined exclude patterns as strings.
+// Excludes the built-in patterns (first 2).
+func (t *ShellTracker) GetExcludePatterns() []string {
+	var patterns []string
+	// Skip the first 2 built-in patterns
+	for i := 2; i < len(t.excludePatterns); i++ {
+		patterns = append(patterns, t.excludePatterns[i].String())
+	}
+	return patterns
+}
+
 // SetShellType sets the shell type to use. Use "auto" for auto-detection.
 func (t *ShellTracker) SetShellType(shellType string) {
 	if shellType == "" || shellType == "auto" {
@@ -70,9 +102,24 @@ func (t *ShellTracker) GetShellType() string {
 	return t.platform.GetShellType()
 }
 
+// SetHistoryPath sets a custom path to the shell history file.
+// Pass empty string to use the default platform-detected path.
+func (t *ShellTracker) SetHistoryPath(path string) {
+	t.historyPathOverride = path
+}
+
+// GetHistoryPathOverride returns the configured history path override, or empty if using default.
+func (t *ShellTracker) GetHistoryPathOverride() string {
+	return t.historyPathOverride
+}
+
 // Poll reads new commands from history and saves them.
 func (t *ShellTracker) Poll(sessionID int64) ([]*storage.ShellCommand, error) {
-	histPath := t.platform.GetShellHistoryPath()
+	// Use custom history path if set, otherwise use platform default
+	histPath := t.historyPathOverride
+	if histPath == "" {
+		histPath = t.platform.GetShellHistoryPath()
+	}
 	if histPath == "" {
 		return nil, nil
 	}
@@ -313,7 +360,11 @@ func (t *ShellTracker) Reset() error {
 }
 
 // GetHistoryPath returns the shell history path being tracked.
+// Returns the custom path if set, otherwise the platform default.
 func (t *ShellTracker) GetHistoryPath() string {
+	if t.historyPathOverride != "" {
+		return t.historyPathOverride
+	}
 	return t.platform.GetShellHistoryPath()
 }
 

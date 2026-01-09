@@ -6,12 +6,28 @@ export function DeleteAppCategory(arg1) {
   return window['go']['main']['App']['DeleteAppCategory'](arg1);
 }
 
+export function DeleteModel(arg1) {
+  return window['go']['main']['App']['DeleteModel'](arg1);
+}
+
 export function DeleteScreenshot(arg1) {
   return window['go']['main']['App']['DeleteScreenshot'](arg1);
 }
 
 export function DeleteSession(arg1) {
   return window['go']['main']['App']['DeleteSession'](arg1);
+}
+
+export function DiscoverGitRepositories(arg1, arg2) {
+  return window['go']['main']['App']['DiscoverGitRepositories'](arg1, arg2);
+}
+
+export function DownloadModel(arg1) {
+  return window['go']['main']['App']['DownloadModel'](arg1);
+}
+
+export function DownloadServer() {
+  return window['go']['main']['App']['DownloadServer']();
 }
 
 export function ExportAnalytics(arg1, arg2, arg3) {
@@ -50,6 +66,14 @@ export function GetAppUsage(arg1, arg2) {
   return window['go']['main']['App']['GetAppUsage'](arg1, arg2);
 }
 
+export function GetAvailableModels() {
+  return window['go']['main']['App']['GetAvailableModels']();
+}
+
+export function GetAvailableMonitors() {
+  return window['go']['main']['App']['GetAvailableMonitors']();
+}
+
 export function GetBundledStatus() {
   return window['go']['main']['App']['GetBundledStatus']();
 }
@@ -84,6 +108,10 @@ export function GetDataDir() {
 
 export function GetDataSourceStats(arg1, arg2) {
   return window['go']['main']['App']['GetDataSourceStats'](arg1, arg2);
+}
+
+export function GetFileAllowedExtensions() {
+  return window['go']['main']['App']['GetFileAllowedExtensions']();
 }
 
 export function GetFocusDistribution(arg1) {
@@ -136,6 +164,10 @@ export function GetScreenshotsForHour(arg1, arg2) {
 
 export function GetScreenshotsForSession(arg1, arg2, arg3) {
   return window['go']['main']['App']['GetScreenshotsForSession'](arg1, arg2, arg3);
+}
+
+export function GetServerStatus() {
+  return window['go']['main']['App']['GetServerStatus']();
 }
 
 export function GetSessionContext(arg1) {
@@ -224,6 +256,10 @@ export function ResumeCapture() {
 
 export function SaveAppCategory(arg1, arg2) {
   return window['go']['main']['App']['SaveAppCategory'](arg1, arg2);
+}
+
+export function SetFileAllowedExtensions(arg1) {
+  return window['go']['main']['App']['SetFileAllowedExtensions'](arg1);
 }
 
 export function StartTracking() {

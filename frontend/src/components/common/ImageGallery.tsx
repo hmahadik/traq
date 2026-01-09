@@ -101,6 +101,9 @@ export function ImageGallery({
               <p className="text-xs text-white/50 mt-1">
                 Position: ({getNullableInt(currentScreenshot.windowX)}, {getNullableInt(currentScreenshot.windowY)}) |
                 Size: {getNullableInt(currentScreenshot.windowWidth)} × {getNullableInt(currentScreenshot.windowHeight)}
+                {isNullableValid(currentScreenshot.processPid) && (
+                  <> | PID: {getNullableInt(currentScreenshot.processPid)}</>
+                )}
               </p>
             )}
           </div>

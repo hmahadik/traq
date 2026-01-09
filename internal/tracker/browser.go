@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"traq/internal/platform"
@@ -18,10 +19,12 @@ import (
 
 // BrowserTracker tracks browser history from supported browsers.
 type BrowserTracker struct {
-	platform       platform.Platform
-	store          *storage.Store
-	checkpointFile string
-	browsers       []string // Enabled browsers
+	platform         platform.Platform
+	store            *storage.Store
+	checkpointFile   string
+	browsers         []string // Enabled browsers
+	excludedDomains  []string // Domains to exclude from tracking
+	historyLimitDays int      // Limit how far back to read history (0 = unlimited)
 }
 
 // BrowserCheckpoint stores the last read timestamp for each browser.
@@ -42,6 +45,48 @@ func NewBrowserTracker(p platform.Platform, store *storage.Store, dataDir string
 // SetEnabledBrowsers sets which browsers to track.
 func (t *BrowserTracker) SetEnabledBrowsers(browsers []string) {
 	t.browsers = browsers
+}
+
+// SetExcludedDomains sets which domains to exclude from tracking.
+func (t *BrowserTracker) SetExcludedDomains(domains []string) {
+	t.excludedDomains = domains
+}
+
+// GetExcludedDomains returns the list of excluded domains.
+func (t *BrowserTracker) GetExcludedDomains() []string {
+	return t.excludedDomains
+}
+
+// SetHistoryLimitDays sets the limit for how far back to read browser history.
+// A value of 0 means no limit (read all available history).
+func (t *BrowserTracker) SetHistoryLimitDays(days int) {
+	t.historyLimitDays = days
+}
+
+// GetHistoryLimitDays returns the current history limit in days.
+func (t *BrowserTracker) GetHistoryLimitDays() int {
+	return t.historyLimitDays
+}
+
+// shouldExcludeDomain checks if a domain should be excluded from tracking.
+func (t *BrowserTracker) shouldExcludeDomain(domain string) bool {
+	if len(t.excludedDomains) == 0 {
+		return false
+	}
+	for _, excluded := range t.excludedDomains {
+		if excluded == "" {
+			continue
+		}
+		// Exact match
+		if domain == excluded {
+			return true
+		}
+		// Subdomain match (e.g., "example.com" excludes "www.example.com" and "sub.example.com")
+		if strings.HasSuffix(domain, "."+excluded) {
+			return true
+		}
+	}
+	return false
 }
 
 // Poll reads new browser history entries.
@@ -66,6 +111,13 @@ func (t *BrowserTracker) Poll(sessionID int64) ([]*storage.BrowserVisit, error) 
 		}
 
 		lastTimestamp := checkpoint.LastTimestamps[browser]
+
+		// Apply history limit if no checkpoint exists and limit is set
+		if lastTimestamp == 0 && t.historyLimitDays > 0 {
+			limitTime := time.Now().AddDate(0, 0, -t.historyLimitDays)
+			lastTimestamp = limitTime.Unix()
+		}
+
 		visits, newTimestamp, err := t.readBrowserHistory(browser, histPath, lastTimestamp, sessionID)
 		if err != nil {
 			continue // Log but continue with other browsers
@@ -74,6 +126,11 @@ func (t *BrowserTracker) Poll(sessionID int64) ([]*storage.BrowserVisit, error) 
 		if len(visits) > 0 {
 			// Save visits
 			for _, visit := range visits {
+				// Check if domain should be excluded
+				if t.shouldExcludeDomain(visit.Domain) {
+					continue
+				}
+
 				// Check for duplicate
 				exists, _ := t.store.VisitExists(visit.Timestamp, visit.URL, visit.Browser)
 				if exists {
