@@ -102,6 +102,8 @@ export function GetSummaryBySession(arg1:number):Promise<storage.Summary>;
 
 export function GetSystemInfo():Promise<Record<string, string>>;
 
+export function GetSystemTheme():Promise<string>;
+
 export function GetThumbnailPath(arg1:number):Promise<string>;
 
 export function GetTopWindows(arg1:string,arg2:number):Promise<Array<service.WindowUsage>>;

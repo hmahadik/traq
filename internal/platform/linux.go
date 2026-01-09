@@ -369,3 +369,30 @@ func (l *Linux) IsAutoStartEnabled() (bool, error) {
 	}
 	return true, nil
 }
+
+// GetSystemTheme detects if the system is using dark or light theme.
+func (l *Linux) GetSystemTheme() string {
+	// Try GNOME/GTK color-scheme setting first
+	out, err := exec.Command("gsettings", "get", "org.gnome.desktop.interface", "color-scheme").Output()
+	if err == nil {
+		result := strings.TrimSpace(string(out))
+		if strings.Contains(result, "dark") {
+			return "dark"
+		}
+		if strings.Contains(result, "light") {
+			return "light"
+		}
+	}
+
+	// Try gtk-theme setting as fallback
+	out, err = exec.Command("gsettings", "get", "org.gnome.desktop.interface", "gtk-theme").Output()
+	if err == nil {
+		result := strings.ToLower(strings.TrimSpace(string(out)))
+		if strings.Contains(result, "dark") {
+			return "dark"
+		}
+	}
+
+	// Default to light
+	return "light"
+}

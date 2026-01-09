@@ -31,6 +31,7 @@ func (m *MockBrowserPlatform) OpenURL(url string) error                  { retur
 func (m *MockBrowserPlatform) ShowNotification(title, body string) error { return nil }
 func (m *MockBrowserPlatform) SetAutoStart(enabled bool) error           { return nil }
 func (m *MockBrowserPlatform) IsAutoStartEnabled() (bool, error)         { return false, nil }
+func (m *MockBrowserPlatform) GetSystemTheme() string                    { return "light" }
 
 // setupBrowserTestStore creates a test store for browser tests.
 func setupBrowserTestStore(t *testing.T) (*storage.Store, func()) {

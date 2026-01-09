@@ -205,7 +205,7 @@ func (s *ConfigService) GetConfig() (*Config, error) {
 			config.AFK.MinSessionMinutes = v
 		}
 	}
-	if val, err := s.store.GetConfig("ui.theme"); err == nil {
+	if val, err := s.store.GetConfig("ui.theme"); err == nil && val != "" {
 		config.UI.Theme = val
 	}
 	if val, err := s.store.GetConfig("ui.showNotifications"); err == nil {

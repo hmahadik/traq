@@ -108,3 +108,8 @@ func (m *MockPlatform) SetAutoStart(enabled bool) error {
 func (m *MockPlatform) IsAutoStartEnabled() (bool, error) {
 	return m.autoStartEnabled, nil
 }
+
+// GetSystemTheme returns the mock system theme.
+func (m *MockPlatform) GetSystemTheme() string {
+	return "light"
+}

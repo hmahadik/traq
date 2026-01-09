@@ -31,6 +31,9 @@ type Platform interface {
 	// Autostart
 	SetAutoStart(enabled bool) error
 	IsAutoStartEnabled() (bool, error)
+
+	// Theme
+	GetSystemTheme() string // Returns "dark" or "light"
 }
 
 // WindowInfo contains information about a window.

@@ -194,6 +194,10 @@ export function GetSystemInfo() {
   return window['go']['main']['App']['GetSystemInfo']();
 }
 
+export function GetSystemTheme() {
+  return window['go']['main']['App']['GetSystemTheme']();
+}
+
 export function GetThumbnailPath(arg1) {
   return window['go']['main']['App']['GetThumbnailPath'](arg1);
 }

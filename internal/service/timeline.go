@@ -59,7 +59,8 @@ type SessionContext struct {
 
 // GetSessionsForDate returns all sessions for a date.
 func (s *TimelineService) GetSessionsForDate(date string) ([]*SessionSummary, error) {
-	t, err := time.Parse("2006-01-02", date)
+	// Parse date in local timezone, not UTC
+	t, err := time.ParseInLocation("2006-01-02", date, time.Local)
 	if err != nil {
 		return nil, err
 	}

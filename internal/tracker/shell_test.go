@@ -28,6 +28,7 @@ func (m *mockPlatformShell) OpenURL(url string) error                    { retur
 func (m *mockPlatformShell) ShowNotification(title, body string) error   { return nil }
 func (m *mockPlatformShell) SetAutoStart(enabled bool) error             { return nil }
 func (m *mockPlatformShell) IsAutoStartEnabled() (bool, error)           { return false, nil }
+func (m *mockPlatformShell) GetSystemTheme() string                      { return "light" }
 
 func setupShellTestDB(t *testing.T) (*storage.Store, string) {
 	tmpDir, err := os.MkdirTemp("", "traq-shell-test-*")

@@ -683,6 +683,14 @@ func (a *App) GetSystemInfo() map[string]string {
 	}
 }
 
+// GetSystemTheme returns the current OS theme ("dark" or "light").
+func (a *App) GetSystemTheme() string {
+	if a.platform == nil {
+		return "light"
+	}
+	return a.platform.GetSystemTheme()
+}
+
 // OpenDataDir opens the data directory in the file manager.
 func (a *App) OpenDataDir() error {
 	if a.platform == nil {

@@ -269,3 +269,17 @@ func (d *Darwin) IsAutoStartEnabled() (bool, error) {
 	}
 	return true, nil
 }
+
+// GetSystemTheme detects if the system is using dark or light theme.
+func (d *Darwin) GetSystemTheme() string {
+	// Use AppleScript to check dark mode
+	out, err := exec.Command("defaults", "read", "-g", "AppleInterfaceStyle").Output()
+	if err == nil {
+		result := strings.TrimSpace(string(out))
+		if strings.ToLower(result) == "dark" {
+			return "dark"
+		}
+	}
+	// If the key doesn't exist or is empty, system is in light mode
+	return "light"
+}

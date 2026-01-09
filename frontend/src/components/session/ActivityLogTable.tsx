@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 
 interface FocusEvent {
   id: number;
-  timestamp: number;
+  startTime: number;
   appName: string;
   windowTitle: string;
   durationSeconds: number;
@@ -16,12 +16,12 @@ interface ActivityLogTableProps {
   focusEvents: FocusEvent[];
 }
 
-type SortField = 'timestamp' | 'appName' | 'windowTitle' | 'durationSeconds';
+type SortField = 'startTime' | 'appName' | 'windowTitle' | 'durationSeconds';
 type SortDirection = 'asc' | 'desc';
 
 export function ActivityLogTable({ focusEvents }: ActivityLogTableProps) {
   const [searchQuery, setSearchQuery] = useState('');
-  const [sortField, setSortField] = useState<SortField>('timestamp');
+  const [sortField, setSortField] = useState<SortField>('startTime');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
 
   // Handle column header click for sorting
@@ -56,9 +56,9 @@ export function ActivityLogTable({ focusEvents }: ActivityLogTableProps) {
       let bValue: string | number;
 
       switch (sortField) {
-        case 'timestamp':
-          aValue = a.timestamp;
-          bValue = b.timestamp;
+        case 'startTime':
+          aValue = a.startTime;
+          bValue = b.startTime;
           break;
         case 'appName':
           aValue = a.appName.toLowerCase();
@@ -124,11 +124,11 @@ export function ActivityLogTable({ focusEvents }: ActivityLogTableProps) {
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => handleSort('timestamp')}
+                  onClick={() => handleSort('startTime')}
                   className="h-8 px-2"
                 >
                   Time
-                  <SortIcon field="timestamp" />
+                  <SortIcon field="startTime" />
                 </Button>
               </th>
               <th className="h-10 px-4 text-left align-middle font-medium text-muted-foreground">
@@ -179,7 +179,7 @@ export function ActivityLogTable({ focusEvents }: ActivityLogTableProps) {
                 return (
                   <tr key={event.id} className="border-b">
                     <td className="p-4 align-middle font-mono text-sm">
-                      {formatTimestamp(event.timestamp)}
+                      {formatTimestamp(event.startTime)}
                     </td>
                     <td className="p-4 align-middle font-medium">{event.appName}</td>
                     <td className="p-4 align-middle max-w-md truncate" title={event.windowTitle}>

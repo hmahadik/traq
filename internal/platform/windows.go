@@ -160,3 +160,20 @@ func (w *Windows) IsAutoStartEnabled() (bool, error) {
 	}
 	return true, nil
 }
+
+// GetSystemTheme detects if the system is using dark or light theme.
+func (w *Windows) GetSystemTheme() string {
+	// Check registry for AppsUseLightTheme
+	// reg query "HKCU\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize" /v AppsUseLightTheme
+	out, err := exec.Command("reg", "query",
+		`HKCU\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize`,
+		"/v", "AppsUseLightTheme").Output()
+	if err == nil {
+		result := string(out)
+		// If AppsUseLightTheme is 0, it's dark mode
+		if strings.Contains(result, "0x0") {
+			return "dark"
+		}
+	}
+	return "light"
+}
