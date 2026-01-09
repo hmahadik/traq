@@ -1,7 +1,8 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Progress } from '@/components/ui/progress';
-import { TrendingUp, TrendingDown, Minus, Award } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { TrendingUp, TrendingDown, Minus, Award, Info } from 'lucide-react';
 
 interface ProductivityScore {
   score: number;
@@ -108,11 +109,22 @@ export function ProductivityScoreCard({ score, isLoading }: ProductivityScoreCar
   const scoreIcon = getScoreIcon(score.score);
 
   return (
-    <Card className="col-span-2">
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium">Productivity Score</CardTitle>
-        <Award className="h-4 w-4 text-muted-foreground" />
-      </CardHeader>
+    <TooltipProvider>
+      <Card className="col-span-2">
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <div className="flex items-center gap-1.5">
+            <CardTitle className="text-sm font-medium">Productivity Score</CardTitle>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Info className="h-3.5 w-3.5 cursor-help text-muted-foreground" />
+              </TooltipTrigger>
+              <TooltipContent className="max-w-xs">
+                <p>Score from 1-5 based on time spent in productive vs distracting applications. Calculated from window focus events and application usage patterns.</p>
+              </TooltipContent>
+            </Tooltip>
+          </div>
+          <Award className="h-4 w-4 text-muted-foreground" />
+        </CardHeader>
       <CardContent className="space-y-4">
         {/* Score Display */}
         <div className="flex items-baseline gap-2">
@@ -173,5 +185,6 @@ export function ProductivityScoreCard({ score, isLoading }: ProductivityScoreCar
         </div>
       </CardContent>
     </Card>
+    </TooltipProvider>
   );
 }

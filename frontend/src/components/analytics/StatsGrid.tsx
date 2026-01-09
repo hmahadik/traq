@@ -1,5 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { formatDuration } from '@/lib/utils';
 import {
   Camera,
@@ -9,6 +10,7 @@ import {
   GitCommit,
   FileText,
   Globe,
+  Info,
 } from 'lucide-react';
 import type { DailyStats } from '@/types';
 
@@ -22,13 +24,26 @@ interface StatCardProps {
   value: string | number;
   icon: React.ReactNode;
   description?: string;
+  tooltip?: string;
 }
 
-function StatCard({ title, value, icon, description }: StatCardProps) {
+function StatCard({ title, value, icon, description, tooltip }: StatCardProps) {
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium">{title}</CardTitle>
+        <div className="flex items-center gap-1.5">
+          <CardTitle className="text-sm font-medium">{title}</CardTitle>
+          {tooltip && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Info className="h-3.5 w-3.5 cursor-help text-muted-foreground" />
+              </TooltipTrigger>
+              <TooltipContent className="max-w-xs">
+                <p>{tooltip}</p>
+              </TooltipContent>
+            </Tooltip>
+          )}
+        </div>
         <div className="h-4 w-4 text-muted-foreground">{icon}</div>
       </CardHeader>
       <CardContent>
@@ -72,19 +87,21 @@ export function StatsGrid({ stats, isLoading }: StatsGridProps) {
   }
 
   return (
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-      <StatCard
-        title="Screenshots"
-        value={stats.totalScreenshots}
-        icon={<Camera className="h-4 w-4" />}
-        description="Captures today"
-      />
-      <StatCard
-        title="Active Time"
-        value={formatDuration(stats.activeMinutes * 60)}
-        icon={<Clock className="h-4 w-4" />}
-        description="Total tracked time"
-      />
+    <TooltipProvider>
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <StatCard
+          title="Screenshots"
+          value={stats.totalScreenshots}
+          icon={<Camera className="h-4 w-4" />}
+          description="Captures today"
+        />
+        <StatCard
+          title="Active Time"
+          value={formatDuration(stats.activeMinutes * 60)}
+          icon={<Clock className="h-4 w-4" />}
+          description="Total tracked time"
+          tooltip="Time actively spent interacting with applications, calculated from window focus events. Excludes idle time (AFK)."
+        />
       <StatCard
         title="Sessions"
         value={stats.totalSessions}
@@ -121,6 +138,7 @@ export function StatsGrid({ stats, isLoading }: StatsGridProps) {
         icon={<Camera className="h-4 w-4" />}
         description={stats.topApps[0] ? `${stats.topApps[0].percentage.toFixed(1)}% of time` : ''}
       />
-    </div>
+      </div>
+    </TooltipProvider>
   );
 }

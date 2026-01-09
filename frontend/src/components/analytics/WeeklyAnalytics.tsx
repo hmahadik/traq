@@ -4,11 +4,13 @@ import {
   XAxis,
   YAxis,
   CartesianGrid,
-  Tooltip,
+  Tooltip as RechartsTooltip,
   ResponsiveContainer,
 } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Info } from 'lucide-react';
 import type { WeeklyStats } from '@/types';
 
 interface WeeklyAnalyticsProps {
@@ -64,9 +66,22 @@ export function WeeklyAnalytics({ data, isLoading }: WeeklyAnalyticsProps) {
   }
 
   // Calculate metrics
+  // Filter to only include completed workdays (not today, not weekends)
+  const today = new Date().toISOString().split('T')[0];
+  const completedWorkdays = data.dailyStats.filter(d => {
+    const date = new Date(d.date);
+    const dayOfWeek = date.getDay(); // 0 = Sunday, 6 = Saturday
+    const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+    const isToday = d.date === today;
+    return !isWeekend && !isToday && d.activeMinutes > 0;
+  });
+
+  const totalActiveMinutesWorkdays = completedWorkdays.reduce((sum, d) => sum + d.activeMinutes, 0);
+  const avgDailyMinutes = completedWorkdays.length > 0 ? totalActiveMinutesWorkdays / completedWorkdays.length : 0;
+
+  // For display purposes, we still show total active time for all days
   const totalActiveMinutes = data.totalActive;
   const activeDays = data.dailyStats.filter(d => d.activeMinutes > 0).length;
-  const avgDailyMinutes = activeDays > 0 ? totalActiveMinutes / activeDays : 0;
 
   // Calculate total break time (assuming work time is 8 hours, breaks are the rest)
   // This is a simplified calculation - in reality you'd track breaks separately
@@ -85,9 +100,10 @@ export function WeeklyAnalytics({ data, isLoading }: WeeklyAnalyticsProps) {
   }));
 
   return (
-    <div className="space-y-4">
-      {/* Weekly Metrics Grid */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+    <TooltipProvider>
+      <div className="space-y-4">
+        {/* Weekly Metrics Grid */}
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -104,22 +120,38 @@ export function WeeklyAnalytics({ data, isLoading }: WeeklyAnalyticsProps) {
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
+            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-1.5">
               Avg Daily Hours
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Info className="h-3.5 w-3.5 cursor-help" />
+                </TooltipTrigger>
+                <TooltipContent className="max-w-xs">
+                  <p>Average hours per completed workday (Monday-Friday, excluding today and days with no activity)</p>
+                </TooltipContent>
+              </Tooltip>
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{formatHours(Math.round(avgDailyMinutes))}</div>
             <p className="text-xs text-muted-foreground mt-1">
-              Per active day
+              Per completed workday ({completedWorkdays.length} days)
             </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
+            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-1.5">
               Total Break Time
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Info className="h-3.5 w-3.5 cursor-help" />
+                </TooltipTrigger>
+                <TooltipContent className="max-w-xs">
+                  <p>Estimated break time calculated as the difference between 8-hour workday and actual active time for each day</p>
+                </TooltipContent>
+              </Tooltip>
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -233,7 +265,7 @@ export function WeeklyAnalytics({ data, isLoading }: WeeklyAnalyticsProps) {
                 axisLine={false}
                 tickFormatter={(v) => `${v}m`}
               />
-              <Tooltip
+              <RechartsTooltip
                 content={({ active, payload }) => {
                   if (active && payload?.[0]) {
                     const data = payload[0].payload;
@@ -283,6 +315,7 @@ export function WeeklyAnalytics({ data, isLoading }: WeeklyAnalyticsProps) {
           </div>
         </CardContent>
       </Card>
-    </div>
+      </div>
+    </TooltipProvider>
   );
 }

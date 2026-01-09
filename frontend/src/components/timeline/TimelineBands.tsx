@@ -24,9 +24,21 @@ function getTimePosition(timestamp: number, dayStart: number): number {
   return (hoursFromStart / 24) * 100;
 }
 
-function getSessionWidth(session: Session, dayStart: number): number {
-  if (!session.durationSeconds) return 0;
-  const durationHours = session.durationSeconds / 3600;
+function getSessionWidth(session: SessionSummary, dayStart: number, dayEnd: number): number {
+  let durationSeconds: number;
+
+  if (session.isOngoing) {
+    // For ongoing sessions, calculate duration from start to now (or end of day, whichever is earlier)
+    const now = Math.floor(Date.now() / 1000);
+    const endTime = Math.min(now, dayEnd);
+    durationSeconds = endTime - session.startTime;
+  } else if (session.durationSeconds) {
+    durationSeconds = session.durationSeconds;
+  } else {
+    return 0;
+  }
+
+  const durationHours = durationSeconds / 3600;
   return (durationHours / 24) * 100;
 }
 
@@ -115,7 +127,7 @@ export function TimelineBands({
               <TooltipProvider>
                 {sessions.map((session, index) => {
                   const left = getTimePosition(session.startTime, dayStart);
-                  const width = getSessionWidth(session, dayStart);
+                  const width = getSessionWidth(session, dayStart, dayEnd);
                   const color = getSessionColor(index);
 
                   return (
@@ -202,7 +214,7 @@ export function TimelineBands({
               {/* For now, we'll show sessions with different colors to represent activity */}
               {sessions.map((session, index) => {
                 const left = getTimePosition(session.startTime, dayStart);
-                const width = getSessionWidth(session, dayStart);
+                const width = getSessionWidth(session, dayStart, dayEnd);
 
                 // Alternate between productive (green), neutral (gray), and distracting (red)
                 // More vibrant colors to match v1
@@ -244,7 +256,7 @@ export function TimelineBands({
               <TooltipProvider>
                 {sessionsWithSummaries.map((session) => {
                   const left = getTimePosition(session.startTime, dayStart);
-                  const width = getSessionWidth(session, dayStart);
+                  const width = getSessionWidth(session, dayStart, dayEnd);
 
                   return (
                     <Tooltip key={session.id}>
