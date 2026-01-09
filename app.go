@@ -968,11 +968,19 @@ func buildInferenceConfig(config *service.Config) *inference.Config {
 	case "bundled":
 		ic.Engine = inference.EngineBundled
 		if config.Inference.Bundled != nil {
-			serverPath, modelPath := inference.GetDefaultPaths()
+			serverPath, defaultModelPath := inference.GetDefaultPaths()
+			modelPath := defaultModelPath
+
+			// Use the configured model if specified
+			if config.Inference.Bundled.Model != "" {
+				if configuredPath, err := inference.GetModelPath(config.Inference.Bundled.Model); err == nil {
+					modelPath = configuredPath
+				}
+			}
+
 			ic.Bundled = &inference.BundledConfig{
 				ModelPath:  modelPath,
 				ServerPath: serverPath,
-				Port:       8080,
 			}
 		}
 	case "cloud":

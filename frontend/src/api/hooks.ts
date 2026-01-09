@@ -8,6 +8,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { EventsOn, EventsOff } from '@wailsjs/runtime/runtime';
+import { toast } from 'sonner';
 import { api } from './client';
 import type { Config } from '@/types';
 
@@ -498,6 +499,11 @@ export function useGenerateSummary() {
     mutationFn: (sessionId: number) => api.summaries.generateSummary(sessionId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['timeline'] });
+      toast.success('Summary generated');
+    },
+    onError: (error: Error) => {
+      console.error('Generate summary failed:', error);
+      toast.error(`Failed to generate summary: ${error.message}`);
     },
   });
 }
@@ -509,6 +515,11 @@ export function useRegenerateSummary() {
     mutationFn: (sessionId: number) => api.summaries.regenerateSummary(sessionId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['timeline'] });
+      toast.success('Summary regenerated');
+    },
+    onError: (error: Error) => {
+      console.error('Regenerate summary failed:', error);
+      toast.error(`Failed to regenerate summary: ${error.message}`);
     },
   });
 }

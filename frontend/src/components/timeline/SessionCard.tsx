@@ -110,7 +110,7 @@ export function SessionCard({
             </div>
             {session.summary && (
               <p className="text-sm text-muted-foreground mt-2 ml-8 line-clamp-2">
-                {session.summary.summary}
+                {session.summary}
               </p>
             )}
             {/* Top Apps */}
@@ -185,8 +185,8 @@ export function SessionCard({
                 </div>
               </TooltipProvider>
             )}
-            {session.summary && (
-              <ConfidenceBadge confidence={session.summary.confidence} />
+            {session.confidence && (
+              <ConfidenceBadge confidence={session.confidence} />
             )}
           </div>
         </div>
@@ -223,21 +223,21 @@ export function SessionCard({
                 <div>
                   <h4 className="text-sm font-medium mb-1">Summary</h4>
                   <p className="text-sm text-muted-foreground">
-                    {session.summary.summary}
+                    {session.summary}
                   </p>
                 </div>
-                {session.summary.explanation && (
+                {session.explanation && (
                   <div>
                     <h4 className="text-sm font-medium mb-1">Details</h4>
                     <p className="text-sm text-muted-foreground">
-                      {session.summary.explanation}
+                      {session.explanation}
                     </p>
                   </div>
                 )}
-                {session.summary.tags.length > 0 && (
+                {session.tags && session.tags.length > 0 && (
                   <div>
                     <h4 className="text-sm font-medium mb-1">Tags</h4>
-                    <TagList tags={session.summary.tags} />
+                    <TagList tags={session.tags} />
                   </div>
                 )}
               </div>

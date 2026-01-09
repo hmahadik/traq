@@ -275,10 +275,10 @@ export function TimelineBands({
                       <TooltipContent>
                         <div className="text-sm max-w-xs">
                           <p className="font-semibold">AI Summary Available</p>
-                          {session.summary?.summary && (
+                          {session.summary && (
                             <p className="text-muted-foreground mt-1">
-                              {session.summary.summary.slice(0, 100)}
-                              {session.summary.summary.length > 100 ? '...' : ''}
+                              {session.summary.slice(0, 100)}
+                              {session.summary.length > 100 ? '...' : ''}
                             </p>
                           )}
                         </div>

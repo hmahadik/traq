@@ -75,7 +75,6 @@ func NewService(config *Config) *Service {
 			config.Bundled = &BundledConfig{
 				ServerPath: serverPath,
 				ModelPath:  modelPath,
-				Port:       8080,
 			}
 		}
 		s.bundled = NewBundledEngine(config.Bundled)
@@ -101,7 +100,6 @@ func (s *Service) UpdateConfig(config *Config) {
 			config.Bundled = &BundledConfig{
 				ServerPath: serverPath,
 				ModelPath:  modelPath,
-				Port:       8080,
 			}
 		}
 		s.bundled = NewBundledEngine(config.Bundled)

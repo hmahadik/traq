@@ -15,11 +15,14 @@ import (
 	"time"
 )
 
+// DefaultBundledPort is the default port for the bundled llama server
+const DefaultBundledPort = 18080
+
 // BundledConfig contains settings for the bundled llama.cpp server
 type BundledConfig struct {
 	ModelPath   string // Path to the GGUF model file
 	ServerPath  string // Path to llama-server binary
-	Port        int    // Port to run on (default: 8080)
+	Port        int    // Port to run on (default: DefaultBundledPort)
 	ContextSize int    // Context window size (default: 2048)
 	GPULayers   int    // Number of layers to offload to GPU (0 = CPU only)
 }
@@ -36,7 +39,7 @@ type BundledEngine struct {
 // NewBundledEngine creates a new bundled engine instance
 func NewBundledEngine(config *BundledConfig) *BundledEngine {
 	if config.Port == 0 {
-		config.Port = 8080
+		config.Port = DefaultBundledPort
 	}
 	if config.ContextSize == 0 {
 		config.ContextSize = 2048
@@ -150,6 +153,10 @@ func (e *BundledEngine) Start() error {
 	}
 
 	e.cmd = exec.Command(e.config.ServerPath, args...)
+
+	// Set LD_LIBRARY_PATH to find libllama.so in the same directory as the server
+	serverDir := filepath.Dir(e.config.ServerPath)
+	e.cmd.Env = append(os.Environ(), fmt.Sprintf("LD_LIBRARY_PATH=%s", serverDir))
 
 	// Suppress output
 	e.cmd.Stdout = nil

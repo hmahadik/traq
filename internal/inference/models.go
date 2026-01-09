@@ -482,7 +482,7 @@ func (d *ModelDownloader) DownloadServer(progress DownloadProgress) error {
 	return nil
 }
 
-// extractServerFromZip extracts the llama-server binary from a downloaded zip file
+// extractServerFromZip extracts the llama-server binary and required libraries from a downloaded zip file
 func extractServerFromZip(zipPath, destPath, targetFilename string) error {
 	r, err := zip.OpenReader(zipPath)
 	if err != nil {
@@ -490,48 +490,71 @@ func extractServerFromZip(zipPath, destPath, targetFilename string) error {
 	}
 	defer r.Close()
 
-	// Look for the server binary in the zip
-	// llama.cpp releases typically have files in a subdirectory
+	destDir := filepath.Dir(destPath)
+	if err := os.MkdirAll(destDir, 0755); err != nil {
+		return fmt.Errorf("failed to create destination directory: %w", err)
+	}
+
+	// Files we need to extract: llama-server and libllama.so (and any .dylib for macOS)
+	neededFiles := map[string]bool{
+		targetFilename: false,
+	}
+
+	// Extract all needed files
 	for _, f := range r.File {
-		// Check if this is the file we're looking for
-		// It might be at the root or in a build/bin subdirectory
+		if f.FileInfo().IsDir() {
+			continue
+		}
+
 		filename := filepath.Base(f.Name)
-		if filename == targetFilename && !f.FileInfo().IsDir() {
-			// Found it - extract to destination
-			rc, err := f.Open()
-			if err != nil {
-				return fmt.Errorf("failed to open file in zip: %w", err)
-			}
-			defer rc.Close()
 
-			// Ensure parent directory exists
-			if err := os.MkdirAll(filepath.Dir(destPath), 0755); err != nil {
-				return fmt.Errorf("failed to create destination directory: %w", err)
-			}
+		// Check if this is a file we need
+		isNeeded := filename == targetFilename ||
+			strings.HasPrefix(filename, "libllama.") ||
+			strings.HasPrefix(filename, "libggml.")
 
-			// Create destination file
-			out, err := os.Create(destPath)
-			if err != nil {
-				return fmt.Errorf("failed to create destination file: %w", err)
-			}
-			defer out.Close()
+		if !isNeeded {
+			continue
+		}
 
-			// Copy content
-			if _, err := io.Copy(out, rc); err != nil {
-				return fmt.Errorf("failed to extract file: %w", err)
-			}
+		rc, err := f.Open()
+		if err != nil {
+			return fmt.Errorf("failed to open %s in zip: %w", filename, err)
+		}
 
-			return nil
+		outPath := filepath.Join(destDir, filename)
+		out, err := os.Create(outPath)
+		if err != nil {
+			rc.Close()
+			return fmt.Errorf("failed to create %s: %w", filename, err)
+		}
+
+		if _, err := io.Copy(out, rc); err != nil {
+			out.Close()
+			rc.Close()
+			return fmt.Errorf("failed to extract %s: %w", filename, err)
+		}
+
+		out.Close()
+		rc.Close()
+
+		// Make binaries executable
+		if filename == targetFilename {
+			os.Chmod(outPath, 0755)
+			neededFiles[targetFilename] = true
 		}
 	}
 
-	// If we didn't find an exact match, list what we found for debugging
-	var foundFiles []string
-	for _, f := range r.File {
-		if strings.Contains(f.Name, "llama") {
-			foundFiles = append(foundFiles, f.Name)
+	if !neededFiles[targetFilename] {
+		// List what we found for debugging
+		var foundFiles []string
+		for _, f := range r.File {
+			if strings.Contains(f.Name, "llama") {
+				foundFiles = append(foundFiles, f.Name)
+			}
 		}
+		return fmt.Errorf("server binary %s not found in zip (found: %v)", targetFilename, foundFiles)
 	}
 
-	return fmt.Errorf("server binary %s not found in zip (found: %v)", targetFilename, foundFiles)
+	return nil
 }
