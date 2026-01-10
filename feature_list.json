@@ -9,7 +9,7 @@
       "Step 4: Navigate to Reports page - verify same date context is maintained",
       "Step 5: Change date in header and verify it updates across all pages"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -33,7 +33,7 @@
       "Step 4: Click Week tab - verify stats show averages and trends for week",
       "Step 5: Click Month tab - verify stats show averages and trends for month"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -45,7 +45,7 @@
       "Step 4: Switch to Month tab - verify chart shows daily buckets (28-31 bars)",
       "Step 5: Switch to Year tab - verify chart shows monthly buckets (12 bars)"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
