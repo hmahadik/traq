@@ -14,6 +14,7 @@ import type { YearlyStats } from '@/types';
 interface YearlyAnalyticsProps {
   data: YearlyStats | undefined;
   isLoading: boolean;
+  onMonthClick?: (monthNumber: number) => void;
 }
 
 function formatHours(minutes: number): string {
@@ -24,7 +25,7 @@ function formatHours(minutes: number): string {
   return `${hours}h ${mins}m`;
 }
 
-export function YearlyAnalytics({ data, isLoading }: YearlyAnalyticsProps) {
+export function YearlyAnalytics({ data, isLoading, onMonthClick }: YearlyAnalyticsProps) {
   if (isLoading) {
     return (
       <div className="space-y-4">
@@ -86,6 +87,7 @@ export function YearlyAnalytics({ data, isLoading }: YearlyAnalyticsProps) {
   const monthlyChartData = data.monthlyStats.map(month => ({
     month: month.monthName.substring(0, 3), // Short month name
     monthFull: month.monthName,
+    monthNumber: month.monthNumber,
     activeMinutes: month.totalActive,
     activeDays: month.activeDays,
     sessions: month.sessions,
@@ -259,6 +261,12 @@ export function YearlyAnalytics({ data, isLoading }: YearlyAnalyticsProps) {
                 dataKey="activeMinutes"
                 fill="hsl(var(--primary))"
                 radius={[4, 4, 0, 0]}
+                onClick={(data) => {
+                  if (onMonthClick && data && data.monthNumber) {
+                    onMonthClick(data.monthNumber);
+                  }
+                }}
+                cursor={onMonthClick ? 'pointer' : 'default'}
               />
             </BarChart>
           </ResponsiveContainer>

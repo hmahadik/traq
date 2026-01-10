@@ -213,7 +213,7 @@
       "Step 4: Hover over month bar - verify tooltip shows month name and data",
       "Step 5: Click on a month bar - verify it either drills down or shows detail"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",

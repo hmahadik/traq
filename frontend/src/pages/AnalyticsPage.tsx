@@ -197,6 +197,14 @@ export function AnalyticsPage() {
     navigate('/timeline');
   };
 
+  const handleMonthClick = (monthNumber: number) => {
+    // Navigate to Month view for the clicked month
+    // Create a date for the first day of that month in the current year
+    const targetDate = new Date(year, monthNumber - 1, 1);
+    setSelectedDate(targetDate);
+    setViewMode('month');
+  };
+
   const handleExport = async (format: 'csv' | 'html' | 'json') => {
     try {
       const content = await api.analytics.exportAnalytics(dateStr, viewMode, format);
@@ -400,7 +408,7 @@ export function AnalyticsPage() {
       )}
 
       {viewMode === 'year' && (
-        <YearlyAnalytics data={yearlyStats} isLoading={yearlyStatsLoading} />
+        <YearlyAnalytics data={yearlyStats} isLoading={yearlyStatsLoading} onMonthClick={handleMonthClick} />
       )}
 
       {viewMode === 'custom' && (
