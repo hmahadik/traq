@@ -261,7 +261,7 @@
       "Step 4: Compare screenshots - verify header design is identical",
       "Step 5: Verify header contains: date picker, arrows, presets, settings, pause/resume"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "style",
@@ -273,7 +273,7 @@
       "Step 4: Verify calendar widget is centered and properly styled",
       "Step 5: Verify date format is readable (e.g., 'Fri, Jan 10')"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "style",
@@ -285,7 +285,7 @@
       "Step 4: Click different tabs - verify smooth transition",
       "Step 5: Verify tab labels are readable and well-spaced"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "style",
@@ -297,7 +297,7 @@
       "Step 4: Verify bars/elements are appropriately sized (not too crowded)",
       "Step 5: Verify axis labels and legends are readable"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "style",
@@ -309,7 +309,7 @@
       "Step 4: Hover over 'Yesterday' button - verify hover state",
       "Step 5: Take screenshot showing preset buttons in various states"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "style",
@@ -321,7 +321,7 @@
       "Step 4: Verify header elements don't wrap or overflow",
       "Step 5: Take screenshot showing responsive layout"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "style",
@@ -333,7 +333,7 @@
       "Step 4: Verify no horizontal scrolling required",
       "Step 5: Verify all interactive elements remain accessible"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "style",
@@ -345,7 +345,7 @@
       "Step 4: Verify layout is balanced and not cluttered",
       "Step 5: Verify report output preview is properly positioned"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "style",
@@ -357,7 +357,7 @@
       "Step 4: Verify smooth transition to Timeline page",
       "Step 5: Take screenshots showing hover and click states"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "style",
@@ -369,6 +369,6 @@
       "Step 4: Verify chart gracefully handles missing data (empty bars, labels)",
       "Step 5: Take screenshots of various empty states"
     ],
-    "passes": false
+    "passes": true
   }
 ]
