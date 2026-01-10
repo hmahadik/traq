@@ -69,10 +69,31 @@ function getWeekStart(date: Date): Date {
   return new Date(result.setDate(diff));
 }
 
+function getWeekEnd(date: Date): Date {
+  const weekStart = getWeekStart(date);
+  return addDays(weekStart, 6); // Saturday
+}
+
+function getMonthStart(date: Date): Date {
+  return new Date(date.getFullYear(), date.getMonth(), 1);
+}
+
+function getMonthEnd(date: Date): Date {
+  return new Date(date.getFullYear(), date.getMonth() + 1, 0);
+}
+
+function getYearStart(date: Date): Date {
+  return new Date(date.getFullYear(), 0, 1);
+}
+
+function getYearEnd(date: Date): Date {
+  return new Date(date.getFullYear(), 11, 31);
+}
+
 export function AnalyticsPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { selectedDate, setTimeframeType, setSelectedDate } = useDateContext();
+  const { selectedDate, setTimeframeType, setSelectedDate, setDateRange } = useDateContext();
   const [viewMode, setViewMode] = useState<ViewMode>('day');
   const [isRegenerating, setIsRegenerating] = useState(false);
   // Custom date range state
@@ -83,10 +104,38 @@ export function AnalyticsPage() {
     return { start, end };
   });
 
-  // Update global timeframe type when view mode changes
+  // Update global timeframe type and dateRange when view mode changes
   useEffect(() => {
     setTimeframeType(viewMode as any);
-  }, [viewMode, setTimeframeType]);
+
+    // Set the appropriate dateRange based on view mode
+    switch (viewMode) {
+      case 'day':
+        setDateRange(null); // Single day, no range needed
+        break;
+      case 'week':
+        setDateRange({
+          start: getWeekStart(selectedDate),
+          end: getWeekEnd(selectedDate),
+        });
+        break;
+      case 'month':
+        setDateRange({
+          start: getMonthStart(selectedDate),
+          end: getMonthEnd(selectedDate),
+        });
+        break;
+      case 'year':
+        setDateRange({
+          start: getYearStart(selectedDate),
+          end: getYearEnd(selectedDate),
+        });
+        break;
+      case 'custom':
+        setDateRange(customRange);
+        break;
+    }
+  }, [viewMode, selectedDate, customRange, setTimeframeType, setDateRange]);
 
   const dateStr = getDateString(selectedDate);
   const weekStartStr = getDateString(getWeekStart(selectedDate));

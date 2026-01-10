@@ -26,6 +26,11 @@ export interface DateContextValue {
   goToToday: () => void;
   goToYesterday: () => void;
   isToday: boolean;
+
+  // Get the appropriate representative date for Timeline
+  // For multi-day ranges, returns end date (capped at today)
+  // For day view, returns selectedDate
+  getRepresentativeDate: () => Date;
 }
 
 const DateContext = createContext<DateContextValue | undefined>(undefined);
@@ -72,6 +77,24 @@ export function DateProvider({ children }: { children: ReactNode }) {
     setSelectedDate(addDays(new Date(), -1));
   }, []);
 
+  const getRepresentativeDate = useCallback(() => {
+    // For day view or when no dateRange is set, use selectedDate
+    if (timeframeType === 'day' || !dateRange) {
+      return selectedDate;
+    }
+
+    // For multi-day views, use end date of range, capped at today
+    const today = new Date();
+    const endDate = dateRange.end;
+
+    // If end date is in the future, cap at today
+    if (getDateString(endDate) > getDateString(today)) {
+      return today;
+    }
+
+    return endDate;
+  }, [timeframeType, dateRange, selectedDate]);
+
   const value: DateContextValue = {
     selectedDate,
     setSelectedDate,
@@ -84,6 +107,7 @@ export function DateProvider({ children }: { children: ReactNode }) {
     goToToday,
     goToYesterday,
     isToday,
+    getRepresentativeDate,
   };
 
   return <DateContext.Provider value={value}>{children}</DateContext.Provider>;

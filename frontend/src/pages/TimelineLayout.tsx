@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 import { Outlet, useNavigate, useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -45,7 +45,22 @@ function addDays(date: Date, days: number): Date {
 export function TimelineLayout() {
   const navigate = useNavigate();
   const { id: selectedSessionId } = useParams<{ id: string }>();
-  const { selectedDate } = useDateContext();
+  const { selectedDate, getRepresentativeDate, setSelectedDate, timeframeType } = useDateContext();
+
+  // When coming from a multi-day view (e.g., Analytics Week),
+  // sync selectedDate to the representative date (end of range, capped at today)
+  useEffect(() => {
+    if (timeframeType !== 'day') {
+      const representativeDate = getRepresentativeDate();
+      const currentDateStr = getDateString(selectedDate);
+      const repDateStr = getDateString(representativeDate);
+
+      // Only update if they differ
+      if (currentDateStr !== repDateStr) {
+        setSelectedDate(representativeDate);
+      }
+    }
+  }, []); // Run only on mount
 
   const [showSidebar, setShowSidebar] = useState(true);
   const [selectedTag, setSelectedTag] = useState<string | null>(null);

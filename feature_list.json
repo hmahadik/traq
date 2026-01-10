@@ -81,7 +81,7 @@
       "Step 4: Return to Analytics, select a future week containing today",
       "Step 5: Navigate to Timeline - verify it shows today (not future date)"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
