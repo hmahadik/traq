@@ -141,7 +141,7 @@
       "Step 4: Click 'Yesterday' preset button",
       "Step 5: Verify Timeline shows yesterday's date"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
