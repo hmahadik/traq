@@ -105,7 +105,7 @@
       "Step 4: Generate a report for a different range (e.g., last week)",
       "Step 5: Verify report generates correctly with the specified range"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -117,7 +117,7 @@
       "Step 4: Verify the global date context updates to match the report's timeframe",
       "Step 5: Navigate to Analytics - verify it shows data for the same timeframe"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",

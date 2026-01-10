@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -20,9 +20,44 @@ import {
 import { api } from '@/api/client';
 import { Loader2, Sparkles, ImageIcon } from 'lucide-react';
 import type { Report } from '@/types';
+import { useDateContext } from '@/contexts';
+
+function formatDateForTimeRange(date: Date): string {
+  const options: Intl.DateTimeFormatOptions = { month: 'short', day: 'numeric', year: 'numeric' };
+  return date.toLocaleDateString('en-US', options);
+}
 
 export function ReportsPage() {
-  const [timeRange, setTimeRange] = useState('Today');
+  const { selectedDate, timeframeType, dateRange, setSelectedDate, setTimeframeType, setDateRange } = useDateContext();
+
+  // Initialize time range from global date context
+  const getInitialTimeRange = () => {
+    if (timeframeType === 'day') {
+      const today = new Date();
+      const isToday = selectedDate.toDateString() === today.toDateString();
+      if (isToday) return 'Today';
+
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
+      const isYesterday = selectedDate.toDateString() === yesterday.toDateString();
+      if (isYesterday) return 'Yesterday';
+
+      return formatDateForTimeRange(selectedDate);
+    }
+
+    if (dateRange) {
+      return `${formatDateForTimeRange(dateRange.start)} - ${formatDateForTimeRange(dateRange.end)}`;
+    }
+
+    return 'Today';
+  };
+
+  const [timeRange, setTimeRange] = useState(getInitialTimeRange());
+
+  // Update time range when global date context changes
+  useEffect(() => {
+    setTimeRange(getInitialTimeRange());
+  }, [selectedDate, timeframeType, dateRange]);
   const [reportType, setReportType] = useState('summary');
   const [includeScreenshots, setIncludeScreenshots] = useState(false);
   const [generatedReport, setGeneratedReport] = useState<Report | undefined>();
@@ -75,6 +110,27 @@ export function ReportsPage() {
           startTime: report.startTime?.Int64 || null,
           endTime: report.endTime?.Int64 || null,
         });
+
+        // Update global date context based on report's timeframe
+        if (report.startTime?.Int64 && report.endTime?.Int64) {
+          const startDate = new Date(report.startTime.Int64 * 1000);
+          const endDate = new Date(report.endTime.Int64 * 1000);
+
+          // Check if it's a single day
+          const isSameDay = startDate.toDateString() === endDate.toDateString();
+
+          if (isSameDay) {
+            // Single day - use day timeframe
+            setSelectedDate(startDate);
+            setTimeframeType('day');
+            setDateRange(null);
+          } else {
+            // Multi-day range - use custom timeframe
+            setDateRange({ start: startDate, end: endDate });
+            setTimeframeType('custom');
+            setSelectedDate(endDate); // Set to end date for consistency
+          }
+        }
       }
     } catch (error) {
       console.error('Failed to load report:', error);
