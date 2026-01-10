@@ -11,7 +11,10 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strconv"
+	"strings"
 	"sync"
+	"syscall"
 	"time"
 )
 
@@ -32,6 +35,7 @@ type BundledEngine struct {
 	config  *BundledConfig
 	cmd     *exec.Cmd
 	running bool
+	managed bool // true if we started the process, false if reusing existing
 	mu      sync.RWMutex
 	client  *http.Client
 }
@@ -125,6 +129,66 @@ func (e *BundledEngine) IsServerInstalled() bool {
 	return err == nil
 }
 
+// pidFilePath returns the path to the PID file
+func (e *BundledEngine) pidFilePath() string {
+	serverPath, _ := GetDefaultPaths()
+	return filepath.Join(filepath.Dir(filepath.Dir(serverPath)), "llama-server.pid")
+}
+
+// writePIDFile writes the current server PID to the PID file
+func (e *BundledEngine) writePIDFile(pid int) error {
+	pidPath := e.pidFilePath()
+	if err := os.MkdirAll(filepath.Dir(pidPath), 0755); err != nil {
+		return err
+	}
+	return os.WriteFile(pidPath, []byte(strconv.Itoa(pid)), 0644)
+}
+
+// removePIDFile removes the PID file
+func (e *BundledEngine) removePIDFile() {
+	os.Remove(e.pidFilePath())
+}
+
+// cleanupStaleProcess checks for and kills any stale server process from previous runs
+func (e *BundledEngine) cleanupStaleProcess() {
+	pidPath := e.pidFilePath()
+	data, err := os.ReadFile(pidPath)
+	if err != nil {
+		return // No PID file, nothing to clean up
+	}
+
+	pid, err := strconv.Atoi(strings.TrimSpace(string(data)))
+	if err != nil {
+		e.removePIDFile()
+		return
+	}
+
+	// Check if process is still running
+	proc, err := os.FindProcess(pid)
+	if err != nil {
+		e.removePIDFile()
+		return
+	}
+
+	// On Unix, FindProcess always succeeds - check if process exists by sending signal 0
+	if err := proc.Signal(syscall.Signal(0)); err != nil {
+		// Process doesn't exist
+		e.removePIDFile()
+		return
+	}
+
+	// Process exists - kill it
+	proc.Signal(os.Interrupt)
+	// Give it a moment to shut down gracefully
+	time.Sleep(500 * time.Millisecond)
+	// Force kill if still running
+	proc.Signal(syscall.Signal(0))
+	if err == nil {
+		proc.Kill()
+	}
+	e.removePIDFile()
+}
+
 // Start starts the bundled llama server
 func (e *BundledEngine) Start() error {
 	e.mu.Lock()
@@ -134,10 +198,19 @@ func (e *BundledEngine) Start() error {
 		return nil // Already running
 	}
 
+	// Clean up any stale process from previous runs
+	e.cleanupStaleProcess()
+
 	// Check if port is available
 	ln, err := net.Listen("tcp", fmt.Sprintf(":%d", e.config.Port))
 	if err != nil {
-		return fmt.Errorf("port %d is already in use", e.config.Port)
+		// Port is in use - check if there's already a healthy server we can reuse
+		if e.checkHealth() {
+			e.running = true
+			e.managed = false // We didn't start this process
+			return nil        // Reuse existing server
+		}
+		return fmt.Errorf("port %d is already in use by another process", e.config.Port)
 	}
 	ln.Close()
 
@@ -166,6 +239,11 @@ func (e *BundledEngine) Start() error {
 		return fmt.Errorf("failed to start llama server: %w", err)
 	}
 
+	// Write PID file for cleanup on next run if we crash
+	if e.cmd.Process != nil {
+		e.writePIDFile(e.cmd.Process.Pid)
+	}
+
 	// Wait for server to be ready (up to 30 seconds)
 	ready := make(chan bool)
 	go func() {
@@ -185,6 +263,7 @@ func (e *BundledEngine) Start() error {
 	}
 
 	e.running = true
+	e.managed = true // We started this process
 	return nil
 }
 
@@ -193,8 +272,15 @@ func (e *BundledEngine) Stop() error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
+	// If we didn't start the process, just mark as not running
+	if !e.managed {
+		e.running = false
+		return nil
+	}
+
 	if e.cmd == nil || e.cmd.Process == nil {
 		e.running = false
+		e.removePIDFile()
 		return nil
 	}
 
@@ -205,7 +291,9 @@ func (e *BundledEngine) Stop() error {
 
 	e.cmd.Wait()
 	e.running = false
+	e.managed = false
 	e.cmd = nil
+	e.removePIDFile()
 
 	return nil
 }

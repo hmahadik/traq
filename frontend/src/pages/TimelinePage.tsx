@@ -6,10 +6,12 @@ import {
   useSessionsForDate,
   useCalendarHeatmap,
   useGenerateSummary,
+  useScreenshotsForDate,
 } from '@/api/hooks';
 import { useListNav } from '@/hooks/useListNav';
 import { formatDate } from '@/lib/utils';
-import { ChevronLeft, ChevronRight, Calendar, List } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Calendar, List, Sparkles } from 'lucide-react';
+import { toast } from 'sonner';
 
 function getDateString(date: Date): string {
   // Use local date components to avoid timezone issues
@@ -28,10 +30,11 @@ function addDays(date: Date, days: number): Date {
 export function TimelinePage() {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [selectedSessionId, setSelectedSessionId] = useState<number | null>(null);
-  const [showCalendar, setShowCalendar] = useState(true);
+  const [showCalendar, setShowCalendar] = useState(false); // Default to hidden for cleaner UI
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [timePeriod, setTimePeriod] = useState<TimePeriod>(null);
   const [selectedApp, setSelectedApp] = useState<string | null>(null);
+  const [isBatchGenerating, setIsBatchGenerating] = useState(false);
 
   const dateStr = getDateString(selectedDate);
   const isToday = dateStr === getDateString(new Date());
@@ -41,6 +44,7 @@ export function TimelinePage() {
     selectedDate.getFullYear(),
     selectedDate.getMonth() + 1
   );
+  const { data: screenshots } = useScreenshotsForDate(dateStr);
   const generateSummary = useGenerateSummary();
 
   // Get list of all apps from sessions for filter dropdown
@@ -150,6 +154,44 @@ export function TimelinePage() {
     setSelectedSessionId(null); // Clear session selection
   }, []);
 
+  // Get sessions without summaries
+  const sessionsWithoutSummaries = useMemo(() => {
+    if (!sessions) return [];
+    return sessions.filter(s => !s.summary);
+  }, [sessions]);
+
+  // Batch generate summaries
+  const handleBatchGenerateSummaries = useCallback(async () => {
+    if (!sessionsWithoutSummaries.length || isBatchGenerating) return;
+
+    setIsBatchGenerating(true);
+    let successCount = 0;
+    let errorCount = 0;
+
+    toast.info(`Generating ${sessionsWithoutSummaries.length} summaries...`);
+
+    for (const session of sessionsWithoutSummaries) {
+      try {
+        await generateSummary.mutateAsync(session.id);
+        successCount++;
+      } catch (error) {
+        console.error(`Failed to generate summary for session ${session.id}:`, error);
+        errorCount++;
+      }
+    }
+
+    setIsBatchGenerating(false);
+
+    if (errorCount === 0) {
+      toast.success(`Successfully generated ${successCount} summaries`);
+    } else {
+      toast.warning(
+        `Generated ${successCount} summaries, ${errorCount} failed`,
+        { description: 'Check the console for details' }
+      );
+    }
+  }, [sessionsWithoutSummaries, isBatchGenerating, generateSummary]);
+
   const formattedDate = selectedDate.toLocaleDateString('en-US', {
     weekday: 'long',
     year: 'numeric',
@@ -158,26 +200,29 @@ export function TimelinePage() {
   });
 
   return (
-    <div className="flex gap-6 h-[calc(100vh-8rem)]">
-      {/* Stats Sidebar */}
-      <div className="hidden xl:block w-72 flex-shrink-0">
-        <div className="sticky top-0 space-y-4">
-          <TimelineStats
-            sessions={sessions}
-            isLoading={sessionsLoading}
-            date={selectedDate}
-          />
-          <TimelineTags
-            sessions={sessions}
-            isLoading={sessionsLoading}
-            selectedTag={selectedTag}
-            onTagClick={handleTagClick}
-          />
+    <div className="flex flex-col xl:flex-row gap-6 h-[calc(100vh-8rem)]">
+      {/* Stats Sidebar - On xl+ screens, show as left sidebar. On smaller screens, show as top section */}
+      <div className="xl:w-72 xl:flex-shrink-0">
+        <div className="xl:sticky xl:top-0 space-y-4">
+          {/* On small screens, show stats and tags side by side */}
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-1 gap-4">
+            <TimelineStats
+              sessions={sessions}
+              isLoading={sessionsLoading}
+              date={selectedDate}
+            />
+            <TimelineTags
+              sessions={sessions}
+              isLoading={sessionsLoading}
+              selectedTag={selectedTag}
+              onTagClick={handleTagClick}
+            />
+          </div>
         </div>
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 xl:overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div>
@@ -185,6 +230,21 @@ export function TimelinePage() {
             <p className="text-muted-foreground">{formattedDate}</p>
           </div>
           <div className="flex items-center gap-2">
+            {/* Batch Generate Summaries Button */}
+            {sessionsWithoutSummaries.length > 0 && (
+              <Button
+                variant="default"
+                size="sm"
+                onClick={handleBatchGenerateSummaries}
+                disabled={isBatchGenerating}
+                className="hidden md:flex"
+              >
+                <Sparkles className="h-4 w-4 mr-2" />
+                {isBatchGenerating
+                  ? 'Generating...'
+                  : `Generate ${sessionsWithoutSummaries.length} ${sessionsWithoutSummaries.length > 1 ? 'Summaries' : 'Summary'}`}
+              </Button>
+            )}
             <Button variant="outline" size="icon" onClick={goToPreviousDay}>
               <ChevronLeft className="h-4 w-4" />
             </Button>
@@ -230,7 +290,7 @@ export function TimelinePage() {
               variant="outline"
               size="icon"
               onClick={() => setShowCalendar(!showCalendar)}
-              className="lg:hidden"
+              title={showCalendar ? "Hide calendar" : "Show calendar"}
             >
               <Calendar className="h-4 w-4" />
             </Button>
@@ -241,6 +301,7 @@ export function TimelinePage() {
         {sessions && sessions.length > 0 && (
           <TimelineBands
             sessions={sessions}
+            screenshots={screenshots || []}
             date={selectedDate}
             onSessionClick={handleSessionSelect}
             highlightedTimeRange={timePeriod ? getTimePeriodRange(timePeriod) : null}
@@ -329,20 +390,18 @@ export function TimelinePage() {
       </div>
 
       {/* Calendar Sidebar */}
-      <div
-        className={`${
-          showCalendar ? 'block' : 'hidden'
-        } lg:block w-72 flex-shrink-0`}
-      >
-        <div className="sticky top-0">
-          <CalendarWidget
-            data={calendarData}
-            isLoading={calendarLoading}
-            selectedDate={selectedDate}
-            onSelectDate={handleDateSelect}
-          />
+      {showCalendar && (
+        <div className="w-72 flex-shrink-0">
+          <div className="sticky top-0">
+            <CalendarWidget
+              data={calendarData}
+              isLoading={calendarLoading}
+              selectedDate={selectedDate}
+              onSelectDate={handleDateSelect}
+            />
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

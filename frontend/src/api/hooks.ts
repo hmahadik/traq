@@ -29,6 +29,7 @@ export const queryKeys = {
     calendar: (year: number, month: number) => ['analytics', 'calendar', year, month] as const,
     appUsage: (start: number, end: number) => ['analytics', 'appUsage', start, end] as const,
     hourly: (date: string) => ['analytics', 'hourly', date] as const,
+    heatmap: () => ['analytics', 'heatmap'] as const,
     dataSources: (start: number, end: number) => ['analytics', 'dataSources', start, end] as const,
     productivityScore: (date: string) => ['analytics', 'productivityScore', date] as const,
     focusDistribution: (date: string) => ['analytics', 'focusDistribution', date] as const,
@@ -39,6 +40,7 @@ export const queryKeys = {
     sessions: (date: string) => ['timeline', 'sessions', date] as const,
     screenshots: (sessionId: number, page: number, perPage: number) =>
       ['timeline', 'screenshots', sessionId, page, perPage] as const,
+    dateScreenshots: (date: string) => ['timeline', 'dateScreenshots', date] as const,
     hourScreenshots: (date: string, hour: number) =>
       ['timeline', 'hourScreenshots', date, hour] as const,
     context: (sessionId: number) => ['timeline', 'context', sessionId] as const,
@@ -120,6 +122,14 @@ export function useHourlyActivity(date: string) {
   });
 }
 
+export function useHourlyActivityHeatmap() {
+  return useQuery({
+    queryKey: queryKeys.analytics.heatmap(),
+    queryFn: () => api.analytics.getHourlyActivityHeatmap(),
+    staleTime: 5 * 60_000, // 5 minutes - this data changes slowly
+  });
+}
+
 export function useDataSourceStatsRange(start: number, end: number) {
   return useQuery({
     queryKey: queryKeys.analytics.dataSources(start, end),
@@ -197,6 +207,14 @@ export function useScreenshotsForHour(date: string, hour: number) {
   return useQuery({
     queryKey: queryKeys.timeline.hourScreenshots(date, hour),
     queryFn: () => api.timeline.getScreenshotsForHour(date, hour),
+    staleTime: 60_000,
+  });
+}
+
+export function useScreenshotsForDate(date: string) {
+  return useQuery({
+    queryKey: queryKeys.timeline.dateScreenshots(date),
+    queryFn: () => api.timeline.getScreenshotsForDate(date),
     staleTime: 60_000,
   });
 }
@@ -501,9 +519,10 @@ export function useGenerateSummary() {
       queryClient.invalidateQueries({ queryKey: ['timeline'] });
       toast.success('Summary generated');
     },
-    onError: (error: Error) => {
+    onError: (error: unknown) => {
       console.error('Generate summary failed:', error);
-      toast.error(`Failed to generate summary: ${error.message}`);
+      const message = error instanceof Error ? error.message : String(error);
+      toast.error(`Failed to generate summary: ${message}`);
     },
   });
 }
@@ -517,9 +536,10 @@ export function useRegenerateSummary() {
       queryClient.invalidateQueries({ queryKey: ['timeline'] });
       toast.success('Summary regenerated');
     },
-    onError: (error: Error) => {
+    onError: (error: unknown) => {
       console.error('Regenerate summary failed:', error);
-      toast.error(`Failed to regenerate summary: ${error.message}`);
+      const message = error instanceof Error ? error.message : String(error);
+      toast.error(`Failed to regenerate summary: ${message}`);
     },
   });
 }
