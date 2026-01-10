@@ -9,6 +9,7 @@ interface TimelineStatsProps {
   sessions: Session[] | undefined;
   isLoading: boolean;
   date: Date;
+  compact?: boolean;
 }
 
 interface DayStats {
@@ -41,9 +42,11 @@ function calculateDayStats(sessions: Session[], date: Date): DayStats {
 
   // Calculate total active time, clamping each session to day boundaries
   // This ensures sessions that span midnight only count time within the selected day
+  const currentTime = Math.floor(Date.now() / 1000);
   const totalActiveTime = sortedSessions.reduce((sum, session) => {
     const sessionStart = Math.max(session.startTime, dayStart);
-    const sessionEnd = Math.min(session.endTime || session.startTime, dayEnd);
+    // For ongoing sessions (no endTime), use current time
+    const sessionEnd = Math.min(session.endTime || currentTime, dayEnd);
     const clampedDuration = Math.max(0, sessionEnd - sessionStart);
     return sum + clampedDuration;
   }, 0);
@@ -71,9 +74,14 @@ function calculateDayStats(sessions: Session[], date: Date): DayStats {
     const prevSession = sortedSessions[i - 1];
     const currentSession = sortedSessions[i];
 
+    // Skip if previous session is ongoing (we don't know the gap yet)
+    if (!prevSession.endTime) {
+      continue;
+    }
+
     // Clamp session times to day boundaries for accurate gap calculation
     const prevEnd = Math.min(
-      Math.max(prevSession.endTime || prevSession.startTime, dayStart),
+      Math.max(prevSession.endTime, dayStart),
       dayEnd
     );
     const currStart = Math.min(
@@ -91,7 +99,14 @@ function calculateDayStats(sessions: Session[], date: Date): DayStats {
   }
 
   // Find longest focus period (longest session)
-  const longestFocus = Math.max(...sortedSessions.map(s => s.durationSeconds || 0));
+  // For ongoing sessions, calculate duration from current time
+  const longestFocus = Math.max(...sortedSessions.map(s => {
+    if (s.durationSeconds) {
+      return s.durationSeconds;
+    }
+    // Ongoing session - calculate duration
+    return Math.max(0, currentTime - s.startTime);
+  }));
 
   return {
     totalActiveTime,
@@ -121,12 +136,27 @@ function StatsSkeleton() {
   );
 }
 
-export function TimelineStats({ sessions, isLoading, date }: TimelineStatsProps) {
+export function TimelineStats({ sessions, isLoading, date, compact = false }: TimelineStatsProps) {
   if (isLoading) {
+    if (compact) {
+      return (
+        <div className="flex items-center gap-4 text-sm text-muted-foreground">
+          <Skeleton className="h-4 w-16" />
+          <Skeleton className="h-4 w-24" />
+        </div>
+      );
+    }
     return <StatsSkeleton />;
   }
 
   if (!sessions || sessions.length === 0) {
+    if (compact) {
+      return (
+        <div className="text-sm text-muted-foreground">
+          No activity recorded
+        </div>
+      );
+    }
     return (
       <Card>
         <CardContent className="pt-6">
@@ -139,9 +169,31 @@ export function TimelineStats({ sessions, isLoading, date }: TimelineStatsProps)
   }
 
   const stats = calculateDayStats(sessions, date);
-  const dailyGoalHours = 8; // TODO: Get from config
+  const dailyGoalHours = 8;
   const dailyGoalSeconds = dailyGoalHours * 3600;
   const hoursWorkedPercent = (stats.totalActiveTime / dailyGoalSeconds) * 100;
+
+  // Compact mode: single row with key stats
+  if (compact) {
+    return (
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+        <div className="flex items-center gap-1.5">
+          <Clock className="h-3.5 w-3.5 text-muted-foreground" />
+          <span className="font-medium">{formatDuration(stats.totalActiveTime)}</span>
+        </div>
+        {stats.startTime && stats.endTime && (
+          <div className="flex items-center gap-1.5 text-muted-foreground">
+            <Calendar className="h-3.5 w-3.5" />
+            <span>{formatTimestamp(stats.startTime)} - {formatTimestamp(stats.endTime)}</span>
+          </div>
+        )}
+        <div className="flex items-center gap-1.5 text-muted-foreground">
+          <Coffee className="h-3.5 w-3.5" />
+          <span>{stats.breaksCount} breaks</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
@@ -247,7 +299,7 @@ export function TimelineStats({ sessions, isLoading, date }: TimelineStatsProps)
               )}
             </div>
           </div>
-          <div className="flex justify-between text-xs text-muted-foreground">
+          <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
             <span>Focus: {formatDuration(stats.totalActiveTime)}</span>
             <span>Breaks: {formatDuration(stats.breaksDuration)}</span>
           </div>

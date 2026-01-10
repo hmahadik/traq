@@ -11,10 +11,12 @@ interface TimelineBandsProps {
   date: Date;
   onSessionClick?: (sessionId: number) => void;
   highlightedTimeRange?: { startHour: number; endHour: number } | null;
+  compact?: boolean;
 }
 
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
-const BAND_HEIGHT = 50; // Increased from 40 for better visibility (matches v1)
+const BAND_HEIGHT = 32; // Compact height for timeline lanes
+const BAND_HEIGHT_COMPACT = 20; // Even more compact for sidebar
 const HOUR_WIDTH = 60; // pixels per hour
 
 function getTimePosition(timestamp: number, dayStart: number): number {
@@ -61,7 +63,9 @@ export function TimelineBands({
   date,
   onSessionClick,
   highlightedTimeRange,
+  compact = false,
 }: TimelineBandsProps) {
+  const bandHeight = compact ? BAND_HEIGHT_COMPACT : BAND_HEIGHT;
   const dayStart = useMemo(() => {
     const start = new Date(date);
     start.setHours(0, 0, 0, 0);
@@ -96,6 +100,60 @@ export function TimelineBands({
       />
     ) : null;
 
+  // Compact mode: show only sessions row without card wrapper
+  if (compact) {
+    return (
+      <div className="space-y-1">
+        {/* Time axis - simplified */}
+        <div className="flex justify-between text-[10px] text-muted-foreground px-1">
+          <span>12am</span>
+          <span>6am</span>
+          <span>12pm</span>
+          <span>6pm</span>
+          <span>12am</span>
+        </div>
+        {/* Sessions only */}
+        <div className="relative overflow-hidden rounded" style={{ height: bandHeight }}>
+          <div className="absolute inset-0 bg-muted/30 border border-border/30 overflow-hidden">
+            {highlightedTimeRange && (
+              <div
+                className="absolute bg-primary/10 border-l border-r border-primary/30"
+                style={{
+                  left: `${(highlightedTimeRange.startHour / 24) * 100}%`,
+                  width: `${((highlightedTimeRange.endHour - highlightedTimeRange.startHour) / 24) * 100}%`,
+                  height: '100%',
+                }}
+              />
+            )}
+            <TooltipProvider>
+              {sessions.map((session, index) => {
+                const left = getTimePosition(session.startTime, dayStart);
+                const width = getSessionWidth(session, dayStart, dayEnd);
+                const color = getSessionColor(index);
+                return (
+                  <Tooltip key={session.id}>
+                    <TooltipTrigger asChild>
+                      <div
+                        className={`absolute ${color} rounded-sm cursor-pointer hover:opacity-80 transition-opacity`}
+                        style={{ left: `${left}%`, width: `${width}%`, height: '100%' }}
+                        onClick={() => onSessionClick?.(session.id)}
+                      />
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom">
+                      <p className="text-xs">
+                        {formatTimestamp(session.startTime)} - {session.endTime ? formatTimestamp(session.endTime) : 'now'}
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                );
+              })}
+            </TooltipProvider>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <Card className="p-6 mb-6">
       <div className="space-y-3 overflow-hidden">{/* Increased spacing from 2 to 3 */}
@@ -121,7 +179,7 @@ export function TimelineBands({
           >
             Sessions
           </div>
-          <div className="flex-1 relative overflow-hidden" style={{ height: BAND_HEIGHT }}>
+          <div className="flex-1 relative overflow-hidden" style={{ height: bandHeight }}>
             <div className="absolute inset-0 bg-muted/30 rounded border border-border/30 overflow-hidden">{/* Enhanced background and added border */}
               <TimeRangeOverlay />
               <TooltipProvider>
@@ -174,7 +232,7 @@ export function TimelineBands({
           >
             Screenshots
           </div>
-          <div className="flex-1 relative" style={{ height: BAND_HEIGHT }}>
+          <div className="flex-1 relative" style={{ height: bandHeight }}>
             <div className="absolute inset-0 bg-muted/30 rounded border border-border/30 overflow-hidden">{/* Enhanced background and added border */}
               <TimeRangeOverlay />
               {dayScreenshots.map((screenshot) => {
@@ -208,36 +266,62 @@ export function TimelineBands({
           >
             Activity
           </div>
-          <div className="flex-1 relative overflow-hidden" style={{ height: BAND_HEIGHT }}>
+          <div className="flex-1 relative overflow-hidden" style={{ height: bandHeight }}>
             <div className="absolute inset-0 bg-muted/30 rounded border border-border/30 overflow-hidden">{/* Enhanced background and added border */}
               <TimeRangeOverlay />
-              {/* For now, we'll show sessions with different colors to represent activity */}
-              {sessions.map((session, index) => {
-                const left = getTimePosition(session.startTime, dayStart);
-                const width = getSessionWidth(session, dayStart, dayEnd);
+              <TooltipProvider>
+                {/* For now, we'll show sessions with different colors to represent activity */}
+                {sessions.map((session, index) => {
+                  const left = getTimePosition(session.startTime, dayStart);
+                  const width = getSessionWidth(session, dayStart, dayEnd);
 
-                // Alternate between productive (green), neutral (gray), and distracting (red)
-                // More vibrant colors to match v1
-                const activityColors = [
-                  'bg-green-500', // Productive/focus
-                  'bg-gray-500',  // Neutral
-                  'bg-red-500',   // Distracting
-                ];
-                const color = activityColors[index % 3];
+                  // Alternate between productive (green), neutral (gray), and distracting (red)
+                  // More vibrant colors to match v1
+                  const activityColors = [
+                    'bg-green-500', // Productive/focus
+                    'bg-gray-500',  // Neutral
+                    'bg-red-500',   // Distracting
+                  ];
+                  const activityLabels = [
+                    'Productive',
+                    'Neutral',
+                    'Distracting',
+                  ];
+                  const color = activityColors[index % 3];
+                  const label = activityLabels[index % 3];
 
-                return (
-                  <div
-                    key={session.id}
-                    className={`absolute ${color} opacity-70`}
-                    style={{
-                      left: `${left}%`,
-                      width: `${width}%`,
-                      height: '100%',
-                      top: 0,
-                    }}
-                  />
-                );
-              })}
+                  return (
+                    <Tooltip key={session.id}>
+                      <TooltipTrigger asChild>
+                        <div
+                          className={`absolute ${color} rounded opacity-70 cursor-pointer hover:opacity-90 transition-opacity`}
+                          style={{
+                            left: `${left}%`,
+                            width: `${width}%`,
+                            height: '100%',
+                            top: 0,
+                          }}
+                          onClick={() => onSessionClick?.(session.id)}
+                        />
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <div className="text-sm">
+                          <p className="font-semibold">{label} Activity</p>
+                          <p className="text-muted-foreground">
+                            {formatTimestamp(session.startTime)} -{' '}
+                            {session.endTime ? formatTimestamp(session.endTime) : 'ongoing'}
+                          </p>
+                          {session.topApps && session.topApps.length > 0 && (
+                            <p className="text-muted-foreground mt-1">
+                              Apps: {session.topApps.slice(0, 3).join(', ')}
+                            </p>
+                          )}
+                        </div>
+                      </TooltipContent>
+                    </Tooltip>
+                  );
+                })}
+              </TooltipProvider>
             </div>
           </div>
         </div>
@@ -250,7 +334,7 @@ export function TimelineBands({
           >
             Summaries
           </div>
-          <div className="flex-1 relative overflow-hidden" style={{ height: BAND_HEIGHT }}>
+          <div className="flex-1 relative overflow-hidden" style={{ height: bandHeight }}>
             <div className="absolute inset-0 bg-muted/30 rounded border border-border/30 overflow-hidden">{/* Enhanced background and added border */}
               <TimeRangeOverlay />
               <TooltipProvider>

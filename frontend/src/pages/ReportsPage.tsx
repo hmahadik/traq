@@ -22,7 +22,7 @@ import { Loader2, Sparkles, ImageIcon } from 'lucide-react';
 import type { Report } from '@/types';
 
 export function ReportsPage() {
-  const [timeRange, setTimeRange] = useState('today');
+  const [timeRange, setTimeRange] = useState('Today');
   const [reportType, setReportType] = useState('summary');
   const [includeScreenshots, setIncludeScreenshots] = useState(false);
   const [generatedReport, setGeneratedReport] = useState<Report | undefined>();
@@ -101,7 +101,7 @@ export function ReportsPage() {
         </div>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[400px_1fr]">
+      <div className="grid gap-6 grid-cols-1 lg:grid-cols-[400px_1fr] xl:grid-cols-[450px_1fr] 2xl:grid-cols-[500px_1fr]">
         {/* Left Column - Report Configuration */}
         <div className="space-y-4">
           <QuickPresets

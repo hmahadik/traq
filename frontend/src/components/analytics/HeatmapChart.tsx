@@ -45,28 +45,10 @@ export function HeatmapChart({ data, isLoading }: HeatmapChartProps) {
     );
   }
 
-  // Generate mock heatmap data if not provided
-  const heatmapData: HeatmapData[] = data || (() => {
-    const result: HeatmapData[] = [];
-    for (let day = 0; day < 7; day++) {
-      for (let hour = 0; hour < 24; hour++) {
-        const isWeekday = day > 0 && day < 6;
-        const isWorkHour = hour >= 9 && hour <= 18;
-        let value = 0;
-        if (isWeekday && isWorkHour) {
-          value = Math.floor(Math.random() * 60);
-        } else if (isWeekday) {
-          value = Math.floor(Math.random() * 20);
-        } else {
-          value = Math.floor(Math.random() * 10);
-        }
-        result.push({ dayOfWeek: day, hour, value });
-      }
-    }
-    return result;
-  })();
+  // Use provided data or empty array
+  const heatmapData: HeatmapData[] = data || [];
 
-  const maxValue = Math.max(...heatmapData.map((d) => d.value));
+  const maxValue = heatmapData.length > 0 ? Math.max(...heatmapData.map((d) => d.value)) : 0;
 
   const getValue = (day: number, hour: number) => {
     const item = heatmapData.find((d) => d.dayOfWeek === day && d.hour === hour);

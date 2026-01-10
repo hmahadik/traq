@@ -15,6 +15,7 @@ interface TimelineFiltersProps {
   availableApps: string[];
   onTimePeriodChange: (period: TimePeriod) => void;
   onAppChange: (app: string | null) => void;
+  compact?: boolean;
 }
 
 const timePeriodConfig = {
@@ -54,6 +55,7 @@ export function TimelineFilters({
   availableApps,
   onTimePeriodChange,
   onAppChange,
+  compact = false,
 }: TimelineFiltersProps) {
   const hasActiveFilters = timePeriod !== null || selectedApp !== null;
 
@@ -61,6 +63,74 @@ export function TimelineFilters({
     onTimePeriodChange(null);
     onAppChange(null);
   };
+
+  // Compact mode: smaller buttons, icons only for time periods
+  if (compact) {
+    return (
+      <div className="flex items-center gap-1 flex-wrap">
+        {/* Time Period Filters - icons only */}
+        {(Object.keys(timePeriodConfig) as Array<keyof typeof timePeriodConfig>).map(
+          (period) => {
+            const config = timePeriodConfig[period];
+            const Icon = config.icon;
+            const isActive = timePeriod === period;
+
+            return (
+              <Button
+                key={period}
+                variant={isActive ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => onTimePeriodChange(isActive ? null : period)}
+                className="h-7 w-7 p-0"
+                title={`${config.label} (${config.description})`}
+              >
+                <Icon className="h-3.5 w-3.5" />
+              </Button>
+            );
+          }
+        )}
+
+        {/* App Filter Dropdown */}
+        {availableApps.length > 0 && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant={selectedApp ? 'default' : 'ghost'}
+                size="sm"
+                className="h-7 text-xs px-2"
+              >
+                {selectedApp || 'App'}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="max-h-[200px] overflow-y-auto">
+              {availableApps.map((app) => (
+                <DropdownMenuItem
+                  key={app}
+                  onClick={() => onAppChange(app === selectedApp ? null : app)}
+                  className={selectedApp === app ? 'bg-accent' : ''}
+                >
+                  {app}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
+
+        {/* Clear */}
+        {hasActiveFilters && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={clearAllFilters}
+            className="h-7 w-7 p-0 text-muted-foreground"
+            title="Clear filters"
+          >
+            <X className="h-3.5 w-3.5" />
+          </Button>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="flex items-center gap-2 mb-4 flex-wrap">

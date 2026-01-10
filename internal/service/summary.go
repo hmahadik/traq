@@ -45,6 +45,12 @@ func (s *SummaryService) GenerateSummary(sessionID int64) (*storage.Summary, err
 		return nil, fmt.Errorf("failed to build context: %w", err)
 	}
 
+	// Check setup status first
+	status := s.inference.GetSetupStatus()
+	if !status.Ready {
+		return nil, fmt.Errorf("inference not ready: %s. %s", status.Issue, status.Suggestion)
+	}
+
 	// Generate summary
 	result, err := s.inference.GenerateSummary(ctx)
 	if err != nil {

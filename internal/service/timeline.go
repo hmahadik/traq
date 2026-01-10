@@ -191,7 +191,7 @@ func (s *TimelineService) GetScreenshotsForSession(sessionID int64, page, perPag
 
 // GetScreenshotsForHour returns screenshots for a specific hour.
 func (s *TimelineService) GetScreenshotsForHour(date string, hour int) ([]*storage.Screenshot, error) {
-	t, err := time.Parse("2006-01-02", date)
+	t, err := time.ParseInLocation("2006-01-02", date, time.Local)
 	if err != nil {
 		return nil, err
 	}
@@ -200,6 +200,19 @@ func (s *TimelineService) GetScreenshotsForHour(date string, hour int) ([]*stora
 	hourEnd := hourStart.Add(time.Hour)
 
 	return s.store.GetScreenshotsByTimeRange(hourStart.Unix(), hourEnd.Unix()-1)
+}
+
+// GetScreenshotsForDate returns all screenshots for a specific date.
+func (s *TimelineService) GetScreenshotsForDate(date string) ([]*storage.Screenshot, error) {
+	t, err := time.ParseInLocation("2006-01-02", date, time.Local)
+	if err != nil {
+		return nil, err
+	}
+
+	dayStart := time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, time.Local)
+	dayEnd := dayStart.AddDate(0, 0, 1)
+
+	return s.store.GetScreenshotsByTimeRange(dayStart.Unix(), dayEnd.Unix()-1)
 }
 
 // GetSessionContext returns all context for a session.
@@ -262,11 +275,11 @@ func (s *TimelineService) GetRecentSessions(limit int) ([]*storage.Session, erro
 
 // GetScreenshotsForDateRange returns screenshots for a date range.
 func (s *TimelineService) GetScreenshotsForDateRange(startDate, endDate string, limit int) ([]*storage.Screenshot, error) {
-	startT, err := time.Parse("2006-01-02", startDate)
+	startT, err := time.ParseInLocation("2006-01-02", startDate, time.Local)
 	if err != nil {
 		return nil, err
 	}
-	endT, err := time.Parse("2006-01-02", endDate)
+	endT, err := time.ParseInLocation("2006-01-02", endDate, time.Local)
 	if err != nil {
 		return nil, err
 	}

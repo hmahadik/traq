@@ -353,6 +353,14 @@ func (a *App) GetHourlyActivity(date string) ([]*service.HourlyActivity, error) 
 	return a.Analytics.GetHourlyActivity(date)
 }
 
+// GetHourlyActivityHeatmap returns activity heatmap data grouped by day-of-week and hour.
+func (a *App) GetHourlyActivityHeatmap() ([]*service.HeatmapData, error) {
+	if a.Analytics == nil {
+		return nil, nil
+	}
+	return a.Analytics.GetHourlyActivityHeatmap()
+}
+
 // GetDataSourceStats returns statistics from all data sources.
 func (a *App) GetDataSourceStats(start, end int64) (*service.DataSourceStats, error) {
 	if a.Analytics == nil {
@@ -392,7 +400,7 @@ func (a *App) GetTopWindows(date string, limit int) ([]*service.WindowUsage, err
 	}
 
 	// Parse date to get start/end timestamps
-	t, err := time.Parse("2006-01-02", date)
+	t, err := time.ParseInLocation("2006-01-02", date, time.Local)
 	if err != nil {
 		return nil, err
 	}
@@ -435,6 +443,14 @@ func (a *App) GetScreenshotsForHour(date string, hour int) ([]*storage.Screensho
 		return nil, nil
 	}
 	return a.Timeline.GetScreenshotsForHour(date, hour)
+}
+
+// GetScreenshotsForDate returns all screenshots for a specific date.
+func (a *App) GetScreenshotsForDate(date string) ([]*storage.Screenshot, error) {
+	if a.Timeline == nil {
+		return nil, nil
+	}
+	return a.Timeline.GetScreenshotsForDate(date)
 }
 
 // GetSessionContext returns all context for a session.
@@ -857,6 +873,19 @@ func (a *App) GetInferenceStatus() *inference.InferenceStatus {
 		}
 	}
 	return a.inference.GetStatus()
+}
+
+// GetInferenceSetupStatus returns detailed setup status with actionable feedback.
+func (a *App) GetInferenceSetupStatus() *inference.SetupStatus {
+	if a.inference == nil {
+		return &inference.SetupStatus{
+			Ready:      false,
+			Engine:     "none",
+			Issue:      "Inference not configured",
+			Suggestion: "Configure AI inference in Settings",
+		}
+	}
+	return a.inference.GetSetupStatus()
 }
 
 // GetBundledStatus returns detailed status of the bundled AI engine.

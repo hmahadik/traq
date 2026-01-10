@@ -74,7 +74,7 @@ function StatCardSkeleton() {
 export function StatsGrid({ stats, isLoading }: StatsGridProps) {
   if (isLoading) {
     return (
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-3 sm:gap-4 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 2xl:grid-cols-8">
         {Array.from({ length: 8 }).map((_, i) => (
           <StatCardSkeleton key={i} />
         ))}
@@ -88,7 +88,7 @@ export function StatsGrid({ stats, isLoading }: StatsGridProps) {
 
   return (
     <TooltipProvider>
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-3 sm:gap-4 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 2xl:grid-cols-8">
         <StatCard
           title="Screenshots"
           value={stats.totalScreenshots}
@@ -134,9 +134,9 @@ export function StatsGrid({ stats, isLoading }: StatsGridProps) {
       />
       <StatCard
         title="Top App"
-        value={stats.topApps[0]?.appName || 'N/A'}
+        value={stats.topApps?.[0]?.appName || 'N/A'}
         icon={<Camera className="h-4 w-4" />}
-        description={stats.topApps[0] ? `${stats.topApps[0].percentage.toFixed(1)}% of time` : ''}
+        description={stats.topApps?.[0] ? `${stats.topApps[0].percentage.toFixed(1)}% of time` : ''}
       />
       </div>
     </TooltipProvider>

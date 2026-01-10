@@ -66,6 +66,10 @@ export function GetFocusDistribution(arg1:string):Promise<Array<service.HourlyFo
 
 export function GetHourlyActivity(arg1:string):Promise<Array<service.HourlyActivity>>;
 
+export function GetHourlyActivityHeatmap():Promise<Array<service.HeatmapData>>;
+
+export function GetInferenceSetupStatus():Promise<inference.SetupStatus>;
+
 export function GetInferenceStatus():Promise<inference.InferenceStatus>;
 
 export function GetMonthlyStats(arg1:number,arg2:number):Promise<service.MonthlyStats>;
@@ -83,6 +87,8 @@ export function GetScreenshot(arg1:number):Promise<storage.Screenshot>;
 export function GetScreenshotInfo(arg1:number):Promise<service.ScreenshotInfo>;
 
 export function GetScreenshotPath(arg1:number):Promise<string>;
+
+export function GetScreenshotsForDate(arg1:string):Promise<Array<storage.Screenshot>>;
 
 export function GetScreenshotsForHour(arg1:string,arg2:number):Promise<Array<storage.Screenshot>>;
 

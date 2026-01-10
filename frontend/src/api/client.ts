@@ -190,6 +190,12 @@ export const analytics = {
     return withRetry(() => App.GetHourlyActivity(date));
   },
 
+  getHourlyActivityHeatmap: async () => {
+    if (isMockMode()) return [];
+    await waitForReady();
+    return withRetry(() => App.GetHourlyActivityHeatmap());
+  },
+
   getDataSourceStats: async (start: number, end: number) => {
     if (isMockMode()) return mockData.getDataSourceStats(start, end);
     await waitForReady();
@@ -279,6 +285,19 @@ export const timeline = {
     if (isMockMode()) return mockData.getScreenshotsForHour(date, hour);
     await waitForReady();
     return withRetry(() => App.GetScreenshotsForHour(date, hour));
+  },
+
+  getScreenshotsForDate: async (date: string) => {
+    if (isMockMode()) {
+      // Get all screenshots for the entire day
+      const screenshots = [];
+      for (let hour = 0; hour < 24; hour++) {
+        screenshots.push(...mockData.getScreenshotsForHour(date, hour));
+      }
+      return screenshots;
+    }
+    await waitForReady();
+    return withRetry(() => App.GetScreenshotsForDate(date));
   },
 
   getSessionContext: async (sessionId: number) => {

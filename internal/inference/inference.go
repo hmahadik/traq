@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -539,6 +540,14 @@ type InferenceStatus struct {
 	CloudConfigured bool   `json:"cloudConfigured,omitempty"`
 }
 
+// SetupStatus contains detailed setup status with actionable feedback
+type SetupStatus struct {
+	Ready      bool   `json:"ready"`
+	Engine     string `json:"engine"`
+	Issue      string `json:"issue,omitempty"`      // Empty if ready
+	Suggestion string `json:"suggestion,omitempty"` // Actionable fix
+}
+
 // GetStatus returns the current status of the inference service
 func (s *Service) GetStatus() *InferenceStatus {
 	if s.config == nil {
@@ -593,6 +602,149 @@ func (s *Service) checkOllamaConnection() bool {
 	}
 	defer resp.Body.Close()
 	return resp.StatusCode == http.StatusOK
+}
+
+// GetSetupStatus returns detailed setup status with actionable feedback
+func (s *Service) GetSetupStatus() *SetupStatus {
+	if s.config == nil {
+		return &SetupStatus{
+			Ready:      false,
+			Engine:     "none",
+			Issue:      "Inference not configured",
+			Suggestion: "Configure AI inference in Settings",
+		}
+	}
+
+	switch s.config.Engine {
+	case EngineOllama:
+		if s.config.Ollama == nil {
+			return &SetupStatus{
+				Ready:      false,
+				Engine:     "ollama",
+				Issue:      "Ollama not configured",
+				Suggestion: "Configure Ollama settings in Settings > AI",
+			}
+		}
+
+		// Test connection to Ollama
+		client := &http.Client{Timeout: 2 * time.Second}
+		url := strings.TrimSuffix(s.config.Ollama.Host, "/") + "/api/tags"
+		resp, err := client.Get(url)
+		if err != nil {
+			return &SetupStatus{
+				Ready:      false,
+				Engine:     "ollama",
+				Issue:      "Cannot reach Ollama server",
+				Suggestion: "Install and start Ollama from https://ollama.com",
+			}
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			return &SetupStatus{
+				Ready:      false,
+				Engine:     "ollama",
+				Issue:      fmt.Sprintf("Ollama server returned status %d", resp.StatusCode),
+				Suggestion: "Check Ollama server status",
+			}
+		}
+
+		// Check if model exists
+		body, err := io.ReadAll(resp.Body)
+		if err == nil {
+			var tagsResp struct {
+				Models []struct {
+					Name string `json:"name"`
+				} `json:"models"`
+			}
+			if err := json.Unmarshal(body, &tagsResp); err == nil {
+				modelFound := false
+				for _, m := range tagsResp.Models {
+					if m.Name == s.config.Ollama.Model {
+						modelFound = true
+						break
+					}
+				}
+				if !modelFound {
+					return &SetupStatus{
+						Ready:      false,
+						Engine:     "ollama",
+						Issue:      fmt.Sprintf("Model '%s' not found in Ollama", s.config.Ollama.Model),
+						Suggestion: fmt.Sprintf("Run: ollama pull %s", s.config.Ollama.Model),
+					}
+				}
+			}
+		}
+
+		return &SetupStatus{Ready: true, Engine: "ollama"}
+
+	case EngineBundled:
+		if s.config.Bundled == nil {
+			return &SetupStatus{
+				Ready:      false,
+				Engine:     "bundled",
+				Issue:      "Bundled engine not configured",
+				Suggestion: "Configure bundled model in Settings > AI",
+			}
+		}
+
+		// Check if server binary exists
+		if s.config.Bundled.ServerPath != "" {
+			if _, err := os.Stat(s.config.Bundled.ServerPath); err != nil {
+				return &SetupStatus{
+					Ready:      false,
+					Engine:     "bundled",
+					Issue:      "llama-server binary not found",
+					Suggestion: "Download bundled AI model in Settings > AI",
+				}
+			}
+		}
+
+		// Check if model file exists
+		if s.config.Bundled.ModelPath != "" {
+			if _, err := os.Stat(s.config.Bundled.ModelPath); err != nil {
+				return &SetupStatus{
+					Ready:      false,
+					Engine:     "bundled",
+					Issue:      "Model file not found",
+					Suggestion: "Download bundled AI model in Settings > AI",
+				}
+			}
+		}
+
+		// Both exist
+		return &SetupStatus{Ready: true, Engine: "bundled"}
+
+	case EngineCloud:
+		if s.config.Cloud == nil {
+			return &SetupStatus{
+				Ready:      false,
+				Engine:     "cloud",
+				Issue:      "Cloud API not configured",
+				Suggestion: "Configure API key in Settings > AI",
+			}
+		}
+
+		// Check API key exists
+		if s.config.Cloud.APIKey == "" {
+			return &SetupStatus{
+				Ready:      false,
+				Engine:     "cloud",
+				Issue:      "API key not configured",
+				Suggestion: "Add API key in Settings > AI",
+			}
+		}
+
+		return &SetupStatus{Ready: true, Engine: "cloud"}
+
+	default:
+		return &SetupStatus{
+			Ready:      false,
+			Engine:     string(s.config.Engine),
+			Issue:      fmt.Sprintf("Unknown inference engine: %s", s.config.Engine),
+			Suggestion: "Select a valid inference engine in Settings > AI",
+		}
+	}
 }
 
 // StartBundled starts the bundled engine if configured

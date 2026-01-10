@@ -122,6 +122,14 @@ export function GetHourlyActivity(arg1) {
   return window['go']['main']['App']['GetHourlyActivity'](arg1);
 }
 
+export function GetHourlyActivityHeatmap() {
+  return window['go']['main']['App']['GetHourlyActivityHeatmap']();
+}
+
+export function GetInferenceSetupStatus() {
+  return window['go']['main']['App']['GetInferenceSetupStatus']();
+}
+
 export function GetInferenceStatus() {
   return window['go']['main']['App']['GetInferenceStatus']();
 }
@@ -156,6 +164,10 @@ export function GetScreenshotInfo(arg1) {
 
 export function GetScreenshotPath(arg1) {
   return window['go']['main']['App']['GetScreenshotPath'](arg1);
+}
+
+export function GetScreenshotsForDate(arg1) {
+  return window['go']['main']['App']['GetScreenshotsForDate'](arg1);
 }
 
 export function GetScreenshotsForHour(arg1, arg2) {

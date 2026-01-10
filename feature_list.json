@@ -1,1671 +1,374 @@
 [
   {
     "category": "functional",
-    "description": "Automatic Screenshot Capture - Periodically captures screen at configurable intervals",
+    "description": "NEW: Unified header with global date context shared across all pages",
     "steps": [
-      "Step 1: Start the application with capture enabled",
-      "Step 2: Wait for the configured capture interval to elapse",
-      "Step 3: Verify a new screenshot appears in the timeline",
-      "Step 4: Check screenshot is saved to disk in correct location"
+      "Step 1: Start the app and navigate to Timeline page",
+      "Step 2: Verify header shows date picker with arrows and Today/Yesterday presets",
+      "Step 3: Navigate to Analytics page - verify same date context is maintained",
+      "Step 4: Navigate to Reports page - verify same date context is maintained",
+      "Step 5: Change date in header and verify it updates across all pages"
     ],
-    "passes": true
+    "passes": false
   },
   {
     "category": "functional",
-    "description": "Configurable Capture Interval - Users can set screenshot frequency (10-300 seconds)",
+    "description": "NEW: Date navigation arrows work correctly with constraints",
     "steps": [
-      "Step 1: Open Settings drawer",
-      "Step 2: Locate capture interval setting",
-      "Step 3: Change interval value within valid range",
-      "Step 4: Verify setting persists after closing settings",
-      "Step 5: Verify captures occur at new interval"
+      "Step 1: Navigate to Timeline with today's date selected",
+      "Step 2: Click next arrow - verify it is disabled (cannot go past today)",
+      "Step 3: Click previous arrow - verify it navigates to yesterday",
+      "Step 4: Click previous arrow again - verify it continues going back",
+      "Step 5: Click next arrow - verify it navigates forward until today"
     ],
-    "passes": true
+    "passes": false
   },
   {
     "category": "functional",
-    "description": "Active Window Context Capture - Records focused window title and app name with each screenshot",
+    "description": "NEW: Analytics page has multi-timeframe tabs (Day/Week/Month/Year/Custom)",
     "steps": [
-      "Step 1: Focus on a specific application window",
-      "Step 2: Trigger or wait for screenshot capture",
-      "Step 3: View the captured screenshot details",
-      "Step 4: Verify window title and app name are recorded"
+      "Step 1: Navigate to Analytics page",
+      "Step 2: Verify tabs are visible: Day, Week, Month, Year, Custom",
+      "Step 3: Click Day tab - verify stats show totals for selected day",
+      "Step 4: Click Week tab - verify stats show averages and trends for week",
+      "Step 5: Click Month tab - verify stats show averages and trends for month"
     ],
-    "passes": true
+    "passes": false
   },
   {
     "category": "functional",
-    "description": "Session-Based Organization - Groups related activity into sessions based on continuous work",
+    "description": "NEW: Analytics charts use smart bucketing based on timeframe",
     "steps": [
-      "Step 1: Start tracking with a fresh session",
-      "Step 2: Capture multiple screenshots while active",
-      "Step 3: Navigate to timeline view",
-      "Step 4: Verify screenshots are grouped into a single session"
+      "Step 1: Navigate to Analytics and select Day tab",
+      "Step 2: Verify chart shows hourly buckets (24 bars for hours)",
+      "Step 3: Switch to Week tab - verify chart shows daily buckets (7 bars)",
+      "Step 4: Switch to Month tab - verify chart shows daily buckets (28-31 bars)",
+      "Step 5: Switch to Year tab - verify chart shows monthly buckets (12 bars)"
     ],
-    "passes": true
+    "passes": false
   },
   {
     "category": "functional",
-    "description": "AFK Detection - Automatically detects when user is away and pauses tracking",
+    "description": "NEW: Click Analytics chart element drills down to Timeline for that specific day",
     "steps": [
-      "Step 1: Start capture with AFK detection enabled",
-      "Step 2: Remain idle for longer than AFK timeout",
-      "Step 3: Verify no new screenshots are captured during idle period",
-      "Step 4: Verify session shows AFK status or paused state"
+      "Step 1: Navigate to Analytics Week tab",
+      "Step 2: Click on a specific day bar in the activity chart",
+      "Step 3: Verify navigation to Timeline page occurs",
+      "Step 4: Verify Timeline shows the exact day that was clicked",
+      "Step 5: Verify session list loads for that selected day"
     ],
-    "passes": true
+    "passes": false
   },
   {
     "category": "functional",
-    "description": "Session Auto-Resume - Resumes previous session if user returns within configurable window",
+    "description": "NEW: Timeline to Analytics transition maintains date context",
     "steps": [
-      "Step 1: Create an active session with captures",
-      "Step 2: Go AFK to pause the session",
-      "Step 3: Return within the resume window timeout",
-      "Step 4: Verify new captures are added to same session"
+      "Step 1: Navigate to Timeline and select a specific date (e.g., Jan 5)",
+      "Step 2: Click on Analytics in sidebar",
+      "Step 3: Verify Analytics opens with Day tab selected",
+      "Step 4: Verify Analytics shows data for the same date (Jan 5)",
+      "Step 5: Switch to Week tab - verify week expands around Jan 5"
     ],
-    "passes": true
+    "passes": false
   },
   {
     "category": "functional",
-    "description": "Perceptual Duplicate Detection - Uses dhash to skip near-identical screenshots",
+    "description": "NEW: Analytics to Timeline transition uses appropriate date logic",
     "steps": [
-      "Step 1: Keep screen static (no changes)",
-      "Step 2: Wait for multiple capture intervals",
-      "Step 3: Check screenshot count",
-      "Step 4: Verify duplicate frames were skipped (fewer screenshots than intervals)"
+      "Step 1: Navigate to Analytics with Week tab (multi-day range)",
+      "Step 2: Click Timeline in sidebar without drilling down",
+      "Step 3: Verify Timeline shows the end date of the week range (capped at today)",
+      "Step 4: Return to Analytics, select a future week containing today",
+      "Step 5: Navigate to Timeline - verify it shows today (not future date)"
     ],
-    "passes": true
+    "passes": false
   },
   {
     "category": "functional",
-    "description": "Local-Only Storage - All data stored exclusively on user's machine",
+    "description": "NEW: Custom timeframe in Analytics with auto-bucketing",
     "steps": [
-      "Step 1: Monitor network traffic while app is running",
-      "Step 2: Capture several screenshots",
-      "Step 3: Verify no data is sent to external servers",
-      "Step 4: Verify all files exist in local data directory"
+      "Step 1: Navigate to Analytics and select Custom tab",
+      "Step 2: Enter a 2-day range - verify chart uses hourly buckets",
+      "Step 3: Enter a 30-day range - verify chart uses daily buckets",
+      "Step 4: Enter a 90-day range - verify chart uses weekly buckets",
+      "Step 5: Verify stats adapt appropriately to custom range"
     ],
-    "passes": true
+    "passes": false
   },
   {
     "category": "functional",
-    "description": "SQLite Database - Uses SQLite for reliable, portable data storage",
+    "description": "NEW: Reports page integrates with global timeframe context",
     "steps": [
-      "Step 1: Locate the data directory",
-      "Step 2: Verify SQLite database file exists",
-      "Step 3: Open database and verify schema is valid",
-      "Step 4: Query database to confirm data integrity"
+      "Step 1: Navigate to Timeline and select Jan 8",
+      "Step 2: Navigate to Reports page",
+      "Step 3: Verify the timeframe input reflects Jan 8 or is pre-filled with context",
+      "Step 4: Generate a report for a different range (e.g., last week)",
+      "Step 5: Verify report generates correctly with the specified range"
     ],
-    "passes": true
+    "passes": false
   },
   {
     "category": "functional",
-    "description": "Date-Organized File Storage - Screenshots stored in YYYY/MM/DD folder hierarchy",
+    "description": "NEW: Click report history item sets global timeframe",
     "steps": [
-      "Step 1: Capture screenshots across different dates",
-      "Step 2: Navigate to screenshot storage directory",
-      "Step 3: Verify YYYY/MM/DD folder structure exists",
-      "Step 4: Verify screenshots are in correct date folders"
+      "Step 1: Navigate to Reports and generate a report for last week",
+      "Step 2: Navigate away to Timeline",
+      "Step 3: Return to Reports and click on the report history item",
+      "Step 4: Verify the global date context updates to match the report's timeframe",
+      "Step 5: Navigate to Analytics - verify it shows data for the same timeframe"
     ],
-    "passes": true
+    "passes": false
   },
   {
     "category": "functional",
-    "description": "AI Session Summaries - Generates natural language summaries of sessions",
-    "steps": [
-      "Step 1: Complete a session with multiple screenshots",
-      "Step 2: End or close the session",
-      "Step 3: View session in timeline",
-      "Step 4: Verify AI-generated summary text is displayed"
-    ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "Bundled AI Model - Ships with local LLM that works offline",
-    "steps": [
-      "Step 1: Disconnect from internet",
-      "Step 2: Generate a session summary",
-      "Step 3: Verify summary is generated using local model",
-      "Step 4: Check AI status shows bundled model active"
-    ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "Activity Tagging - Automatically categorizes sessions with relevant tags",
-    "steps": [
-      "Step 1: Complete a session with coding activity",
-      "Step 2: View session details",
-      "Step 3: Verify automatic tags are applied (e.g., 'coding', 'browsing')",
-      "Step 4: Verify tags match actual activity content"
-    ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "Confidence Indicators - Shows confidence level for AI-generated summaries",
-    "steps": [
-      "Step 1: View a session with AI summary",
-      "Step 2: Locate confidence indicator",
-      "Step 3: Verify confidence level is displayed (percentage or scale)",
-      "Step 4: Verify indicator reflects summary reliability"
-    ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "Context-Aware Summaries - Includes window titles and app names in summary generation",
-    "steps": [
-      "Step 1: Create session with varied window activity",
-      "Step 2: Generate AI summary",
-      "Step 3: Read summary content",
-      "Step 4: Verify summary references specific apps and windows used"
-    ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "Daily Timeline View - Shows all sessions for selected day in chronological order",
+    "description": "NEW: Date picker calendar widget allows direct date selection",
     "steps": [
       "Step 1: Navigate to Timeline page",
-      "Step 2: Select a date with recorded sessions",
-      "Step 3: Verify all sessions for that day are displayed",
-      "Step 4: Verify sessions are in chronological order"
-    ],
-    "passes": true
-  },
-  {
-    "category": "style",
-    "description": "Session Cards - Displays session summaries as expandable cards with metadata",
-    "steps": [
-      "Step 1: Navigate to Timeline view",
-      "Step 2: Observe session card layout",
-      "Step 3: Verify cards show summary, time, and metadata",
-      "Step 4: Click to expand card and verify additional details appear"
-    ],
-    "passes": true
-  },
-  {
-    "category": "style",
-    "description": "Screenshot Thumbnails - Shows small previews of screenshots within session cards",
-    "steps": [
-      "Step 1: Navigate to Timeline view",
-      "Step 2: Locate a session card with screenshots",
-      "Step 3: Verify thumbnail images are displayed",
-      "Step 4: Verify thumbnails are appropriately sized and load quickly"
-    ],
-    "passes": true
-  },
-  {
-    "category": "style",
-    "description": "Calendar Heatmap - Displays activity intensity across days in calendar view",
-    "steps": [
-      "Step 1: Navigate to Analytics or Calendar view",
-      "Step 2: Locate calendar heatmap component",
-      "Step 3: Verify days with more activity show darker/different colors",
-      "Step 4: Verify color intensity correlates with activity level"
-    ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "Date Navigation - Easy navigation between days with controls",
-    "steps": [
-      "Step 1: Navigate to Timeline view",
-      "Step 2: Use previous/next day buttons",
-      "Step 3: Use date picker to jump to specific date",
-      "Step 4: Use 'Today' button to return to current date",
-      "Step 5: Verify all navigation methods work correctly"
-    ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "Linux Support - Full functionality on Linux with X11 window tracking",
-    "steps": [
-      "Step 1: Launch application on Linux with X11",
-      "Step 2: Verify screenshot capture works",
-      "Step 3: Verify window title detection works",
-      "Step 4: Verify all core features function correctly"
-    ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "macOS Support - Full functionality on macOS using Accessibility APIs",
-    "steps": [
-      "Step 1: Launch application on macOS",
-      "Step 2: Grant necessary accessibility permissions",
-      "Step 3: Verify screenshot capture works",
-      "Step 4: Verify window title detection works"
+      "Step 2: Click on the date in the header to open calendar picker",
+      "Step 3: Select a past date from the calendar",
+      "Step 4: Verify the calendar closes and Timeline updates to selected date",
+      "Step 5: Verify header shows the newly selected date"
     ],
     "passes": false
   },
   {
     "category": "functional",
-    "description": "Windows Support - Full functionality on Windows using Win32 APIs",
+    "description": "NEW: Quick preset buttons (Today/Yesterday) work from header",
     "steps": [
-      "Step 1: Launch application on Windows",
-      "Step 2: Verify screenshot capture works",
-      "Step 3: Verify window title detection works",
-      "Step 4: Verify all core features function correctly"
+      "Step 1: Navigate to Timeline and select an old date (e.g., 1 week ago)",
+      "Step 2: Click 'Today' preset button in header",
+      "Step 3: Verify Timeline immediately jumps to today's date",
+      "Step 4: Click 'Yesterday' preset button",
+      "Step 5: Verify Timeline shows yesterday's date"
     ],
     "passes": false
   },
   {
     "category": "functional",
-    "description": "Single Binary Distribution - Distributed as single executable with no runtime dependencies",
+    "description": "NEW: Settings and Pause/Resume controls remain accessible from header",
     "steps": [
-      "Step 1: Download application binary",
-      "Step 2: Verify it's a single executable file",
-      "Step 3: Run without installing dependencies",
-      "Step 4: Verify application launches and functions"
+      "Step 1: Navigate to any page (Timeline/Analytics/Reports)",
+      "Step 2: Verify settings icon is visible in header",
+      "Step 3: Click settings icon - verify settings drawer opens",
+      "Step 4: Close settings drawer",
+      "Step 5: Verify Pause/Resume button is visible and functional in header"
     ],
-    "passes": true
+    "passes": false
   },
   {
     "category": "functional",
-    "description": "Native Desktop App - Uses native webview (Wails) instead of Electron",
+    "description": "NEW: Filters persist within Timeline view across date changes",
     "steps": [
-      "Step 1: Check application binary size (should be < 50MB)",
-      "Step 2: Monitor memory usage during operation",
-      "Step 3: Verify memory usage stays under 200MB",
-      "Step 4: Verify native OS integration works"
+      "Step 1: Navigate to Timeline for today",
+      "Step 2: Apply a time period filter (e.g., Morning)",
+      "Step 3: Apply an app filter (e.g., VS Code)",
+      "Step 4: Change date to yesterday using navigation arrows",
+      "Step 5: Verify the same filters are still applied to yesterday's data"
     ],
-    "passes": true
+    "passes": false
   },
   {
     "category": "functional",
-    "description": "Enable/Disable Capture - Toggle screenshot capture without closing app",
+    "description": "NEW: Analytics Day tab behaves exactly like current Timeline day view",
     "steps": [
-      "Step 1: Open Settings or use tray menu",
-      "Step 2: Disable capture",
-      "Step 3: Verify no new screenshots are taken",
-      "Step 4: Re-enable capture",
-      "Step 5: Verify screenshots resume"
+      "Step 1: Navigate to Timeline and note the stats and charts for a specific day",
+      "Step 2: Navigate to Analytics and select Day tab for the same day",
+      "Step 3: Verify the metrics match (total time, session count, top app)",
+      "Step 4: Verify the activity chart shows same hourly breakdown",
+      "Step 5: Compare visual representation - should be equivalent"
     ],
-    "passes": true
+    "passes": false
   },
   {
     "category": "functional",
-    "description": "Quality Settings - Configure screenshot compression quality",
+    "description": "NEW: Analytics Week tab shows averages and trends",
     "steps": [
-      "Step 1: Open Settings drawer",
-      "Step 2: Locate quality/compression setting",
-      "Step 3: Adjust quality level",
-      "Step 4: Capture new screenshots",
-      "Step 5: Verify file sizes change with quality setting"
+      "Step 1: Navigate to Analytics and select Week tab",
+      "Step 2: Verify stats show average daily time (not total for week)",
+      "Step 3: Verify stats show trends or comparisons where applicable",
+      "Step 4: Verify chart shows 7 bars representing each day",
+      "Step 5: Hover over bars - verify tooltips show date and activity"
     ],
-    "passes": true
+    "passes": false
   },
   {
     "category": "functional",
-    "description": "Duplicate Threshold - Adjust sensitivity of perceptual duplicate detection",
+    "description": "NEW: Analytics Month tab adapts metrics and charts",
     "steps": [
-      "Step 1: Open Settings drawer",
-      "Step 2: Locate duplicate threshold setting",
-      "Step 3: Adjust threshold value",
-      "Step 4: Test with similar screenshots",
-      "Step 5: Verify threshold affects duplicate detection behavior"
+      "Step 1: Navigate to Analytics and select Month tab",
+      "Step 2: Verify stats show monthly totals and daily averages",
+      "Step 3: Verify chart shows 28-31 bars (one per day)",
+      "Step 4: Verify metrics include comparisons or trends if available",
+      "Step 5: Click on a day bar - verify drill-down to Timeline for that day"
     ],
-    "passes": true
+    "passes": false
   },
   {
     "category": "functional",
-    "description": "AFK Timeout Configuration - Set duration before user is considered away",
+    "description": "NEW: Analytics Year tab shows monthly aggregation",
     "steps": [
-      "Step 1: Open Settings drawer",
-      "Step 2: Locate AFK timeout setting",
-      "Step 3: Set a specific timeout value",
-      "Step 4: Go idle and measure time until AFK triggers",
-      "Step 5: Verify AFK triggers at configured time"
+      "Step 1: Navigate to Analytics and select Year tab",
+      "Step 2: Verify chart shows 12 bars (one per month)",
+      "Step 3: Verify stats show yearly totals and monthly averages",
+      "Step 4: Hover over month bar - verify tooltip shows month name and data",
+      "Step 5: Click on a month bar - verify it either drills down or shows detail"
     ],
-    "passes": true
+    "passes": false
   },
   {
     "category": "functional",
-    "description": "Minimum Session Duration - Set minimum duration for sessions to be saved",
+    "description": "NEW: Sidebar navigation reflects new structure (Timeline/Analytics/Reports)",
     "steps": [
-      "Step 1: Open Settings drawer",
-      "Step 2: Set minimum session duration",
-      "Step 3: Create a very short session (below minimum)",
-      "Step 4: Verify short session is not saved",
-      "Step 5: Create session above minimum and verify it saves"
+      "Step 1: Open the app and check sidebar navigation items",
+      "Step 2: Verify sidebar shows: Timeline, Analytics, Reports",
+      "Step 3: Verify Settings is NOT in sidebar (should be in header)",
+      "Step 4: Click each nav item and verify correct page loads",
+      "Step 5: Verify active state highlighting works for each nav item"
     ],
-    "passes": true
+    "passes": false
   },
   {
     "category": "functional",
-    "description": "Session Persistence - Reliably saves sessions even on unexpected termination",
+    "description": "NEW: Timeline maintains master-detail layout with session list",
     "steps": [
-      "Step 1: Start a session with multiple screenshots",
-      "Step 2: Force-kill the application process",
-      "Step 3: Restart the application",
-      "Step 4: Verify previous session data was preserved"
+      "Step 1: Navigate to Timeline for a day with multiple sessions",
+      "Step 2: Verify left panel shows session list with stats and filters",
+      "Step 3: Click on a session in the list",
+      "Step 4: Verify right panel shows session detail (screenshots, tags, AI summary)",
+      "Step 5: Verify master-detail layout is responsive"
     ],
-    "passes": true
+    "passes": false
   },
   {
     "category": "functional",
-    "description": "Screenshot Persistence - Screenshots written to disk before being referenced",
+    "description": "NEW: Global date context state is shared via context/store",
     "steps": [
-      "Step 1: Capture a screenshot",
-      "Step 2: Immediately check disk for file",
-      "Step 3: Verify file exists and is complete",
-      "Step 4: Verify database references valid file path"
+      "Step 1: Open browser dev tools and check for date context state",
+      "Step 2: Navigate to Timeline and select a date",
+      "Step 3: Navigate to Analytics - verify state persists (same date)",
+      "Step 4: Change date in Analytics",
+      "Step 5: Navigate to Reports - verify new date persists"
     ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "Graceful Shutdown - Properly closes sessions and flushes data on exit",
-    "steps": [
-      "Step 1: Start active session with captures",
-      "Step 2: Close application normally",
-      "Step 3: Restart application",
-      "Step 4: Verify session was properly closed",
-      "Step 5: Verify all data was saved correctly"
-    ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "Database Migrations - Supports schema updates across app versions",
-    "steps": [
-      "Step 1: Check for migration files/system",
-      "Step 2: Verify migration version tracking exists",
-      "Step 3: Verify migrations run automatically on startup",
-      "Step 4: Verify schema matches expected version"
-    ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "Data Integrity - Uses transactions and foreign keys for consistency",
-    "steps": [
-      "Step 1: Inspect database schema",
-      "Step 2: Verify foreign key constraints exist",
-      "Step 3: Attempt to create orphan records",
-      "Step 4: Verify constraints prevent invalid data"
-    ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "Daily Statistics - Shows total screenshots, sessions, and active time per day",
-    "steps": [
-      "Step 1: Navigate to Analytics page",
-      "Step 2: Select a day with activity",
-      "Step 3: Verify screenshot count is displayed",
-      "Step 4: Verify session count is displayed",
-      "Step 5: Verify active time is displayed"
-    ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "Top Applications - Displays most-used applications with time spent",
-    "steps": [
-      "Step 1: Navigate to Analytics page",
-      "Step 2: Locate top applications section",
-      "Step 3: Verify application list is displayed",
-      "Step 4: Verify time spent is shown for each app",
-      "Step 5: Verify apps are sorted by usage"
-    ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "Session Count - Tracks number of distinct work sessions per day",
-    "steps": [
-      "Step 1: Create multiple distinct sessions in one day",
-      "Step 2: Navigate to Analytics or Timeline",
-      "Step 3: Verify session count matches actual sessions",
-      "Step 4: Verify count updates when new sessions are added"
-    ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "Active Time Calculation - Calculates working time excluding AFK periods",
-    "steps": [
-      "Step 1: Work actively for a measured period",
-      "Step 2: Go AFK for a measured period",
-      "Step 3: Resume work for another measured period",
-      "Step 4: Check active time statistic",
-      "Step 5: Verify AFK time is excluded from total"
-    ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "Screenshot Count - Tracks total screenshots captured",
-    "steps": [
-      "Step 1: Note current screenshot count",
-      "Step 2: Capture several new screenshots",
-      "Step 3: Refresh statistics",
-      "Step 4: Verify count increased correctly"
-    ],
-    "passes": true
+    "passes": false
   },
   {
     "category": "style",
-    "description": "Dark/Light Theme - Supports system theme preference and manual override",
+    "description": "NEW: Unified header has consistent design across all pages",
     "steps": [
-      "Step 1: Open Settings drawer",
-      "Step 2: Locate theme setting",
-      "Step 3: Switch between dark and light themes",
-      "Step 4: Verify UI updates accordingly",
-      "Step 5: Verify system theme option works"
+      "Step 1: Navigate to Timeline and take screenshot of header",
+      "Step 2: Navigate to Analytics and take screenshot of header",
+      "Step 3: Navigate to Reports and take screenshot of header",
+      "Step 4: Compare screenshots - verify header design is identical",
+      "Step 5: Verify header contains: date picker, arrows, presets, settings, pause/resume"
     ],
-    "passes": true
+    "passes": false
   },
   {
     "category": "style",
-    "description": "Responsive Layout - Adapts to different window sizes",
+    "description": "NEW: Header date picker has clean, accessible design",
     "steps": [
-      "Step 1: Resize window to various sizes",
-      "Step 2: Verify layout adapts appropriately",
-      "Step 3: Test at minimum supported width",
-      "Step 4: Verify no content is cut off or broken"
+      "Step 1: Navigate to Timeline page",
+      "Step 2: Take screenshot of closed date picker in header",
+      "Step 3: Click to open date picker - take screenshot",
+      "Step 4: Verify calendar widget is centered and properly styled",
+      "Step 5: Verify date format is readable (e.g., 'Fri, Jan 10')"
     ],
-    "passes": true
+    "passes": false
   },
   {
     "category": "style",
-    "description": "Loading States - Shows skeleton loaders while data loads",
+    "description": "NEW: Analytics tabs are visually clear and accessible",
     "steps": [
-      "Step 1: Navigate to a data-heavy page",
-      "Step 2: Observe initial load state",
-      "Step 3: Verify skeleton/loading indicators appear",
-      "Step 4: Verify content replaces loaders when ready"
+      "Step 1: Navigate to Analytics page",
+      "Step 2: Take screenshot showing all tabs (Day/Week/Month/Year/Custom)",
+      "Step 3: Verify active tab is visually distinct (underline, color, etc.)",
+      "Step 4: Click different tabs - verify smooth transition",
+      "Step 5: Verify tab labels are readable and well-spaced"
     ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "Error Handling - Displays user-friendly error messages",
-    "steps": [
-      "Step 1: Trigger an error condition (e.g., invalid input)",
-      "Step 2: Observe error display",
-      "Step 3: Verify message is user-friendly (not technical)",
-      "Step 4: Verify error doesn't crash the application"
-    ],
-    "passes": true
+    "passes": false
   },
   {
     "category": "style",
-    "description": "Toast Notifications - Provides feedback for user actions",
+    "description": "NEW: Charts have appropriate sizing and spacing for different timeframes",
     "steps": [
-      "Step 1: Perform an action (e.g., save settings)",
-      "Step 2: Observe toast notification appears",
-      "Step 3: Verify toast shows relevant message",
-      "Step 4: Verify toast dismisses automatically or manually"
+      "Step 1: Navigate to Analytics Day tab - take screenshot of hourly chart",
+      "Step 2: Switch to Week tab - take screenshot of daily chart",
+      "Step 3: Switch to Month tab - take screenshot of daily chart",
+      "Step 4: Verify bars/elements are appropriately sized (not too crowded)",
+      "Step 5: Verify axis labels and legends are readable"
     ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "System Tray Icon - Runs in background with system tray presence",
-    "steps": [
-      "Step 1: Launch application",
-      "Step 2: Verify system tray icon appears",
-      "Step 3: Close main window",
-      "Step 4: Verify app continues running in tray"
-    ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "Tray Menu - Quick access to common actions from tray icon",
-    "steps": [
-      "Step 1: Right-click system tray icon",
-      "Step 2: Verify context menu appears",
-      "Step 3: Verify common actions are available (pause, settings, quit)",
-      "Step 4: Test menu actions work correctly"
-    ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "Auto-Start Option - Option to launch app on system boot",
-    "steps": [
-      "Step 1: Open Settings drawer",
-      "Step 2: Locate auto-start setting",
-      "Step 3: Enable auto-start",
-      "Step 4: Restart system",
-      "Step 5: Verify app launches automatically"
-    ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "Background Operation - Continues tracking when main window is closed",
-    "steps": [
-      "Step 1: Start capture with main window open",
-      "Step 2: Close main window (not quit)",
-      "Step 3: Continue working on computer",
-      "Step 4: Reopen main window",
-      "Step 5: Verify screenshots were captured while window was closed"
-    ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "Daemon Architecture - Separate tracking daemon from UI for reliability",
-    "steps": [
-      "Step 1: Check running processes",
-      "Step 2: Verify separate daemon process exists",
-      "Step 3: Close UI window",
-      "Step 4: Verify daemon continues running",
-      "Step 5: Verify capture continues without UI"
-    ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "Shell Command Tracking - Records commands executed in terminal/shell",
-    "steps": [
-      "Step 1: Enable shell tracking in settings",
-      "Step 2: Execute several commands in terminal",
-      "Step 3: View session details",
-      "Step 4: Verify commands are recorded with timestamps"
-    ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "Git Activity Tracking - Tracks commits, branches, and repository activity",
-    "steps": [
-      "Step 1: Register a git repository in settings",
-      "Step 2: Make commits in the repository",
-      "Step 3: View session details",
-      "Step 4: Verify git commits are recorded"
-    ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "File Event Tracking - Monitors file creation, modification, and deletion",
-    "steps": [
-      "Step 1: Configure file watch directories",
-      "Step 2: Create, modify, and delete files in watched directory",
-      "Step 3: View session details",
-      "Step 4: Verify file events are recorded"
-    ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "Browser History Tracking - Records visited URLs and page titles",
-    "steps": [
-      "Step 1: Enable browser tracking in settings",
-      "Step 2: Browse several websites",
-      "Step 3: View session details",
-      "Step 4: Verify URLs and page titles are recorded"
-    ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "Multi-Shell Support - Supports bash, zsh, fish, and PowerShell history",
-    "steps": [
-      "Step 1: Configure shell type in settings",
-      "Step 2: Execute commands in configured shell",
-      "Step 3: Verify commands are captured from correct history file",
-      "Step 4: Test with different shell types"
-    ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "Multi-Browser Support - Supports Chrome, Firefox, Safari, Edge, Brave",
-    "steps": [
-      "Step 1: Configure browser selection in settings",
-      "Step 2: Browse with selected browser",
-      "Step 3: Verify history is captured",
-      "Step 4: Test with multiple browsers"
-    ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "Git Repository Registration - Manually add repositories to track",
-    "steps": [
-      "Step 1: Open settings",
-      "Step 2: Navigate to git repository settings",
-      "Step 3: Add a repository path",
-      "Step 4: Verify repository appears in tracked list"
-    ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "File Watch Directories - Configure which directories to monitor for file events",
-    "steps": [
-      "Step 1: Open settings",
-      "Step 2: Navigate to file tracking settings",
-      "Step 3: Add directories to watch",
-      "Step 4: Verify directories are monitored"
-    ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "Sensitive Command Filtering - Automatically excludes commands containing passwords/tokens",
-    "steps": [
-      "Step 1: Execute command with sensitive data (e.g., export TOKEN=xxx)",
-      "Step 2: View shell command history in session",
-      "Step 3: Verify sensitive commands are filtered or redacted"
-    ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "Navigation Command Filtering - Option to exclude trivial commands (cd, ls, pwd)",
-    "steps": [
-      "Step 1: Enable navigation command filtering",
-      "Step 2: Execute trivial commands (cd, ls, pwd)",
-      "Step 3: View shell command history",
-      "Step 4: Verify trivial commands are excluded"
-    ],
-    "passes": true
+    "passes": false
   },
   {
     "category": "style",
-    "description": "Hourly Activity Chart - Visualizes activity distribution across hours of day",
-    "steps": [
-      "Step 1: Navigate to Analytics page",
-      "Step 2: Locate hourly activity chart",
-      "Step 3: Verify chart shows 24-hour breakdown",
-      "Step 4: Verify activity levels are accurately represented"
-    ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "Weekly Statistics View - Aggregates stats across a week",
-    "steps": [
-      "Step 1: Navigate to Analytics page",
-      "Step 2: Select weekly view or time range",
-      "Step 3: Verify stats are aggregated for 7 days",
-      "Step 4: Verify totals are correct"
-    ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "Monthly Statistics View - Aggregates stats across a month",
-    "steps": [
-      "Step 1: Navigate to Analytics page",
-      "Step 2: Select monthly view or time range",
-      "Step 3: Verify stats are aggregated for full month",
-      "Step 4: Verify totals are correct"
-    ],
-    "passes": true
-  },
-  {
-    "category": "style",
-    "description": "App Usage Pie Chart - Visual breakdown of time by application",
-    "steps": [
-      "Step 1: Navigate to Analytics page",
-      "Step 2: Locate app usage pie chart",
-      "Step 3: Verify chart shows proportional app usage",
-      "Step 4: Verify colors and labels are clear"
-    ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "App Usage Table - Sortable list of applications with durations",
-    "steps": [
-      "Step 1: Navigate to Analytics page",
-      "Step 2: Locate app usage table",
-      "Step 3: Verify table shows apps with durations",
-      "Step 4: Test sorting by different columns"
-    ],
-    "passes": true
-  },
-  {
-    "category": "style",
-    "description": "Activity Heatmap - 7x24 grid showing activity patterns by day/hour",
-    "steps": [
-      "Step 1: Navigate to Analytics page",
-      "Step 2: Locate activity heatmap",
-      "Step 3: Verify grid shows days vs hours",
-      "Step 4: Verify color intensity reflects activity level"
-    ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "Data Source Statistics - Aggregate stats for shell, git, files, browser",
-    "steps": [
-      "Step 1: Navigate to Analytics page",
-      "Step 2: Locate data source statistics section",
-      "Step 3: Verify counts for each data source type",
-      "Step 4: Verify stats update with new data"
-    ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "Top Shell Commands - Most frequently used commands",
-    "steps": [
-      "Step 1: Navigate to Analytics page",
-      "Step 2: Locate top shell commands section",
-      "Step 3: Verify commands are listed by frequency",
-      "Step 4: Verify count is accurate"
-    ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "Top Git Repositories - Most active repositories",
-    "steps": [
-      "Step 1: Navigate to Analytics page",
-      "Step 2: Locate top repositories section",
-      "Step 3: Verify repos are listed by activity",
-      "Step 4: Verify commit counts are accurate"
-    ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "Top Domains Visited - Most frequently visited websites",
-    "steps": [
-      "Step 1: Navigate to Analytics page",
-      "Step 2: Locate top domains section",
-      "Step 3: Verify domains are listed by visit count",
-      "Step 4: Verify counts are accurate"
-    ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "Productivity Score - Calculates daily productivity rating (1-5 scale)",
-    "steps": [
-      "Step 1: Navigate to Analytics page",
-      "Step 2: Locate productivity score display",
-      "Step 3: Verify score is calculated and displayed",
-      "Step 4: Verify score reflects actual productive vs distracting time"
-    ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "App Categorization - Classifies apps as productive/neutral/distracting",
-    "steps": [
-      "Step 1: Open Settings or Analytics",
-      "Step 2: View app categories",
-      "Step 3: Verify apps are categorized",
-      "Step 4: Verify categories can be customized"
-    ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "Productive Time Tracking - Tracks time spent in productive apps",
-    "steps": [
-      "Step 1: Use apps categorized as productive",
-      "Step 2: Navigate to Analytics page",
-      "Step 3: Locate productive time metric",
-      "Step 4: Verify time matches actual usage"
-    ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "Distraction Time Tracking - Tracks time spent in distracting apps",
-    "steps": [
-      "Step 1: Use apps categorized as distracting",
-      "Step 2: Navigate to Analytics page",
-      "Step 3: Locate distraction time metric",
-      "Step 4: Verify time matches actual usage"
-    ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "Focus Distribution - Analyzes context-switching patterns",
-    "steps": [
-      "Step 1: Work with multiple apps, switching frequently",
-      "Step 2: Navigate to Analytics page",
-      "Step 3: Locate focus distribution analysis",
-      "Step 4: Verify context switches are counted accurately"
-    ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "Top Windows Analysis - Tracks most-used window titles",
-    "steps": [
-      "Step 1: Navigate to Analytics page",
-      "Step 2: Locate top windows section",
-      "Step 3: Verify window titles are listed by usage",
-      "Step 4: Verify durations are accurate"
-    ],
-    "passes": true
-  },
-  {
-    "category": "style",
-    "description": "Time Distribution Chart - Shows app usage patterns throughout the day",
-    "steps": [
-      "Step 1: Navigate to Analytics page",
-      "Step 2: Locate time distribution chart",
-      "Step 3: Verify chart shows usage over time",
-      "Step 4: Verify different apps are distinguishable"
-    ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "Activity Tags Analysis - Aggregates and visualizes session tags",
-    "steps": [
-      "Step 1: Navigate to Analytics page",
-      "Step 2: Locate tags analysis section",
-      "Step 3: Verify tags are aggregated with counts",
-      "Step 4: Verify visualization is clear"
-    ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "Natural Language Date Parsing - Parses inputs like 'yesterday', 'last week'",
-    "steps": [
-      "Step 1: Navigate to Reports page",
-      "Step 2: Enter natural language date (e.g., 'yesterday')",
-      "Step 3: Verify date is correctly parsed",
-      "Step 4: Test various phrases ('last week', 'past 3 days')"
-    ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "Summary Report Type - Generates high-level activity overview",
-    "steps": [
-      "Step 1: Navigate to Reports page",
-      "Step 2: Select Summary report type",
-      "Step 3: Generate report",
-      "Step 4: Verify report contains high-level overview"
-    ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "Detailed Report Type - Generates comprehensive report with all metrics",
-    "steps": [
-      "Step 1: Navigate to Reports page",
-      "Step 2: Select Detailed report type",
-      "Step 3: Generate report",
-      "Step 4: Verify report contains comprehensive metrics"
-    ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "Standup Report Type - Generates team standup-formatted report",
-    "steps": [
-      "Step 1: Navigate to Reports page",
-      "Step 2: Select Standup report type",
-      "Step 3: Generate report",
-      "Step 4: Verify report follows standup format (done, doing, blockers)"
-    ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "Markdown Export - Exports reports as Markdown files",
-    "steps": [
-      "Step 1: Generate a report",
-      "Step 2: Select Markdown export option",
-      "Step 3: Download/save the file",
-      "Step 4: Verify file is valid Markdown"
-    ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "HTML Export - Exports reports as styled HTML",
-    "steps": [
-      "Step 1: Generate a report",
-      "Step 2: Select HTML export option",
-      "Step 3: Download/save the file",
-      "Step 4: Verify file is valid HTML with styling"
-    ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "PDF Export - Exports reports as PDF documents",
-    "steps": [
-      "Step 1: Generate a report",
-      "Step 2: Select PDF export option",
-      "Step 3: Download/save the file",
-      "Step 4: Verify file is valid PDF"
-    ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "JSON Export - Exports reports as structured JSON",
-    "steps": [
-      "Step 1: Generate a report",
-      "Step 2: Select JSON export option",
-      "Step 3: Download/save the file",
-      "Step 4: Verify file is valid JSON with expected structure"
-    ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "Report History - View and manage previously generated reports",
-    "steps": [
-      "Step 1: Generate several reports",
-      "Step 2: Navigate to report history",
-      "Step 3: Verify previous reports are listed",
-      "Step 4: Verify reports can be viewed/deleted"
-    ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "Quick Report Presets - One-click generation for common report types",
-    "steps": [
-      "Step 1: Navigate to Reports page",
-      "Step 2: Locate quick preset buttons",
-      "Step 3: Click a preset (e.g., 'Yesterday Summary')",
-      "Step 4: Verify report generates with correct parameters"
-    ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "Session Detail View - Dedicated page for exploring a single session",
+    "description": "NEW: Navigation preset buttons have clear hover and active states",
     "steps": [
       "Step 1: Navigate to Timeline",
-      "Step 2: Click on a session to open details",
-      "Step 3: Verify dedicated detail page opens",
-      "Step 4: Verify all session information is displayed"
+      "Step 2: Hover over 'Today' button - verify hover state",
+      "Step 3: Verify active button (current selection) has distinct style",
+      "Step 4: Hover over 'Yesterday' button - verify hover state",
+      "Step 5: Take screenshot showing preset buttons in various states"
     ],
-    "passes": true
+    "passes": false
   },
   {
     "category": "style",
-    "description": "Session Screenshots Gallery - Browse all screenshots from a session",
+    "description": "NEW: Timeline layout is responsive and usable on narrow viewports (1024px)",
     "steps": [
-      "Step 1: Open session detail view",
-      "Step 2: Locate screenshots gallery",
-      "Step 3: Verify all session screenshots are displayed",
-      "Step 4: Verify gallery is navigable"
+      "Step 1: Resize browser window to 1024px width",
+      "Step 2: Navigate to Timeline page",
+      "Step 3: Verify session list and detail panel both visible",
+      "Step 4: Verify header elements don't wrap or overflow",
+      "Step 5: Take screenshot showing responsive layout"
     ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "Activity Log Table - View all focus events within a session",
-    "steps": [
-      "Step 1: Open session detail view",
-      "Step 2: Locate activity log table",
-      "Step 3: Verify focus events are listed chronologically",
-      "Step 4: Verify timestamps and durations are shown"
-    ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "Session Context - See shell commands, git commits, files changed during session",
-    "steps": [
-      "Step 1: Open session detail view",
-      "Step 2: Locate context sections",
-      "Step 3: Verify shell commands are shown if any",
-      "Step 4: Verify git commits and file changes are shown"
-    ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "Session Deletion - Remove sessions and associated data",
-    "steps": [
-      "Step 1: Open session detail view",
-      "Step 2: Click delete session button",
-      "Step 3: Confirm deletion",
-      "Step 4: Verify session is removed from timeline",
-      "Step 5: Verify associated screenshots are deleted"
-    ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "Screenshot Deletion - Remove individual screenshots",
-    "steps": [
-      "Step 1: Open session detail view",
-      "Step 2: Select a screenshot",
-      "Step 3: Click delete button",
-      "Step 4: Verify screenshot is removed from session"
-    ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "Keyboard Navigation - Navigate timeline with keyboard shortcuts (j/k, arrows)",
-    "steps": [
-      "Step 1: Navigate to Timeline view",
-      "Step 2: Press j/k or arrow keys",
-      "Step 3: Verify selection moves between sessions",
-      "Step 4: Verify Enter opens selected session"
-    ],
-    "passes": true
+    "passes": false
   },
   {
     "category": "style",
-    "description": "Image Lightbox - Full-screen screenshot viewer with navigation",
+    "description": "NEW: Analytics page is responsive across different viewport sizes",
     "steps": [
-      "Step 1: Click on a screenshot thumbnail",
-      "Step 2: Verify lightbox opens with full-size image",
-      "Step 3: Verify navigation arrows work",
-      "Step 4: Verify close button works"
+      "Step 1: Resize browser to 1920px width - take screenshot of Analytics",
+      "Step 2: Resize to 1366px width - verify layout adapts gracefully",
+      "Step 3: Resize to 1024px width - verify tabs and charts remain usable",
+      "Step 4: Verify no horizontal scrolling required",
+      "Step 5: Verify all interactive elements remain accessible"
     ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "Tag Filtering - Filter sessions by activity tags",
-    "steps": [
-      "Step 1: Navigate to Timeline view",
-      "Step 2: Locate tag filter",
-      "Step 3: Select a tag to filter by",
-      "Step 4: Verify only sessions with that tag are shown"
-    ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "Time Period Filtering - Filter by morning/afternoon/evening",
-    "steps": [
-      "Step 1: Navigate to Timeline view",
-      "Step 2: Locate time period filter",
-      "Step 3: Select a time period",
-      "Step 4: Verify only sessions from that period are shown"
-    ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "App Filtering - Filter sessions by application",
-    "steps": [
-      "Step 1: Navigate to Timeline view",
-      "Step 2: Locate app filter",
-      "Step 3: Select an application",
-      "Step 4: Verify only sessions with that app are shown"
-    ],
-    "passes": true
+    "passes": false
   },
   {
     "category": "style",
-    "description": "Collapsible Sections - Expand/collapse detail sections",
+    "description": "NEW: Reports page integrates cleanly with new header design",
     "steps": [
-      "Step 1: Navigate to a page with collapsible sections",
-      "Step 2: Click section header to collapse",
-      "Step 3: Verify section collapses with animation",
-      "Step 4: Click again to expand"
+      "Step 1: Navigate to Reports page",
+      "Step 2: Take screenshot showing header and reports content",
+      "Step 3: Verify time range input doesn't conflict with header date picker",
+      "Step 4: Verify layout is balanced and not cluttered",
+      "Step 5: Verify report output preview is properly positioned"
     ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "External Ollama Support - Connect to external Ollama server for inference",
-    "steps": [
-      "Step 1: Open Settings",
-      "Step 2: Navigate to AI configuration",
-      "Step 3: Enter Ollama server URL",
-      "Step 4: Test connection",
-      "Step 5: Verify summaries use external Ollama"
-    ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "Cloud API Support - Option to use Anthropic/OpenAI APIs for summaries",
-    "steps": [
-      "Step 1: Open Settings",
-      "Step 2: Navigate to AI configuration",
-      "Step 3: Select cloud provider",
-      "Step 4: Enter API key",
-      "Step 5: Verify summaries use cloud API"
-    ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "Model Selection - Choose which AI model to use for summaries",
-    "steps": [
-      "Step 1: Open Settings",
-      "Step 2: Navigate to AI configuration",
-      "Step 3: View available models",
-      "Step 4: Select a different model",
-      "Step 5: Verify new model is used for summaries"
-    ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "Model Download Manager - Download and manage AI models from UI",
-    "steps": [
-      "Step 1: Open Settings",
-      "Step 2: Navigate to model management",
-      "Step 3: View available models for download",
-      "Step 4: Download a model",
-      "Step 5: Verify model appears in selection list"
-    ],
-    "passes": true
+    "passes": false
   },
   {
     "category": "style",
-    "description": "Download Progress Indicator - Shows progress when downloading models",
+    "description": "NEW: Drill-down interactions have clear visual feedback",
     "steps": [
-      "Step 1: Start a model download",
-      "Step 2: Observe progress indicator",
-      "Step 3: Verify progress updates during download",
-      "Step 4: Verify completion is indicated"
+      "Step 1: Navigate to Analytics Week tab",
+      "Step 2: Hover over a chart bar - verify hover state (cursor, highlight)",
+      "Step 3: Click on the bar - verify visual feedback during navigation",
+      "Step 4: Verify smooth transition to Timeline page",
+      "Step 5: Take screenshots showing hover and click states"
     ],
-    "passes": true
+    "passes": false
   },
   {
     "category": "style",
-    "description": "Inference Status Display - Shows whether AI is available and which model is active",
+    "description": "NEW: Empty states are informative for new timeframes (e.g., future dates blocked)",
     "steps": [
-      "Step 1: View AI status indicator in UI",
-      "Step 2: Verify it shows availability status",
-      "Step 3: Verify active model name is displayed",
-      "Step 4: Verify status updates when model changes"
+      "Step 1: Navigate to Timeline for a date with no data",
+      "Step 2: Verify empty state message is clear and helpful",
+      "Step 3: Navigate to Analytics Year tab with sparse data",
+      "Step 4: Verify chart gracefully handles missing data (empty bars, labels)",
+      "Step 5: Take screenshots of various empty states"
     ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "Custom API Endpoints - Configure custom API endpoints for cloud providers",
-    "steps": [
-      "Step 1: Open Settings",
-      "Step 2: Navigate to AI configuration",
-      "Step 3: Enter custom API endpoint URL",
-      "Step 4: Save and test connection",
-      "Step 5: Verify requests go to custom endpoint"
-    ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "API Key Management - Securely store and manage API keys",
-    "steps": [
-      "Step 1: Open Settings",
-      "Step 2: Navigate to API key settings",
-      "Step 3: Add an API key",
-      "Step 4: Verify key is stored securely (masked in UI)",
-      "Step 5: Verify key can be updated or deleted"
-    ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "Inference Time Tracking - Records how long each summary took to generate",
-    "steps": [
-      "Step 1: Generate a session summary",
-      "Step 2: View summary details",
-      "Step 3: Verify inference time is displayed",
-      "Step 4: Verify time is reasonable for model used"
-    ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "Model Attribution - Tracks which model generated each summary",
-    "steps": [
-      "Step 1: Generate summaries with different models",
-      "Step 2: View summary details",
-      "Step 3: Verify model name is attributed to each summary"
-    ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "Screenshot Quality Presets - Quick selection (low/medium/high) for quality",
-    "steps": [
-      "Step 1: Open Settings",
-      "Step 2: Navigate to capture settings",
-      "Step 3: Select quality preset",
-      "Step 4: Capture screenshots",
-      "Step 5: Verify file sizes match preset expectations"
-    ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "Thumbnail Generation - Creates small thumbnails for faster UI loading",
-    "steps": [
-      "Step 1: Capture screenshots",
-      "Step 2: Check storage directory for thumbnails",
-      "Step 3: Verify thumbnails are smaller than originals",
-      "Step 4: Verify UI loads thumbnails quickly"
-    ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "WebP Format - Uses modern WebP format for efficient storage",
-    "steps": [
-      "Step 1: Capture screenshots",
-      "Step 2: Check file format of saved screenshots",
-      "Step 3: Verify files are in WebP format",
-      "Step 4: Verify quality is acceptable"
-    ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "Monitor Selection - Choose which monitor to capture on multi-monitor setups",
-    "steps": [
-      "Step 1: Connect multiple monitors",
-      "Step 2: Open Settings",
-      "Step 3: Navigate to capture settings",
-      "Step 4: Select specific monitor",
-      "Step 5: Verify captures are from selected monitor"
-    ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "Window Geometry Capture - Records window position and size",
-    "steps": [
-      "Step 1: Capture screenshot with active window",
-      "Step 2: View screenshot metadata",
-      "Step 3: Verify window x, y, width, height are recorded"
-    ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "Monitor Info Capture - Records which monitor the window was on",
-    "steps": [
-      "Step 1: Use multiple monitors",
-      "Step 2: Capture screenshots from different monitors",
-      "Step 3: View screenshot metadata",
-      "Step 4: Verify monitor identifier is recorded"
-    ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "Process ID Capture - Records the process ID of active window",
-    "steps": [
-      "Step 1: Capture screenshot with active window",
-      "Step 2: View screenshot metadata",
-      "Step 3: Verify process ID is recorded",
-      "Step 4: Verify PID matches actual process"
-    ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "Window Class Capture - Records window class for better app identification",
-    "steps": [
-      "Step 1: Capture screenshot with active window",
-      "Step 2: View screenshot metadata",
-      "Step 3: Verify window class is recorded"
-    ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "Force Capture Button - Manually trigger an immediate screenshot",
-    "steps": [
-      "Step 1: Locate force capture button in UI or tray",
-      "Step 2: Click the button",
-      "Step 3: Verify screenshot is captured immediately",
-      "Step 4: Verify screenshot appears in timeline"
-    ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "Capture Pause/Resume - Temporarily pause capture without stopping daemon",
-    "steps": [
-      "Step 1: Click pause capture button",
-      "Step 2: Verify no new screenshots are taken",
-      "Step 3: Verify daemon is still running",
-      "Step 4: Click resume",
-      "Step 5: Verify captures resume"
-    ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "Shell History Path Override - Custom path to shell history file",
-    "steps": [
-      "Step 1: Open Settings",
-      "Step 2: Navigate to shell tracking",
-      "Step 3: Enter custom history file path",
-      "Step 4: Verify commands are read from custom path"
-    ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "Shell Exclude Patterns - Regex patterns for commands to exclude",
-    "steps": [
-      "Step 1: Open Settings",
-      "Step 2: Configure exclude patterns",
-      "Step 3: Execute commands matching patterns",
-      "Step 4: Verify matching commands are excluded"
-    ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "Git Search Paths - Directories to search for git repositories",
-    "steps": [
-      "Step 1: Open Settings",
-      "Step 2: Configure git search paths",
-      "Step 3: Run repository discovery",
-      "Step 4: Verify repos in configured paths are found"
-    ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "Git Auto-Discovery - Automatically finds git repos in specified paths",
-    "steps": [
-      "Step 1: Configure git search paths",
-      "Step 2: Enable auto-discovery",
-      "Step 3: Verify repositories are automatically detected",
-      "Step 4: Verify new repos are tracked"
-    ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "Git Depth Limit - Limits how deep to search for repositories",
-    "steps": [
-      "Step 1: Open Settings",
-      "Step 2: Configure git search depth",
-      "Step 3: Create nested repo structure",
-      "Step 4: Verify search respects depth limit"
-    ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "File Watch Patterns - Include/exclude patterns for file tracking",
-    "steps": [
-      "Step 1: Open Settings",
-      "Step 2: Configure file include/exclude patterns",
-      "Step 3: Create files matching and not matching patterns",
-      "Step 4: Verify only matching files are tracked"
-    ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "File Extension Filtering - Filter file events by extension",
-    "steps": [
-      "Step 1: Open Settings",
-      "Step 2: Configure allowed file extensions",
-      "Step 3: Create files with various extensions",
-      "Step 4: Verify only configured extensions are tracked"
-    ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "Browser Selection - Choose which browsers to track",
-    "steps": [
-      "Step 1: Open Settings",
-      "Step 2: Navigate to browser tracking",
-      "Step 3: Enable/disable specific browsers",
-      "Step 4: Verify only selected browsers are tracked"
-    ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "Browser History Limit - Limits how far back to read browser history",
-    "steps": [
-      "Step 1: Open Settings",
-      "Step 2: Configure history limit (e.g., 7 days)",
-      "Step 3: Verify only recent history within limit is read"
-    ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "Domain Exclusion - Excludes specific domains from browser tracking",
-    "steps": [
-      "Step 1: Open Settings",
-      "Step 2: Add domains to exclusion list",
-      "Step 3: Visit excluded domains",
-      "Step 4: Verify visits to excluded domains are not tracked"
-    ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "Storage Statistics - Shows database and screenshot storage usage",
-    "steps": [
-      "Step 1: Open Settings or About page",
-      "Step 2: Locate storage statistics section",
-      "Step 3: Verify database size is displayed",
-      "Step 4: Verify screenshot storage size is displayed"
-    ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "Data Directory Location - Displays and optionally changes data location",
-    "steps": [
-      "Step 1: Open Settings",
-      "Step 2: Locate data directory setting",
-      "Step 3: Verify current path is displayed",
-      "Step 4: Test changing to a different location if supported"
-    ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "Open Data Directory - Quick access to open data folder in file manager",
-    "steps": [
-      "Step 1: Open Settings",
-      "Step 2: Locate 'Open Data Directory' button",
-      "Step 3: Click button",
-      "Step 4: Verify file manager opens to correct directory"
-    ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "Database Optimization - Periodic VACUUM and optimization",
-    "steps": [
-      "Step 1: Use app to generate significant data",
-      "Step 2: Trigger database optimization",
-      "Step 3: Verify database size is reduced after optimization",
-      "Step 4: Verify app continues to function correctly"
-    ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "Index Optimization - Proper indexing for fast queries",
-    "steps": [
-      "Step 1: Generate large dataset",
-      "Step 2: Perform various queries",
-      "Step 3: Verify query times are within acceptable limits",
-      "Step 4: Inspect database indexes"
-    ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "Lazy Image Loading - Loads images on-demand for better performance",
-    "steps": [
-      "Step 1: Navigate to timeline with many screenshots",
-      "Step 2: Observe image loading behavior",
-      "Step 3: Scroll to load more images",
-      "Step 4: Verify images load as they come into view"
-    ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "Pagination - Paginates large result sets",
-    "steps": [
-      "Step 1: Generate large dataset",
-      "Step 2: Navigate to timeline or analytics",
-      "Step 3: Verify pagination controls appear",
-      "Step 4: Test navigating between pages"
-    ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "Query Caching - Caches frequent queries with TanStack Query",
-    "steps": [
-      "Step 1: Navigate to a data page",
-      "Step 2: Navigate away and back",
-      "Step 3: Verify data loads instantly from cache",
-      "Step 4: Verify stale data is refreshed in background"
-    ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "Background Refresh - Refreshes data in background while viewing",
-    "steps": [
-      "Step 1: View a page with data",
-      "Step 2: Generate new data in background",
-      "Step 3: Observe data updates without manual refresh",
-      "Step 4: Verify UI updates smoothly"
-    ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "Stale Time Configuration - Configures how long cached data is considered fresh",
-    "steps": [
-      "Step 1: Check cache behavior with default settings",
-      "Step 2: Modify stale time if configurable",
-      "Step 3: Verify cache respects configured stale time"
-    ],
-    "passes": true
-  },
-  {
-    "category": "style",
-    "description": "Hour Groups - Groups screenshots by hour within day view",
-    "steps": [
-      "Step 1: Navigate to Timeline with day view",
-      "Step 2: Observe screenshot grouping",
-      "Step 3: Verify screenshots are grouped by hour",
-      "Step 4: Verify hour headers are displayed"
-    ],
-    "passes": true
-  },
-  {
-    "category": "style",
-    "description": "Timeline Bands - Visual representation of sessions across hours",
-    "steps": [
-      "Step 1: Navigate to Timeline view",
-      "Step 2: Locate timeline band visualization",
-      "Step 3: Verify sessions are shown as bands across time",
-      "Step 4: Verify band lengths reflect session duration"
-    ],
-    "passes": true
-  },
-  {
-    "category": "style",
-    "description": "Session Duration Display - Shows duration in human-readable format",
-    "steps": [
-      "Step 1: Navigate to Timeline view",
-      "Step 2: View session cards",
-      "Step 3: Verify duration is displayed (e.g., '1h 23m')",
-      "Step 4: Verify format is human-readable"
-    ],
-    "passes": true
-  },
-  {
-    "category": "style",
-    "description": "Time Range Display - Shows session start/end times",
-    "steps": [
-      "Step 1: Navigate to Timeline view",
-      "Step 2: View session cards",
-      "Step 3: Verify start and end times are displayed",
-      "Step 4: Verify times are in user's locale format"
-    ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "Top Apps in Session - Shows most-used apps per session",
-    "steps": [
-      "Step 1: View session card on Timeline",
-      "Step 2: Locate top apps indicator",
-      "Step 3: Verify apps are listed",
-      "Step 4: Verify apps match actual session usage"
-    ],
-    "passes": true
-  },
-  {
-    "category": "style",
-    "description": "Data Source Indicators - Shows which data sources have data for session",
-    "steps": [
-      "Step 1: View session card on Timeline",
-      "Step 2: Locate data source indicators",
-      "Step 3: Verify icons for shell, git, files, browser are shown",
-      "Step 4: Verify only sources with data are highlighted"
-    ],
-    "passes": true
-  },
-  {
-    "category": "style",
-    "description": "Empty State Handling - Friendly messages when no data exists",
-    "steps": [
-      "Step 1: Navigate to a page with no data",
-      "Step 2: Observe empty state display",
-      "Step 3: Verify friendly message is shown",
-      "Step 4: Verify helpful action is suggested"
-    ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "Date Range Selection - Selects custom date ranges for views",
-    "steps": [
-      "Step 1: Navigate to Analytics or Timeline",
-      "Step 2: Locate date range selector",
-      "Step 3: Select custom start and end dates",
-      "Step 4: Verify data is filtered to selected range"
-    ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "Quick Date Jumps - Jumps to specific dates quickly",
-    "steps": [
-      "Step 1: Navigate to Timeline",
-      "Step 2: Locate quick date jump controls",
-      "Step 3: Use preset buttons (today, yesterday, this week)",
-      "Step 4: Verify view jumps to correct date"
-    ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "Calendar Month Navigation - Navigates between months in calendar view",
-    "steps": [
-      "Step 1: Navigate to Calendar or Analytics view",
-      "Step 2: Locate calendar component",
-      "Step 3: Click previous/next month buttons",
-      "Step 4: Verify calendar navigates correctly"
-    ],
-    "passes": true
+    "passes": false
   }
 ]

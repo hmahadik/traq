@@ -23,6 +23,7 @@ import {
 import {
   useDailyStats,
   useHourlyActivity,
+  useHourlyActivityHeatmap,
   useAppUsage,
   useAppUsageRange,
   useDataSourceStats,
@@ -48,7 +49,11 @@ import { toast } from 'sonner';
 type ViewMode = 'day' | 'week' | 'month' | 'custom';
 
 function getDateString(date: Date): string {
-  return date.toISOString().split('T')[0];
+  // Use local date components to avoid timezone issues
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 function addDays(date: Date, days: number): Date {
@@ -88,6 +93,7 @@ export function AnalyticsPage() {
   // Day view data
   const { data: stats, isLoading: statsLoading } = useDailyStats(dateStr);
   const { data: hourlyActivity, isLoading: hourlyLoading } = useHourlyActivity(dateStr);
+  const { data: heatmapData, isLoading: heatmapLoading } = useHourlyActivityHeatmap();
   const { data: appUsage, isLoading: appUsageLoading } = useAppUsage(dateStr);
   const { data: dataSourceStats, isLoading: dataSourcesLoading } = useDataSourceStats(dateStr);
   const { data: productivityScore, isLoading: productivityLoading } = useProductivityScore(dateStr);
@@ -179,7 +185,13 @@ export function AnalyticsPage() {
     }
   };
 
-  const formattedDate = selectedDate.toLocaleDateString('en-US', {
+  // Short format for mobile, full format for larger screens
+  const formattedDateShort = selectedDate.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
+  const formattedDateFull = selectedDate.toLocaleDateString('en-US', {
     weekday: 'long',
     year: 'numeric',
     month: 'long',
@@ -193,19 +205,24 @@ export function AnalyticsPage() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Analytics</h1>
           <p className="text-muted-foreground">
-            {viewMode === 'custom'
-              ? `${customRange.start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${customRange.end.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`
-              : formattedDate}
+            {viewMode === 'custom' ? (
+              `${customRange.start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${customRange.end.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`
+            ) : (
+              <>
+                <span className="sm:hidden">{formattedDateShort}</span>
+                <span className="hidden sm:inline">{formattedDateFull}</span>
+              </>
+            )}
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           {/* View Mode Toggle */}
           <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as ViewMode)}>
-            <TabsList className="h-9">
-              <TabsTrigger value="day" className="text-xs px-3">Day</TabsTrigger>
-              <TabsTrigger value="week" className="text-xs px-3">Week</TabsTrigger>
-              <TabsTrigger value="month" className="text-xs px-3">Month</TabsTrigger>
-              <TabsTrigger value="custom" className="text-xs px-3">Custom</TabsTrigger>
+            <TabsList className="h-10">
+              <TabsTrigger value="day" className="text-sm sm:px-3">Day</TabsTrigger>
+              <TabsTrigger value="week" className="text-sm sm:px-3">Week</TabsTrigger>
+              <TabsTrigger value="month" className="text-sm sm:px-3">Month</TabsTrigger>
+              <TabsTrigger value="custom" className="text-sm sm:px-3">Custom</TabsTrigger>
             </TabsList>
           </Tabs>
 
@@ -219,9 +236,9 @@ export function AnalyticsPage() {
                 value={selectedDate}
                 onChange={setSelectedDate}
                 trigger={
-                  <Button variant="outline" className="gap-2">
+                  <Button variant="outline" size="sm" className="gap-1 sm:gap-2 px-2 sm:px-3">
                     <Calendar className="h-4 w-4" />
-                    {isToday ? 'Today' : selectedDate.toLocaleDateString()}
+                    <span className="hidden sm:inline">{isToday ? 'Today' : selectedDate.toLocaleDateString()}</span>
                   </Button>
                 }
               />
@@ -238,6 +255,7 @@ export function AnalyticsPage() {
                   variant="ghost"
                   size="sm"
                   onClick={() => setSelectedDate(new Date())}
+                  className="hidden sm:flex"
                 >
                   Today
                 </Button>
@@ -254,7 +272,7 @@ export function AnalyticsPage() {
             />
           )}
 
-          {/* Regenerate Button */}
+          {/* Regenerate Button - icon only on mobile */}
           <Button
             variant="outline"
             size="sm"
@@ -263,15 +281,15 @@ export function AnalyticsPage() {
             disabled={isRegenerating}
           >
             <RefreshCw className={`h-4 w-4 ${isRegenerating ? 'animate-spin' : ''}`} />
-            {isRegenerating ? 'Regenerating...' : 'Regenerate'}
+            <span className="hidden sm:inline">{isRegenerating ? 'Regenerating...' : 'Regenerate'}</span>
           </Button>
 
-          {/* Export Button */}
+          {/* Export Button - icon only on mobile */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" size="sm" className="gap-2">
                 <Download className="h-4 w-4" />
-                Export
+                <span className="hidden sm:inline">Export</span>
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
@@ -293,10 +311,10 @@ export function AnalyticsPage() {
       {viewMode === 'day' && (
         <>
           {/* Stats Grid */}
-          <StatsGrid stats={stats} isLoading={statsLoading} />
+          <StatsGrid className="grid gap-4 grid-cols-1 lg:grid-cols-2 2xl:grid-cols-4" stats={stats} isLoading={statsLoading} />
 
           {/* Productivity Score */}
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-4 grid-cols-1 lg:grid-cols-2 2xl:grid-cols-4">
             <ProductivityScoreCard score={productivityScore} isLoading={productivityLoading} />
           </div>
 
@@ -309,26 +327,22 @@ export function AnalyticsPage() {
             </TabsList>
 
             <TabsContent value="activity" className="space-y-4">
-              <div className="grid gap-4 lg:grid-cols-2">
+              <div className="grid gap-4 md:grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3">
                 <ActivityChart data={hourlyActivity} isLoading={hourlyLoading} />
-                <HeatmapChart data={undefined} isLoading={hourlyLoading} />
-              </div>
-              <div className="grid gap-4 lg:grid-cols-2">
+                {/* <HeatmapChart data={heatmapData} isLoading={heatmapLoading} /> */}
                 <FocusDistributionChart data={focusDistribution} isLoading={focusLoading} />
                 <ActivityTagsChart data={activityTags} isLoading={tagsLoading} />
               </div>
             </TabsContent>
 
             <TabsContent value="apps" className="space-y-4">
-              <div className="grid gap-4 lg:grid-cols-2">
+              <div className="grid gap-4 md:grid-cols-1 lg:grid-cols-2 2xl:grid-cols-4">
                 <AppUsageChart data={appUsage} isLoading={appUsageLoading} />
                 <TimeDistributionChart
                   data={appUsage}
                   isLoading={appUsageLoading}
                   onAppClick={handleAppClick}
                 />
-              </div>
-              <div className="grid gap-4 lg:grid-cols-2">
                 <AppUsageTable
                   data={appUsage}
                   isLoading={appUsageLoading}
@@ -386,7 +400,7 @@ export function AnalyticsPage() {
             </TabsList>
 
             <TabsContent value="apps" className="space-y-4">
-              <div className="grid gap-4 lg:grid-cols-2">
+              <div className="grid gap-4 md:grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3">
                 <AppUsageChart data={customAppUsage} isLoading={customAppUsageLoading} />
                 <AppUsageTable
                   data={customAppUsage}

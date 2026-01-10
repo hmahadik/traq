@@ -1,6 +1,6 @@
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Zap, Sun, History, CalendarDays, CalendarRange, MessageSquare } from 'lucide-react';
+import { Zap, Clock, History, CalendarDays, CalendarRange, MessageSquare } from 'lucide-react';
 
 interface QuickPresetsProps {
   onGenerate: (timeRange: string, reportType: 'summary' | 'detailed' | 'standup') => void;
@@ -12,43 +12,43 @@ const QUICK_PRESETS = [
     label: 'Today',
     timeRange: 'today',
     reportType: 'summary' as const,
-    icon: Sun,
-    description: 'Summary report for today',
+    icon: Clock,
+    description: 'Summary report',
   },
   {
     label: 'Yesterday',
     timeRange: 'yesterday',
     reportType: 'summary' as const,
     icon: History,
-    description: 'Summary report for yesterday',
+    description: 'Summary report',
   },
   {
     label: 'This Week',
     timeRange: 'this week',
     reportType: 'summary' as const,
     icon: CalendarDays,
-    description: 'Weekly summary report',
+    description: 'Summary report',
   },
   {
     label: 'Last Week',
     timeRange: 'last week',
     reportType: 'summary' as const,
     icon: CalendarRange,
-    description: 'Summary for last week',
+    description: 'Summary report',
   },
   {
-    label: 'Standup (Today)',
+    label: 'Today',
     timeRange: 'today',
     reportType: 'standup' as const,
     icon: MessageSquare,
-    description: 'Daily standup for today',
+    description: 'Daily standup',
   },
   {
-    label: 'Standup (Yesterday)',
+    label: 'Yesterday',
     timeRange: 'yesterday',
     reportType: 'standup' as const,
     icon: MessageSquare,
-    description: 'Daily standup for yesterday',
+    description: 'Daily standup',
   },
 ];
 

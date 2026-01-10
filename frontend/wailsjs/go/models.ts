@@ -92,6 +92,24 @@ export namespace inference {
 	        this.size = source["size"];
 	    }
 	}
+	export class SetupStatus {
+	    ready: boolean;
+	    engine: string;
+	    issue?: string;
+	    suggestion?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new SetupStatus(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.ready = source["ready"];
+	        this.engine = source["engine"];
+	        this.issue = source["issue"];
+	        this.suggestion = source["suggestion"];
+	    }
+	}
 
 }
 
@@ -823,6 +841,22 @@ export namespace service {
 	
 	
 	
+	export class HeatmapData {
+	    dayOfWeek: number;
+	    hour: number;
+	    value: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new HeatmapData(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.dayOfWeek = source["dayOfWeek"];
+	        this.hour = source["hour"];
+	        this.value = source["value"];
+	    }
+	}
 	export class HourlyActivity {
 	    hour: number;
 	    screenshotCount: number;

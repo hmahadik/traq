@@ -201,7 +201,7 @@ type WindowUsage struct {
 // GetDailyStats returns statistics for a specific date.
 func (s *AnalyticsService) GetDailyStats(date string) (*DailyStats, error) {
 	// Parse date to get start/end timestamps
-	t, err := time.Parse("2006-01-02", date)
+	t, err := time.ParseInLocation("2006-01-02", date, time.Local)
 	if err != nil {
 		return nil, err
 	}
@@ -249,7 +249,7 @@ func (s *AnalyticsService) GetDailyStats(date string) (*DailyStats, error) {
 
 // GetWeeklyStats returns statistics for a week starting from the given date.
 func (s *AnalyticsService) GetWeeklyStats(startDate string) (*WeeklyStats, error) {
-	t, err := time.Parse("2006-01-02", startDate)
+	t, err := time.ParseInLocation("2006-01-02", startDate, time.Local)
 	if err != nil {
 		return nil, err
 	}
@@ -338,7 +338,7 @@ func (s *AnalyticsService) calculateWeeklyBreakdown(dailyStats []*DailyStats, mo
 	var currentWeek *WeekStats
 
 	for i, dayStat := range dailyStats {
-		dayDate, _ := time.Parse("2006-01-02", dayStat.Date)
+		dayDate, _ := time.ParseInLocation("2006-01-02", dayStat.Date, time.Local)
 		dayOfWeek := int(dayDate.Weekday())
 
 		// Start new week on Sunday or first day of month
@@ -440,7 +440,7 @@ func (s *AnalyticsService) GetAppUsage(start, end int64) ([]*AppUsage, error) {
 
 // GetHourlyActivity returns hourly activity breakdown for a date.
 func (s *AnalyticsService) GetHourlyActivity(date string) ([]*HourlyActivity, error) {
-	t, err := time.Parse("2006-01-02", date)
+	t, err := time.ParseInLocation("2006-01-02", date, time.Local)
 	if err != nil {
 		return nil, err
 	}
@@ -460,6 +460,58 @@ func (s *AnalyticsService) GetHourlyActivity(date string) ([]*HourlyActivity, er
 	}
 
 	return activity, nil
+}
+
+// HeatmapData represents activity intensity for a specific day-of-week and hour combination.
+type HeatmapData struct {
+	DayOfWeek int   `json:"dayOfWeek"` // 0 = Sunday, 6 = Saturday
+	Hour      int   `json:"hour"`      // 0-23
+	Value     int64 `json:"value"`     // Active minutes
+}
+
+// GetHourlyActivityHeatmap returns activity heatmap data grouped by day-of-week and hour.
+// This aggregates the last 4 weeks of data to show typical activity patterns.
+func (s *AnalyticsService) GetHourlyActivityHeatmap() ([]*HeatmapData, error) {
+	// Get data for last 4 weeks (28 days) to have enough samples
+	endTime := time.Now()
+	startTime := endTime.AddDate(0, 0, -28)
+
+	// Get all focus events in this range
+	focusEvents, err := s.store.GetWindowFocusEventsByTimeRange(startTime.Unix(), endTime.Unix())
+	if err != nil {
+		return nil, err
+	}
+
+	// Aggregate by day-of-week and hour
+	// Key: "dayOfWeek-hour" -> total active seconds
+	activityMap := make(map[string]float64)
+
+	for _, evt := range focusEvents {
+		eventTime := time.Unix(evt.StartTime, 0)
+		dayOfWeek := int(eventTime.Weekday()) // 0 = Sunday
+		hour := eventTime.Hour()
+
+		key := fmt.Sprintf("%d-%d", dayOfWeek, hour)
+		activityMap[key] += evt.DurationSeconds
+	}
+
+	// Convert to result slice
+	var result []*HeatmapData
+	for day := 0; day < 7; day++ {
+		for hour := 0; hour < 24; hour++ {
+			key := fmt.Sprintf("%d-%d", day, hour)
+			activeSeconds := activityMap[key]
+			activeMinutes := int64(activeSeconds / 60)
+
+			result = append(result, &HeatmapData{
+				DayOfWeek: day,
+				Hour:      hour,
+				Value:     activeMinutes,
+			})
+		}
+	}
+
+	return result, nil
 }
 
 // GetDataSourceStats returns statistics from all data sources.
@@ -620,7 +672,7 @@ func (s *AnalyticsService) categorizeApp(appName string) AppCategory {
 // GetProductivityScore calculates productivity score for a date.
 func (s *AnalyticsService) GetProductivityScore(date string) (*ProductivityScore, error) {
 	// Parse date to get start/end timestamps
-	t, err := time.Parse("2006-01-02", date)
+	t, err := time.ParseInLocation("2006-01-02", date, time.Local)
 	if err != nil {
 		return nil, err
 	}
@@ -717,7 +769,7 @@ func (s *AnalyticsService) sortAppUsage(appDurations map[string]float64) []*AppU
 func (s *AnalyticsService) GetFocusDistribution(date string) ([]*HourlyFocus, error) {
 	// Parse date to get start/end timestamps
 	layout := "2006-01-02"
-	t, err := time.Parse(layout, date)
+	t, err := time.ParseInLocation(layout, date, time.Local)
 	if err != nil {
 		return nil, err
 	}
@@ -801,7 +853,7 @@ func (s *AnalyticsService) GetFocusDistribution(date string) ([]*HourlyFocus, er
 // Returns top tags sorted by total time spent, useful for understanding activity distribution.
 func (s *AnalyticsService) GetActivityTags(date string) ([]*TagUsage, error) {
 	// Parse date to get start/end timestamps
-	t, err := time.Parse("2006-01-02", date)
+	t, err := time.ParseInLocation("2006-01-02", date, time.Local)
 	if err != nil {
 		return nil, err
 	}
@@ -949,7 +1001,7 @@ func (s *AnalyticsService) ExportAnalytics(date, viewMode, format string) (strin
 		return s.exportWeeklyAnalytics(date, format)
 	case "month":
 		// Parse year and month from date string (YYYY-MM-DD)
-		t, err := time.Parse("2006-01-02", date)
+		t, err := time.ParseInLocation("2006-01-02", date, time.Local)
 		if err != nil {
 			return "", err
 		}
@@ -967,7 +1019,7 @@ func (s *AnalyticsService) exportDailyAnalytics(date, format string) (string, er
 	}
 
 	// Parse date to get start/end timestamps for GetAppUsage
-	t, err := time.Parse("2006-01-02", date)
+	t, err := time.ParseInLocation("2006-01-02", date, time.Local)
 	if err != nil {
 		return "", err
 	}

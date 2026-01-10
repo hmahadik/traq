@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Calendar, BarChart3, FileText, Settings, Camera, Loader2, Menu, X, Pause, Play } from 'lucide-react';
+import { Calendar, BarChart3, FileText, Camera, Loader2, Menu, X, Pause, Play } from 'lucide-react';
 import logoSrc from '@/assets/logo-minimal.svg';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -14,11 +14,7 @@ const navItems = [
   { to: '/reports', label: 'Reports', icon: FileText },
 ];
 
-interface SidebarProps {
-  onSettingsClick: () => void;
-}
-
-export function Sidebar({ onSettingsClick }: SidebarProps) {
+export function Sidebar() {
   const location = useLocation();
   const [isCapturing, setIsCapturing] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
@@ -170,18 +166,6 @@ export function Sidebar({ onSettingsClick }: SidebarProps) {
             </TooltipContent>
           </Tooltip>
         </TooltipProvider>
-        <Button
-          variant="ghost"
-          className="w-full flex flex-col items-center gap-1 h-auto py-2 transition-colors duration-75"
-          onClick={() => {
-            onSettingsClick();
-            setMobileMenuOpen(false);
-          }}
-          aria-label="Settings"
-        >
-          <Settings className="h-5 w-5" />
-          <span className="text-xs font-medium">Settings</span>
-        </Button>
       </div>
     </>
   );

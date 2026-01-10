@@ -200,12 +200,12 @@ export function TimelinePage() {
   });
 
   return (
-    <div className="flex flex-col xl:flex-row gap-6 h-[calc(100vh-8rem)]">
+    <div className="flex flex-col xl:flex-row gap-6 h-[calc(100vh-5rem)] lg:h-[calc(100vh-3rem)]">
       {/* Stats Sidebar - On xl+ screens, show as left sidebar. On smaller screens, show as top section */}
       <div className="xl:w-72 xl:flex-shrink-0">
         <div className="xl:sticky xl:top-0 space-y-4">
-          {/* On small screens, show stats and tags side by side */}
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-1 gap-4">
+          {/* On small screens, show stats and tags side by side (sm covers landscape mobile) */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-1 gap-4">
             <TimelineStats
               sessions={sessions}
               isLoading={sessionsLoading}
@@ -336,7 +336,7 @@ export function TimelinePage() {
         )}
 
         {/* Sessions List */}
-        <ScrollArea className="flex-1 -mr-4 pr-4">
+        <ScrollArea className="flex-1 min-h-0 -mr-4 pr-4">
           <div className="space-y-4">
             {sessionsLoading ? (
               Array.from({ length: 4 }).map((_, i) => (
@@ -365,8 +365,7 @@ export function TimelinePage() {
                 <SessionCardWithThumbnails
                   key={session.id}
                   session={session}
-                  isSelected={selectedSessionId === session.id || selectedIndex === index}
-                  onSelect={() => handleSessionSelect(session.id)}
+                  isSelected={selectedIndex === index}
                   onGenerateSummary={() => handleGenerateSummary(session.id)}
                   isGeneratingSummary={
                     generateSummary.isPending && generateSummary.variables === session.id
@@ -376,17 +375,6 @@ export function TimelinePage() {
             )}
           </div>
         </ScrollArea>
-
-        {/* Keyboard Navigation Hint */}
-        {filteredSessions && filteredSessions.length > 0 && (
-          <div className="mt-4 pt-4 border-t text-xs text-muted-foreground text-center">
-            Use <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono">↑</kbd>{' '}
-            <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono">↓</kbd> or{' '}
-            <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono">j</kbd>{' '}
-            <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono">k</kbd> to navigate,{' '}
-            <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono">Enter</kbd> to expand
-          </div>
-        )}
       </div>
 
       {/* Calendar Sidebar */}

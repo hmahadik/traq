@@ -1,26 +1,25 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { TagList } from '@/components/common/TagBadge';
-import { ConfidenceBadge } from '@/components/common/ConfidenceBadge';
+import { TagBadge } from '@/components/common/TagBadge';
 import { AppBadge } from '@/components/common/AppBadge';
+import { ImageGallery } from '@/components/common/ImageGallery';
 import { formatTimeRange, formatDuration, cn } from '@/lib/utils';
 import { useThumbnail } from '@/api/hooks';
 import {
-  ChevronDown,
-  ChevronRight,
   Camera,
   Clock,
-  ExternalLink,
   Sparkles,
   Loader2,
   Terminal,
   GitBranch,
   FileText,
   Globe,
+  ZoomIn,
+  ChevronRight,
 } from 'lucide-react';
 import {
   Tooltip,
@@ -30,8 +29,8 @@ import {
 } from '@/components/ui/tooltip';
 import type { SessionSummary, Screenshot } from '@/types';
 
-// Small thumbnail component that loads via hook
-function ThumbnailImage({ screenshot }: { screenshot: Screenshot }) {
+// Thumbnail with zoom overlay on hover
+function ThumbnailImage({ screenshot, showZoom = false }: { screenshot: Screenshot; showZoom?: boolean }) {
   const { data: thumbnailUrl, isLoading } = useThumbnail(screenshot.id);
 
   if (isLoading) {
@@ -39,12 +38,19 @@ function ThumbnailImage({ screenshot }: { screenshot: Screenshot }) {
   }
 
   return (
-    <img
-      src={thumbnailUrl}
-      alt=""
-      className="absolute inset-0 w-full h-full object-cover"
-      loading="lazy"
-    />
+    <>
+      <img
+        src={thumbnailUrl}
+        alt=""
+        className="absolute inset-0 w-full h-full object-cover transition-transform group-hover/thumb:scale-105"
+        loading="lazy"
+      />
+      {showZoom && (
+        <div className="absolute inset-0 bg-black/0 group-hover/thumb:bg-black/40 transition-colors flex items-center justify-center">
+          <ZoomIn className="h-4 w-4 text-white opacity-0 group-hover/thumb:opacity-100 transition-opacity" />
+        </div>
+      )}
+    </>
   );
 }
 
@@ -66,252 +72,233 @@ export function SessionCard({
   isGeneratingSummary = false,
 }: SessionCardProps) {
   const navigate = useNavigate();
-  const [expanded, setExpanded] = useState(false);
+  const [galleryOpen, setGalleryOpen] = useState(false);
+  const [galleryIndex, setGalleryIndex] = useState(0);
 
-  const handleViewDetails = () => {
+  const handleCardClick = () => {
     navigate(`/session/${session.id}`);
   };
 
-  const displayThumbnails = thumbnails.slice(0, 6);
-  const remainingCount = session.screenshotCount - displayThumbnails.length;
+  const handleThumbnailClick = (e: React.MouseEvent, index: number) => {
+    e.stopPropagation();
+    setGalleryIndex(index);
+    setGalleryOpen(true);
+  };
+
+  const handleGenerateSummary = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onGenerateSummary?.();
+  };
+
+  const displayThumbnails = thumbnails.slice(0, 5);
+  const remainingCount = Math.max(0, session.screenshotCount - displayThumbnails.length);
 
   return (
-    <Card
-      data-testid="session-card"
-      className={cn(
-        'transition-all hover:shadow-md',
-        isSelected && 'ring-2 ring-primary',
-        'cursor-pointer'
-      )}
-      onClick={onSelect}
-    >
-      <CardHeader className="pb-3">
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-6 w-6 flex-shrink-0"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setExpanded(!expanded);
-                }}
-              >
-                {expanded ? (
-                  <ChevronDown className="h-4 w-4" />
-                ) : (
-                  <ChevronRight className="h-4 w-4" />
-                )}
-              </Button>
-              <span className="font-semibold">
-                {formatTimeRange(session.startTime, session.endTime ?? session.startTime)}
-              </span>
-            </div>
-            {session.summary && (
-              <p className="text-sm text-muted-foreground mt-2 ml-8 line-clamp-2">
-                {session.summary}
-              </p>
-            )}
-            {/* Top Apps */}
-            {session.topApps && session.topApps.length > 0 && (
-              <div className="flex items-center gap-2 mt-2 ml-8" data-testid="top-apps">
-                {session.topApps.slice(0, 3).map((app) => (
-                  <AppBadge key={app} appName={app} size="sm" showName={false} />
-                ))}
-                {session.topApps.length > 3 && (
-                  <span className="text-xs text-muted-foreground">
-                    +{session.topApps.length - 3} more
-                  </span>
-                )}
+    <>
+      <Card
+        data-testid="session-card"
+        className={cn(
+          'group transition-all cursor-pointer',
+          'hover:shadow-lg hover:border-primary/30 hover:-translate-y-0.5',
+          isSelected && 'ring-2 ring-primary shadow-lg'
+        )}
+        onClick={handleCardClick}
+      >
+        <CardContent className="p-4">
+          {/* Main row: Time, Summary, Meta */}
+          <div className="flex items-start gap-4">
+            {/* Left: Time and Summary */}
+            <div className="flex-1 min-w-0">
+              {/* Time range with arrow indicator */}
+              <div className="flex items-center gap-2 mb-1">
+                <span className="font-semibold text-base">
+                  {formatTimeRange(session.startTime, session.endTime ?? session.startTime)}
+                </span>
+                <ChevronRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
               </div>
-            )}
-          </div>
-          <div className="flex flex-col items-end gap-2 flex-shrink-0">
-            <div className="flex items-center gap-2">
-              <Badge variant="secondary" className="gap-1">
-                <Camera className="h-3 w-3" />
-                {session.screenshotCount}
-              </Badge>
-              <Badge variant="outline" className="gap-1">
+
+              {/* Summary or Generate button */}
+              {session.summary ? (
+                <p className="text-sm text-muted-foreground line-clamp-2 mb-2">
+                  {session.summary}
+                </p>
+              ) : (
+                <div className="mb-2">
+                  {onGenerateSummary && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 px-2 text-xs text-muted-foreground hover:text-primary"
+                      onClick={handleGenerateSummary}
+                      disabled={isGeneratingSummary}
+                    >
+                      {isGeneratingSummary ? (
+                        <>
+                          <Loader2 className="mr-1.5 h-3 w-3 animate-spin" />
+                          Generating...
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="mr-1.5 h-3 w-3" />
+                          Generate summary
+                        </>
+                      )}
+                    </Button>
+                  )}
+                </div>
+              )}
+
+              {/* Apps and Tags row */}
+              <div className="flex items-center gap-2 flex-wrap">
+                {/* Top Apps */}
+                {session.topApps && session.topApps.length > 0 && (
+                  <div className="flex items-center gap-1">
+                    {session.topApps.slice(0, 3).map((app) => (
+                      <AppBadge key={app} appName={app} size="sm" showName={false} />
+                    ))}
+                    {session.topApps.length > 3 && (
+                      <span className="text-xs text-muted-foreground ml-0.5">
+                        +{session.topApps.length - 3}
+                      </span>
+                    )}
+                  </div>
+                )}
+
+                {/* Tags */}
+                {session.tags && session.tags.length > 0 && (
+                  <div className="flex items-center gap-1">
+                    {session.tags.slice(0, 2).map((tag) => (
+                      <TagBadge key={tag} tag={tag} size="sm" />
+                    ))}
+                    {session.tags.length > 2 && (
+                      <span className="text-xs text-muted-foreground">
+                        +{session.tags.length - 2}
+                      </span>
+                    )}
+                  </div>
+                )}
+
+                {/* Data Source Indicators */}
+                <TooltipProvider>
+                  <div className="flex items-center gap-1">
+                    {session.hasShell && (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div className="p-1 rounded bg-primary/10 text-primary">
+                            <Terminal className="h-3 w-3" />
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent>Shell commands</TooltipContent>
+                      </Tooltip>
+                    )}
+                    {session.hasGit && (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div className="p-1 rounded bg-orange-500/10 text-orange-500">
+                            <GitBranch className="h-3 w-3" />
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent>Git activity</TooltipContent>
+                      </Tooltip>
+                    )}
+                    {session.hasFiles && (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div className="p-1 rounded bg-green-500/10 text-green-500">
+                            <FileText className="h-3 w-3" />
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent>File events</TooltipContent>
+                      </Tooltip>
+                    )}
+                    {session.hasBrowser && (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div className="p-1 rounded bg-blue-500/10 text-blue-500">
+                            <Globe className="h-3 w-3" />
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent>Browser history</TooltipContent>
+                      </Tooltip>
+                    )}
+                  </div>
+                </TooltipProvider>
+              </div>
+            </div>
+
+            {/* Right: Meta badges */}
+            <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
+              <Badge variant="secondary" className="gap-1 text-xs">
                 <Clock className="h-3 w-3" />
                 {formatDuration(session.durationSeconds ?? 0)}
               </Badge>
-            </div>
-            {/* Data Source Indicators */}
-            {(session.hasShell || session.hasGit || session.hasFiles || session.hasBrowser) && (
-              <TooltipProvider>
-                <div className="flex items-center gap-1" data-testid="data-source-indicators">
-                  {session.hasShell && (
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <div className="p-1 rounded bg-primary/10 text-primary">
-                          <Terminal className="h-3 w-3" />
-                        </div>
-                      </TooltipTrigger>
-                      <TooltipContent>Shell commands</TooltipContent>
-                    </Tooltip>
-                  )}
-                  {session.hasGit && (
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <div className="p-1 rounded bg-orange-500/10 text-orange-500">
-                          <GitBranch className="h-3 w-3" />
-                        </div>
-                      </TooltipTrigger>
-                      <TooltipContent>Git activity</TooltipContent>
-                    </Tooltip>
-                  )}
-                  {session.hasFiles && (
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <div className="p-1 rounded bg-green-500/10 text-green-500">
-                          <FileText className="h-3 w-3" />
-                        </div>
-                      </TooltipTrigger>
-                      <TooltipContent>File events</TooltipContent>
-                    </Tooltip>
-                  )}
-                  {session.hasBrowser && (
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <div className="p-1 rounded bg-blue-500/10 text-blue-500">
-                          <Globe className="h-3 w-3" />
-                        </div>
-                      </TooltipTrigger>
-                      <TooltipContent>Browser history</TooltipContent>
-                    </Tooltip>
-                  )}
-                </div>
-              </TooltipProvider>
-            )}
-            {session.confidence && (
-              <ConfidenceBadge confidence={session.confidence} />
-            )}
-          </div>
-        </div>
-      </CardHeader>
-
-      {/* Filmstrip */}
-      {displayThumbnails.length > 0 && (
-        <CardContent className="pt-0 pb-3">
-          <div className="flex gap-1 overflow-hidden">
-            {displayThumbnails.map((thumb) => (
-              <div
-                key={thumb.id}
-                className="relative flex-shrink-0 w-20 h-[45px] rounded overflow-hidden bg-muted"
-              >
-                <ThumbnailImage screenshot={thumb} />
-              </div>
-            ))}
-            {remainingCount > 0 && (
-              <div className="flex-shrink-0 w-20 h-[45px] rounded bg-primary/10 flex items-center justify-center border border-primary/20">
-                <span className="text-sm font-medium text-primary">+{remainingCount}</span>
-              </div>
-            )}
-          </div>
-        </CardContent>
-      )}
-
-      {/* Expanded Content */}
-      {expanded && (
-        <CardContent className="pt-0 border-t">
-          <div className="pt-4 space-y-4">
-            {/* Summary Section */}
-            {session.summary ? (
-              <div className="space-y-3">
-                <div>
-                  <h4 className="text-sm font-medium mb-1">Summary</h4>
-                  <p className="text-sm text-muted-foreground">
-                    {session.summary}
-                  </p>
-                </div>
-                {session.explanation && (
-                  <div>
-                    <h4 className="text-sm font-medium mb-1">Details</h4>
-                    <p className="text-sm text-muted-foreground">
-                      {session.explanation}
-                    </p>
-                  </div>
-                )}
-                {session.tags && session.tags.length > 0 && (
-                  <div>
-                    <h4 className="text-sm font-medium mb-1">Tags</h4>
-                    <TagList tags={session.tags} />
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="flex items-center justify-between py-2">
-                <p className="text-sm text-muted-foreground italic">
-                  No summary generated yet
-                </p>
-                {onGenerateSummary && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onGenerateSummary();
-                    }}
-                    disabled={isGeneratingSummary}
-                  >
-                    {isGeneratingSummary ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Generating...
-                      </>
-                    ) : (
-                      <>
-                        <Sparkles className="mr-2 h-4 w-4" />
-                        Generate Summary
-                      </>
-                    )}
-                  </Button>
-                )}
-              </div>
-            )}
-
-            {/* Actions */}
-            <div className="flex justify-end pt-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleViewDetails();
-                }}
-              >
-                View Details
-                <ExternalLink className="ml-2 h-4 w-4" />
-              </Button>
+              <Badge variant="outline" className="gap-1 text-xs">
+                <Camera className="h-3 w-3" />
+                {session.screenshotCount}
+              </Badge>
             </div>
           </div>
+
+          {/* Thumbnails filmstrip */}
+          {displayThumbnails.length > 0 && (
+            <div className="flex gap-1.5 mt-3 overflow-hidden">
+              {displayThumbnails.map((thumb, index) => (
+                <div
+                  key={thumb.id}
+                  className="group/thumb relative flex-shrink-0 w-[72px] h-[40px] rounded overflow-hidden bg-muted cursor-pointer ring-1 ring-border hover:ring-2 hover:ring-primary transition-all"
+                  onClick={(e) => handleThumbnailClick(e, index)}
+                >
+                  <ThumbnailImage screenshot={thumb} showZoom />
+                </div>
+              ))}
+              {remainingCount > 0 && (
+                <div
+                  className="flex-shrink-0 w-[72px] h-[40px] rounded bg-muted/50 flex items-center justify-center border border-dashed border-border hover:border-primary hover:bg-muted transition-colors cursor-pointer"
+                  onClick={(e) => handleThumbnailClick(e, displayThumbnails.length - 1)}
+                >
+                  <span className="text-xs font-medium text-muted-foreground">+{remainingCount}</span>
+                </div>
+              )}
+            </div>
+          )}
         </CardContent>
+      </Card>
+
+      {/* Fullscreen Image Gallery */}
+      {thumbnails.length > 0 && (
+        <ImageGallery
+          screenshots={thumbnails}
+          initialIndex={galleryIndex}
+          open={galleryOpen}
+          onOpenChange={setGalleryOpen}
+        />
       )}
-    </Card>
+    </>
   );
 }
 
 export function SessionCardSkeleton() {
   return (
     <Card>
-      <CardHeader className="pb-3">
-        <div className="flex items-start justify-between gap-4">
-          <div className="space-y-2">
+      <CardContent className="p-4">
+        <div className="flex items-start gap-4">
+          <div className="flex-1 space-y-2">
             <Skeleton className="h-5 w-32" />
-            <Skeleton className="h-4 w-64" />
+            <Skeleton className="h-4 w-full max-w-md" />
+            <div className="flex gap-2">
+              <Skeleton className="h-5 w-5 rounded" />
+              <Skeleton className="h-5 w-5 rounded" />
+              <Skeleton className="h-5 w-5 rounded" />
+            </div>
           </div>
-          <div className="flex gap-2">
-            <Skeleton className="h-5 w-20" />
+          <div className="flex flex-col gap-1.5">
             <Skeleton className="h-5 w-16" />
+            <Skeleton className="h-5 w-12" />
           </div>
         </div>
-      </CardHeader>
-      <CardContent className="pt-0 pb-3">
-        <div className="flex gap-1">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <Skeleton key={i} className="w-20 h-[45px] rounded" />
+        <div className="flex gap-1.5 mt-3">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <Skeleton key={i} className="w-[72px] h-[40px] rounded" />
           ))}
         </div>
       </CardContent>

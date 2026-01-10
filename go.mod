@@ -10,6 +10,7 @@ require (
 	github.com/corona10/goimagehash v1.1.0
 	github.com/disintegration/imaging v1.6.2
 	github.com/fsnotify/fsnotify v1.9.0
+	github.com/jung-kurt/gofpdf v1.16.2
 	github.com/kbinani/screenshot v0.0.0-20250624051815-089614a94018
 	github.com/mattn/go-sqlite3 v1.14.33
 	github.com/wailsapp/wails/v2 v2.11.0

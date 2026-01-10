@@ -1,12 +1,14 @@
 package service
 
 import (
+	"bytes"
 	"fmt"
 	"regexp"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/jung-kurt/gofpdf"
 	"traq/internal/storage"
 )
 
@@ -305,6 +307,8 @@ func (s *ReportsService) ExportReport(reportID int64, format string) (string, er
 		return s.markdownToHTML(content), nil
 	case "json":
 		return fmt.Sprintf(`{"title":"%s","content":"%s"}`, report.Title, content), nil
+	case "pdf":
+		return s.markdownToPDF(report.Title, content)
 	default: // markdown
 		return content, nil
 	}
@@ -336,6 +340,87 @@ func (s *ReportsService) markdownToHTML(md string) string {
 	html = strings.ReplaceAll(html, "\n\n", "</p><p>")
 
 	return "<html><body><p>" + html + "</p></body></html>"
+}
+
+// markdownToPDF converts markdown to PDF.
+func (s *ReportsService) markdownToPDF(title, md string) (string, error) {
+	pdf := gofpdf.New("P", "mm", "A4", "")
+	pdf.AddPage()
+
+	// Set up fonts
+	pdf.SetFont("Arial", "B", 16)
+
+	// Add title
+	pdf.CellFormat(0, 10, title, "", 1, "C", false, 0, "")
+	pdf.Ln(5)
+
+	// Process markdown line by line
+	pdf.SetFont("Arial", "", 11)
+	lines := strings.Split(md, "\n")
+
+	for i := 0; i < len(lines); i++ {
+		line := lines[i]
+
+		// Skip empty lines
+		if strings.TrimSpace(line) == "" {
+			pdf.Ln(3)
+			continue
+		}
+
+		// Handle headers
+		if strings.HasPrefix(line, "# ") {
+			pdf.SetFont("Arial", "B", 16)
+			pdf.MultiCell(0, 10, strings.TrimPrefix(line, "# "), "", "", false)
+			pdf.SetFont("Arial", "", 11)
+			pdf.Ln(2)
+			continue
+		} else if strings.HasPrefix(line, "## ") {
+			pdf.SetFont("Arial", "B", 14)
+			pdf.MultiCell(0, 8, strings.TrimPrefix(line, "## "), "", "", false)
+			pdf.SetFont("Arial", "", 11)
+			pdf.Ln(2)
+			continue
+		} else if strings.HasPrefix(line, "### ") {
+			pdf.SetFont("Arial", "B", 12)
+			pdf.MultiCell(0, 7, strings.TrimPrefix(line, "### "), "", "", false)
+			pdf.SetFont("Arial", "", 11)
+			pdf.Ln(2)
+			continue
+		}
+
+		// Handle bullet points
+		if strings.HasPrefix(line, "- ") || strings.HasPrefix(line, "* ") {
+			text := strings.TrimPrefix(strings.TrimPrefix(line, "- "), "* ")
+			// Remove markdown formatting for simplicity
+			text = regexp.MustCompile(`\*\*(.+?)\*\*`).ReplaceAllString(text, "$1")
+			text = regexp.MustCompile(`\*(.+?)\*`).ReplaceAllString(text, "$1")
+			text = regexp.MustCompile("`(.+?)`").ReplaceAllString(text, "$1")
+
+			pdf.SetX(15) // Indent
+			pdf.MultiCell(0, 6, "• "+text, "", "", false)
+			continue
+		}
+
+		// Regular text
+		// Remove markdown formatting
+		text := line
+		text = regexp.MustCompile(`\*\*(.+?)\*\*`).ReplaceAllString(text, "$1")
+		text = regexp.MustCompile(`\*(.+?)\*`).ReplaceAllString(text, "$1")
+		text = regexp.MustCompile("`(.+?)`").ReplaceAllString(text, "$1")
+
+		if strings.TrimSpace(text) != "" {
+			pdf.MultiCell(0, 6, text, "", "", false)
+		}
+	}
+
+	// Output to buffer
+	var buf bytes.Buffer
+	err := pdf.Output(&buf)
+	if err != nil {
+		return "", fmt.Errorf("failed to generate PDF: %w", err)
+	}
+
+	return buf.String(), nil
 }
 
 // GetReport returns a report by ID with full content.
@@ -536,12 +621,12 @@ func (s *ReportsService) ParseTimeRange(input string) (*TimeRange, error) {
 			label = fmt.Sprintf("Past %d Days", days)
 		} else {
 			// Try parsing as date
-			parsed, err := time.Parse("2006-01-02", input)
+			parsed, err := time.ParseInLocation("2006-01-02", input, time.Local)
 			if err != nil {
 				// Try month name
-				parsed, err = time.Parse("January 2006", input)
+				parsed, err = time.ParseInLocation("January 2006", input, time.Local)
 				if err != nil {
-					parsed, err = time.Parse("January", input)
+					parsed, err = time.ParseInLocation("January", input, time.Local)
 					if err != nil {
 						return nil, fmt.Errorf("could not parse time range: %s", input)
 					}

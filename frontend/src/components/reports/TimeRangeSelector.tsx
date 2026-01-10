@@ -13,14 +13,14 @@ interface TimeRangeSelectorProps {
 }
 
 const PRESETS = [
-  { label: 'Today', value: 'today' },
-  { label: 'Yesterday', value: 'yesterday' },
-  { label: 'This Week', value: 'this week' },
-  { label: 'Last Week', value: 'last week' },
-  { label: 'Past 3 Days', value: 'past 3 days' },
-  { label: 'Past 7 Days', value: 'past 7 days' },
-  { label: 'This Month', value: 'this month' },
-  { label: 'Last Month', value: 'last month' },
+  { label: 'Today', value: 'Today' },
+  { label: 'Yesterday', value: 'Yesterday' },
+  { label: 'This Week', value: 'This Week' },
+  { label: 'Last Week', value: 'Last Week' },
+  { label: 'Past 3 Days', value: 'Past 3 Days' },
+  { label: 'Past 7 Days', value: 'Past 7 Days' },
+  { label: 'This Month', value: 'This Month' },
+  { label: 'Last Month', value: 'Last Month' },
 ];
 
 export function TimeRangeSelector({ value, onChange, parsedRange }: TimeRangeSelectorProps) {

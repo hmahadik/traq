@@ -78,7 +78,7 @@ export function SettingsDrawer({ open, onOpenChange }: SettingsDrawerProps) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+      <DialogContent className="max-w-5xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Settings</DialogTitle>
           <DialogDescription>
@@ -651,7 +651,7 @@ export function SettingsDrawer({ open, onOpenChange }: SettingsDrawerProps) {
                 <div className="space-y-1.5">
                   <label className="text-sm font-medium">Exclude Patterns</label>
                   <textarea
-                    className="w-full min-h-[80px] px-3 py-2 text-sm rounded-md border border-input bg-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 font-mono"
+                    className="w-full min-h-[80px] px-3 py-2 text-sm rounded-md border border-input bg-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 font-mono resize-y"
                     value={(config.dataSources.shell.excludePatterns || []).join('\n')}
                     onChange={(e) => {
                       const patterns = e.target.value
@@ -736,7 +736,7 @@ export function SettingsDrawer({ open, onOpenChange }: SettingsDrawerProps) {
                     Directory patterns to exclude from file tracking (one per line)
                   </p>
                   <textarea
-                    className="w-full h-24 text-sm p-2 border rounded-md bg-background font-mono resize-none"
+                    className="w-full h-24 text-sm p-2 border rounded-md bg-background font-mono resize-y"
                     placeholder="node_modules&#10;.git&#10;__pycache__&#10;.venv"
                     value={(config.dataSources.files.excludePatterns || []).join('\n')}
                     onChange={(e) => {
@@ -857,7 +857,7 @@ export function SettingsDrawer({ open, onOpenChange }: SettingsDrawerProps) {
                     Domains to exclude from tracking (one per line)
                   </p>
                   <textarea
-                    className="w-full min-h-[80px] text-sm p-2 border rounded-md bg-background font-mono"
+                    className="w-full min-h-[80px] text-sm p-2 border rounded-md bg-background font-mono resize-y"
                     placeholder="facebook.com&#10;twitter.com&#10;instagram.com"
                     value={(config.dataSources.browser.excludedDomains || []).join('\n')}
                     onChange={(e) => {

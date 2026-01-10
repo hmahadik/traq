@@ -9,6 +9,7 @@ interface TimelineTagsProps {
   isLoading: boolean;
   selectedTag: string | null;
   onTagClick: (tag: string) => void;
+  compact?: boolean;
 }
 
 interface TagCount {
@@ -41,8 +42,11 @@ function extractTags(sessions: SessionSummary[]): TagCount[] {
     .sort((a, b) => b.count - a.count);
 }
 
-export function TimelineTags({ sessions, isLoading, selectedTag, onTagClick }: TimelineTagsProps) {
+export function TimelineTags({ sessions, isLoading, selectedTag, onTagClick, compact = false }: TimelineTagsProps) {
   if (isLoading) {
+    if (compact) {
+      return <Skeleton className="h-6 w-32" />;
+    }
     return (
       <Card>
         <CardHeader className="pb-3">
@@ -63,6 +67,7 @@ export function TimelineTags({ sessions, isLoading, selectedTag, onTagClick }: T
   const tags = extractTags(sessions || []);
 
   if (tags.length === 0) {
+    if (compact) return null;
     return (
       <Card>
         <CardHeader className="pb-3">
@@ -75,6 +80,33 @@ export function TimelineTags({ sessions, isLoading, selectedTag, onTagClick }: T
           <p className="text-sm text-muted-foreground">No tags for this date</p>
         </CardContent>
       </Card>
+    );
+  }
+
+  // Compact mode: inline badges
+  if (compact) {
+    return (
+      <div className="flex flex-wrap gap-1">
+        {tags.slice(0, 5).map(({ tag, count }) => (
+          <button
+            key={tag}
+            onClick={() => onTagClick(tag)}
+            className={`
+              inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs transition-colors
+              ${selectedTag === tag
+                ? 'bg-primary text-primary-foreground'
+                : 'bg-muted hover:bg-accent'
+              }
+            `}
+          >
+            {tag}
+            <span className="text-[10px] opacity-70">({count})</span>
+          </button>
+        ))}
+        {tags.length > 5 && (
+          <span className="text-xs text-muted-foreground px-1">+{tags.length - 5}</span>
+        )}
+      </div>
     );
   }
 

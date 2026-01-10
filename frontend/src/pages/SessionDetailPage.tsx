@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useSessionContext, useScreenshotsForSession, useRegenerateSummary, useDeleteSession, useDeleteScreenshot } from '@/api/hooks';
 import { formatTimeRange, formatDuration, formatTimestamp, getNullableInt, getNullableString, isNullableValid } from '@/lib/utils';
-import { Terminal, GitCommit, FileText, Globe, ArrowLeft, RefreshCw, Trash2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Terminal, GitCommit, FileText, Globe, RefreshCw, Trash2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Screenshot } from '@/components/common/Screenshot';
 import { ActivityLogTable } from '@/components/session/ActivityLogTable';
 import { CollapsibleSection } from '@/components/session/CollapsibleSection';
@@ -121,49 +121,42 @@ export function SessionDetailPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <Button variant="ghost" size="sm" asChild className="mb-4">
-          <Link to="/timeline" className="flex items-center gap-2">
-            <ArrowLeft className="h-4 w-4" />
-            Back to Timeline
-          </Link>
-        </Button>
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">
-              Session {session.id}
-            </h1>
-            <p className="text-muted-foreground">
-              {formatTimeRange(session.startTime, getNullableInt(session.endTime, session.startTime))} ({formatDuration(getNullableInt(session.durationSeconds, 0))})
-            </p>
-          </div>
-          <div className="flex gap-2 items-center">
-            {isNullableValid(summary?.confidence) && (
-              <Badge variant={getNullableString(summary?.confidence) === 'high' ? 'default' : 'secondary'}>
-                {getNullableString(summary?.confidence)} confidence
-              </Badge>
-            )}
-            {summary && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleRegenerateSummary}
-                disabled={regenerateMutation.isPending}
-              >
-                <RefreshCw className={`h-4 w-4 mr-2 ${regenerateMutation.isPending ? 'animate-spin' : ''}`} />
-                {regenerateMutation.isPending ? 'Regenerating...' : 'Regenerate Summary'}
-              </Button>
-            )}
+      {/* Header */}
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">
+            Session {session.id}
+          </h1>
+          <p className="text-muted-foreground">
+            {formatTimeRange(session.startTime, getNullableInt(session.endTime, session.startTime))} ({formatDuration(getNullableInt(session.durationSeconds, 0))})
+          </p>
+        </div>
+        <div className="flex gap-2 items-center flex-shrink-0">
+          {isNullableValid(summary?.confidence) && (
+            <Badge variant={getNullableString(summary?.confidence) === 'high' ? 'default' : 'secondary'}>
+              {getNullableString(summary?.confidence)} confidence
+            </Badge>
+          )}
+          {summary && (
             <Button
-              variant="destructive"
+              variant="outline"
               size="sm"
-              onClick={() => setDeleteDialogOpen(true)}
-              disabled={deleteMutation.isPending}
+              onClick={handleRegenerateSummary}
+              disabled={regenerateMutation.isPending}
             >
-              <Trash2 className="h-4 w-4 mr-2" />
-              Delete Session
+              <RefreshCw className={`h-4 w-4 mr-2 ${regenerateMutation.isPending ? 'animate-spin' : ''}`} />
+              {regenerateMutation.isPending ? 'Regenerating...' : 'Regenerate'}
             </Button>
-          </div>
+          )}
+          <Button
+            variant="destructive"
+            size="sm"
+            onClick={() => setDeleteDialogOpen(true)}
+            disabled={deleteMutation.isPending}
+          >
+            <Trash2 className="h-4 w-4 mr-2" />
+            Delete
+          </Button>
         </div>
       </div>
 

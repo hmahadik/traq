@@ -17,3 +17,4 @@ export {
   TableSkeleton,
   PageSkeleton,
 } from './LoadingStates';
+export { RouteErrorBoundary } from './ErrorBoundary';

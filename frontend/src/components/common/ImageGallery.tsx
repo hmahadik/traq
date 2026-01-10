@@ -80,7 +80,7 @@ export function ImageGallery({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent data-testid="image-gallery" className="max-w-[95vw] max-h-[95vh] p-0 bg-black/95 border-0">
+      <DialogContent data-testid="image-gallery" className="w-screen h-screen max-w-none max-h-none p-0 bg-black/95 border-0 rounded-none">
         {/* Header */}
         <div className="absolute top-0 left-0 right-0 z-10 flex items-center justify-between p-4 bg-gradient-to-b from-black/80 to-transparent">
           <div className="text-white">
@@ -135,7 +135,7 @@ export function ImageGallery({
         </div>
 
         {/* Main Image */}
-        <div className="flex items-center justify-center h-[85vh] overflow-auto">
+        <div className="flex items-center justify-center h-full overflow-auto py-20">
           {isLoading ? (
             <Skeleton className="w-[80vw] aspect-video" />
           ) : (

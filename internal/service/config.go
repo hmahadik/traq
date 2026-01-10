@@ -661,9 +661,9 @@ func (s *ConfigService) getDefaultSystemConfig() *SystemConfig {
 
 func (s *ConfigService) getDefaultInferenceConfig() *InferenceConfig {
 	return &InferenceConfig{
-		Engine: "ollama",
+		Engine: "bundled",
 		Bundled: &BundledInferenceConfig{
-			Model: "gemma3:4b-it-qat",
+			Model: "gemma-2-2b-it-q4",
 		},
 		Ollama: &OllamaConfig{
 			Host:  "http://localhost:11434",
