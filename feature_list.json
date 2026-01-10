@@ -57,7 +57,7 @@
       "Step 4: Verify Timeline shows the exact day that was clicked",
       "Step 5: Verify session list loads for that selected day"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",

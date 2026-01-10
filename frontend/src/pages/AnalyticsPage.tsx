@@ -72,7 +72,7 @@ function getWeekStart(date: Date): Date {
 export function AnalyticsPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { selectedDate, setTimeframeType } = useDateContext();
+  const { selectedDate, setTimeframeType, setSelectedDate } = useDateContext();
   const [viewMode, setViewMode] = useState<ViewMode>('day');
   const [isRegenerating, setIsRegenerating] = useState(false);
   // Custom date range state
@@ -127,6 +127,15 @@ export function AnalyticsPage() {
   const handleWindowClick = (windowTitle: string, appName: string) => {
     // Navigate to day view filtered by window
     navigate(`/day/${dateStr}?window=${encodeURIComponent(windowTitle)}&app=${encodeURIComponent(appName)}`);
+  };
+
+  const handleDayClick = (date: string) => {
+    // Navigate to Timeline for the clicked date
+    const clickedDate = new Date(date);
+    // Update the global date context first
+    setSelectedDate(clickedDate);
+    // Then navigate to Timeline
+    navigate('/timeline');
   };
 
   const handleExport = async (format: 'csv' | 'html' | 'json') => {
@@ -324,7 +333,7 @@ export function AnalyticsPage() {
       )}
 
       {viewMode === 'week' && (
-        <WeeklyAnalytics data={weeklyStats} isLoading={weeklyStatsLoading} />
+        <WeeklyAnalytics data={weeklyStats} isLoading={weeklyStatsLoading} onDayClick={handleDayClick} />
       )}
 
       {viewMode === 'month' && (

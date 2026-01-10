@@ -16,6 +16,7 @@ import type { WeeklyStats } from '@/types';
 interface WeeklyAnalyticsProps {
   data: WeeklyStats | undefined;
   isLoading: boolean;
+  onDayClick?: (date: string) => void;
 }
 
 function formatHours(minutes: number): string {
@@ -26,7 +27,7 @@ function formatHours(minutes: number): string {
   return `${hours}h ${mins}m`;
 }
 
-export function WeeklyAnalytics({ data, isLoading }: WeeklyAnalyticsProps) {
+export function WeeklyAnalytics({ data, isLoading, onDayClick }: WeeklyAnalyticsProps) {
   if (isLoading) {
     return (
       <div className="space-y-4">
@@ -294,6 +295,8 @@ export function WeeklyAnalytics({ data, isLoading }: WeeklyAnalyticsProps) {
                 dataKey="activeMinutes"
                 fill="hsl(var(--primary))"
                 radius={[4, 4, 0, 0]}
+                onClick={(data) => onDayClick?.(data.date)}
+                cursor="pointer"
               />
             </BarChart>
           </ResponsiveContainer>
