@@ -21,7 +21,7 @@
       "Step 4: Click previous arrow again - verify it continues going back",
       "Step 5: Click next arrow - verify it navigates forward until today"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
