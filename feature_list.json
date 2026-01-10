@@ -153,7 +153,7 @@
       "Step 4: Close settings drawer",
       "Step 5: Verify Pause/Resume button is visible and functional in header"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
