@@ -225,7 +225,7 @@
       "Step 4: Click each nav item and verify correct page loads",
       "Step 5: Verify active state highlighting works for each nav item"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -237,7 +237,7 @@
       "Step 4: Verify right panel shows session detail (screenshots, tags, AI summary)",
       "Step 5: Verify master-detail layout is responsive"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -249,7 +249,7 @@
       "Step 4: Change date in Analytics",
       "Step 5: Navigate to Reports - verify new date persists"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "style",
