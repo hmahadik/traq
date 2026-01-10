@@ -396,7 +396,7 @@ export function AnalyticsPage() {
       )}
 
       {viewMode === 'month' && (
-        <MonthlyAnalytics data={monthlyStats} isLoading={monthlyStatsLoading} />
+        <MonthlyAnalytics data={monthlyStats} isLoading={monthlyStatsLoading} onDayClick={handleDayClick} />
       )}
 
       {viewMode === 'year' && (

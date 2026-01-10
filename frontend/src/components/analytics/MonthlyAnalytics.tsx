@@ -16,6 +16,7 @@ import type { MonthlyStats } from '@/types';
 interface MonthlyAnalyticsProps {
   data: MonthlyStats | undefined;
   isLoading: boolean;
+  onDayClick?: (date: string) => void;
 }
 
 function formatHours(minutes: number): string {
@@ -34,7 +35,7 @@ function getMonthName(month: number): string {
   return months[month - 1] || '';
 }
 
-export function MonthlyAnalytics({ data, isLoading }: MonthlyAnalyticsProps) {
+export function MonthlyAnalytics({ data, isLoading, onDayClick }: MonthlyAnalyticsProps) {
   if (isLoading) {
     return (
       <div className="space-y-4">
@@ -95,27 +96,18 @@ export function MonthlyAnalytics({ data, isLoading }: MonthlyAnalyticsProps) {
   const totalShellCommands = data.dailyStats.reduce((sum, d) => sum + d.shellCommands, 0);
   const totalGitCommits = data.dailyStats.reduce((sum, d) => sum + d.gitCommits, 0);
 
-  // Weekly breakdown chart data
-  const weeklyChartData = data.weeklyStats?.map(week => ({
-    week: `Week ${week.weekNumber}`,
-    activeMinutes: week.totalActive,
-    activeDays: week.activeDays,
-    avgPerDay: week.activeDays > 0 ? Math.round(week.totalActive / week.activeDays) : 0,
-  })) || [];
-
-  // Daily trend chart data (show every few days to avoid overcrowding)
-  const samplingRate = Math.max(1, Math.floor(daysInMonth / 15)); // Show ~15 data points
-  const trendChartData = data.dailyStats
-    .filter((_, index) => index % samplingRate === 0)
-    .map(d => {
-      const date = new Date(d.date);
-      return {
-        date: d.date,
-        label: `${date.getDate()}`,
-        activeMinutes: d.activeMinutes,
-        sessions: d.totalSessions,
-      };
-    });
+  // Daily activity chart data (show all days in the month)
+  const dailyChartData = data.dailyStats.map(d => {
+    const date = new Date(d.date);
+    return {
+      date: d.date,
+      day: date.getDate(),
+      dayLabel: `${date.getDate()}`,
+      activeMinutes: d.activeMinutes,
+      sessions: d.totalSessions,
+      screenshots: d.totalScreenshots,
+    };
+  });
 
   const monthName = getMonthName(data.month);
 
@@ -215,17 +207,21 @@ export function MonthlyAnalytics({ data, isLoading }: MonthlyAnalyticsProps) {
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              Peak Week
+              Peak Day
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {weeklyChartData.length > 0
-                ? `Week ${weeklyChartData.reduce((max, w) => w.activeMinutes > max.activeMinutes ? w : max, weeklyChartData[0]).week.split(' ')[1]}`
+              {dailyChartData.length > 0
+                ? (() => {
+                    const peakDay = dailyChartData.reduce((max, d) => d.activeMinutes > max.activeMinutes ? d : max, dailyChartData[0]);
+                    const date = new Date(peakDay.date);
+                    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                  })()
                 : 'N/A'}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              Most active week
+              Most active day
             </p>
           </CardContent>
         </Card>
@@ -247,66 +243,26 @@ export function MonthlyAnalytics({ data, isLoading }: MonthlyAnalyticsProps) {
         </Card>
       </div>
 
-      {/* Weekly Breakdown Chart */}
-      {weeklyChartData.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Week-over-Week Activity</CardTitle>
-            <p className="text-sm text-muted-foreground">
-              Active time per week throughout the month
-            </p>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={weeklyChartData}>
-                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                <XAxis
-                  dataKey="week"
-                  className="text-sm"
-                  tick={{ fill: 'currentColor' }}
-                />
-                <YAxis
-                  className="text-sm"
-                  tick={{ fill: 'currentColor' }}
-                  label={{ value: 'Minutes', angle: -90, position: 'insideLeft' }}
-                />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: 'hsl(var(--background))',
-                    border: '1px solid hsl(var(--border))',
-                    borderRadius: '6px',
-                  }}
-                  formatter={(value: number, name: string) => {
-                    if (name === 'activeMinutes') return [formatHours(value), 'Active Time'];
-                    if (name === 'activeDays') return [value, 'Active Days'];
-                    if (name === 'avgPerDay') return [formatHours(value), 'Avg/Day'];
-                    return [value, name];
-                  }}
-                />
-                <Bar dataKey="activeMinutes" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Daily Activity Trend */}
+      {/* Daily Activity Chart */}
       <Card>
         <CardHeader>
-          <CardTitle>Daily Activity Trend</CardTitle>
+          <CardTitle>Daily Activity</CardTitle>
           <p className="text-sm text-muted-foreground">
-            Active time throughout the month
+            Active time for each day in {monthName}
           </p>
         </CardHeader>
         <CardContent>
           <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={trendChartData}>
+            <BarChart data={dailyChartData}>
               <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
               <XAxis
-                dataKey="label"
+                dataKey="dayLabel"
                 className="text-sm"
-                tick={{ fill: 'currentColor' }}
-                label={{ value: `Day of ${monthName}`, position: 'insideBottom', offset: -5 }}
+                tick={{ fill: 'currentColor', fontSize: 10 }}
+                angle={-45}
+                textAnchor="end"
+                height={60}
+                label={{ value: `Day of ${monthName}`, position: 'insideBottom', offset: -10 }}
               />
               <YAxis
                 className="text-sm"
@@ -320,27 +276,32 @@ export function MonthlyAnalytics({ data, isLoading }: MonthlyAnalyticsProps) {
                   borderRadius: '6px',
                 }}
                 formatter={(value: number, name: string) => {
-                  if (name === 'activeMinutes') return [formatHours(value as number), 'Active Time'];
+                  if (name === 'activeMinutes') return [formatHours(value), 'Active Time'];
                   if (name === 'sessions') return [value, 'Sessions'];
+                  if (name === 'screenshots') return [value, 'Screenshots'];
                   return [value, name];
                 }}
                 labelFormatter={(label) => {
-                  const item = trendChartData.find(d => d.label === label);
+                  const item = dailyChartData.find(d => d.dayLabel === label);
                   if (item) {
                     const date = new Date(item.date);
-                    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+                    return date.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' });
                   }
                   return label;
                 }}
               />
-              <Line
-                type="monotone"
+              <Bar
                 dataKey="activeMinutes"
-                stroke="hsl(var(--primary))"
-                strokeWidth={2}
-                dot={{ fill: 'hsl(var(--primary))', r: 4 }}
+                fill="hsl(var(--primary))"
+                radius={[4, 4, 0, 0]}
+                cursor={onDayClick ? 'pointer' : 'default'}
+                onClick={(data) => {
+                  if (onDayClick && data && data.date) {
+                    onDayClick(data.date);
+                  }
+                }}
               />
-            </LineChart>
+            </BarChart>
           </ResponsiveContainer>
         </CardContent>
       </Card>
