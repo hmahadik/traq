@@ -119,3 +119,24 @@ export interface DomainCount {
   domain: string;
   visits: number;
 }
+
+export interface YearlyStats {
+  year: number;
+  startDate: string;
+  endDate: string;
+  monthlyStats: MonthStats[];
+  totalActive: number;
+  activeMonths: number;
+  averages: MonthStats | null;
+}
+
+export interface MonthStats {
+  monthNumber: number;
+  monthName: string;
+  startDate: string;
+  endDate: string;
+  totalActive: number;
+  activeDays: number;
+  sessions: number;
+  screenshots: number;
+}

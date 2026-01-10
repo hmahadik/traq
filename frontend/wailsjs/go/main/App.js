@@ -238,6 +238,10 @@ export function GetWeeklyStats(arg1) {
   return window['go']['main']['App']['GetWeeklyStats'](arg1);
 }
 
+export function GetYearlyStats(arg1) {
+  return window['go']['main']['App']['GetYearlyStats'](arg1);
+}
+
 export function IsReady() {
   return window['go']['main']['App']['IsReady']();
 }

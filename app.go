@@ -313,6 +313,20 @@ func (a *App) GetMonthlyStats(year, month int) (result *service.MonthlyStats, er
 	return a.Analytics.GetMonthlyStats(year, month)
 }
 
+// GetYearlyStats returns statistics for a year.
+func (a *App) GetYearlyStats(year int) (result *service.YearlyStats, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			result = nil
+			err = fmt.Errorf("internal error: %v", r)
+		}
+	}()
+	if a == nil || !a.ready || a.Analytics == nil {
+		return nil, nil
+	}
+	return a.Analytics.GetYearlyStats(year)
+}
+
 // GetCustomRangeStats returns statistics for a custom date range with auto-bucketing.
 func (a *App) GetCustomRangeStats(startDate, endDate string) (result *service.CustomRangeStats, err error) {
 	defer func() {

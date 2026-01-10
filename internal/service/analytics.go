@@ -53,6 +53,29 @@ type MonthlyStats struct {
 	Averages    *DailyStats   `json:"averages"`
 }
 
+// YearlyStats contains statistics for a year.
+type YearlyStats struct {
+	Year          int           `json:"year"`
+	StartDate     string        `json:"startDate"`
+	EndDate       string        `json:"endDate"`
+	MonthlyStats  []*MonthStats `json:"monthlyStats"`
+	TotalActive   int64         `json:"totalActive"`
+	ActiveMonths  int           `json:"activeMonths"`
+	Averages      *MonthStats   `json:"averages"`
+}
+
+// MonthStats represents summary stats for a single month within a year.
+type MonthStats struct {
+	MonthNumber int    `json:"monthNumber"` // 1-12
+	MonthName   string `json:"monthName"`
+	StartDate   string `json:"startDate"`
+	EndDate     string `json:"endDate"`
+	TotalActive int64  `json:"totalActive"` // Total active minutes for the month
+	ActiveDays  int    `json:"activeDays"`  // Number of days with activity
+	Sessions    int64  `json:"sessions"`
+	Screenshots int64  `json:"screenshots"`
+}
+
 // WeekStats represents summary stats for a single week within a month.
 type WeekStats struct {
 	WeekNumber  int   `json:"weekNumber"`  // 1-5 within the month
@@ -386,6 +409,81 @@ func (s *AnalyticsService) calculateWeeklyBreakdown(dailyStats []*DailyStats, mo
 	}
 
 	return weeks
+}
+
+// GetYearlyStats returns statistics for a given year.
+func (s *AnalyticsService) GetYearlyStats(year int) (*YearlyStats, error) {
+	firstDay := time.Date(year, time.January, 1, 0, 0, 0, 0, time.Local)
+	lastDay := time.Date(year, time.December, 31, 23, 59, 59, 0, time.Local)
+
+	stats := &YearlyStats{
+		Year:      year,
+		StartDate: firstDay.Format("2006-01-02"),
+		EndDate:   lastDay.Format("2006-01-02"),
+	}
+
+	// Get monthly stats for each month
+	var totalActive int64
+	var totalScreenshots int64
+	var totalSessions int64
+	var activeMonths int
+
+	for month := 1; month <= 12; month++ {
+		monthStats, err := s.GetMonthlyStats(year, month)
+		if err != nil {
+			continue
+		}
+
+		// Calculate month summary
+		activeDays := 0
+		var monthScreenshots int64
+		var monthSessions int64
+		for _, dayStat := range monthStats.DailyStats {
+			if dayStat.ActiveMinutes > 0 {
+				activeDays++
+			}
+			monthScreenshots += dayStat.TotalScreenshots
+			monthSessions += dayStat.TotalSessions
+		}
+
+		monthSummary := &MonthStats{
+			MonthNumber: month,
+			MonthName:   time.Month(month).String(),
+			StartDate:   monthStats.StartDate,
+			EndDate:     monthStats.EndDate,
+			TotalActive: monthStats.TotalActive,
+			ActiveDays:  activeDays,
+			Sessions:    monthSessions,
+			Screenshots: monthScreenshots,
+		}
+
+		stats.MonthlyStats = append(stats.MonthlyStats, monthSummary)
+		totalActive += monthStats.TotalActive
+
+		// Track active months
+		if monthStats.TotalActive > 0 {
+			activeMonths++
+		}
+
+		// Aggregate for overall totals
+		totalScreenshots += monthScreenshots
+		totalSessions += monthSessions
+	}
+
+	stats.TotalActive = totalActive
+	stats.ActiveMonths = activeMonths
+
+	// Calculate averages (only for active months)
+	if activeMonths > 0 {
+		stats.Averages = &MonthStats{
+			MonthName:   "average",
+			TotalActive: totalActive / int64(activeMonths),
+			Screenshots: totalScreenshots / int64(activeMonths),
+			Sessions:    totalSessions / int64(activeMonths),
+		}
+	}
+
+	return stats, nil
 }
 
 // GetCalendarHeatmap returns calendar data for a month.

@@ -189,7 +189,7 @@
       "Step 4: Verify chart shows 7 bars representing each day",
       "Step 5: Hover over bars - verify tooltips show date and activity"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",

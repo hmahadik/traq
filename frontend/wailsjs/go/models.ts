@@ -958,6 +958,32 @@ export namespace service {
 	    }
 	}
 	
+	export class MonthStats {
+	    monthNumber: number;
+	    monthName: string;
+	    startDate: string;
+	    endDate: string;
+	    totalActive: number;
+	    activeDays: number;
+	    sessions: number;
+	    screenshots: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new MonthStats(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.monthNumber = source["monthNumber"];
+	        this.monthName = source["monthName"];
+	        this.startDate = source["startDate"];
+	        this.endDate = source["endDate"];
+	        this.totalActive = source["totalActive"];
+	        this.activeDays = source["activeDays"];
+	        this.sessions = source["sessions"];
+	        this.screenshots = source["screenshots"];
+	    }
+	}
 	export class MonthlyStats {
 	    year: number;
 	    month: number;
@@ -1331,6 +1357,48 @@ export namespace service {
 	        this.percentage = source["percentage"];
 	        this.focusCount = source["focusCount"];
 	    }
+	}
+	export class YearlyStats {
+	    year: number;
+	    startDate: string;
+	    endDate: string;
+	    monthlyStats: MonthStats[];
+	    totalActive: number;
+	    activeMonths: number;
+	    averages?: MonthStats;
+	
+	    static createFrom(source: any = {}) {
+	        return new YearlyStats(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.year = source["year"];
+	        this.startDate = source["startDate"];
+	        this.endDate = source["endDate"];
+	        this.monthlyStats = this.convertValues(source["monthlyStats"], MonthStats);
+	        this.totalActive = source["totalActive"];
+	        this.activeMonths = source["activeMonths"];
+	        this.averages = this.convertValues(source["averages"], MonthStats);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
 
 }

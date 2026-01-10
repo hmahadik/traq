@@ -172,6 +172,12 @@ export const analytics = {
     return withRetry(() => App.GetMonthlyStats(year, month));
   },
 
+  getYearlyStats: async (year: number) => {
+    if (isMockMode()) return mockData.getWeeklyStats(`${year}-01-01`);
+    await waitForReady();
+    return withRetry(() => App.GetYearlyStats(year));
+  },
+
   getCustomRangeStats: async (startDate: string, endDate: string) => {
     if (isMockMode()) return mockData.getWeeklyStats(startDate);
     await waitForReady();

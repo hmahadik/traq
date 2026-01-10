@@ -124,6 +124,8 @@ export function GetWatchedDirectories():Promise<Array<string>>;
 
 export function GetWeeklyStats(arg1:string):Promise<service.WeeklyStats>;
 
+export function GetYearlyStats(arg1:number):Promise<service.YearlyStats>;
+
 export function IsReady():Promise<boolean>;
 
 export function OpenDataDir():Promise<void>;

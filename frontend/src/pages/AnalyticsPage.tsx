@@ -19,6 +19,7 @@ import {
   TopWindowsList,
   WeeklyAnalytics,
   MonthlyAnalytics,
+  YearlyAnalytics,
   CustomRangeAnalytics,
 } from '@/components/analytics';
 import {
@@ -35,6 +36,7 @@ import {
   useTopWindows,
   useWeeklyStats,
   useMonthlyStats,
+  useYearlyStats,
   useCustomRangeStats,
   queryKeys,
 } from '@/api/hooks';
@@ -165,6 +167,9 @@ export function AnalyticsPage() {
   const year = selectedDate.getFullYear();
   const month = selectedDate.getMonth() + 1; // JavaScript months are 0-indexed
   const { data: monthlyStats, isLoading: monthlyStatsLoading } = useMonthlyStats(year, month);
+
+  // Year view data
+  const { data: yearlyStats, isLoading: yearlyStatsLoading } = useYearlyStats(year);
 
   // Custom range data
   const customStartDate = getDateString(customRange.start);
@@ -392,6 +397,10 @@ export function AnalyticsPage() {
 
       {viewMode === 'month' && (
         <MonthlyAnalytics data={monthlyStats} isLoading={monthlyStatsLoading} />
+      )}
+
+      {viewMode === 'year' && (
+        <YearlyAnalytics data={yearlyStats} isLoading={yearlyStatsLoading} />
       )}
 
       {viewMode === 'custom' && (
