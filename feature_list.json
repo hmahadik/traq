@@ -69,7 +69,7 @@
       "Step 4: Verify Analytics shows data for the same date (Jan 5)",
       "Step 5: Switch to Week tab - verify week expands around Jan 5"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
