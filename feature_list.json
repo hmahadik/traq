@@ -129,7 +129,7 @@
       "Step 4: Verify the calendar closes and Timeline updates to selected date",
       "Step 5: Verify header shows the newly selected date"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
