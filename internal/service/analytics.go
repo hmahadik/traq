@@ -218,18 +218,37 @@ func (s *AnalyticsService) GetDailyStats(date string) (*DailyStats, error) {
 	sessions, _ := s.store.GetSessionsByTimeRange(start, end)
 	stats.TotalSessions = int64(len(sessions))
 
-	// Calculate active minutes from focus events (excludes AFK periods)
-	// Focus events only record time when user is actively interacting with windows
-	focusEvents, _ := s.store.GetWindowFocusEventsByTimeRange(start, end)
-	var totalActiveSeconds float64
-	for _, evt := range focusEvents {
-		if evt.DurationSeconds > 0 {
-			totalActiveSeconds += evt.DurationSeconds
+	// Calculate active minutes from session durations (matches Timeline behavior)
+	// This ensures Analytics Day tab shows the same metric as Timeline
+	currentTime := time.Now().Unix()
+	var totalActiveSeconds int64
+	for _, session := range sessions {
+		// Calculate session duration, clamping to day boundaries
+		sessionStart := session.StartTime
+		if sessionStart < start {
+			sessionStart = start
+		}
+
+		var sessionEnd int64
+		if !session.EndTime.Valid {
+			// Ongoing session - use current time
+			sessionEnd = currentTime
+		} else {
+			sessionEnd = session.EndTime.Int64
+		}
+		if sessionEnd > end {
+			sessionEnd = end
+		}
+
+		duration := sessionEnd - sessionStart
+		if duration > 0 {
+			totalActiveSeconds += duration
 		}
 	}
-	stats.ActiveMinutes = int64(totalActiveSeconds / 60)
+	stats.ActiveMinutes = totalActiveSeconds / 60
 
-	// Get top apps from the same focus events (already fetched above)
+	// Get top apps from focus events for app usage tracking
+	focusEvents, _ := s.store.GetWindowFocusEventsByTimeRange(start, end)
 	appDurations := make(map[string]float64)
 	for _, evt := range focusEvents {
 		appDurations[evt.AppName] += evt.DurationSeconds

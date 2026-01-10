@@ -177,7 +177,7 @@
       "Step 4: Verify the activity chart shows same hourly breakdown",
       "Step 5: Compare visual representation - should be equivalent"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
