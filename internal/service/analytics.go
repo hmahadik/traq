@@ -1327,7 +1327,205 @@ func (s *AnalyticsService) exportMonthlyHTML(stats *MonthlyStats) string {
 			week.WeekNumber, week.StartDate, week.EndDate, week.TotalActive, week.ActiveDays))
 	}
 	html.WriteString("</tbody></table>")
-	
+
 	html.WriteString("</body></html>")
 	return html.String()
+}
+
+// CustomRangeStats contains statistics for a custom date range with auto-bucketing.
+type CustomRangeStats struct {
+	StartDate   string        `json:"startDate"`
+	EndDate     string        `json:"endDate"`
+	BucketType  string        `json:"bucketType"` // "hourly", "daily", or "weekly"
+	TotalActive int64         `json:"totalActive"`
+	Averages    *DailyStats   `json:"averages"`
+	// Buckets contains the activity data based on BucketType:
+	// - hourly: HourlyActivity for each hour in range
+	// - daily: DailyStats for each day
+	// - weekly: WeekStats for each week
+	HourlyBuckets []*HourlyActivity `json:"hourlyBuckets,omitempty"`
+	DailyBuckets  []*DailyStats     `json:"dailyBuckets,omitempty"`
+	WeeklyBuckets []*WeekStats      `json:"weeklyBuckets,omitempty"`
+}
+
+// GetCustomRangeStats returns statistics for a custom date range with smart bucketing.
+// Bucket logic: 1-2 days = hourly, 3-60 days = daily, 60+ days = weekly.
+func (s *AnalyticsService) GetCustomRangeStats(startDate, endDate string) (*CustomRangeStats, error) {
+	start, err := time.ParseInLocation("2006-01-02", startDate, time.Local)
+	if err != nil {
+		return nil, err
+	}
+	end, err := time.ParseInLocation("2006-01-02", endDate, time.Local)
+	if err != nil {
+		return nil, err
+	}
+
+	// Calculate number of days in range
+	daysDiff := int(end.Sub(start).Hours() / 24) + 1 // +1 to include both start and end days
+
+	stats := &CustomRangeStats{
+		StartDate: startDate,
+		EndDate:   endDate,
+	}
+
+	// Determine bucket type based on range length
+	if daysDiff <= 2 {
+		stats.BucketType = "hourly"
+		return s.getHourlyBucketedStats(start, end, stats)
+	} else if daysDiff <= 60 {
+		stats.BucketType = "daily"
+		return s.getDailyBucketedStats(start, end, stats)
+	} else {
+		stats.BucketType = "weekly"
+		return s.getWeeklyBucketedStats(start, end, stats)
+	}
+}
+
+// getHourlyBucketedStats aggregates hourly activity across 1-2 days.
+func (s *AnalyticsService) getHourlyBucketedStats(start, end time.Time, stats *CustomRangeStats) (*CustomRangeStats, error) {
+	var totalActive int64
+	hourlyMap := make(map[int]*HourlyActivity) // hour (0-23) -> aggregated activity
+
+	// Initialize all 24 hours
+	for hour := 0; hour < 24; hour++ {
+		hourlyMap[hour] = &HourlyActivity{Hour: hour}
+	}
+
+	// Iterate through each day in range
+	for day := start; !day.After(end); day = day.AddDate(0, 0, 1) {
+		dateStr := day.Format("2006-01-02")
+		hourlyData, err := s.GetHourlyActivity(dateStr)
+		if err != nil {
+			continue
+		}
+
+		// Aggregate hourly data
+		for _, hourData := range hourlyData {
+			hourlyMap[hourData.Hour].ScreenshotCount += hourData.ScreenshotCount
+			hourlyMap[hourData.Hour].ActiveMinutes += hourData.ActiveMinutes
+			totalActive += hourData.ActiveMinutes
+		}
+	}
+
+	// Convert map to sorted slice
+	for hour := 0; hour < 24; hour++ {
+		stats.HourlyBuckets = append(stats.HourlyBuckets, hourlyMap[hour])
+	}
+
+	stats.TotalActive = totalActive
+	return stats, nil
+}
+
+// getDailyBucketedStats aggregates daily stats across 3-60 days.
+func (s *AnalyticsService) getDailyBucketedStats(start, end time.Time, stats *CustomRangeStats) (*CustomRangeStats, error) {
+	var totalActive int64
+	var totalScreenshots int64
+	var totalSessions int64
+	var activeDays int
+
+	// Iterate through each day in range
+	for day := start; !day.After(end); day = day.AddDate(0, 0, 1) {
+		dateStr := day.Format("2006-01-02")
+		dayStats, err := s.GetDailyStats(dateStr)
+		if err != nil {
+			continue
+		}
+
+		stats.DailyBuckets = append(stats.DailyBuckets, dayStats)
+		totalActive += dayStats.ActiveMinutes
+		totalScreenshots += dayStats.TotalScreenshots
+		totalSessions += dayStats.TotalSessions
+
+		if dayStats.ActiveMinutes > 0 {
+			activeDays++
+		}
+	}
+
+	stats.TotalActive = totalActive
+
+	// Calculate averages
+	if activeDays > 0 {
+		stats.Averages = &DailyStats{
+			Date:             "average",
+			TotalScreenshots: totalScreenshots / int64(activeDays),
+			TotalSessions:    totalSessions / int64(activeDays),
+			ActiveMinutes:    totalActive / int64(activeDays),
+		}
+	}
+
+	return stats, nil
+}
+
+// getWeeklyBucketedStats aggregates weekly stats across 60+ days.
+func (s *AnalyticsService) getWeeklyBucketedStats(start, end time.Time, stats *CustomRangeStats) (*CustomRangeStats, error) {
+	var totalActive int64
+	var totalScreenshots int64
+	var totalSessions int64
+	var activeDays int
+
+	// Get all daily stats first
+	var allDailyStats []*DailyStats
+	for day := start; !day.After(end); day = day.AddDate(0, 0, 1) {
+		dateStr := day.Format("2006-01-02")
+		dayStats, err := s.GetDailyStats(dateStr)
+		if err != nil {
+			continue
+		}
+
+		allDailyStats = append(allDailyStats, dayStats)
+		totalActive += dayStats.ActiveMinutes
+		totalScreenshots += dayStats.TotalScreenshots
+		totalSessions += dayStats.TotalSessions
+
+		if dayStats.ActiveMinutes > 0 {
+			activeDays++
+		}
+	}
+
+	// Group into weeks (Sunday to Saturday)
+	weekNumber := 1
+	var currentWeek *WeekStats
+
+	for i, dayStat := range allDailyStats {
+		dayDate, _ := time.ParseInLocation("2006-01-02", dayStat.Date, time.Local)
+		dayOfWeek := int(dayDate.Weekday())
+
+		// Start new week on Sunday or first day
+		if currentWeek == nil || (dayOfWeek == 0 && i > 0) {
+			if currentWeek != nil {
+				stats.WeeklyBuckets = append(stats.WeeklyBuckets, currentWeek)
+				weekNumber++
+			}
+			currentWeek = &WeekStats{
+				WeekNumber: weekNumber,
+				StartDate:  dayStat.Date,
+			}
+		}
+
+		// Update current week
+		currentWeek.EndDate = dayStat.Date
+		currentWeek.TotalActive += dayStat.ActiveMinutes
+		if dayStat.ActiveMinutes > 0 {
+			currentWeek.ActiveDays++
+		}
+	}
+
+	// Add final week
+	if currentWeek != nil {
+		stats.WeeklyBuckets = append(stats.WeeklyBuckets, currentWeek)
+	}
+
+	stats.TotalActive = totalActive
+
+	// Calculate averages
+	if activeDays > 0 {
+		stats.Averages = &DailyStats{
+			Date:             "average",
+			TotalScreenshots: totalScreenshots / int64(activeDays),
+			TotalSessions:    totalSessions / int64(activeDays),
+			ActiveMinutes:    totalActive / int64(activeDays),
+		}
+	}
+
+	return stats, nil
 }

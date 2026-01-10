@@ -89,6 +89,14 @@ export function useMonthlyStats(year: number, month: number) {
   });
 }
 
+export function useCustomRangeStats(startDate: string, endDate: string) {
+  return useQuery({
+    queryKey: [...queryKeys.analytics.weekly(startDate), endDate] as const,
+    queryFn: () => api.analytics.getCustomRangeStats(startDate, endDate),
+    staleTime: 60_000,
+  });
+}
+
 export function useCalendarHeatmap(year: number, month: number) {
   return useQuery({
     queryKey: queryKeys.analytics.calendar(year, month),

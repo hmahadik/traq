@@ -313,6 +313,20 @@ func (a *App) GetMonthlyStats(year, month int) (result *service.MonthlyStats, er
 	return a.Analytics.GetMonthlyStats(year, month)
 }
 
+// GetCustomRangeStats returns statistics for a custom date range with auto-bucketing.
+func (a *App) GetCustomRangeStats(startDate, endDate string) (result *service.CustomRangeStats, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			result = nil
+			err = fmt.Errorf("internal error: %v", r)
+		}
+	}()
+	if a == nil || !a.ready || a.Analytics == nil {
+		return nil, nil
+	}
+	return a.Analytics.GetCustomRangeStats(startDate, endDate)
+}
+
 // ExportAnalytics exports analytics data in the specified format.
 // viewMode can be "day", "week", or "month"
 // format can be "csv", "html", or "json"

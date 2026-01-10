@@ -603,26 +603,40 @@ export namespace service {
 		    return a;
 		}
 	}
-	export class DaemonStatus {
-	    running: boolean;
-	    paused: boolean;
-	    isAFK: boolean;
-	    sessionId: number;
-	    sessionDuration: number;
-	    idleDuration: number;
+	export class WeekStats {
+	    weekNumber: number;
+	    startDate: string;
+	    endDate: string;
+	    totalActive: number;
+	    activeDays: number;
 	
 	    static createFrom(source: any = {}) {
-	        return new DaemonStatus(source);
+	        return new WeekStats(source);
 	    }
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.running = source["running"];
-	        this.paused = source["paused"];
-	        this.isAFK = source["isAFK"];
-	        this.sessionId = source["sessionId"];
-	        this.sessionDuration = source["sessionDuration"];
-	        this.idleDuration = source["idleDuration"];
+	        this.weekNumber = source["weekNumber"];
+	        this.startDate = source["startDate"];
+	        this.endDate = source["endDate"];
+	        this.totalActive = source["totalActive"];
+	        this.activeDays = source["activeDays"];
+	    }
+	}
+	export class HourlyActivity {
+	    hour: number;
+	    screenshotCount: number;
+	    activeMinutes: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new HourlyActivity(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.hour = source["hour"];
+	        this.screenshotCount = source["screenshotCount"];
+	        this.activeMinutes = source["activeMinutes"];
 	    }
 	}
 	export class DailyStats {
@@ -671,6 +685,73 @@ export namespace service {
 		    return a;
 		}
 	}
+	export class CustomRangeStats {
+	    startDate: string;
+	    endDate: string;
+	    bucketType: string;
+	    totalActive: number;
+	    averages?: DailyStats;
+	    hourlyBuckets?: HourlyActivity[];
+	    dailyBuckets?: DailyStats[];
+	    weeklyBuckets?: WeekStats[];
+	
+	    static createFrom(source: any = {}) {
+	        return new CustomRangeStats(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.startDate = source["startDate"];
+	        this.endDate = source["endDate"];
+	        this.bucketType = source["bucketType"];
+	        this.totalActive = source["totalActive"];
+	        this.averages = this.convertValues(source["averages"], DailyStats);
+	        this.hourlyBuckets = this.convertValues(source["hourlyBuckets"], HourlyActivity);
+	        this.dailyBuckets = this.convertValues(source["dailyBuckets"], DailyStats);
+	        this.weeklyBuckets = this.convertValues(source["weeklyBuckets"], WeekStats);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class DaemonStatus {
+	    running: boolean;
+	    paused: boolean;
+	    isAFK: boolean;
+	    sessionId: number;
+	    sessionDuration: number;
+	    idleDuration: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new DaemonStatus(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.running = source["running"];
+	        this.paused = source["paused"];
+	        this.isAFK = source["isAFK"];
+	        this.sessionId = source["sessionId"];
+	        this.sessionDuration = source["sessionDuration"];
+	        this.idleDuration = source["idleDuration"];
+	    }
+	}
+	
 	export class DailySummary {
 	    id: number;
 	    date: string;
@@ -857,22 +938,7 @@ export namespace service {
 	        this.value = source["value"];
 	    }
 	}
-	export class HourlyActivity {
-	    hour: number;
-	    screenshotCount: number;
-	    activeMinutes: number;
 	
-	    static createFrom(source: any = {}) {
-	        return new HourlyActivity(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.hour = source["hour"];
-	        this.screenshotCount = source["screenshotCount"];
-	        this.activeMinutes = source["activeMinutes"];
-	    }
-	}
 	export class HourlyFocus {
 	    hour: number;
 	    contextSwitches: number;
@@ -892,26 +958,6 @@ export namespace service {
 	    }
 	}
 	
-	export class WeekStats {
-	    weekNumber: number;
-	    startDate: string;
-	    endDate: string;
-	    totalActive: number;
-	    activeDays: number;
-	
-	    static createFrom(source: any = {}) {
-	        return new WeekStats(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.weekNumber = source["weekNumber"];
-	        this.startDate = source["startDate"];
-	        this.endDate = source["endDate"];
-	        this.totalActive = source["totalActive"];
-	        this.activeDays = source["activeDays"];
-	    }
-	}
 	export class MonthlyStats {
 	    year: number;
 	    month: number;

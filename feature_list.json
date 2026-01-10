@@ -93,7 +93,7 @@
       "Step 4: Enter a 90-day range - verify chart uses weekly buckets",
       "Step 5: Verify stats adapt appropriately to custom range"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",

@@ -50,6 +50,8 @@ export function GetConfig():Promise<service.Config>;
 
 export function GetCurrentTime():Promise<number>;
 
+export function GetCustomRangeStats(arg1:string,arg2:string):Promise<service.CustomRangeStats>;
+
 export function GetDaemonStatus():Promise<service.DaemonStatus>;
 
 export function GetDailyStats(arg1:string):Promise<service.DailyStats>;

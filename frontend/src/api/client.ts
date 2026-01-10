@@ -172,6 +172,12 @@ export const analytics = {
     return withRetry(() => App.GetMonthlyStats(year, month));
   },
 
+  getCustomRangeStats: async (startDate: string, endDate: string) => {
+    if (isMockMode()) return mockData.getWeeklyStats(startDate);
+    await waitForReady();
+    return withRetry(() => App.GetCustomRangeStats(startDate, endDate));
+  },
+
   getCalendarHeatmap: async (year: number, month: number) => {
     if (isMockMode()) return mockData.getCalendarHeatmap(year, month);
     await waitForReady();

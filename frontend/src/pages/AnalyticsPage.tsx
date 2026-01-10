@@ -19,6 +19,7 @@ import {
   TopWindowsList,
   WeeklyAnalytics,
   MonthlyAnalytics,
+  CustomRangeAnalytics,
 } from '@/components/analytics';
 import {
   useDailyStats,
@@ -34,6 +35,7 @@ import {
   useTopWindows,
   useWeeklyStats,
   useMonthlyStats,
+  useCustomRangeStats,
   queryKeys,
 } from '@/api/hooks';
 import { Download, RefreshCw } from 'lucide-react';
@@ -165,6 +167,9 @@ export function AnalyticsPage() {
   const { data: monthlyStats, isLoading: monthlyStatsLoading } = useMonthlyStats(year, month);
 
   // Custom range data
+  const customStartDate = getDateString(customRange.start);
+  const customEndDate = getDateString(customRange.end);
+  const { data: customRangeStats, isLoading: customRangeLoading } = useCustomRangeStats(customStartDate, customEndDate);
   const { data: customAppUsage, isLoading: customAppUsageLoading } = useAppUsageRange(customStartTs, customEndTs);
   const { data: customDataSourceStats, isLoading: customDataSourcesLoading } = useDataSourceStatsRange(customStartTs, customEndTs);
 
@@ -391,26 +396,14 @@ export function AnalyticsPage() {
 
       {viewMode === 'custom' && (
         <>
-          {/* Custom Range Summary */}
-          <div className="p-4 border rounded-lg bg-muted/30">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="font-semibold">Custom Date Range</h3>
-                <p className="text-sm text-muted-foreground">
-                  {Math.ceil((customRange.end.getTime() - customRange.start.getTime()) / (1000 * 60 * 60 * 24)) + 1} days selected
-                </p>
-              </div>
-              <div className="text-right">
-                <p className="text-sm text-muted-foreground">
-                  {customRange.start.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
-                  {' - '}
-                  {customRange.end.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
-                </p>
-              </div>
-            </div>
-          </div>
+          {/* Custom Range Analytics with Auto-Bucketing */}
+          <CustomRangeAnalytics
+            data={customRangeStats as any}
+            isLoading={customRangeLoading}
+            onDayClick={handleDayClick}
+          />
 
-          {/* Custom Range Analytics */}
+          {/* Additional Custom Range Details */}
           <Tabs defaultValue="apps" className="space-y-4">
             <TabsList>
               <TabsTrigger value="apps">Applications</TabsTrigger>

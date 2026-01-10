@@ -90,6 +90,10 @@ export function GetCurrentTime() {
   return window['go']['main']['App']['GetCurrentTime']();
 }
 
+export function GetCustomRangeStats(arg1, arg2) {
+  return window['go']['main']['App']['GetCustomRangeStats'](arg1, arg2);
+}
+
 export function GetDaemonStatus() {
   return window['go']['main']['App']['GetDaemonStatus']();
 }
