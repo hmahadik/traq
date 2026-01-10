@@ -1,10 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { DatePicker } from '@/components/common/DatePicker';
 import { DateRangePicker, type DateRange } from '@/components/common';
+import { useDateContext } from '@/contexts';
 import {
   StatsGrid,
   ActivityChart,
@@ -36,7 +36,7 @@ import {
   useMonthlyStats,
   queryKeys,
 } from '@/api/hooks';
-import { Calendar, ChevronLeft, ChevronRight, Download, RefreshCw } from 'lucide-react';
+import { Download, RefreshCw } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -46,7 +46,7 @@ import {
 import { api } from '@/api/client';
 import { toast } from 'sonner';
 
-type ViewMode = 'day' | 'week' | 'month' | 'custom';
+type ViewMode = 'day' | 'week' | 'month' | 'year' | 'custom';
 
 function getDateString(date: Date): string {
   // Use local date components to avoid timezone issues
@@ -72,8 +72,8 @@ function getWeekStart(date: Date): Date {
 export function AnalyticsPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { selectedDate, setTimeframeType } = useDateContext();
   const [viewMode, setViewMode] = useState<ViewMode>('day');
-  const [selectedDate, setSelectedDate] = useState(new Date());
   const [isRegenerating, setIsRegenerating] = useState(false);
   // Custom date range state
   const [customRange, setCustomRange] = useState<DateRange>(() => {
@@ -82,6 +82,12 @@ export function AnalyticsPage() {
     start.setDate(start.getDate() - 6); // Default to last 7 days
     return { start, end };
   });
+
+  // Update global timeframe type when view mode changes
+  useEffect(() => {
+    setTimeframeType(viewMode as any);
+  }, [viewMode, setTimeframeType]);
+
   const dateStr = getDateString(selectedDate);
   const weekStartStr = getDateString(getWeekStart(selectedDate));
   const isToday = dateStr === getDateString(new Date());
@@ -112,16 +118,6 @@ export function AnalyticsPage() {
   // Custom range data
   const { data: customAppUsage, isLoading: customAppUsageLoading } = useAppUsageRange(customStartTs, customEndTs);
   const { data: customDataSourceStats, isLoading: customDataSourcesLoading } = useDataSourceStatsRange(customStartTs, customEndTs);
-
-  const handlePrevDay = () => {
-    setSelectedDate((d) => addDays(d, -1));
-  };
-
-  const handleNextDay = () => {
-    if (!isToday) {
-      setSelectedDate((d) => addDays(d, 1));
-    }
-  };
 
   const handleAppClick = (appName: string) => {
     // Navigate to day view filtered by app
@@ -222,48 +218,12 @@ export function AnalyticsPage() {
               <TabsTrigger value="day" className="text-sm sm:px-3">Day</TabsTrigger>
               <TabsTrigger value="week" className="text-sm sm:px-3">Week</TabsTrigger>
               <TabsTrigger value="month" className="text-sm sm:px-3">Month</TabsTrigger>
+              <TabsTrigger value="year" className="text-sm sm:px-3">Year</TabsTrigger>
               <TabsTrigger value="custom" className="text-sm sm:px-3">Custom</TabsTrigger>
             </TabsList>
           </Tabs>
 
-          {/* Date Navigation - show for non-custom views */}
-          {viewMode !== 'custom' && (
-            <>
-              <Button variant="outline" size="icon" onClick={handlePrevDay}>
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <DatePicker
-                value={selectedDate}
-                onChange={setSelectedDate}
-                trigger={
-                  <Button variant="outline" size="sm" className="gap-1 sm:gap-2 px-2 sm:px-3">
-                    <Calendar className="h-4 w-4" />
-                    <span className="hidden sm:inline">{isToday ? 'Today' : selectedDate.toLocaleDateString()}</span>
-                  </Button>
-                }
-              />
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={handleNextDay}
-                disabled={isToday}
-              >
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-              {!isToday && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setSelectedDate(new Date())}
-                  className="hidden sm:flex"
-                >
-                  Today
-                </Button>
-              )}
-            </>
-          )}
-
-          {/* Custom Date Range Picker - show for custom view */}
+          {/* Custom Range Picker */}
           {viewMode === 'custom' && (
             <DateRangePicker
               value={customRange}
