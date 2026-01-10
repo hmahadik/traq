@@ -165,7 +165,7 @@
       "Step 4: Change date to yesterday using navigation arrows",
       "Step 5: Verify the same filters are still applied to yesterday's data"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
