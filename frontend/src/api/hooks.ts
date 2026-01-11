@@ -49,6 +49,7 @@ export const queryKeys = {
       ['timeline', 'events', startTime, endTime, eventTypes] as const,
     eventsForDate: (date: string, eventTypes?: string[]) =>
       ['timeline', 'eventsForDate', date, eventTypes] as const,
+    gridData: (date: string) => ['timeline', 'gridData', date] as const,
   },
   reports: {
     history: () => ['reports', 'history'] as const,
@@ -57,6 +58,7 @@ export const queryKeys = {
   config: {
     all: () => ['config'] as const,
     inference: () => ['config', 'inference'] as const,
+    categorizationRules: () => ['config', 'categorization', 'rules'] as const,
     models: () => ['config', 'models'] as const,
   },
   screenshots: {
@@ -237,6 +239,14 @@ export function useScreenshotsForDate(date: string) {
     queryKey: queryKeys.timeline.dateScreenshots(date),
     queryFn: () => api.timeline.getScreenshotsForDate(date),
     staleTime: 60_000,
+  });
+}
+
+export function useTimelineGridData(date: string) {
+  return useQuery({
+    queryKey: queryKeys.timeline.gridData(date),
+    queryFn: () => api.timeline.getTimelineGridData(date),
+    staleTime: 30_000, // 30 seconds
   });
 }
 

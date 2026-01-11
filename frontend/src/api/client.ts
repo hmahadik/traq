@@ -318,6 +318,12 @@ export const timeline = {
     return withRetry(() => App.GetSessionContext(sessionId));
   },
 
+  getTimelineGridData: async (date: string) => {
+    if (isMockMode()) return mockData.getTimelineGridData?.(date) || null;
+    await waitForReady();
+    return withRetry(() => App.GetTimelineGridData(date));
+  },
+
   getRecentSessions: async (limit: number) => {
     if (isMockMode()) {
       const today = new Date().toISOString().split('T')[0];
@@ -672,6 +678,21 @@ export const git = {
     await waitForReady();
     const repos = await App.DiscoverGitRepositories(searchPaths, maxDepth);
     return repos || [];
+  },
+
+  getCategorizationRules: async () => {
+    await waitForReady();
+    return withRetry(() => App.GetCategorizationRules());
+  },
+
+  setAppTimelineCategory: async (appName: string, category: string) => {
+    await waitForReady();
+    return App.SetAppTimelineCategory(appName, category);
+  },
+
+  deleteTimelineCategoryRule: async (appName: string) => {
+    await waitForReady();
+    return App.DeleteTimelineCategoryRule(appName);
   },
 };
 
