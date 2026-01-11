@@ -480,7 +480,7 @@
       "Verify success toast appears",
       "If webhook configured, verify Slack receives message"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "empty-states",
