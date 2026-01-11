@@ -11,6 +11,7 @@ export interface TimelineGridData {
   gitEvents: Record<number, GitEventDisplay[]>; // hour -> git events
   shellEvents: Record<number, ShellEventDisplay[]>; // hour -> shell commands
   fileEvents: Record<number, FileEventDisplay[]>; // hour -> file events
+  browserEvents: Record<number, BrowserEventDisplay[]>; // hour -> browser visits
 }
 
 export interface DayStats {
@@ -115,6 +116,20 @@ export interface FileEventDisplay {
   fileSizeBytes: number;
   watchCategory: string; // downloads, projects, documents
   oldPath: string; // For rename events
+  hourOffset: number; // Hour of day (0-23)
+  minuteOffset: number; // Minute within hour (0-59)
+  pixelPosition: number; // Vertical position in pixels (0-60)
+}
+
+export interface BrowserEventDisplay {
+  id: number;
+  timestamp: number;
+  url: string;
+  title: string;
+  domain: string;
+  browser: string; // chrome, firefox, safari, edge
+  visitDurationSeconds: number;
+  transitionType: string;
   hourOffset: number; // Hour of day (0-23)
   minuteOffset: number; // Minute within hour (0-59)
   pixelPosition: number; // Vertical position in pixels (0-60)

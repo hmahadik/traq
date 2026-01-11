@@ -216,6 +216,38 @@ export namespace service {
 	        this.historyLimitDays = source["historyLimitDays"];
 	    }
 	}
+	export class BrowserEventDisplay {
+	    id: number;
+	    timestamp: number;
+	    url: string;
+	    title: string;
+	    domain: string;
+	    browser: string;
+	    visitDurationSeconds: number;
+	    transitionType: string;
+	    hourOffset: number;
+	    minuteOffset: number;
+	    pixelPosition: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new BrowserEventDisplay(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.timestamp = source["timestamp"];
+	        this.url = source["url"];
+	        this.title = source["title"];
+	        this.domain = source["domain"];
+	        this.browser = source["browser"];
+	        this.visitDurationSeconds = source["visitDurationSeconds"];
+	        this.transitionType = source["transitionType"];
+	        this.hourOffset = source["hourOffset"];
+	        this.minuteOffset = source["minuteOffset"];
+	        this.pixelPosition = source["pixelPosition"];
+	    }
+	}
 	export class DomainUsage {
 	    domain: string;
 	    visitCount: number;
@@ -1670,6 +1702,7 @@ export namespace service {
 	    gitEvents: Record<number, Array<GitEventDisplay>>;
 	    shellEvents: Record<number, Array<ShellEventDisplay>>;
 	    fileEvents: Record<number, Array<FileEventDisplay>>;
+	    browserEvents: Record<number, Array<BrowserEventDisplay>>;
 	
 	    static createFrom(source: any = {}) {
 	        return new TimelineGridData(source);
@@ -1686,6 +1719,7 @@ export namespace service {
 	        this.gitEvents = this.convertValues(source["gitEvents"], Array<GitEventDisplay>, true);
 	        this.shellEvents = this.convertValues(source["shellEvents"], Array<ShellEventDisplay>, true);
 	        this.fileEvents = this.convertValues(source["fileEvents"], Array<FileEventDisplay>, true);
+	        this.browserEvents = this.convertValues(source["browserEvents"], Array<BrowserEventDisplay>, true);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

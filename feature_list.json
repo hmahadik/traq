@@ -729,8 +729,8 @@
       "Verify related visits to same domain grouped",
       "Click to revisit URL or see visit context"
     ],
-    "passes": false,
-    "note": "FUTURE ENHANCEMENT: Not in original spec. See UNIFIED_TIMELINE_VISION.md. Browser visits currently viewable in Analytics > Data Sources."
+    "passes": true,
+    "note": "IMPLEMENTED: Browser visits now appear inline in Timeline view with cyan-themed cards. Shows page title, domain, browser type (Chrome), and visit duration. Cards are positioned at correct timestamps and include onClick handlers. Total visit count displayed in column header (e.g., '228 visits')."
   },
   {
     "category": "unified-timeline",

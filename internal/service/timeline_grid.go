@@ -19,6 +19,7 @@ type TimelineGridData struct {
 	GitEvents        map[int][]GitEventDisplay                 `json:"gitEvents"`  // hour -> git events
 	ShellEvents      map[int][]ShellEventDisplay               `json:"shellEvents"` // hour -> shell commands
 	FileEvents       map[int][]FileEventDisplay                `json:"fileEvents"` // hour -> file events
+	BrowserEvents    map[int][]BrowserEventDisplay             `json:"browserEvents"` // hour -> browser visits
 }
 
 // DayStats contains aggregated statistics for a day.
@@ -117,6 +118,21 @@ type FileEventDisplay struct {
 	HourOffset    int     `json:"hourOffset"`    // Hour of day (0-23)
 	MinuteOffset  int     `json:"minuteOffset"`  // Minute within hour (0-59)
 	PixelPosition float64 `json:"pixelPosition"` // Vertical position in pixels (0-60)
+}
+
+// BrowserEventDisplay represents a browser visit for timeline display.
+type BrowserEventDisplay struct {
+	ID                   int64   `json:"id"`
+	Timestamp            int64   `json:"timestamp"`
+	URL                  string  `json:"url"`
+	Title                string  `json:"title"`
+	Domain               string  `json:"domain"`
+	Browser              string  `json:"browser"` // chrome, firefox, safari, edge
+	VisitDurationSeconds int64   `json:"visitDurationSeconds"`
+	TransitionType       string  `json:"transitionType"`
+	HourOffset           int     `json:"hourOffset"`      // Hour of day (0-23)
+	MinuteOffset         int     `json:"minuteOffset"`    // Minute within hour (0-59)
+	PixelPosition        float64 `json:"pixelPosition"`   // Vertical position in pixels (0-60)
 }
 
 // GetTimelineGridData retrieves all data needed for the v3 timeline grid view.
@@ -471,6 +487,57 @@ func (s *TimelineService) GetTimelineGridData(date string) (*TimelineGridData, e
 		fileEvents[hour] = append(fileEvents[hour], fileEvent)
 	}
 
+	// Fetch browser visits for the day
+	browserVisits_, err := s.store.GetBrowserVisitsByTimeRange(dayStart.Unix(), dayEnd.Unix())
+	if err != nil {
+		// Non-fatal: log and continue with empty browser visits
+		browserVisits_ = []*storage.BrowserVisit{}
+	}
+
+	// Build browser events map: hour -> events
+	browserEvents := make(map[int][]BrowserEventDisplay)
+
+	for _, visit := range browserVisits_ {
+		visitTime := time.Unix(visit.Timestamp, 0).In(time.Local)
+		hour := visitTime.Hour()
+		minute := visitTime.Minute()
+		pixelPosition := (float64(minute) / 60.0) * 60.0
+
+		// Get title or use empty string
+		title := ""
+		if visit.Title.Valid {
+			title = visit.Title.String
+		}
+
+		// Get visit duration or use 0
+		visitDuration := int64(0)
+		if visit.VisitDurationSeconds.Valid {
+			visitDuration = visit.VisitDurationSeconds.Int64
+		}
+
+		// Get transition type or use empty string
+		transitionType := ""
+		if visit.TransitionType.Valid {
+			transitionType = visit.TransitionType.String
+		}
+
+		browserEvent := BrowserEventDisplay{
+			ID:                   visit.ID,
+			Timestamp:            visit.Timestamp,
+			URL:                  visit.URL,
+			Title:                title,
+			Domain:               visit.Domain,
+			Browser:              visit.Browser,
+			VisitDurationSeconds: visitDuration,
+			TransitionType:       transitionType,
+			HourOffset:           hour,
+			MinuteOffset:         minute,
+			PixelPosition:        pixelPosition,
+		}
+
+		browserEvents[hour] = append(browserEvents[hour], browserEvent)
+	}
+
 	return &TimelineGridData{
 		Date:             date,
 		DayStats:         dayStats,
@@ -481,6 +548,7 @@ func (s *TimelineService) GetTimelineGridData(date string) (*TimelineGridData, e
 		GitEvents:        gitEvents,
 		ShellEvents:      shellEvents,
 		FileEvents:       fileEvents,
+		BrowserEvents:    browserEvents,
 	}, nil
 }
 
