@@ -1,382 +1,800 @@
 [
   {
-    "category": "functional",
-    "description": "NEW: Backend - Categorization rules table exists in database",
+    "category": "journey-daily-review",
+    "description": "Timeline grid loads and displays hour markers",
     "steps": [
-      "Step 1: Connect to SQLite database at ~/.local/share/traq/data.db",
-      "Step 2: Query schema for app_categorization_rules table",
-      "Step 3: Verify table has columns: id, app_name, category, is_system_default, created_at",
-      "Step 4: Verify table is created successfully"
+      "Navigate to Timeline page for a day with activity",
+      "Verify grid container renders",
+      "Verify hour column shows time labels (8 AM, 9 AM, etc.)",
+      "Verify each hour block is 80px tall",
+      "Verify only active hours plus buffer are displayed"
     ],
     "passes": true
   },
   {
-    "category": "functional",
-    "description": "NEW: Backend - Default categorization rules are seeded",
+    "category": "journey-daily-review",
+    "description": "Activity blocks positioned correctly within grid",
     "steps": [
-      "Step 1: Navigate to Timeline page in running app",
-      "Step 2: Open browser dev tools and check network requests",
-      "Step 3: Verify GetTimelineGridData returns Categories map",
-      "Step 4: Check that common apps (VS Code, Zoom, Slack) have appropriate categories"
+      "Navigate to Timeline page with activity data",
+      "Identify activity blocks in app columns",
+      "Verify blocks vertical position matches actual start time",
+      "Verify block height corresponds to activity duration",
+      "Verify minimum height of 4px for short activities"
     ],
     "passes": true
   },
   {
-    "category": "functional",
-    "description": "NEW: Backend - GetTimelineGridData endpoint returns grid data structure",
+    "category": "journey-daily-review",
+    "description": "CRITICAL: Activity blocks open ImageGallery filtered to that time window on click",
     "steps": [
-      "Step 1: Start the app with init.sh",
-      "Step 2: Navigate to Timeline page",
-      "Step 3: Open browser dev tools console",
-      "Step 4: Execute window.runtime.GetTimelineGridData(new Date().toISOString().split('T')[0])",
-      "Step 5: Verify response contains: Date, DayStats, TopApps, HourlyGrid, SessionSummaries, Categories"
+      "Navigate to Timeline page with activity",
+      "Click on an activity block (e.g., VS Code block from 2:15-2:45 PM)",
+      "Verify ImageGallery modal opens",
+      "Verify gallery shows only screenshots from that activity's time range (2:15-2:45 PM)",
+      "Verify gallery title shows the app name and time range",
+      "Verify user can navigate through screenshots within that window",
+      "Verify closing gallery returns to timeline"
+    ],
+    "passes": false
+  },
+  {
+    "category": "journey-daily-review",
+    "description": "AI Summary column displays session summaries",
+    "steps": [
+      "Navigate to Timeline page with sessions",
+      "Locate AI Summary column (second sticky column)",
+      "Verify session blocks appear at correct vertical positions",
+      "Verify summary text is visible or '(No summary)' placeholder shown",
+      "Verify time range displayed on each block"
     ],
     "passes": true
   },
   {
-    "category": "functional",
-    "description": "NEW: Frontend - useTimelineGridData hook fetches and caches grid data",
+    "category": "journey-daily-review",
+    "description": "CRITICAL: AI Summary blocks open ImageGallery for full session on click",
     "steps": [
-      "Step 1: Navigate to Timeline page",
-      "Step 2: Open React DevTools",
-      "Step 3: Verify useTimelineGridData hook is present in component tree",
-      "Step 4: Check that React Query cache contains 'timeline.grid' query with date key",
-      "Step 5: Verify data structure matches TimelineGridData type"
+      "Navigate to Timeline page with sessions",
+      "Click on an AI Summary block (e.g., session from 9:00 AM - 11:30 AM)",
+      "Verify ImageGallery modal opens",
+      "Verify gallery shows all screenshots from that session's full time range",
+      "Verify gallery title shows session summary or time range",
+      "Verify user can navigate through all session screenshots",
+      "Verify closing gallery returns to timeline"
+    ],
+    "passes": false
+  },
+  {
+    "category": "journey-daily-review",
+    "description": "Screenshot column shows thumbnails per hour",
+    "steps": [
+      "Navigate to Timeline page with screenshots",
+      "Locate Screenshot column on the right",
+      "Verify thumbnails display for hours with screenshots",
+      "Verify '+N more' badge shows when more than 2 screenshots",
+      "Verify clicking thumbnail opens ImageGallery"
     ],
     "passes": true
   },
   {
-    "category": "functional",
-    "description": "NEW: Timeline Grid View - Hour column displays with correct hour markers",
+    "category": "journey-daily-review",
+    "description": "Date navigation updates grid data correctly",
     "steps": [
-      "Step 1: Navigate to Timeline page for a day with activity",
-      "Step 2: Verify left sticky column shows hour markers (e.g., 8 AM, 9 AM, 10 AM)",
-      "Step 3: Verify each hour block is 60px tall",
-      "Step 4: Verify only active hours plus 1 hour buffer are shown",
-      "Step 5: Verify hour column remains sticky when scrolling horizontally"
+      "Navigate to Timeline page",
+      "Click 'Previous Day' button",
+      "Verify date updates and grid refreshes with new data",
+      "Click 'Next Day' button",
+      "Click 'Today' button and verify current date selected"
     ],
     "passes": true
   },
   {
-    "category": "functional",
-    "description": "NEW: Timeline Grid View - App columns render for top apps with correct headers",
+    "category": "journey-daily-review",
+    "description": "Friendly app names display throughout timeline",
     "steps": [
-      "Step 1: Navigate to Timeline page with activity",
-      "Step 2: Verify app columns appear after the AI Summary column",
-      "Step 3: Check that each app column shows: app icon, app name, total duration",
-      "Step 4: Verify columns are 140px wide",
-      "Step 5: Verify top 6 apps by duration are displayed"
+      "Navigate to Timeline page with activity",
+      "Check app column headers",
+      "Verify 'Chrome' not 'google-chrome'",
+      "Verify 'VS Code' not 'code'",
+      "Verify 'Terminal' not 'tilix' or 'gnome-terminal'"
     ],
     "passes": true
   },
   {
-    "category": "functional",
-    "description": "NEW: Timeline Grid View - Activity blocks positioned correctly within app columns",
+    "category": "journey-daily-review",
+    "description": "Daily stats sidebar shows accurate metrics",
     "steps": [
-      "Step 1: Navigate to Timeline page with activity",
-      "Step 2: Identify an activity block in an app column",
-      "Step 3: Check that block vertical position matches the actual start time",
-      "Step 4: Verify block height corresponds to activity duration",
-      "Step 5: Hover over block and verify tooltip shows window title, duration, and time"
+      "Navigate to Timeline page with activity",
+      "Locate left sidebar Daily Summary Card",
+      "Verify total hours tracked displays",
+      "Verify start/end times match actual activity span",
+      "Verify break count and longest focus session shown"
     ],
     "passes": true
   },
   {
-    "category": "functional",
-    "description": "NEW: Timeline Grid View - AI Summary column shows session summaries at correct times",
+    "category": "journey-daily-review",
+    "description": "Category breakdown bar shows time distribution",
     "steps": [
-      "Step 1: Navigate to Timeline page with sessions",
-      "Step 2: Locate the AI Summary column (sticky, after hour column)",
-      "Step 3: Verify session summary blocks appear at correct vertical positions",
-      "Step 4: Check that summary blocks have colored left borders based on category (focus=green, meetings=red, comms=purple)",
-      "Step 5: Verify summary text and time range are displayed"
+      "Navigate to Timeline page with activity",
+      "Locate breakdown bar in sidebar",
+      "Verify segments for focus, meetings, comms, other appear",
+      "Verify legend shows category labels with durations",
+      "Verify segment widths proportional to time"
     ],
     "passes": true
   },
   {
-    "category": "functional",
-    "description": "NEW: Timeline Grid View - Multi-hour sessions span across hour boundaries",
+    "category": "journey-analytics",
+    "description": "App usage pie chart renders correctly",
     "steps": [
-      "Step 1: Find or create a session spanning multiple hours (e.g., 9:00-11:30)",
-      "Step 2: Navigate to Timeline page for that date",
-      "Step 3: Verify the session summary block spans vertically across all hours",
-      "Step 4: Check that the block height extends from start time to end time correctly"
+      "Navigate to Analytics page",
+      "Locate app usage pie chart",
+      "Verify chart renders with colored segments",
+      "Verify hover shows app name and duration",
+      "Verify friendly app names display"
     ],
     "passes": true
   },
   {
-    "category": "functional",
-    "description": "NEW: Sidebar - Daily Summary Card displays total hours and key metrics",
+    "category": "journey-analytics",
+    "description": "CRITICAL: App usage table shows correct column data",
     "steps": [
-      "Step 1: Navigate to Timeline page with activity",
-      "Step 2: Locate the left sidebar Daily Summary Card",
-      "Step 3: Verify large hero number shows total hours tracked",
-      "Step 4: Verify stats rows show: day span, breaks, longest focus session",
-      "Step 5: Check that gradient text styling is applied"
+      "Navigate to Analytics page",
+      "Locate app usage table below pie chart",
+      "Verify App Name column shows friendly names",
+      "Verify Duration column shows formatted time",
+      "Verify Sessions column shows numeric value (not undefined)"
+    ],
+    "passes": false
+  },
+  {
+    "category": "journey-analytics",
+    "description": "CRITICAL: Heatmap chart is enabled and displays",
+    "steps": [
+      "Navigate to Analytics page",
+      "Scroll to heatmap section",
+      "Verify heatmap component is rendered (not commented out)",
+      "Verify day-of-week labels on Y axis",
+      "Verify hour labels on X axis",
+      "Verify color intensity reflects activity level"
+    ],
+    "passes": false
+  },
+  {
+    "category": "journey-analytics",
+    "description": "Focus distribution shows all 24 hours",
+    "steps": [
+      "Navigate to Analytics page",
+      "Locate Focus Distribution chart",
+      "Verify all 24 hours displayed (0-23 or 12 AM-11 PM)",
+      "Verify inactive hours shown with different styling",
+      "Verify active hours show focus quality colors"
+    ],
+    "passes": false
+  },
+  {
+    "category": "journey-analytics",
+    "description": "Date range switching updates all charts",
+    "steps": [
+      "Navigate to Analytics page",
+      "Switch from Today to Week view",
+      "Verify all charts update with weekly data",
+      "Switch to Month view",
+      "Verify aggregated data displays correctly"
     ],
     "passes": true
   },
   {
-    "category": "functional",
-    "description": "NEW: Sidebar - Breakdown bar shows categorized time distribution",
+    "category": "journey-analytics",
+    "description": "Custom date range selection doesn't corrupt state",
     "steps": [
-      "Step 1: Navigate to Timeline page with activity",
-      "Step 2: Locate the breakdown bar in left sidebar",
-      "Step 3: Verify bar segments appear for: focus (green), meetings (blue), comms (purple), other (gray)",
-      "Step 4: Verify legend shows category labels with durations",
-      "Step 5: Check that segment widths are proportional to time spent"
+      "Navigate to Analytics page",
+      "Select Custom date range",
+      "Pick start date (e.g., Jan 1)",
+      "Pick end date (e.g., Jan 7)",
+      "Verify date picker values remain stable after selection",
+      "Verify charts update without console errors"
+    ],
+    "passes": false
+  },
+  {
+    "category": "journey-reports",
+    "description": "Report generates successfully for all types",
+    "steps": [
+      "Navigate to Reports page",
+      "Select 'Summary' report type",
+      "Enter time range 'today'",
+      "Click Generate",
+      "Verify report appears in preview",
+      "Repeat for 'Detailed' and 'Standup' types"
     ],
     "passes": true
   },
   {
-    "category": "functional",
-    "description": "NEW: Sidebar - Top Apps section lists apps with icons and durations",
+    "category": "journey-reports",
+    "description": "Natural language time ranges parse correctly",
     "steps": [
-      "Step 1: Navigate to Timeline page with activity",
-      "Step 2: Locate Top Apps section in left sidebar",
-      "Step 3: Verify list shows top apps with icons",
-      "Step 4: Verify each app shows name and total duration",
-      "Step 5: Check that apps are ordered by duration (highest first)"
+      "Navigate to Reports page",
+      "Enter 'today' and generate - verify correct date",
+      "Enter 'yesterday' and generate - verify correct date",
+      "Enter 'last week' and generate - verify 7-day range",
+      "Enter 'past 3 days' and generate - verify 3-day range"
     ],
     "passes": true
   },
   {
-    "category": "functional",
-    "description": "NEW: Timeline Header - Date navigation works correctly",
+    "category": "journey-reports",
+    "description": "Markdown preview renders headers, bold, italic, code",
     "steps": [
-      "Step 1: Navigate to Timeline page",
-      "Step 2: Click 'Previous Day' button",
-      "Step 3: Verify date updates and grid data refreshes",
-      "Step 4: Click 'Next Day' button",
-      "Step 5: Verify date updates correctly",
-      "Step 6: Click 'Today' button and verify current date is selected"
+      "Generate a detailed report",
+      "Verify H1, H2, H3 headers render with proper styling",
+      "Verify **bold** text renders as bold",
+      "Verify *italic* text renders as italic",
+      "Verify `code` renders with background styling"
     ],
     "passes": true
   },
   {
-    "category": "functional",
-    "description": "NEW: Timeline Header - Total time displays in header",
+    "category": "journey-reports",
+    "description": "CRITICAL: Markdown tables render in preview",
     "steps": [
-      "Step 1: Navigate to Timeline page with activity",
-      "Step 2: Locate the header section",
-      "Step 3: Verify total time for the day is displayed prominently",
-      "Step 4: Verify format matches existing time formatting (e.g., '7.5h' or '7h 30m')"
+      "Generate a detailed report (which includes tables)",
+      "Scroll to app usage or session table section",
+      "Verify table renders with proper rows and columns",
+      "Verify not displaying raw pipe characters (| text |)",
+      "Verify table is readable and aligned"
+    ],
+    "passes": false
+  },
+  {
+    "category": "journey-reports",
+    "description": "CRITICAL: Export buttons download actual files",
+    "steps": [
+      "Generate a report",
+      "Click 'Markdown' export button",
+      "Verify browser downloads a .md file",
+      "Click 'HTML' export button",
+      "Verify browser downloads a .html file",
+      "Click 'JSON' export button",
+      "Verify browser downloads a .json file"
+    ],
+    "passes": false
+  },
+  {
+    "category": "journey-reports",
+    "description": "CRITICAL: JSON export produces valid JSON",
+    "steps": [
+      "Generate a report with quotes in content",
+      "Export as JSON",
+      "Open the downloaded file",
+      "Parse with JSON.parse() or json.loads()",
+      "Verify no parse errors occur",
+      "Verify content with special characters preserved correctly"
+    ],
+    "passes": false
+  },
+  {
+    "category": "journey-reports",
+    "description": "CRITICAL: Delete report button actually deletes",
+    "steps": [
+      "Generate a report",
+      "Note the report appears in history sidebar",
+      "Click delete button for that report",
+      "Confirm deletion",
+      "Verify report removed from history list",
+      "Refresh page and verify report still gone"
+    ],
+    "passes": false
+  },
+  {
+    "category": "journey-reports",
+    "description": "Report history loads and displays previous reports",
+    "steps": [
+      "Generate multiple reports",
+      "Navigate away and back to Reports page",
+      "Verify report history sidebar shows all generated reports",
+      "Click a report in history",
+      "Verify preview loads that report's content"
     ],
     "passes": true
   },
   {
-    "category": "functional",
-    "description": "NEW: Horizontal scroll works smoothly with many app columns",
+    "category": "journey-screenshots",
+    "description": "Screenshots page loads and displays grid",
     "steps": [
-      "Step 1: Navigate to Timeline page with 6+ active apps",
-      "Step 2: Scroll horizontally through app columns",
-      "Step 3: Verify Hour column and AI Summary column remain sticky",
-      "Step 4: Verify smooth scrolling performance",
-      "Step 5: Verify all app columns are accessible via scroll"
+      "Navigate to Screenshots page",
+      "Verify screenshot grid renders",
+      "Verify thumbnails display for screenshots",
+      "Verify date selector shows current date",
+      "Verify lazy loading works (images load on scroll)"
     ],
     "passes": true
   },
   {
-    "category": "functional",
-    "description": "NEW: Activity block tooltips show full details on hover",
+    "category": "journey-screenshots",
+    "description": "CRITICAL: Hour filter exists and works",
     "steps": [
-      "Step 1: Navigate to Timeline page with activity",
-      "Step 2: Hover over an activity block in an app column",
-      "Step 3: Verify tooltip appears with: window title, duration, start time, end time",
-      "Step 4: Verify tooltip positioning is correct and readable",
-      "Step 5: Move mouse away and verify tooltip disappears"
+      "Navigate to Screenshots page",
+      "Locate hour filter dropdown or selector",
+      "Select a specific hour (e.g., 3 PM)",
+      "Verify only screenshots from that hour display",
+      "Clear filter and verify all screenshots return"
+    ],
+    "passes": false
+  },
+  {
+    "category": "journey-screenshots",
+    "description": "App filter shows friendly names and filters correctly",
+    "steps": [
+      "Navigate to Screenshots page",
+      "Open app filter dropdown",
+      "Verify friendly names display (Chrome, not google-chrome)",
+      "Select an app",
+      "Verify only screenshots from that app display"
     ],
     "passes": true
   },
   {
-    "category": "functional",
-    "description": "NEW: Empty hours show diagonal line pattern",
+    "category": "journey-screenshots",
+    "description": "Window title search filters screenshots",
     "steps": [
-      "Step 1: Navigate to Timeline page",
-      "Step 2: Locate an hour block with no activity",
-      "Step 3: Verify empty hour blocks show diagonal line pattern (CSS gradient)",
-      "Step 4: Verify pattern is consistent across all empty hours"
+      "Navigate to Screenshots page with various window titles",
+      "Enter a search term in window title search",
+      "Verify only matching screenshots display",
+      "Verify search is case-insensitive",
+      "Clear search and verify all screenshots return"
     ],
     "passes": true
   },
   {
-    "category": "functional",
-    "description": "NEW: Very short activities (<1min) are visible with minimum height",
+    "category": "journey-screenshots",
+    "description": "Preview modal opens and shows full details",
     "steps": [
-      "Step 1: Find or create a very short activity (under 1 minute)",
-      "Step 2: Navigate to Timeline page for that date",
-      "Step 3: Verify the activity block is visible (min 4px height)",
-      "Step 4: Hover and verify tooltip shows correct short duration"
+      "Navigate to Screenshots page",
+      "Click on a screenshot thumbnail",
+      "Verify full-size preview modal opens",
+      "Verify app name displayed",
+      "Verify window title displayed",
+      "Verify timestamp displayed"
     ],
     "passes": true
   },
   {
-    "category": "functional",
-    "description": "NEW: Empty day shows appropriate empty state message",
+    "category": "journey-screenshots",
+    "description": "Session context shown on screenshots",
     "steps": [
-      "Step 1: Navigate to Timeline page for a date with no activity",
-      "Step 2: Verify empty state message is displayed",
-      "Step 3: Check that message is clear and helpful",
-      "Step 4: Verify sidebar still shows but with zero values"
+      "Navigate to Screenshots page",
+      "View screenshot thumbnails in grid",
+      "Verify session ID or session indicator visible",
+      "Click to preview",
+      "Verify can navigate to or view session context"
+    ],
+    "passes": false
+  },
+  {
+    "category": "journey-screenshots",
+    "description": "Missing image files show error placeholder",
+    "steps": [
+      "Have a screenshot record in DB where file is deleted from disk",
+      "Navigate to Screenshots page for that date",
+      "Verify broken image shows placeholder (not blank)",
+      "Verify 'File not found' or similar message shown",
+      "Verify UI doesn't crash"
+    ],
+    "passes": false
+  },
+  {
+    "category": "journey-screenshots",
+    "description": "Batch delete works with confirmation",
+    "steps": [
+      "Navigate to Screenshots page",
+      "Enable multi-select mode",
+      "Select multiple screenshots",
+      "Click batch delete button",
+      "Confirm deletion in dialog",
+      "Verify selected screenshots removed from grid"
     ],
     "passes": true
   },
   {
-    "category": "functional",
-    "description": "NEW: Categorization settings UI allows viewing rules",
+    "category": "security",
+    "description": "CRITICAL: No XSS in markdown rendering",
     "steps": [
-      "Step 1: Navigate to Settings page or open categorization modal",
-      "Step 2: Locate categorization rules section",
-      "Step 3: Verify list of existing rules is displayed",
-      "Step 4: Check that each rule shows: app name, category"
+      "Generate a report containing **<img src=x onerror=alert('XSS')>** in content",
+      "View report preview",
+      "Open browser developer console",
+      "Verify no JavaScript alert fires",
+      "Verify malicious content is escaped or stripped"
+    ],
+    "passes": false
+  },
+  {
+    "category": "data-integrity",
+    "description": "Total time in sidebar matches activity sum",
+    "steps": [
+      "Navigate to Timeline page with activity",
+      "Note total time displayed in sidebar",
+      "Manually sum activity block durations from tooltips",
+      "Verify totals match within 1-minute margin",
+      "Verify category breakdown percentages sum to 100%"
     ],
     "passes": true
   },
   {
-    "category": "functional",
-    "description": "NEW: Categorization settings UI allows adding new rules",
+    "category": "accessibility",
+    "description": "Interactive elements have proper ARIA labels",
     "steps": [
-      "Step 1: Open categorization settings",
-      "Step 2: Click 'Add Rule' button",
-      "Step 3: Enter app name (e.g., 'Firefox') and select category (e.g., 'other')",
-      "Step 4: Save the rule",
-      "Step 5: Verify rule appears in the list",
-      "Step 6: Navigate to Timeline and verify Firefox activities use new category color"
+      "Navigate to Timeline page",
+      "Inspect activity blocks with browser dev tools",
+      "Verify role='button' on clickable elements",
+      "Verify aria-label describes the element",
+      "Verify keyboard focus visible on interactive elements"
+    ],
+    "passes": false
+  },
+  {
+    "category": "performance",
+    "description": "Timeline page loads within 2 seconds",
+    "steps": [
+      "Navigate to Timeline page for a day with 100+ activity blocks",
+      "Start timer when navigation begins",
+      "Stop timer when grid is fully rendered",
+      "Verify load time is under 2 seconds",
+      "Verify no visible lag during scroll"
     ],
     "passes": true
   },
   {
-    "category": "functional",
-    "description": "NEW: Categorization settings UI allows editing existing rules",
+    "category": "navigation",
+    "description": "Calendar widget allows jumping to any past date",
     "steps": [
-      "Step 1: Open categorization settings",
-      "Step 2: Select an existing rule",
-      "Step 3: Click 'Edit' button",
-      "Step 4: Change the category (e.g., from 'focus' to 'comms')",
-      "Step 5: Save changes",
-      "Step 6: Verify rule is updated in the list",
-      "Step 7: Navigate to Timeline and verify category change is reflected"
+      "Navigate to Timeline page",
+      "Open calendar widget",
+      "Select a date from last month",
+      "Verify grid updates with that date's data",
+      "Verify future dates are not selectable"
     ],
     "passes": true
   },
   {
-    "category": "functional",
-    "description": "NEW: Categorization settings UI allows deleting rules",
+    "category": "settings",
+    "description": "Categorization rules can be viewed and modified",
     "steps": [
-      "Step 1: Open categorization settings",
-      "Step 2: Select an existing rule",
-      "Step 3: Click 'Delete' button",
-      "Step 4: Confirm deletion",
-      "Step 5: Verify rule is removed from the list",
-      "Step 6: Verify app falls back to default category"
+      "Open Settings from sidebar",
+      "Navigate to categorization section",
+      "View existing rules list",
+      "Add a new rule (e.g., Firefox = other)",
+      "Save and verify rule persists",
+      "Delete rule and verify removal"
     ],
     "passes": true
   },
   {
-    "category": "style",
-    "description": "NEW: Timeline Grid View matches reference design layout",
+    "category": "settings",
+    "description": "Issue reporting dialog submits successfully",
     "steps": [
-      "Step 1: Navigate to Timeline page",
-      "Step 2: Take screenshot",
-      "Step 3: Compare with reference at screenshots/references/traq-timeline-v3.html",
-      "Step 4: Verify layout matches: left sidebar + main grid area",
-      "Step 5: Verify hour column width ~50px, summary column ~160px, app columns ~140px"
+      "Click Report Issue in sidebar",
+      "Fill in description",
+      "Select severity",
+      "Submit issue",
+      "Verify success toast appears",
+      "If webhook configured, verify Slack receives message"
     ],
     "passes": true
   },
   {
-    "category": "style",
-    "description": "NEW: Activity blocks have gradient backgrounds matching design",
+    "category": "empty-states",
+    "description": "Empty day shows appropriate message",
     "steps": [
-      "Step 1: Navigate to Timeline page with activity",
-      "Step 2: Take close-up screenshot of activity blocks",
-      "Step 3: Verify blocks have subtle gradient backgrounds",
-      "Step 4: Verify category colors are applied correctly",
-      "Step 5: Check that blocks have appropriate border radius and shadows"
+      "Navigate to Timeline page for a date with no activity",
+      "Verify empty state message displays",
+      "Verify message is helpful (not just blank)",
+      "Verify sidebar shows zero values appropriately"
     ],
     "passes": true
   },
   {
-    "category": "style",
-    "description": "NEW: Daily Summary Card has hero gradient text styling",
+    "category": "data-sources-git",
+    "description": "Git activity tracking captures commits",
     "steps": [
-      "Step 1: Navigate to Timeline page",
-      "Step 2: Take screenshot of Daily Summary Card in sidebar",
-      "Step 3: Verify large hour number has gradient text effect",
-      "Step 4: Verify card styling matches design (background, padding, borders)"
+      "Make a git commit in a tracked repository",
+      "Navigate to Analytics page",
+      "Locate Data Sources panel or Git section",
+      "Verify commit count increments",
+      "Verify repository name captured",
+      "Verify insertions/deletions tracked"
     ],
     "passes": true
   },
   {
-    "category": "style",
-    "description": "NEW: Breakdown bar segments have correct colors and styling",
+    "category": "data-sources-git",
+    "description": "Git stats show top repositories by activity",
     "steps": [
-      "Step 1: Navigate to Timeline page with activity",
-      "Step 2: Take screenshot of breakdown bar",
-      "Step 3: Verify segment colors: focus=green, meetings=blue, comms=purple, other=gray",
-      "Step 4: Verify smooth transitions between segments",
-      "Step 5: Verify legend styling is clear and readable"
+      "Navigate to Analytics page with git history",
+      "Locate Git statistics section",
+      "Verify TopRepos list shows repositories",
+      "Verify each repo shows commit count",
+      "Verify repos ordered by activity (most active first)"
     ],
     "passes": true
   },
   {
-    "category": "style",
-    "description": "NEW: Timeline Grid scrolls smoothly with sticky columns",
+    "category": "data-sources-git",
+    "description": "Git stats aggregate correctly across date ranges",
     "steps": [
-      "Step 1: Navigate to Timeline page with multiple app columns",
-      "Step 2: Record horizontal scroll interaction",
-      "Step 3: Verify Hour and AI Summary columns remain fixed on left",
-      "Step 4: Verify app columns scroll smoothly",
-      "Step 5: Check for visual glitches or alignment issues during scroll"
+      "Navigate to Analytics page",
+      "Select 'Week' time range",
+      "Verify git stats show weekly totals",
+      "Select 'Month' time range",
+      "Verify git stats aggregate monthly",
+      "Verify totals match sum of daily commits"
     ],
     "passes": true
   },
   {
-    "category": "style",
-    "description": "NEW: Responsive layout works on different window sizes",
+    "category": "data-sources-shell",
+    "description": "Shell command tracking captures terminal activity",
     "steps": [
-      "Step 1: Navigate to Timeline page",
-      "Step 2: Resize window to narrow width (~1200px)",
-      "Step 3: Verify sidebar remains visible or collapses gracefully",
-      "Step 4: Verify grid scrolls horizontally without breaking",
-      "Step 5: Test at wide width (~1920px) and verify layout uses space well"
+      "Execute several terminal commands",
+      "Navigate to Analytics page",
+      "Locate Shell statistics section",
+      "Verify total command count updates",
+      "Verify shell type detected (bash, zsh, etc.)"
     ],
     "passes": true
   },
   {
-    "category": "style",
-    "description": "NEW: Loading states show skeletons for grid components",
+    "category": "data-sources-shell",
+    "description": "Shell stats show top commands used",
     "steps": [
-      "Step 1: Navigate to Timeline page",
-      "Step 2: Refresh and observe loading state",
-      "Step 3: Verify skeleton loaders appear for sidebar and grid",
-      "Step 4: Verify skeletons match final layout structure",
-      "Step 5: Verify smooth transition from loading to loaded state"
+      "Navigate to Analytics page with shell history",
+      "Locate Shell statistics section",
+      "Verify TopCommands list populated",
+      "Verify command counts accurate",
+      "Verify commands ordered by frequency"
     ],
     "passes": true
   },
   {
-    "category": "functional",
-    "description": "NEW: Grid data accuracy - Total time matches sum of activities",
+    "category": "data-sources-shell",
+    "description": "Shell stats break down by shell type",
     "steps": [
-      "Step 1: Navigate to Timeline page with activity",
-      "Step 2: Note total time displayed in header/sidebar",
-      "Step 3: Manually sum all activity block durations (use tooltips)",
-      "Step 4: Verify totals match within reasonable margin (\u00b11 minute)",
-      "Step 5: Check that breakdown percentages add up to 100%"
+      "Navigate to Analytics page with shell history",
+      "Locate Shell statistics section",
+      "Verify ShellTypes breakdown shows",
+      "Verify bash vs zsh vs other differentiated",
+      "Verify counts per shell type"
     ],
     "passes": true
   },
   {
-    "category": "functional",
-    "description": "NEW: Session without AI summary shows placeholder",
+    "category": "data-sources-files",
+    "description": "File activity tracking captures file events",
     "steps": [
-      "Step 1: Find or create a session without an AI-generated summary",
-      "Step 2: Navigate to Timeline page for that date",
-      "Step 3: Locate the session block in AI Summary column",
-      "Step 4: Verify placeholder text like '(No summary)' is displayed",
-      "Step 5: Verify block still shows time range correctly"
+      "Create, modify, and delete files in tracked directories",
+      "Navigate to Analytics page",
+      "Locate File statistics section",
+      "Verify total file events count",
+      "Verify event types tracked (create, modify, delete)"
     ],
     "passes": true
+  },
+  {
+    "category": "data-sources-files",
+    "description": "File stats show events by type breakdown",
+    "steps": [
+      "Navigate to Analytics page with file history",
+      "Locate File statistics section",
+      "Verify EventsByType map populated",
+      "Verify create/modify/delete counts shown",
+      "Verify breakdown adds up to total"
+    ],
+    "passes": true
+  },
+  {
+    "category": "data-sources-files",
+    "description": "File stats show top extensions",
+    "steps": [
+      "Navigate to Analytics page with file history",
+      "Locate File statistics section",
+      "Verify TopExtensions list shows file types",
+      "Verify common extensions (.ts, .go, .md) appear",
+      "Verify extensions ordered by frequency"
+    ],
+    "passes": true
+  },
+  {
+    "category": "data-sources-browser",
+    "description": "Browser activity tracking captures page visits",
+    "steps": [
+      "Browse websites in tracked browser",
+      "Navigate to Analytics page",
+      "Locate Browser statistics section",
+      "Verify total visits count",
+      "Verify unique domains count"
+    ],
+    "passes": true
+  },
+  {
+    "category": "data-sources-browser",
+    "description": "Browser stats show top domains visited",
+    "steps": [
+      "Navigate to Analytics page with browser history",
+      "Locate Browser statistics section",
+      "Verify TopDomains list populated",
+      "Verify domains show visit counts",
+      "Verify domains ordered by frequency"
+    ],
+    "passes": true
+  },
+  {
+    "category": "data-sources-browser",
+    "description": "Browser stats break down by browser type",
+    "steps": [
+      "Navigate to Analytics page with browser history",
+      "Locate Browser statistics section",
+      "Verify BrowserCounts map shows breakdown",
+      "Verify Chrome/Firefox/etc differentiated",
+      "Verify counts per browser"
+    ],
+    "passes": true
+  },
+  {
+    "category": "data-sources-integration",
+    "description": "Data sources panel visible in Analytics page",
+    "steps": [
+      "Navigate to Analytics page",
+      "Locate Data Sources section/panel",
+      "Verify Git, Shell, Files, Browser sections present",
+      "Verify each section shows summary stats",
+      "Verify sections collapsible or expandable"
+    ],
+    "passes": true
+  },
+  {
+    "category": "data-sources-integration",
+    "description": "Data sources included in generated reports",
+    "steps": [
+      "Navigate to Reports page",
+      "Generate a Detailed report",
+      "Scroll through report content",
+      "Verify git commits mentioned if any",
+      "Verify shell activity mentioned if any",
+      "Verify file changes mentioned if any"
+    ],
+    "passes": true
+  },
+  {
+    "category": "data-sources-integration",
+    "description": "Daily stats include data source counts",
+    "steps": [
+      "Navigate to Analytics or Timeline page",
+      "View daily stats/summary",
+      "Verify shellCommands count displayed",
+      "Verify gitCommits count displayed",
+      "Verify filesModified count displayed"
+    ],
+    "passes": true
+  },
+  {
+    "category": "unified-timeline",
+    "description": "VISION: Git commits appear inline in timeline at correct timestamps",
+    "steps": [
+      "Navigate to Timeline page for a day with git commits",
+      "Scroll to the time when a commit was made",
+      "Verify git commit event appears in timeline (not just Analytics)",
+      "Verify commit shows: message, repo name, branch, timestamp",
+      "Verify commit is positioned correctly relative to screenshots",
+      "Click commit to see diff or navigate to repo"
+    ],
+    "passes": false
+  },
+  {
+    "category": "unified-timeline",
+    "description": "VISION: Shell commands appear inline in timeline",
+    "steps": [
+      "Navigate to Timeline page for a day with shell activity",
+      "Scroll to time when significant commands were run",
+      "Verify shell events appear in timeline",
+      "Verify command shows: command text, shell type, exit status if available",
+      "Verify commands grouped if many in quick succession",
+      "Click to expand command details or see surrounding context"
+    ],
+    "passes": false
+  },
+  {
+    "category": "unified-timeline",
+    "description": "VISION: File modifications appear inline in timeline",
+    "steps": [
+      "Navigate to Timeline page for a day with file activity",
+      "Scroll to time when files were modified",
+      "Verify file events appear in timeline",
+      "Verify event shows: filename, event type (create/modify/delete), path",
+      "Verify related files grouped together",
+      "Click to see file diff or open in editor"
+    ],
+    "passes": false
+  },
+  {
+    "category": "unified-timeline",
+    "description": "VISION: Browser visits appear inline in timeline",
+    "steps": [
+      "Navigate to Timeline page for a day with browser activity",
+      "Scroll to time when browsing occurred",
+      "Verify browser events appear in timeline",
+      "Verify visit shows: page title, domain, timestamp",
+      "Verify related visits to same domain grouped",
+      "Click to revisit URL or see visit context"
+    ],
+    "passes": false
+  },
+  {
+    "category": "unified-timeline",
+    "description": "VISION: All event types can be filtered in timeline",
+    "steps": [
+      "Navigate to Timeline page",
+      "Locate event type filter controls",
+      "Toggle off 'Git' - verify commits hidden",
+      "Toggle off 'Shell' - verify commands hidden",
+      "Toggle off 'Files' - verify file events hidden",
+      "Toggle off 'Browser' - verify visits hidden",
+      "Toggle off 'Screenshots' - verify only events remain",
+      "Toggle all back on - verify full timeline restored"
+    ],
+    "passes": false
+  },
+  {
+    "category": "unified-timeline",
+    "description": "VISION: Timeline shows correlated activity clusters",
+    "steps": [
+      "Navigate to Timeline page for a busy day",
+      "Identify a cluster of related activity",
+      "Verify cluster shows: commits + file changes + screenshots together",
+      "Verify visual grouping indicates these events are related",
+      "Click cluster to expand and see all events",
+      "Verify temporal proximity is visually clear"
+    ],
+    "passes": false
+  },
+  {
+    "category": "unified-timeline",
+    "description": "VISION: Search finds events across all data sources",
+    "steps": [
+      "Navigate to Timeline page",
+      "Enter search term (e.g., 'auth')",
+      "Verify results include: git commits with 'auth' in message",
+      "Verify results include: files with 'auth' in path",
+      "Verify results include: browser visits to pages about auth",
+      "Verify results include: screenshots with 'auth' in window title",
+      "Click result to jump to that point in timeline"
+    ],
+    "passes": false
+  },
+  {
+    "category": "unified-timeline",
+    "description": "VISION: Reports include unified event timeline",
+    "steps": [
+      "Navigate to Reports page",
+      "Generate a Detailed report for a day with mixed activity",
+      "Verify report includes chronological event list",
+      "Verify events show: git commits, shell commands, file changes",
+      "Verify events are in correct time order",
+      "Verify events correlate with session summaries"
+    ],
+    "passes": false
+  },
+  {
+    "category": "unified-timeline",
+    "description": "VISION: Going back in time reconstructs full context",
+    "steps": [
+      "Navigate to Timeline for a past date (e.g., last month)",
+      "Find a session where you solved a problem",
+      "Verify you can see: what was on screen (screenshots)",
+      "Verify you can see: what code changed (git commits)",
+      "Verify you can see: what commands ran (shell)",
+      "Verify you can see: what you researched (browser)",
+      "Verify the full story of that work session is reconstructible"
+    ],
+    "passes": false
   }
 ]
