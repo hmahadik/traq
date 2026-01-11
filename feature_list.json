@@ -442,7 +442,7 @@
       "Verify load time is under 2 seconds",
       "Verify no visible lag during scroll"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "navigation",
