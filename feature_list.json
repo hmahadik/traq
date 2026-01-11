@@ -8,7 +8,7 @@
       "Step 3: Verify table has columns: id, app_name, category, is_system_default, created_at",
       "Step 4: Verify table is created successfully"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -19,7 +19,7 @@
       "Step 3: Verify GetTimelineGridData returns Categories map",
       "Step 4: Check that common apps (VS Code, Zoom, Slack) have appropriate categories"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -31,7 +31,7 @@
       "Step 4: Execute window.runtime.GetTimelineGridData(new Date().toISOString().split('T')[0])",
       "Step 5: Verify response contains: Date, DayStats, TopApps, HourlyGrid, SessionSummaries, Categories"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -43,7 +43,7 @@
       "Step 4: Check that React Query cache contains 'timeline.grid' query with date key",
       "Step 5: Verify data structure matches TimelineGridData type"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -55,7 +55,7 @@
       "Step 4: Verify only active hours plus 1 hour buffer are shown",
       "Step 5: Verify hour column remains sticky when scrolling horizontally"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -67,7 +67,7 @@
       "Step 4: Verify columns are 140px wide",
       "Step 5: Verify top 6 apps by duration are displayed"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -79,7 +79,7 @@
       "Step 4: Verify block height corresponds to activity duration",
       "Step 5: Hover over block and verify tooltip shows window title, duration, and time"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -91,7 +91,7 @@
       "Step 4: Check that summary blocks have colored left borders based on category (focus=green, meetings=red, comms=purple)",
       "Step 5: Verify summary text and time range are displayed"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -102,7 +102,7 @@
       "Step 3: Verify the session summary block spans vertically across all hours",
       "Step 4: Check that the block height extends from start time to end time correctly"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -114,7 +114,7 @@
       "Step 4: Verify stats rows show: day span, breaks, longest focus session",
       "Step 5: Check that gradient text styling is applied"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -126,7 +126,7 @@
       "Step 4: Verify legend shows category labels with durations",
       "Step 5: Check that segment widths are proportional to time spent"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -138,7 +138,7 @@
       "Step 4: Verify each app shows name and total duration",
       "Step 5: Check that apps are ordered by duration (highest first)"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -151,7 +151,7 @@
       "Step 5: Verify date updates correctly",
       "Step 6: Click 'Today' button and verify current date is selected"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -162,7 +162,7 @@
       "Step 3: Verify total time for the day is displayed prominently",
       "Step 4: Verify format matches existing time formatting (e.g., '7.5h' or '7h 30m')"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -174,7 +174,7 @@
       "Step 4: Verify smooth scrolling performance",
       "Step 5: Verify all app columns are accessible via scroll"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -186,7 +186,7 @@
       "Step 4: Verify tooltip positioning is correct and readable",
       "Step 5: Move mouse away and verify tooltip disappears"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -197,7 +197,7 @@
       "Step 3: Verify empty hour blocks show diagonal line pattern (CSS gradient)",
       "Step 4: Verify pattern is consistent across all empty hours"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -208,7 +208,7 @@
       "Step 3: Verify the activity block is visible (min 4px height)",
       "Step 4: Hover and verify tooltip shows correct short duration"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -219,7 +219,7 @@
       "Step 3: Check that message is clear and helpful",
       "Step 4: Verify sidebar still shows but with zero values"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -282,7 +282,7 @@
       "Step 4: Verify layout matches: left sidebar + main grid area",
       "Step 5: Verify hour column width ~50px, summary column ~160px, app columns ~140px"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "style",
@@ -294,7 +294,7 @@
       "Step 4: Verify category colors are applied correctly",
       "Step 5: Check that blocks have appropriate border radius and shadows"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "style",
@@ -305,7 +305,7 @@
       "Step 3: Verify large hour number has gradient text effect",
       "Step 4: Verify card styling matches design (background, padding, borders)"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "style",
@@ -317,7 +317,7 @@
       "Step 4: Verify smooth transitions between segments",
       "Step 5: Verify legend styling is clear and readable"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "style",
@@ -329,7 +329,7 @@
       "Step 4: Verify app columns scroll smoothly",
       "Step 5: Check for visual glitches or alignment issues during scroll"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "style",
@@ -341,7 +341,7 @@
       "Step 4: Verify grid scrolls horizontally without breaking",
       "Step 5: Test at wide width (~1920px) and verify layout uses space well"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "style",
@@ -362,10 +362,10 @@
       "Step 1: Navigate to Timeline page with activity",
       "Step 2: Note total time displayed in header/sidebar",
       "Step 3: Manually sum all activity block durations (use tooltips)",
-      "Step 4: Verify totals match within reasonable margin (±1 minute)",
+      "Step 4: Verify totals match within reasonable margin (\u00b11 minute)",
       "Step 5: Check that breakdown percentages add up to 100%"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -377,6 +377,6 @@
       "Step 4: Verify placeholder text like '(No summary)' is displayed",
       "Step 5: Verify block still shows time range correctly"
     ],
-    "passes": false
+    "passes": true
   }
 ]
