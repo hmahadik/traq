@@ -687,7 +687,8 @@
       "Verify commit is positioned correctly relative to screenshots",
       "Click commit to see diff or navigate to repo"
     ],
-    "passes": false
+    "passes": false,
+    "note": "FUTURE ENHANCEMENT: Not in original spec. See UNIFIED_TIMELINE_VISION.md. Git commits currently viewable in Analytics > Data Sources."
   },
   {
     "category": "unified-timeline",
@@ -700,7 +701,8 @@
       "Verify commands grouped if many in quick succession",
       "Click to expand command details or see surrounding context"
     ],
-    "passes": false
+    "passes": false,
+    "note": "FUTURE ENHANCEMENT: Not in original spec. See UNIFIED_TIMELINE_VISION.md. Shell commands currently viewable in Analytics > Data Sources."
   },
   {
     "category": "unified-timeline",
@@ -713,7 +715,8 @@
       "Verify related files grouped together",
       "Click to see file diff or open in editor"
     ],
-    "passes": false
+    "passes": false,
+    "note": "FUTURE ENHANCEMENT: Not in original spec. See UNIFIED_TIMELINE_VISION.md. File events currently viewable in Analytics > Data Sources."
   },
   {
     "category": "unified-timeline",
@@ -726,7 +729,8 @@
       "Verify related visits to same domain grouped",
       "Click to revisit URL or see visit context"
     ],
-    "passes": false
+    "passes": false,
+    "note": "FUTURE ENHANCEMENT: Not in original spec. See UNIFIED_TIMELINE_VISION.md. Browser visits currently viewable in Analytics > Data Sources."
   },
   {
     "category": "unified-timeline",
@@ -741,7 +745,8 @@
       "Toggle off 'Screenshots' - verify only events remain",
       "Toggle all back on - verify full timeline restored"
     ],
-    "passes": false
+    "passes": false,
+    "note": "FUTURE ENHANCEMENT: Not in original spec. See UNIFIED_TIMELINE_VISION.md. Requires unified timeline implementation first."
   },
   {
     "category": "unified-timeline",
@@ -754,7 +759,8 @@
       "Click cluster to expand and see all events",
       "Verify temporal proximity is visually clear"
     ],
-    "passes": false
+    "passes": false,
+    "note": "FUTURE ENHANCEMENT: Not in original spec. See UNIFIED_TIMELINE_VISION.md. Requires AI/ML correlation logic and unified timeline implementation."
   },
   {
     "category": "unified-timeline",
@@ -768,7 +774,8 @@
       "Verify results include: screenshots with 'auth' in window title",
       "Click result to jump to that point in timeline"
     ],
-    "passes": false
+    "passes": false,
+    "note": "FUTURE ENHANCEMENT: Not in original spec. See UNIFIED_TIMELINE_VISION.md. Requires full-text search across all event types."
   },
   {
     "category": "unified-timeline",
@@ -781,7 +788,8 @@
       "Verify events are in correct time order",
       "Verify events correlate with session summaries"
     ],
-    "passes": false
+    "passes": false,
+    "note": "FUTURE ENHANCEMENT: Not in original spec. See UNIFIED_TIMELINE_VISION.md. Reports currently show data source counts in overview."
   },
   {
     "category": "unified-timeline",
@@ -795,6 +803,7 @@
       "Verify you can see: what you researched (browser)",
       "Verify the full story of that work session is reconstructible"
     ],
-    "passes": false
+    "passes": false,
+    "note": "FUTURE ENHANCEMENT: Not in original spec. See UNIFIED_TIMELINE_VISION.md. Screenshots + Analytics currently provide partial context reconstruction."
   }
 ]
