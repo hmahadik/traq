@@ -195,7 +195,7 @@
       "Verify date picker values remain stable after selection",
       "Verify charts update without console errors"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "journey-reports",
