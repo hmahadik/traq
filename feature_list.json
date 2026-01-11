@@ -394,7 +394,7 @@
       "Confirm deletion in dialog",
       "Verify selected screenshots removed from grid"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "security",
