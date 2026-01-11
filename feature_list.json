@@ -418,7 +418,7 @@
       "Verify totals match within 1-minute margin",
       "Verify category breakdown percentages sum to 100%"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "accessibility",
