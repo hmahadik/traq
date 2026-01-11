@@ -7,6 +7,7 @@ import { TimelineGridView } from '@/components/timeline/TimelineGridView';
 import { DailySummaryCard } from '@/components/timeline/DailySummaryCard';
 import { BreakdownBar } from '@/components/timeline/BreakdownBar';
 import { TopAppsSection } from '@/components/timeline/TopAppsSection';
+import { TimelinePageSkeleton } from '@/components/timeline/TimelineGridSkeleton';
 
 function getDateString(date: Date): string {
   // Use local date components to avoid timezone issues
@@ -60,18 +61,8 @@ export function TimelinePage() {
 
   return (
     <div className="flex flex-col xl:flex-row gap-6 h-[calc(100vh-5rem)] lg:h-[calc(100vh-3rem)]">
-      {/* Left Sidebar - Stats and Summary */}
-      <div className="xl:w-80 xl:flex-shrink-0">
-        <div className="xl:sticky xl:top-0 space-y-4">
-          <DailySummaryCard stats={gridData?.dayStats || null} />
-          <BreakdownBar stats={gridData?.dayStats || null} />
-          <TopAppsSection topApps={gridData?.topApps || []} />
-        </div>
-      </div>
-
-      {/* Main Content - Timeline Grid */}
-      <div className="flex-1 flex flex-col min-w-0 xl:overflow-hidden">
-        {/* Header */}
+      {/* Header - Always visible */}
+      <div className="xl:hidden">
         <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Timeline</h1>
@@ -128,20 +119,91 @@ export function TimelinePage() {
             </Button>
           </div>
         </div>
-
-        {/* Grid View */}
-        {gridLoading ? (
-          <div className="flex items-center justify-center h-64 text-muted-foreground">
-            <div>Loading timeline...</div>
-          </div>
-        ) : gridData ? (
-          <TimelineGridView data={gridData} />
-        ) : (
-          <div className="flex items-center justify-center h-64 text-muted-foreground">
-            <div>No data available</div>
-          </div>
-        )}
       </div>
+
+      {/* Loading State */}
+      {gridLoading ? (
+        <TimelinePageSkeleton />
+      ) : gridData ? (
+        <>
+          {/* Left Sidebar - Stats and Summary */}
+          <div className="xl:w-80 xl:flex-shrink-0">
+            <div className="xl:sticky xl:top-0 space-y-4">
+              <DailySummaryCard stats={gridData.dayStats || null} />
+              <BreakdownBar stats={gridData.dayStats || null} />
+              <TopAppsSection topApps={gridData.topApps || []} />
+            </div>
+          </div>
+
+          {/* Main Content - Timeline Grid */}
+          <div className="flex-1 flex flex-col min-w-0 xl:overflow-hidden">
+            {/* Header - Desktop */}
+            <div className="hidden xl:flex items-center justify-between mb-6">
+              <div>
+                <h1 className="text-3xl font-bold tracking-tight">Timeline</h1>
+                <p className="text-muted-foreground">{formattedDate}</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="icon" onClick={goToPreviousDay}>
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={goToNextDay}
+                  disabled={isToday}
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+                {/* Quick Date Jump Buttons */}
+                <div className="flex items-center gap-1 ml-2">
+                  <Button
+                    variant={isToday ? 'secondary' : 'ghost'}
+                    size="sm"
+                    onClick={() => handleDateSelect(new Date())}
+                  >
+                    Today
+                  </Button>
+                  <Button
+                    variant={dateStr === getDateString(addDays(new Date(), -1)) ? 'secondary' : 'ghost'}
+                    size="sm"
+                    onClick={() => handleDateSelect(addDays(new Date(), -1))}
+                  >
+                    Yesterday
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      const today = new Date();
+                      const dayOfWeek = today.getDay();
+                      const startOfWeek = addDays(today, -dayOfWeek);
+                      handleDateSelect(startOfWeek);
+                    }}
+                  >
+                    This Week
+                  </Button>
+                </div>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setShowCalendar(!showCalendar)}
+                  title={showCalendar ? 'Hide calendar' : 'Show calendar'}
+                >
+                  <Calendar className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+
+            {/* Grid View */}
+            <TimelineGridView data={gridData} />
+          </div>
+        </>
+      ) : (
+        <div className="flex items-center justify-center h-64 text-muted-foreground">
+          <div>No data available</div>
+        </div>
+      )}
 
       {/* Calendar Sidebar */}
       {showCalendar && (
