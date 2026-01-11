@@ -12,6 +12,21 @@ import { toast } from 'sonner';
 import { api } from './client';
 import type { Config } from '@/types';
 
+// Check if we're in a Wails runtime environment
+function isWailsRuntime(): boolean {
+  return typeof window !== 'undefined' &&
+         window['runtime'] !== undefined;
+}
+
+// Safe wrapper for EventsOn that only works in Wails runtime
+function safeEventsOn(eventName: string, callback: (...args: any[]) => void): () => void {
+  if (isWailsRuntime()) {
+    return EventsOn(eventName, callback);
+  }
+  // Return no-op cleanup function for non-Wails environments
+  return () => {};
+}
+
 // Helper to convert date string to timestamp range
 function getDateRange(date: string): { start: number; end: number } {
   const d = new Date(date);
@@ -382,18 +397,18 @@ export function useDownloadModel() {
 
   useEffect(() => {
     // Listen for download progress events
-    const cancelProgress = EventsOn('model:download:progress', (data: { modelId: string; percent: number }) => {
+    const cancelProgress = safeEventsOn('model:download:progress', (data: { modelId: string; percent: number }) => {
       setProgress(data.percent);
     });
 
-    const cancelComplete = EventsOn('model:download:complete', (data: { modelId: string }) => {
+    const cancelComplete = safeEventsOn('model:download:complete', (data: { modelId: string }) => {
       setProgress(null);
       setDownloadingModelId(null);
       // Refresh the models list to show the newly downloaded model
       queryClient.invalidateQueries({ queryKey: queryKeys.config.models() });
     });
 
-    const cancelError = EventsOn('model:download:error', (data: { modelId: string; error: string }) => {
+    const cancelError = safeEventsOn('model:download:error', (data: { modelId: string; error: string }) => {
       setProgress(null);
       setDownloadingModelId(null);
       console.error('Model download failed:', data.error);
@@ -436,11 +451,11 @@ export function useDownloadServer() {
 
   useEffect(() => {
     // Listen for download progress events
-    const cancelProgress = EventsOn('server:download:progress', (data: { percent: number }) => {
+    const cancelProgress = safeEventsOn('server:download:progress', (data: { percent: number }) => {
       setProgress(data.percent);
     });
 
-    const cancelComplete = EventsOn('server:download:complete', () => {
+    const cancelComplete = safeEventsOn('server:download:complete', () => {
       setProgress(null);
       setIsDownloading(false);
       setError(null);
@@ -449,7 +464,7 @@ export function useDownloadServer() {
       queryClient.invalidateQueries({ queryKey: queryKeys.config.inference() });
     });
 
-    const cancelError = EventsOn('server:download:error', (data: { error: string }) => {
+    const cancelError = safeEventsOn('server:download:error', (data: { error: string }) => {
       setProgress(null);
       setIsDownloading(false);
       setError(data.error);

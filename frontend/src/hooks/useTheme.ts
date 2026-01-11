@@ -2,6 +2,13 @@ import { useEffect, useState } from 'react';
 import { useConfig } from '../api/hooks';
 import { GetSystemTheme } from '../../wailsjs/go/main/App';
 
+// Check if we're in a Wails runtime environment
+function isWailsRuntime(): boolean {
+  return typeof window !== 'undefined' &&
+         window['go'] !== undefined &&
+         window['go']['main'] !== undefined;
+}
+
 /**
  * Applies the configured theme to the document.
  * Handles 'light', 'dark', and 'system' (follows OS preference) modes.
@@ -14,14 +21,21 @@ export function useTheme() {
   useEffect(() => {
     const theme = config?.ui?.theme || 'system';
     if (theme === 'system') {
-      GetSystemTheme()
-        .then((detected) => {
-          setSystemTheme(detected === 'dark' ? 'dark' : 'light');
-        })
-        .catch(() => {
-          // Fallback to light if detection fails
-          setSystemTheme('light');
-        });
+      // Only call GetSystemTheme if we're in a Wails runtime
+      if (isWailsRuntime()) {
+        GetSystemTheme()
+          .then((detected) => {
+            setSystemTheme(detected === 'dark' ? 'dark' : 'light');
+          })
+          .catch(() => {
+            // Fallback to light if detection fails
+            setSystemTheme('light');
+          });
+      } else {
+        // Browser fallback: use media query
+        const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        setSystemTheme(isDark ? 'dark' : 'light');
+      }
     }
   }, [config?.ui?.theme]);
 
