@@ -9,7 +9,7 @@
       "Verify each hour block is 80px tall",
       "Verify only active hours plus buffer are displayed"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "journey-daily-review",
@@ -21,7 +21,7 @@
       "Verify block height corresponds to activity duration",
       "Verify minimum height of 4px for short activities"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "journey-daily-review",
@@ -35,7 +35,7 @@
       "Verify user can navigate through screenshots within that window",
       "Verify closing gallery returns to timeline"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "journey-daily-review",
@@ -47,7 +47,7 @@
       "Verify summary text is visible or '(No summary)' placeholder shown",
       "Verify time range displayed on each block"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "journey-daily-review",
@@ -61,7 +61,7 @@
       "Verify user can navigate through all session screenshots",
       "Verify closing gallery returns to timeline"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "journey-daily-review",
@@ -73,7 +73,7 @@
       "Verify '+N more' badge shows when more than 2 screenshots",
       "Verify clicking thumbnail opens ImageGallery"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "journey-daily-review",
@@ -85,7 +85,7 @@
       "Click 'Next Day' button",
       "Click 'Today' button and verify current date selected"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "journey-daily-review",
@@ -97,7 +97,7 @@
       "Verify 'VS Code' not 'code'",
       "Verify 'Terminal' not 'tilix' or 'gnome-terminal'"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "journey-daily-review",
@@ -109,7 +109,7 @@
       "Verify start/end times match actual activity span",
       "Verify break count and longest focus session shown"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "journey-daily-review",
@@ -121,7 +121,7 @@
       "Verify legend shows category labels with durations",
       "Verify segment widths proportional to time"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "journey-analytics",
@@ -133,7 +133,7 @@
       "Verify hover shows app name and duration",
       "Verify friendly app names display"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "journey-analytics",
@@ -182,7 +182,7 @@
       "Switch to Month view",
       "Verify aggregated data displays correctly"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "journey-analytics",
@@ -308,7 +308,7 @@
       "Verify date selector shows current date",
       "Verify lazy loading works (images load on scroll)"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "journey-screenshots",
@@ -332,7 +332,7 @@
       "Select an app",
       "Verify only screenshots from that app display"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "journey-screenshots",
@@ -344,7 +344,7 @@
       "Verify search is case-insensitive",
       "Clear search and verify all screenshots return"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "journey-screenshots",
@@ -357,7 +357,7 @@
       "Verify window title displayed",
       "Verify timestamp displayed"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "journey-screenshots",
