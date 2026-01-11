@@ -454,7 +454,7 @@
       "Verify grid updates with that date's data",
       "Verify future dates are not selectable"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "settings",
@@ -491,7 +491,7 @@
       "Verify message is helpful (not just blank)",
       "Verify sidebar shows zero values appropriately"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "data-sources-git",
