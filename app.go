@@ -1071,6 +1071,119 @@ func (a *App) DownloadServer() error {
 }
 
 // ============================================================================
+// Tag Management Methods (exposed to frontend)
+// ============================================================================
+
+// GetAllTags returns all unique tags with their occurrence counts.
+func (a *App) GetAllTags() ([]*storage.TagUsageInfo, error) {
+	if a.store == nil {
+		return nil, nil
+	}
+	return a.store.GetAllTags()
+}
+
+// RenameTag renames a tag across all summaries.
+func (a *App) RenameTag(oldName, newName string) (int, error) {
+	if a.store == nil {
+		return 0, nil
+	}
+	return a.store.RenameTag(oldName, newName)
+}
+
+// MergeTags merges sourceTag into targetTag across all summaries.
+func (a *App) MergeTags(sourceTag, targetTag string) (int, error) {
+	if a.store == nil {
+		return 0, nil
+	}
+	return a.store.MergeTags(sourceTag, targetTag)
+}
+
+// DeleteTag removes a tag from all summaries.
+func (a *App) DeleteTag(tagName string) (int, error) {
+	if a.store == nil {
+		return 0, nil
+	}
+	return a.store.DeleteTag(tagName)
+}
+
+// AddTagToSession adds a tag to a session's summary.
+func (a *App) AddTagToSession(sessionID int64, tagName string) error {
+	if a.store == nil {
+		return nil
+	}
+	return a.store.AddTagToSession(sessionID, tagName)
+}
+
+// RemoveTagFromSession removes a tag from a session's summary.
+func (a *App) RemoveTagFromSession(sessionID int64, tagName string) error {
+	if a.store == nil {
+		return nil
+	}
+	return a.store.RemoveTagFromSession(sessionID, tagName)
+}
+
+// SetTagsForSession replaces all tags for a session.
+func (a *App) SetTagsForSession(sessionID int64, tags []string) error {
+	if a.store == nil {
+		return nil
+	}
+	return a.store.SetTagsForSession(sessionID, tags)
+}
+
+// ============================================================================
+// Hierarchical Summary Methods (exposed to frontend)
+// ============================================================================
+
+// GetHierarchicalSummary retrieves a summary by period type and date.
+func (a *App) GetHierarchicalSummary(periodType, periodDate string) (*storage.HierarchicalSummary, error) {
+	if a.store == nil {
+		return nil, nil
+	}
+	return a.store.GetHierarchicalSummary(periodType, periodDate)
+}
+
+// ListHierarchicalSummaries retrieves summaries of a given period type.
+func (a *App) ListHierarchicalSummaries(periodType string, limit int) ([]*storage.HierarchicalSummary, error) {
+	if a.store == nil {
+		return nil, nil
+	}
+	return a.store.ListHierarchicalSummaries(periodType, limit)
+}
+
+// GetLatestHierarchicalSummaries returns the most recent summary for each period type.
+func (a *App) GetLatestHierarchicalSummaries() (map[string]*storage.HierarchicalSummary, error) {
+	if a.store == nil {
+		return nil, nil
+	}
+	return a.store.GetLatestHierarchicalSummaries()
+}
+
+// UpdateHierarchicalSummary updates an existing summary (marks as user-edited).
+func (a *App) UpdateHierarchicalSummary(id int64, summary string) error {
+	if a.store == nil {
+		return nil
+	}
+	hs, err := a.store.GetHierarchicalSummaryByID(id)
+	if err != nil {
+		return err
+	}
+	if hs == nil {
+		return nil
+	}
+	hs.Summary = summary
+	hs.UserEdited = true
+	return a.store.UpdateHierarchicalSummary(hs)
+}
+
+// DeleteHierarchicalSummary deletes a summary.
+func (a *App) DeleteHierarchicalSummary(id int64) error {
+	if a.store == nil {
+		return nil
+	}
+	return a.store.DeleteHierarchicalSummary(id)
+}
+
+// ============================================================================
 // Helper functions
 // ============================================================================
 

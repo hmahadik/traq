@@ -57,6 +57,30 @@ This revised plan focuses on **genuinely valuable features** from v1, excluding 
    - Backend: `timeline_grid.go` now clips effectiveStart/effectiveEnd to dayStart/dayEnd
    - Fixes overflow where sessions starting at 11 PM and ending at 1 AM would render past grid bottom
 
+### Session 2 (2026-01-11)
+7. **Screenshots Browser Page** - New dedicated page for browsing screenshots:
+   - `/screenshots` route with sidebar navigation (Image icon)
+   - Gallery view with date navigation
+   - Filter by application
+   - Search by window title
+   - Multi-select with visual checkboxes
+   - Bulk delete functionality
+   - Preview dialog with full-size image
+
+8. **Hierarchical Summaries Database Schema**:
+   - Migration v6 adds `hierarchical_summaries` table
+   - Migration v6 adds `projects` table
+   - Storage layer: `storage/hierarchical_summaries.go`
+   - API methods exposed in `app.go`
+   - Frontend hooks in `api/hooks.ts`
+
+9. **Tag Management Backend APIs**:
+   - `GetAllTags()` - List all tags with occurrence counts
+   - `RenameTag()`, `MergeTags()`, `DeleteTag()` - Bulk tag operations
+   - `AddTagToSession()`, `RemoveTagFromSession()`, `SetTagsForSession()` - Per-session tags
+   - Storage layer: `storage/tags.go`
+   - Frontend hooks in `api/hooks.ts`
+
 ---
 
 ## SECTION A: IMPLEMENT (Well-Designed Features)
@@ -246,23 +270,23 @@ Keep current tab structure but simplify each tab:
 ---
 
 ### 3. Hierarchical Summaries System
-**Status:** Not implemented in v2
+**Status:** ✅ DATABASE & API COMPLETE (2026-01-11)
 **Priority:** High
 
-**What to Implement:**
-- [ ] Backend: Implement hierarchical summary generation service
-  - Daily summaries (synthesize all sessions for a day)
-  - Weekly summaries (synthesize daily summaries)
-  - Monthly summaries (synthesize weekly summaries)
-- [ ] Backend: Add API methods
-  - `GetHierarchicalSummary(periodType, periodDate)` - Get summary
-  - `GenerateHierarchicalSummary(periodType, periodDate)` - Generate on-demand
-  - `RegenerateHierarchicalSummary(periodType, periodDate)` - Regenerate existing
-  - `ListHierarchicalSummaries(periodType)` - List all summaries
-- [ ] Database: Create `hierarchical_summaries` table
-- [ ] Frontend: Create **single** unified summary page (`/summary/:periodType/:periodDate`)
-  - Handles day/week/month with conditional rendering
-  - NOT separate pages per period type
+**What was Implemented:**
+- [x] Database: Created `hierarchical_summaries` table (migration v6)
+- [x] Database: Created `projects` table (migration v6)
+- [x] Backend: Storage layer (storage/hierarchical_summaries.go)
+  - `SaveHierarchicalSummary()`, `GetHierarchicalSummary()`
+  - `ListHierarchicalSummaries()`, `GetLatestHierarchicalSummaries()`
+  - `UpdateHierarchicalSummary()`, `DeleteHierarchicalSummary()`
+  - `GetMissingDailySummaries()` - Find dates needing generation
+- [x] Backend: App.go API methods exposed to frontend
+- [x] Frontend: API client and React Query hooks
+
+**Remaining:**
+- [ ] Backend: Implement hierarchical summary generation service (AI synthesis)
+- [ ] Frontend: Create unified summary page
 - [ ] Frontend: Add navigation to summaries from Analytics
 
 **Database Schema:**
@@ -281,21 +305,23 @@ CREATE TABLE hierarchical_summaries (
 ---
 
 ### 4. Screenshots Browser Page
-**Status:** Not implemented in v2
+**Status:** ✅ IMPLEMENTED (2026-01-11)
 **Priority:** High
 
-**What to Implement:**
-- [ ] Frontend: Create dedicated Screenshots page (`/screenshots`)
-- [ ] Frontend: Screenshot gallery view with filtering
-  - Filter by date range
+**What was Implemented:**
+- [x] Frontend: Created dedicated Screenshots page (`/screenshots`)
+- [x] Frontend: Screenshot gallery view with filtering
+  - Filter by date (navigation)
   - Filter by application
-  - Search by OCR content (if available)
-- [ ] Frontend: Basic batch operations
+  - Search by window title
+- [x] Frontend: Basic batch operations
+  - Multi-select with visual checkboxes
   - Bulk delete
-  - Bulk export
-- [ ] Backend: Add batch screenshot operations API
-  - `BatchDeleteScreenshots(ids)`
-  - `BatchExportScreenshots(ids, format)`
+- [x] Sidebar navigation added (Image icon)
+
+**Remaining (optional):**
+- [ ] Backend: Batch export functionality
+- [ ] OCR content search
 
 ---
 
@@ -357,16 +383,20 @@ The v1 Reports UI was built around presets, history, and caching - all workaroun
 ---
 
 ### 6. Basic Tag Management
-**Status:** Basic tag display exists, no management
+**Status:** ✅ BACKEND COMPLETE (2026-01-11)
 **Priority:** Medium
 
-**What to Implement:**
-- [ ] Backend: Add API methods
+**What was Implemented:**
+- [x] Backend: Add API methods (storage/tags.go, app.go)
   - `GetAllTags()` - List all tags with occurrence counts
-  - `RenameTag(oldName, newName)` - Rename tag
+  - `RenameTag(oldName, newName)` - Rename tag across all summaries
   - `MergeTags(sourceTag, targetTag)` - Merge two tags
-  - `DeleteTag(tagName)` - Delete tag
-- [ ] Frontend: Create Tag Management section in Settings
+  - `DeleteTag(tagName)` - Delete tag from all summaries
+  - `AddTagToSession()`, `RemoveTagFromSession()`, `SetTagsForSession()` - Per-session tag management
+- [x] Frontend: API client and React Query hooks (api/client.ts, api/hooks.ts)
+
+**Remaining:**
+- [ ] Frontend: Create Tag Management UI in Settings
 - [ ] Frontend: Tag editing in Timeline/Sessions
 
 ---

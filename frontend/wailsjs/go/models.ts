@@ -1893,6 +1893,30 @@ export namespace storage {
 		    return a;
 		}
 	}
+	export class HierarchicalSummary {
+	    id: number;
+	    periodType: string;
+	    periodDate: string;
+	    summary: string;
+	    userEdited: boolean;
+	    generatedAt: number;
+	    createdAt: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new HierarchicalSummary(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.periodType = source["periodType"];
+	        this.periodDate = source["periodDate"];
+	        this.summary = source["summary"];
+	        this.userEdited = source["userEdited"];
+	        this.generatedAt = source["generatedAt"];
+	        this.createdAt = source["createdAt"];
+	    }
+	}
 	export class Report {
 	    id: number;
 	    title: string;
@@ -2142,6 +2166,20 @@ export namespace storage {
 		    }
 		    return a;
 		}
+	}
+	export class TagUsageInfo {
+	    tag: string;
+	    count: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new TagUsageInfo(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.tag = source["tag"];
+	        this.count = source["count"];
+	    }
 	}
 	export class WindowFocusEvent {
 	    id: number;

@@ -6,13 +6,19 @@ import {main} from '../models';
 import {inference} from '../models';
 import {tracker} from '../models';
 
+export function AddTagToSession(arg1:number,arg2:string):Promise<void>;
+
 export function DeleteAppCategory(arg1:string):Promise<void>;
+
+export function DeleteHierarchicalSummary(arg1:number):Promise<void>;
 
 export function DeleteModel(arg1:string):Promise<void>;
 
 export function DeleteScreenshot(arg1:number):Promise<void>;
 
 export function DeleteSession(arg1:number):Promise<void>;
+
+export function DeleteTag(arg1:string):Promise<number>;
 
 export function DeleteTimelineCategoryRule(arg1:string):Promise<void>;
 
@@ -35,6 +41,8 @@ export function GenerateSummary(arg1:number):Promise<storage.Summary>;
 export function GetActivityTags(arg1:string):Promise<Array<service.TagUsage>>;
 
 export function GetAllApps():Promise<Array<main.AppWithCategory>>;
+
+export function GetAllTags():Promise<Array<storage.TagUsageInfo>>;
 
 export function GetAppCategories():Promise<Array<storage.AppCategoryRecord>>;
 
@@ -70,6 +78,8 @@ export function GetFileAllowedExtensions():Promise<Array<string>>;
 
 export function GetFocusDistribution(arg1:string):Promise<Array<service.HourlyFocus>>;
 
+export function GetHierarchicalSummary(arg1:string,arg2:string):Promise<storage.HierarchicalSummary>;
+
 export function GetHourlyActivity(arg1:string):Promise<Array<service.HourlyActivity>>;
 
 export function GetHourlyActivityHeatmap():Promise<Array<service.HeatmapData>>;
@@ -77,6 +87,8 @@ export function GetHourlyActivityHeatmap():Promise<Array<service.HeatmapData>>;
 export function GetInferenceSetupStatus():Promise<inference.SetupStatus>;
 
 export function GetInferenceStatus():Promise<inference.InferenceStatus>;
+
+export function GetLatestHierarchicalSummaries():Promise<Record<string, storage.HierarchicalSummary>>;
 
 export function GetMonthlyStats(arg1:number,arg2:number):Promise<service.MonthlyStats>;
 
@@ -134,6 +146,10 @@ export function GetYearlyStats(arg1:number):Promise<service.YearlyStats>;
 
 export function IsReady():Promise<boolean>;
 
+export function ListHierarchicalSummaries(arg1:string,arg2:number):Promise<Array<storage.HierarchicalSummary>>;
+
+export function MergeTags(arg1:string,arg2:string):Promise<number>;
+
 export function OpenDataDir():Promise<void>;
 
 export function OptimizeDatabase():Promise<number>;
@@ -146,6 +162,10 @@ export function RegenerateSummary(arg1:number):Promise<storage.Summary>;
 
 export function RegisterGitRepository(arg1:string):Promise<storage.GitRepository>;
 
+export function RemoveTagFromSession(arg1:number,arg2:string):Promise<void>;
+
+export function RenameTag(arg1:string,arg2:string):Promise<number>;
+
 export function RestartTracking():Promise<void>;
 
 export function ResumeCapture():Promise<void>;
@@ -156,6 +176,8 @@ export function SetAppTimelineCategory(arg1:string,arg2:string):Promise<void>;
 
 export function SetFileAllowedExtensions(arg1:Array<string>):Promise<void>;
 
+export function SetTagsForSession(arg1:number,arg2:Array<string>):Promise<void>;
+
 export function StartTracking():Promise<void>;
 
 export function StopTracking():Promise<void>;
@@ -165,5 +187,7 @@ export function UnregisterGitRepository(arg1:number):Promise<void>;
 export function UnwatchDirectory(arg1:string):Promise<void>;
 
 export function UpdateConfig(arg1:Record<string, any>):Promise<void>;
+
+export function UpdateHierarchicalSummary(arg1:number,arg2:string):Promise<void>;
 
 export function WatchDirectory(arg1:string):Promise<void>;

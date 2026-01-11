@@ -4,7 +4,7 @@ import (
 	"fmt"
 )
 
-const schemaVersion = 5
+const schemaVersion = 6
 
 const schema = `
 -- ============================================================================
@@ -277,6 +277,12 @@ func (s *Store) Migrate() error {
 			return fmt.Errorf("failed to apply migration 5: %w", err)
 		}
 	}
+	if currentVersion < 6 {
+		// Migration v6: Add hierarchical_summaries and projects tables
+		if err := s.applyMigration6(); err != nil {
+			return fmt.Errorf("failed to apply migration 6: %w", err)
+		}
+	}
 
 	// Record schema version
 	if currentVersion == 0 {
@@ -471,6 +477,44 @@ func (s *Store) applyMigration5() error {
 		if err != nil {
 			return fmt.Errorf("failed to seed default rule for %s: %w", rule.appName, err)
 		}
+	}
+
+	return nil
+}
+
+// applyMigration6 creates the hierarchical_summaries and projects tables.
+func (s *Store) applyMigration6() error {
+	// Create hierarchical_summaries table
+	_, err := s.db.Exec(`
+		CREATE TABLE IF NOT EXISTS hierarchical_summaries (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			period_type TEXT NOT NULL CHECK(period_type IN ('day', 'week', 'month')),
+			period_date TEXT NOT NULL,
+			summary TEXT NOT NULL,
+			user_edited INTEGER DEFAULT 0,
+			generated_at INTEGER NOT NULL,
+			created_at INTEGER DEFAULT (strftime('%s', 'now')),
+			UNIQUE(period_type, period_date)
+		);
+		CREATE INDEX IF NOT EXISTS idx_hier_summaries_period ON hierarchical_summaries(period_type, period_date);
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to create hierarchical_summaries table: %w", err)
+	}
+
+	// Create projects table
+	_, err = s.db.Exec(`
+		CREATE TABLE IF NOT EXISTS projects (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			name TEXT NOT NULL UNIQUE,
+			detection_patterns TEXT,
+			is_manual INTEGER DEFAULT 0,
+			created_at INTEGER DEFAULT (strftime('%s', 'now'))
+		);
+		CREATE INDEX IF NOT EXISTS idx_projects_name ON projects(name);
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to create projects table: %w", err)
 	}
 
 	return nil

@@ -626,3 +626,132 @@ export function useDeleteSession() {
     },
   });
 }
+
+// ============================================================================
+// Tag Management Hooks
+// ============================================================================
+
+export function useAllTags() {
+  return useQuery({
+    queryKey: ['tags', 'all'],
+    queryFn: () => api.tags.getAll(),
+    staleTime: 30_000,
+  });
+}
+
+export function useRenameTag() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ oldName, newName }: { oldName: string; newName: string }) =>
+      api.tags.rename(oldName, newName),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tags'] });
+      queryClient.invalidateQueries({ queryKey: ['timeline'] });
+    },
+  });
+}
+
+export function useMergeTags() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ sourceTag, targetTag }: { sourceTag: string; targetTag: string }) =>
+      api.tags.merge(sourceTag, targetTag),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tags'] });
+      queryClient.invalidateQueries({ queryKey: ['timeline'] });
+    },
+  });
+}
+
+export function useDeleteTag() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (tagName: string) => api.tags.delete(tagName),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tags'] });
+      queryClient.invalidateQueries({ queryKey: ['timeline'] });
+    },
+  });
+}
+
+export function useAddTagToSession() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ sessionId, tagName }: { sessionId: number; tagName: string }) =>
+      api.tags.addToSession(sessionId, tagName),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tags'] });
+      queryClient.invalidateQueries({ queryKey: ['timeline'] });
+    },
+  });
+}
+
+export function useRemoveTagFromSession() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ sessionId, tagName }: { sessionId: number; tagName: string }) =>
+      api.tags.removeFromSession(sessionId, tagName),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tags'] });
+      queryClient.invalidateQueries({ queryKey: ['timeline'] });
+    },
+  });
+}
+
+// ============================================================================
+// Hierarchical Summary Hooks
+// ============================================================================
+
+export function useHierarchicalSummary(periodType: string, periodDate: string) {
+  return useQuery({
+    queryKey: ['hierarchicalSummaries', periodType, periodDate],
+    queryFn: () => api.hierarchicalSummaries.get(periodType, periodDate),
+    enabled: !!periodType && !!periodDate,
+    staleTime: 60_000,
+  });
+}
+
+export function useHierarchicalSummariesList(periodType: string, limit: number = 50) {
+  return useQuery({
+    queryKey: ['hierarchicalSummaries', 'list', periodType, limit],
+    queryFn: () => api.hierarchicalSummaries.list(periodType, limit),
+    enabled: !!periodType,
+    staleTime: 60_000,
+  });
+}
+
+export function useLatestHierarchicalSummaries() {
+  return useQuery({
+    queryKey: ['hierarchicalSummaries', 'latest'],
+    queryFn: () => api.hierarchicalSummaries.getLatest(),
+    staleTime: 60_000,
+  });
+}
+
+export function useUpdateHierarchicalSummary() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, summary }: { id: number; summary: string }) =>
+      api.hierarchicalSummaries.update(id, summary),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['hierarchicalSummaries'] });
+    },
+  });
+}
+
+export function useDeleteHierarchicalSummary() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: number) => api.hierarchicalSummaries.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['hierarchicalSummaries'] });
+    },
+  });
+}

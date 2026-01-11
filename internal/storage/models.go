@@ -164,6 +164,32 @@ type AFKEvent struct {
 	CreatedAt   int64         `json:"createdAt"`
 }
 
+// HierarchicalSummary represents a day/week/month summary.
+type HierarchicalSummary struct {
+	ID          int64  `json:"id"`
+	PeriodType  string `json:"periodType"` // day, week, month
+	PeriodDate  string `json:"periodDate"` // ISO date (YYYY-MM-DD for day, YYYY-WXX for week, YYYY-MM for month)
+	Summary     string `json:"summary"`
+	UserEdited  bool   `json:"userEdited"`
+	GeneratedAt int64  `json:"generatedAt"`
+	CreatedAt   int64  `json:"createdAt"`
+}
+
+// Project represents a tracked project.
+type Project struct {
+	ID                int64    `json:"id"`
+	Name              string   `json:"name"`
+	DetectionPatterns []string `json:"detectionPatterns"` // JSON array of path patterns
+	IsManual          bool     `json:"isManual"`
+	CreatedAt         int64    `json:"createdAt"`
+}
+
+// TagUsageInfo represents tag aggregation info.
+type TagUsageInfo struct {
+	Tag   string `json:"tag"`
+	Count int    `json:"count"`
+}
+
 // Helper functions for JSON array fields
 
 // ParseJSONStringArray parses a JSON string array from a nullable string.

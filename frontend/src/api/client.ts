@@ -728,6 +728,76 @@ export const fileWatch = {
   },
 };
 
+/**
+ * Tag Management API
+ */
+export const tags = {
+  getAll: async () => {
+    await waitForReady();
+    return withRetry(() => App.GetAllTags());
+  },
+
+  rename: async (oldName: string, newName: string) => {
+    await waitForReady();
+    return App.RenameTag(oldName, newName);
+  },
+
+  merge: async (sourceTag: string, targetTag: string) => {
+    await waitForReady();
+    return App.MergeTags(sourceTag, targetTag);
+  },
+
+  delete: async (tagName: string) => {
+    await waitForReady();
+    return App.DeleteTag(tagName);
+  },
+
+  addToSession: async (sessionId: number, tagName: string) => {
+    await waitForReady();
+    return App.AddTagToSession(sessionId, tagName);
+  },
+
+  removeFromSession: async (sessionId: number, tagName: string) => {
+    await waitForReady();
+    return App.RemoveTagFromSession(sessionId, tagName);
+  },
+
+  setForSession: async (sessionId: number, tags: string[]) => {
+    await waitForReady();
+    return App.SetTagsForSession(sessionId, tags);
+  },
+};
+
+/**
+ * Hierarchical Summaries API
+ */
+export const hierarchicalSummaries = {
+  get: async (periodType: string, periodDate: string) => {
+    await waitForReady();
+    return withRetry(() => App.GetHierarchicalSummary(periodType, periodDate));
+  },
+
+  list: async (periodType: string, limit: number = 50) => {
+    await waitForReady();
+    return withRetry(() => App.ListHierarchicalSummaries(periodType, limit));
+  },
+
+  getLatest: async () => {
+    await waitForReady();
+    return withRetry(() => App.GetLatestHierarchicalSummaries());
+  },
+
+  update: async (id: number, summary: string) => {
+    await waitForReady();
+    return App.UpdateHierarchicalSummary(id, summary);
+  },
+
+  delete: async (id: number) => {
+    await waitForReady();
+    return App.DeleteHierarchicalSummary(id);
+  },
+};
+
 // Unified API export
 export const api = {
   analytics,
@@ -739,4 +809,6 @@ export const api = {
   summaries,
   git,
   fileWatch,
+  tags,
+  hierarchicalSummaries,
 };
