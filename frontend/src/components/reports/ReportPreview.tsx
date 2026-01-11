@@ -247,7 +247,7 @@ function RenderedMarkdown({ content }: { content: string | null }) {
       flushTable(index);
     }
 
-    // Headers
+    // Headers - React automatically escapes content in JSX
     if (line.startsWith('# ')) {
       elements.push(<h1 key={index} className="text-2xl font-bold mt-6 mb-4">{line.slice(2)}</h1>);
     } else if (line.startsWith('## ')) {
@@ -255,13 +255,13 @@ function RenderedMarkdown({ content }: { content: string | null }) {
     } else if (line.startsWith('### ')) {
       elements.push(<h3 key={index} className="text-lg font-medium mt-4 mb-2">{line.slice(4)}</h3>);
     }
-    // Lists
+    // Lists - React automatically escapes content in JSX
     else if (line.startsWith('- ') || line.startsWith('* ')) {
       elements.push(
         <li key={index} className="ml-4 list-disc">{line.slice(2)}</li>
       );
     }
-    // Numbered lists
+    // Numbered lists - React automatically escapes content in JSX
     else if (/^\d+\. /.test(line)) {
       const text = line.replace(/^\d+\. /, '');
       elements.push(
@@ -272,7 +272,7 @@ function RenderedMarkdown({ content }: { content: string | null }) {
     else if (line === '---' || line === '***') {
       elements.push(<hr key={index} className="my-4" />);
     }
-    // Blockquote
+    // Blockquote - React automatically escapes content in JSX
     else if (line.startsWith('> ')) {
       elements.push(
         <blockquote key={index} className="border-l-4 border-muted-foreground/30 pl-4 italic text-muted-foreground">
@@ -282,7 +282,16 @@ function RenderedMarkdown({ content }: { content: string | null }) {
     }
     // Bold text handling and regular paragraphs
     else if (line.trim()) {
-      const processedLine = line
+      // First, escape HTML to prevent XSS
+      const escapedLine = line
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+
+      // Then apply markdown formatting
+      const processedLine = escapedLine
         .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
         .replace(/\*(.*?)\*/g, '<em>$1</em>')
         .replace(/`([^`]+)`/g, '<code class="bg-muted px-1 rounded text-sm">$1</code>');

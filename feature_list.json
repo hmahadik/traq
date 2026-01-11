@@ -406,7 +406,7 @@
       "Verify no JavaScript alert fires",
       "Verify malicious content is escaped or stripped"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "data-integrity",
