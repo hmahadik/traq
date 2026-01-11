@@ -1,17 +1,17 @@
 import React from 'react';
 import { DayStats } from '@/types/timeline';
-import { Card } from '@/components/ui/card';
 
 interface DailySummaryCardProps {
   stats: DayStats | null;
 }
 
+// Standard workday in seconds (8 hours)
+const WORKDAY_SECONDS = 8 * 60 * 60;
+
 export const DailySummaryCard: React.FC<DailySummaryCardProps> = ({ stats }) => {
   if (!stats) {
     return (
-      <Card className="p-4">
-        <div className="text-center text-muted-foreground">No activity today</div>
-      </Card>
+      <div className="text-center text-muted-foreground py-4">No activity today</div>
     );
   }
 
@@ -35,45 +35,63 @@ export const DailySummaryCard: React.FC<DailySummaryCardProps> = ({ stats }) => 
     });
   };
 
+  // Calculate percentage of 8-hour workday (can be over 100%)
+  const workdayPercent = Math.round((stats.totalSeconds / WORKDAY_SECONDS) * 100);
+  // For progress bar, cap at 100%
+  const progressBarPercent = Math.min(workdayPercent, 100);
+
   return (
-    <Card className="p-6">
-      {/* Hero Section */}
-      <div className="mb-6">
-        <div className="text-sm text-muted-foreground mb-2">⏱️ Hours Worked</div>
-        <div className="text-5xl font-bold bg-gradient-to-r from-primary via-purple-500 to-pink-500 bg-clip-text text-transparent">
-          {formatDuration(stats.totalSeconds)}
+    <div className="space-y-4">
+      {/* Hours Worked - Hero Section */}
+      <div>
+        <div className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Hours Worked</div>
+        <div className="flex items-baseline gap-2">
+          <span className="text-4xl font-bold bg-gradient-to-r from-primary via-purple-500 to-pink-500 bg-clip-text text-transparent">
+            {formatDuration(stats.totalSeconds)}
+          </span>
+          <span className="text-lg text-muted-foreground">/ 8h</span>
+          <span className={`text-sm font-medium ${workdayPercent >= 100 ? 'text-emerald-500' : 'text-muted-foreground'}`}>
+            ({workdayPercent}%)
+          </span>
         </div>
-        <div className="text-sm text-muted-foreground mt-1">
-          {Math.floor(stats.totalSeconds / 60)} minutes total
+        {/* Progress bar */}
+        <div className="mt-2 h-1.5 bg-muted rounded-full overflow-hidden">
+          <div
+            className={`h-full rounded-full transition-all duration-300 ${workdayPercent >= 100 ? 'bg-gradient-to-r from-emerald-400 to-emerald-600' : 'bg-gradient-to-r from-primary via-purple-500 to-pink-500'}`}
+            style={{ width: `${progressBarPercent}%` }}
+          />
         </div>
       </div>
 
-      {/* Stats Grid */}
-      <div className="space-y-3">
-        {/* Day Span */}
-        {stats.daySpan && (
-          <div className="flex items-center justify-between py-2 border-b border-border/50">
-            <span className="text-sm text-muted-foreground">📅 Day Span</span>
-            <span className="text-sm font-medium">
-              {formatTime(stats.daySpan.startTime)} - {formatTime(stats.daySpan.endTime)}
-            </span>
+      {/* Start & End Time */}
+      {stats.daySpan && (
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <div className="text-xs text-muted-foreground uppercase tracking-wide mb-0.5">Start Time</div>
+            <div className="text-lg font-semibold">{formatTime(stats.daySpan.startTime)}</div>
           </div>
-        )}
+          <div>
+            <div className="text-xs text-muted-foreground uppercase tracking-wide mb-0.5">End Time</div>
+            <div className="text-lg font-semibold">{formatTime(stats.daySpan.endTime)}</div>
+          </div>
+        </div>
+      )}
 
+      {/* Breaks & Longest Focus - Grid layout, no card styling */}
+      <div className="grid grid-cols-2 gap-4">
         {/* Breaks */}
-        <div className="flex items-center justify-between py-2 border-b border-border/50">
-          <span className="text-sm text-muted-foreground">☕ Breaks</span>
-          <span className="text-sm font-medium">
-            {stats.breakCount} breaks ({formatDuration(stats.breakDuration)})
-          </span>
+        <div>
+          <div className="text-xs text-muted-foreground uppercase tracking-wide mb-0.5">Breaks</div>
+          <div className="text-lg font-semibold">{formatDuration(stats.breakDuration)}</div>
+          <div className="text-xs text-muted-foreground">{stats.breakCount} break{stats.breakCount !== 1 ? 's' : ''}</div>
         </div>
 
         {/* Longest Focus */}
-        <div className="flex items-center justify-between py-2">
-          <span className="text-sm text-muted-foreground">🎯 Longest Focus</span>
-          <span className="text-sm font-medium">{formatDuration(stats.longestFocus)}</span>
+        <div>
+          <div className="text-xs text-muted-foreground uppercase tracking-wide mb-0.5">Longest Focus</div>
+          <div className="text-lg font-semibold">{formatDuration(stats.longestFocus)}</div>
         </div>
       </div>
-    </Card>
+    </div>
   );
 };

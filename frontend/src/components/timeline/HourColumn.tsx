@@ -1,4 +1,5 @@
 import React from 'react';
+import { Clock } from 'lucide-react';
 import { GRID_CONSTANTS } from '@/types/timeline';
 
 interface HourColumnProps {
@@ -16,25 +17,28 @@ export const HourColumn: React.FC<HourColumnProps> = ({ hours }) => {
 
   return (
     <div
-      className="sticky left-0 z-20 bg-background border-r border-border"
+      className="sticky left-0 z-20 bg-muted border-r border-border"
       style={{ width: `${GRID_CONSTANTS.HOUR_COLUMN_WIDTH_PX}px` }}
     >
+      {/* Header - matches other column headers with icon */}
+      <div className="sticky top-0 z-10 bg-card border-b border-border px-2 py-2.5">
+        <div className="flex items-center justify-center gap-1">
+          <div className="w-5 h-5 rounded bg-slate-500 flex items-center justify-center">
+            <Clock className="w-3 h-3 text-white" />
+          </div>
+        </div>
+      </div>
+
+      {/* Hour labels */}
       {hours.map((hour) => (
         <div
           key={hour}
-          className="relative border-b border-border/50 flex items-start justify-center pt-1"
+          className="relative border-b border-border flex items-start justify-end pr-2 pt-1"
           style={{ height: `${GRID_CONSTANTS.HOUR_HEIGHT_PX}px` }}
         >
-          <span className="text-xs text-muted-foreground font-medium">
+          <span className="text-[11px] text-muted-foreground font-medium">
             {formatHour(hour)}
           </span>
-          {/* Empty hour diagonal lines background pattern */}
-          <div className="absolute inset-0 opacity-5"
-            style={{
-              backgroundImage: 'repeating-linear-gradient(45deg, currentColor 0, currentColor 1px, transparent 0, transparent 50%)',
-              backgroundSize: '10px 10px'
-            }}
-          />
         </div>
       ))}
     </div>

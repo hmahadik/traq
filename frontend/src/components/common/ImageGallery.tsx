@@ -88,7 +88,7 @@ export function ImageGallery({
               {formatDate(currentScreenshot.timestamp)} {formatTimestamp(currentScreenshot.timestamp)}
             </p>
             <p className="text-xs text-white/70">
-              {currentScreenshot.appName} - {currentScreenshot.windowTitle}
+              {getNullableString(currentScreenshot.appName) || 'Unknown'} - {getNullableString(currentScreenshot.windowTitle) || 'Screenshot'}
             </p>
             {/* Window Class */}
             {isNullableValid(currentScreenshot.windowClass) && (
@@ -141,7 +141,7 @@ export function ImageGallery({
           ) : (
             <img
               src={imageUrl}
-              alt={currentScreenshot.windowTitle || 'Screenshot'}
+              alt={getNullableString(currentScreenshot.windowTitle) || 'Screenshot'}
               className="max-w-full max-h-full object-contain transition-transform duration-200"
               style={{ transform: `scale(${zoom})` }}
             />

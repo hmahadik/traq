@@ -1,11 +1,17 @@
-import { TimelineEvent, getEventDuration } from '@/types/timelineEvent';
+// Legacy types - keeping for reference but not used in v3 grid
+// import { TimelineEvent, getEventDuration } from '@/types/timelineEvent';
+
+// Stub for legacy functions - these aren't used in v3 grid
+const getEventDuration = (event: any): number | null => {
+  return event?.durationSeconds || event?.duration || null;
+};
 
 /**
- * Represents a positioned activity in the timeline
+ * Represents a positioned activity in the timeline (legacy)
  */
 export interface PositionedActivity {
   id: number;
-  activity: TimelineEvent;
+  activity: any; // Was TimelineEvent
   top: number; // pixels from top of grid
   left: number; // pixels from left (lane offset)
   height: number; // pixels
@@ -153,6 +159,58 @@ export function getAppIcon(appName: string): string {
 }
 
 /**
+ * Get cleaner display name for an app
+ * Converts system names like "google-chrome" to "Chrome"
+ */
+const APP_DISPLAY_NAMES: Record<string, string> = {
+  'google-chrome': 'Chrome',
+  'chromium': 'Chromium',
+  'chromium-browser': 'Chromium',
+  'firefox': 'Firefox',
+  'firefox-esr': 'Firefox',
+  'code': 'VS Code',
+  'code-oss': 'VS Code',
+  'tilix': 'Tilix',
+  'gnome-terminal': 'Terminal',
+  'konsole': 'Konsole',
+  'alacritty': 'Alacritty',
+  'kitty': 'Kitty',
+  'org.gnome.nautilus': 'Files',
+  'nautilus': 'Files',
+  'dolphin': 'Files',
+  'thunar': 'Files',
+  'eog': 'Image Viewer',
+  'gwenview': 'Image Viewer',
+  'slack': 'Slack',
+  'discord': 'Discord',
+  'teams': 'Teams',
+  'zoom': 'Zoom',
+  'spotify': 'Spotify',
+  'notion': 'Notion',
+  'obsidian': 'Obsidian',
+  'figma-linux': 'Figma',
+};
+
+export function getAppDisplayName(appName: string): string {
+  const lower = appName.toLowerCase();
+  if (APP_DISPLAY_NAMES[lower]) return APP_DISPLAY_NAMES[lower];
+
+  // Remove common prefixes/suffixes
+  let display = appName
+    .replace(/^org\.gnome\./i, '')
+    .replace(/^org\.kde\./i, '')
+    .replace(/^com\.[^.]+\./i, '')
+    .replace(/-dev-linux-amd64$/i, '')
+    .replace(/-linux-amd64$/i, '')
+    .replace(/-linux$/i, '')
+    .replace(/\.exe$/i, '')
+    .replace(/\s*\([^)]+\)$/i, ''); // Remove parenthetical suffixes
+
+  // Capitalize first letter
+  return display.charAt(0).toUpperCase() + display.slice(1);
+}
+
+/**
  * Calculates summary statistics from activities
  */
 export interface DailySummary {
@@ -225,4 +283,106 @@ export function formatTimeOfDay(timestamp: number): string {
     minute: '2-digit',
     meridiem: 'short',
   });
+}
+
+/**
+ * Groups activity blocks that have small gaps between them.
+ * This creates a cleaner timeline view like Timely by merging
+ * adjacent activities from the same app that are within the gap threshold.
+ *
+ * @param blocks - Array of activity blocks to group
+ * @param maxGapSeconds - Maximum gap in seconds to consider for merging (default: 300 = 5 minutes)
+ * @returns Array of grouped activity blocks (merged blocks have combined duration)
+ */
+export interface ActivityBlockForGrouping {
+  id: number;
+  windowTitle: string;
+  appName: string;
+  startTime: number;
+  endTime: number;
+  durationSeconds: number;
+  category: string;
+  hourOffset: number;
+  minuteOffset: number;
+  pixelPosition: number;
+  pixelHeight: number;
+}
+
+export function groupAdjacentActivities(
+  blocks: ActivityBlockForGrouping[],
+  maxGapSeconds: number = 300 // 5 minutes default
+): ActivityBlockForGrouping[] {
+  if (blocks.length === 0) return [];
+
+  // Sort by start time
+  const sorted = [...blocks].sort((a, b) => a.startTime - b.startTime);
+  const grouped: ActivityBlockForGrouping[] = [];
+
+  let currentGroup: ActivityBlockForGrouping | null = null;
+
+  for (const block of sorted) {
+    if (!currentGroup) {
+      // Start a new group
+      currentGroup = { ...block };
+    } else {
+      // Check if this block should be merged with the current group
+      const gap = block.startTime - currentGroup.endTime;
+
+      if (gap <= maxGapSeconds) {
+        // Merge: extend the current group
+        currentGroup.endTime = Math.max(currentGroup.endTime, block.endTime);
+        currentGroup.durationSeconds = currentGroup.endTime - currentGroup.startTime;
+        // Update pixel height to reflect new duration
+        // pixelHeight is calculated at render time based on duration, so we just update duration
+        // Also keep the most recent window title for the tooltip
+        currentGroup.windowTitle = block.windowTitle;
+      } else {
+        // Gap is too large, save current group and start new one
+        grouped.push(currentGroup);
+        currentGroup = { ...block };
+      }
+    }
+  }
+
+  // Don't forget the last group
+  if (currentGroup) {
+    grouped.push(currentGroup);
+  }
+
+  return grouped;
+}
+
+/**
+ * Snaps a timestamp to the nearest 15-minute boundary
+ * @param timestamp - Unix timestamp in seconds
+ * @param snapDirection - 'floor' snaps down, 'ceil' snaps up, 'nearest' snaps to closest
+ * @returns Snapped timestamp in seconds
+ */
+export function snapTo15Minutes(
+  timestamp: number,
+  snapDirection: 'floor' | 'ceil' | 'nearest' = 'floor'
+): number {
+  const date = new Date(timestamp * 1000);
+  const minutes = date.getMinutes();
+  const seconds = date.getSeconds();
+
+  let snappedMinutes: number;
+
+  if (snapDirection === 'floor') {
+    snappedMinutes = Math.floor(minutes / 15) * 15;
+  } else if (snapDirection === 'ceil') {
+    snappedMinutes = Math.ceil(minutes / 15) * 15;
+  } else {
+    // nearest
+    const remainder = minutes % 15;
+    snappedMinutes = remainder < 7.5
+      ? Math.floor(minutes / 15) * 15
+      : Math.ceil(minutes / 15) * 15;
+  }
+
+  date.setMinutes(snappedMinutes);
+  date.setSeconds(0);
+  date.setMilliseconds(0);
+
+  return Math.floor(date.getTime() / 1000);
 }

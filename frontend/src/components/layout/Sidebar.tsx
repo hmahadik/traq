@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Calendar, BarChart3, FileText, Camera, Loader2, Menu, X, Pause, Play } from 'lucide-react';
+import { Clock, PieChart, ClipboardList, Camera, Loader2, Menu, X, Pause, Play, Settings } from 'lucide-react';
 import logoSrc from '@/assets/logo-minimal.svg';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -9,12 +9,16 @@ import { toast } from 'sonner';
 import { system, api } from '@/api/client';
 
 const navItems = [
-  { to: '/', label: 'Timeline', icon: Calendar },
-  { to: '/analytics', label: 'Analytics', icon: BarChart3 },
-  { to: '/reports', label: 'Reports', icon: FileText },
+  { to: '/', label: 'Timeline', icon: Clock },
+  { to: '/analytics', label: 'Analytics', icon: PieChart },
+  { to: '/reports', label: 'Reports', icon: ClipboardList },
 ];
 
-export function Sidebar() {
+interface SidebarProps {
+  onSettingsClick?: () => void;
+}
+
+export function Sidebar({ onSettingsClick }: SidebarProps) {
   const location = useLocation();
   const [isCapturing, setIsCapturing] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
@@ -163,6 +167,25 @@ export function Sidebar() {
             </TooltipTrigger>
             <TooltipContent side="right">
               <p>{isPaused ? 'Resume capture first' : 'Capture screenshot now'}</p>
+            </TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                className="w-full flex flex-col items-center gap-1 h-auto py-2 transition-colors duration-75"
+                onClick={() => {
+                  onSettingsClick?.();
+                  setMobileMenuOpen(false);
+                }}
+                aria-label="Settings"
+              >
+                <Settings className="h-5 w-5" />
+                <span className="text-xs font-medium">Settings</span>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="right">
+              <p>Open settings</p>
             </TooltipContent>
           </Tooltip>
         </TooltipProvider>

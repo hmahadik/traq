@@ -1,13 +1,14 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
-import { ChevronLeft, ChevronRight, Calendar } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Calendar, Sparkles, Loader2 } from 'lucide-react';
 import { CalendarWidget } from '@/components/timeline';
-import { useTimelineGridData, useCalendarHeatmap } from '@/api/hooks';
+import { useTimelineGridData, useCalendarHeatmap, useGenerateSummary } from '@/api/hooks';
 import { TimelineGridView } from '@/components/timeline/TimelineGridView';
 import { DailySummaryCard } from '@/components/timeline/DailySummaryCard';
 import { BreakdownBar } from '@/components/timeline/BreakdownBar';
 import { TopAppsSection } from '@/components/timeline/TopAppsSection';
 import { TimelinePageSkeleton } from '@/components/timeline/TimelineGridSkeleton';
+import { toast } from 'sonner';
 
 function getDateString(date: Date): string {
   // Use local date components to avoid timezone issues
@@ -26,6 +27,7 @@ function addDays(date: Date, days: number): Date {
 export function TimelinePage() {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [showCalendar, setShowCalendar] = useState(false);
+  const [isBatchGenerating, setIsBatchGenerating] = useState(false);
 
   const dateStr = getDateString(selectedDate);
   const isToday = dateStr === getDateString(new Date());
@@ -36,6 +38,42 @@ export function TimelinePage() {
     selectedDate.getFullYear(),
     selectedDate.getMonth() + 1
   );
+  const generateSummary = useGenerateSummary();
+
+  // Sessions without summaries
+  const sessionsWithoutSummaries = useMemo(() => {
+    if (!gridData?.sessionSummaries) return [];
+    return gridData.sessionSummaries.filter(s => !s.summary);
+  }, [gridData?.sessionSummaries]);
+
+  // Batch generate summaries
+  const handleBatchGenerateSummaries = useCallback(async () => {
+    if (!sessionsWithoutSummaries.length || isBatchGenerating) return;
+
+    setIsBatchGenerating(true);
+    let successCount = 0;
+    let errorCount = 0;
+
+    toast.info(`Generating ${sessionsWithoutSummaries.length} summaries...`);
+
+    for (const session of sessionsWithoutSummaries) {
+      try {
+        await generateSummary.mutateAsync(session.id);
+        successCount++;
+      } catch (error) {
+        console.error(`Failed to generate summary for session ${session.id}:`, error);
+        errorCount++;
+      }
+    }
+
+    setIsBatchGenerating(false);
+
+    if (errorCount === 0) {
+      toast.success(`Successfully generated ${successCount} summaries`);
+    } else {
+      toast.warning(`Generated ${successCount} summaries, ${errorCount} failed`);
+    }
+  }, [sessionsWithoutSummaries, isBatchGenerating, generateSummary]);
 
   // Navigation handlers
   const goToPreviousDay = useCallback(() => {
@@ -117,6 +155,22 @@ export function TimelinePage() {
             >
               <Calendar className="h-4 w-4" />
             </Button>
+            {sessionsWithoutSummaries.length > 0 && (
+              <Button
+                variant="default"
+                size="sm"
+                onClick={handleBatchGenerateSummaries}
+                disabled={isBatchGenerating}
+                title={`Generate ${sessionsWithoutSummaries.length} missing summaries`}
+              >
+                {isBatchGenerating ? (
+                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                ) : (
+                  <Sparkles className="h-4 w-4 mr-1" />
+                )}
+                {sessionsWithoutSummaries.length}
+              </Button>
+            )}
           </div>
         </div>
       </div>
@@ -136,7 +190,7 @@ export function TimelinePage() {
           </div>
 
           {/* Main Content - Timeline Grid */}
-          <div className="flex-1 flex flex-col min-w-0 xl:overflow-hidden">
+          <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
             {/* Header - Desktop */}
             <div className="hidden xl:flex items-center justify-between mb-6">
               <div>
@@ -192,6 +246,22 @@ export function TimelinePage() {
                 >
                   <Calendar className="h-4 w-4" />
                 </Button>
+                {sessionsWithoutSummaries.length > 0 && (
+                  <Button
+                    variant="default"
+                    size="sm"
+                    onClick={handleBatchGenerateSummaries}
+                    disabled={isBatchGenerating}
+                    title={`Generate ${sessionsWithoutSummaries.length} missing summaries`}
+                  >
+                    {isBatchGenerating ? (
+                      <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                    ) : (
+                      <Sparkles className="h-4 w-4 mr-1" />
+                    )}
+                    {sessionsWithoutSummaries.length}
+                  </Button>
+                )}
               </div>
             </div>
 

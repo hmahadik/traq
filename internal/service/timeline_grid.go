@@ -109,17 +109,35 @@ func (s *TimelineService) GetTimelineGridData(date string) (*TimelineGridData, e
 	}
 
 	// Build hourly grid: hour -> app -> blocks
+	// IMPORTANT: Events may span midnight or hour boundaries, so we clip them
 	hourlyGrid := make(map[int]map[string][]ActivityBlock)
 	for _, event := range focusEvents {
-		startTime := time.Unix(event.StartTime, 0).In(time.Local)
-		_ = time.Unix(event.EndTime, 0).In(time.Local) // Used for reference, calculated from duration
+		// Clip event times to day boundaries
+		effectiveStart := event.StartTime
+		if effectiveStart < dayStart.Unix() {
+			effectiveStart = dayStart.Unix()
+		}
+
+		effectiveEnd := event.EndTime
+		if effectiveEnd > dayEnd.Unix() {
+			effectiveEnd = dayEnd.Unix()
+		}
+
+		// Skip if event doesn't overlap with this day after clipping
+		if effectiveStart >= effectiveEnd {
+			continue
+		}
+
+		startTime := time.Unix(effectiveStart, 0).In(time.Local)
 
 		hour := startTime.Hour()
 		minute := startTime.Minute()
 
 		// Calculate pixel position and height (60px per hour)
 		pixelPosition := (float64(minute) / 60.0) * 60.0
-		durationSeconds := event.DurationSeconds
+
+		// Use clipped duration for display
+		durationSeconds := float64(effectiveEnd - effectiveStart)
 		pixelHeight := (durationSeconds / 3600.0) * 60.0
 
 		// Ensure minimum visibility (4px)
@@ -131,9 +149,9 @@ func (s *TimelineService) GetTimelineGridData(date string) (*TimelineGridData, e
 			ID:              event.ID,
 			WindowTitle:     event.WindowTitle,
 			AppName:         event.AppName,
-			StartTime:       event.StartTime,
-			EndTime:         event.EndTime,
-			DurationSeconds: event.DurationSeconds,
+			StartTime:       effectiveStart,
+			EndTime:         effectiveEnd,
+			DurationSeconds: durationSeconds,
 			Category:        categories[event.AppName],
 			HourOffset:      hour,
 			MinuteOffset:    minute,
@@ -164,20 +182,47 @@ func (s *TimelineService) GetTimelineGridData(date string) (*TimelineGridData, e
 	}
 
 	// Build session summaries with positions
+	// IMPORTANT: Sessions may span midnight, so we clip them to day boundaries
+	dayStartUnix := dayStart.Unix()
+	dayEndUnix := dayEnd.Unix()
+
 	sessionSummaries := make([]*SessionSummaryWithPosition, 0, len(sessions))
 	for _, sess := range sessions {
-		startTime := time.Unix(sess.StartTime, 0).In(time.Local)
+		// Clip session times to day boundaries for display purposes
+		effectiveStart := sess.StartTime
+		if effectiveStart < dayStartUnix {
+			effectiveStart = dayStartUnix // Session started before this day
+		}
+
+		var effectiveEnd int64
+		if sess.EndTime != nil {
+			effectiveEnd = *sess.EndTime
+		} else {
+			// Ongoing session - use current time or day end, whichever is earlier
+			now := time.Now().Unix()
+			if now > dayEndUnix {
+				effectiveEnd = dayEndUnix
+			} else {
+				effectiveEnd = now
+			}
+		}
+		if effectiveEnd > dayEndUnix {
+			effectiveEnd = dayEndUnix // Session extends past this day
+		}
+
+		// Skip if session doesn't overlap with this day after clipping
+		if effectiveStart >= effectiveEnd {
+			continue
+		}
+
+		startTime := time.Unix(effectiveStart, 0).In(time.Local)
 
 		hour := startTime.Hour()
 		minute := startTime.Minute()
 		pixelPosition := (float64(minute) / 60.0) * 60.0
 
-		var durationSeconds float64
-		if sess.DurationSeconds != nil {
-			durationSeconds = float64(*sess.DurationSeconds)
-		} else if sess.EndTime != nil {
-			durationSeconds = float64(*sess.EndTime - sess.StartTime)
-		}
+		// Use clipped duration for display
+		durationSeconds := float64(effectiveEnd - effectiveStart)
 
 		pixelHeight := (durationSeconds / 3600.0) * 60.0
 		if pixelHeight < 10 {
