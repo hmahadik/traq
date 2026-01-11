@@ -467,7 +467,7 @@
       "Save and verify rule persists",
       "Delete rule and verify removal"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "settings",
