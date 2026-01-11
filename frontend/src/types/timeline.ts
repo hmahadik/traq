@@ -9,6 +9,7 @@ export interface TimelineGridData {
   sessionSummaries: SessionSummaryWithPosition[];
   categories: Record<string, string>; // app -> category
   gitEvents: Record<number, GitEventDisplay[]>; // hour -> git events
+  shellEvents: Record<number, ShellEventDisplay[]>; // hour -> shell commands
 }
 
 export interface DayStats {
@@ -84,6 +85,19 @@ export interface GitEventDisplay {
   branch: string;
   insertions: number;
   deletions: number;
+  hourOffset: number; // Hour of day (0-23)
+  minuteOffset: number; // Minute within hour (0-59)
+  pixelPosition: number; // Vertical position in pixels (0-60)
+}
+
+export interface ShellEventDisplay {
+  id: number;
+  timestamp: number;
+  command: string;
+  shellType: string;
+  workingDirectory: string;
+  exitCode: number;
+  durationSeconds: number;
   hourOffset: number; // Hour of day (0-23)
   minuteOffset: number; // Minute within hour (0-59)
   pixelPosition: number; // Vertical position in pixels (0-60)

@@ -1510,6 +1510,36 @@ export namespace service {
 	    }
 	}
 	
+	export class ShellEventDisplay {
+	    id: number;
+	    timestamp: number;
+	    command: string;
+	    shellType: string;
+	    workingDirectory: string;
+	    exitCode: number;
+	    durationSeconds: number;
+	    hourOffset: number;
+	    minuteOffset: number;
+	    pixelPosition: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new ShellEventDisplay(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.timestamp = source["timestamp"];
+	        this.command = source["command"];
+	        this.shellType = source["shellType"];
+	        this.workingDirectory = source["workingDirectory"];
+	        this.exitCode = source["exitCode"];
+	        this.durationSeconds = source["durationSeconds"];
+	        this.hourOffset = source["hourOffset"];
+	        this.minuteOffset = source["minuteOffset"];
+	        this.pixelPosition = source["pixelPosition"];
+	    }
+	}
 	
 	export class StorageStats {
 	    screenshotCount: number;
@@ -1602,6 +1632,7 @@ export namespace service {
 	    sessionSummaries: SessionSummaryWithPosition[];
 	    categories: Record<string, string>;
 	    gitEvents: Record<number, Array<GitEventDisplay>>;
+	    shellEvents: Record<number, Array<ShellEventDisplay>>;
 	
 	    static createFrom(source: any = {}) {
 	        return new TimelineGridData(source);
@@ -1616,6 +1647,7 @@ export namespace service {
 	        this.sessionSummaries = this.convertValues(source["sessionSummaries"], SessionSummaryWithPosition);
 	        this.categories = source["categories"];
 	        this.gitEvents = this.convertValues(source["gitEvents"], Array<GitEventDisplay>, true);
+	        this.shellEvents = this.convertValues(source["shellEvents"], Array<ShellEventDisplay>, true);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

@@ -701,8 +701,8 @@
       "Verify commands grouped if many in quick succession",
       "Click to expand command details or see surrounding context"
     ],
-    "passes": false,
-    "note": "FUTURE ENHANCEMENT: Not in original spec. See UNIFIED_TIMELINE_VISION.md. Shell commands currently viewable in Analytics > Data Sources."
+    "passes": true,
+    "note": "IMPLEMENTED: Shell commands now appear inline in Timeline view with full details (command, shell type, exit code, working directory, duration). Commands display with success/failure indicators (green checkmark for exit code 0, red X for failures). Column shows total command count and integrates seamlessly between Git and app columns."
   },
   {
     "category": "unified-timeline",

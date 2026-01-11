@@ -17,6 +17,7 @@ type TimelineGridData struct {
 	SessionSummaries []*SessionSummaryWithPosition             `json:"sessionSummaries"`
 	Categories       map[string]string                         `json:"categories"` // app -> category
 	GitEvents        map[int][]GitEventDisplay                 `json:"gitEvents"`  // hour -> git events
+	ShellEvents      map[int][]ShellEventDisplay               `json:"shellEvents"` // hour -> shell commands
 }
 
 // DayStats contains aggregated statistics for a day.
@@ -84,6 +85,20 @@ type GitEventDisplay struct {
 	HourOffset      int     `json:"hourOffset"`      // Hour of day (0-23)
 	MinuteOffset    int     `json:"minuteOffset"`    // Minute within hour (0-59)
 	PixelPosition   float64 `json:"pixelPosition"`   // Vertical position in pixels (0-60)
+}
+
+// ShellEventDisplay represents a shell command for timeline display.
+type ShellEventDisplay struct {
+	ID               int64   `json:"id"`
+	Timestamp        int64   `json:"timestamp"`
+	Command          string  `json:"command"`
+	ShellType        string  `json:"shellType"`
+	WorkingDirectory string  `json:"workingDirectory"`
+	ExitCode         int64   `json:"exitCode"`
+	DurationSeconds  float64 `json:"durationSeconds"`
+	HourOffset       int     `json:"hourOffset"`      // Hour of day (0-23)
+	MinuteOffset     int     `json:"minuteOffset"`    // Minute within hour (0-59)
+	PixelPosition    float64 `json:"pixelPosition"`   // Vertical position in pixels (0-60)
 }
 
 // GetTimelineGridData retrieves all data needed for the v3 timeline grid view.
@@ -335,6 +350,56 @@ func (s *TimelineService) GetTimelineGridData(date string) (*TimelineGridData, e
 		gitEvents[hour] = append(gitEvents[hour], gitEvent)
 	}
 
+	// Fetch shell commands for the day
+	shellCommands, err := s.store.GetShellCommandsByTimeRange(dayStart.Unix(), dayEnd.Unix())
+	if err != nil {
+		// Non-fatal: log and continue with empty shell events
+		shellCommands = []*storage.ShellCommand{}
+	}
+
+	// Build shell events map: hour -> events
+	shellEvents := make(map[int][]ShellEventDisplay)
+
+	for _, cmd := range shellCommands {
+		cmdTime := time.Unix(cmd.Timestamp, 0).In(time.Local)
+		hour := cmdTime.Hour()
+		minute := cmdTime.Minute()
+		pixelPosition := (float64(minute) / 60.0) * 60.0
+
+		// Get working directory or use empty string
+		workingDir := ""
+		if cmd.WorkingDirectory.Valid {
+			workingDir = cmd.WorkingDirectory.String
+		}
+
+		// Get exit code or use 0
+		exitCode := int64(0)
+		if cmd.ExitCode.Valid {
+			exitCode = cmd.ExitCode.Int64
+		}
+
+		// Get duration or use 0
+		duration := 0.0
+		if cmd.DurationSeconds.Valid {
+			duration = cmd.DurationSeconds.Float64
+		}
+
+		shellEvent := ShellEventDisplay{
+			ID:               cmd.ID,
+			Timestamp:        cmd.Timestamp,
+			Command:          cmd.Command,
+			ShellType:        cmd.ShellType,
+			WorkingDirectory: workingDir,
+			ExitCode:         exitCode,
+			DurationSeconds:  duration,
+			HourOffset:       hour,
+			MinuteOffset:     minute,
+			PixelPosition:    pixelPosition,
+		}
+
+		shellEvents[hour] = append(shellEvents[hour], shellEvent)
+	}
+
 	return &TimelineGridData{
 		Date:             date,
 		DayStats:         dayStats,
@@ -343,6 +408,7 @@ func (s *TimelineService) GetTimelineGridData(date string) (*TimelineGridData, e
 		SessionSummaries: sessionSummaries,
 		Categories:       friendlyCategories,
 		GitEvents:        gitEvents,
+		ShellEvents:      shellEvents,
 	}, nil
 }
 
