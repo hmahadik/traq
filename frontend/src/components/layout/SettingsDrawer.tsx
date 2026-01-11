@@ -23,6 +23,7 @@ import { Progress } from '@/components/ui/progress';
 import { useConfig, useUpdateConfig, useInferenceStatus, useAvailableModels, useDownloadModel, useServerStatus, useDownloadServer, useStorageStats, useOpenDataDir, useDataDir, useOptimizeDatabase, useAvailableMonitors } from '@/api/hooks';
 import { formatBytes } from '@/lib/utils';
 import { CategoriesTab } from '@/components/settings/CategoriesTab';
+import { TimelineCategoriesTab } from '@/components/settings/TimelineCategoriesTab';
 import { GitRepositoriesSection } from '@/components/settings/GitRepositoriesSection';
 import { FileWatchDirectoriesSection } from '@/components/settings/FileWatchDirectoriesSection';
 import { FileExtensionFilterSection } from '@/components/settings/FileExtensionFilterSection';
@@ -96,6 +97,7 @@ export function SettingsDrawer({ open, onOpenChange }: SettingsDrawerProps) {
             <TabsTrigger value="capture" className="flex-shrink-0">Capture</TabsTrigger>
             <TabsTrigger value="ai" className="flex-shrink-0">AI</TabsTrigger>
             <TabsTrigger value="categories" className="flex-shrink-0">Categories</TabsTrigger>
+            <TabsTrigger value="timeline-categories" className="flex-shrink-0">Timeline Categories</TabsTrigger>
             <TabsTrigger value="sources" className="flex-shrink-0">Sources</TabsTrigger>
             <TabsTrigger value="system" className="flex-shrink-0">System</TabsTrigger>
           </TabsList>
@@ -883,6 +885,10 @@ export function SettingsDrawer({ open, onOpenChange }: SettingsDrawerProps) {
 
           <TabsContent value="categories" className="space-y-6 mt-4">
             <CategoriesTab />
+          </TabsContent>
+
+          <TabsContent value="timeline-categories" className="space-y-6 mt-4">
+            <TimelineCategoriesTab />
           </TabsContent>
 
           <TabsContent value="system" className="space-y-6 mt-4">
