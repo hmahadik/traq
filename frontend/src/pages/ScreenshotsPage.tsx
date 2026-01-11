@@ -27,7 +27,7 @@ import {
   ZoomIn,
   Check,
 } from 'lucide-react';
-import { useScreenshotsForDate, useDeleteScreenshot } from '@/api/hooks';
+import { useScreenshotsForDate, useScreenshotsForHour, useDeleteScreenshot } from '@/api/hooks';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
@@ -68,6 +68,7 @@ export function ScreenshotsPage() {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [selectedScreenshots, setSelectedScreenshots] = useState<Set<number>>(new Set());
   const [filterApp, setFilterApp] = useState<string>('all');
+  const [filterHour, setFilterHour] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [previewScreenshot, setPreviewScreenshot] = useState<{
     id: number;
@@ -80,8 +81,16 @@ export function ScreenshotsPage() {
   const dateStr = getDateString(selectedDate);
   const isToday = dateStr === getDateString(new Date());
 
-  // Fetch screenshots for the selected date
-  const { data: screenshots, isLoading, refetch } = useScreenshotsForDate(dateStr);
+  // Fetch screenshots - use hour-specific hook if hour filter is active
+  const hourNum = filterHour !== 'all' ? parseInt(filterHour, 10) : null;
+  const { data: screenshotsByDate, isLoading: isLoadingDate, refetch: refetchDate } =
+    useScreenshotsForDate(dateStr, { enabled: hourNum === null });
+  const { data: screenshotsByHour, isLoading: isLoadingHour, refetch: refetchHour } =
+    useScreenshotsForHour(dateStr, hourNum ?? 0, { enabled: hourNum !== null });
+
+  const screenshots = hourNum !== null ? screenshotsByHour : screenshotsByDate;
+  const isLoading = hourNum !== null ? isLoadingHour : isLoadingDate;
+  const refetch = hourNum !== null ? refetchHour : refetchDate;
   const deleteScreenshot = useDeleteScreenshot();
 
   // Get unique apps from current screenshots
@@ -94,6 +103,17 @@ export function ScreenshotsPage() {
     }
     return Array.from(apps).sort();
   }, [screenshots]);
+
+  // Get unique hours from current screenshots (for hour filter dropdown)
+  const uniqueHours = useMemo(() => {
+    if (!screenshotsByDate) return [];
+    const hours = new Set<number>();
+    for (const s of screenshotsByDate) {
+      const date = new Date(s.timestamp * 1000);
+      hours.add(date.getHours());
+    }
+    return Array.from(hours).sort((a, b) => a - b);
+  }, [screenshotsByDate]);
 
   // Filter screenshots
   const filteredScreenshots = useMemo(() => {
@@ -119,12 +139,14 @@ export function ScreenshotsPage() {
   const goToPreviousDay = useCallback(() => {
     setSelectedDate((d) => addDays(d, -1));
     setSelectedScreenshots(new Set());
+    setFilterHour('all');
   }, []);
 
   const goToNextDay = useCallback(() => {
     if (!isToday) {
       setSelectedDate((d) => addDays(d, 1));
       setSelectedScreenshots(new Set());
+      setFilterHour('all');
     }
   }, [isToday]);
 
@@ -235,8 +257,8 @@ export function ScreenshotsPage() {
 
       {/* Filters and Actions */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 mb-4">
-        <div className="flex items-center gap-2 flex-1">
-          <div className="relative flex-1 max-w-xs">
+        <div className="flex items-center gap-2 flex-1 flex-wrap">
+          <div className="relative flex-1 max-w-xs min-w-[200px]">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Search by window title..."
@@ -245,6 +267,25 @@ export function ScreenshotsPage() {
               className="pl-8"
             />
           </div>
+          <Select value={filterHour} onValueChange={setFilterHour}>
+            <SelectTrigger className="w-[140px]">
+              <SelectValue placeholder="Filter by hour" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Hours</SelectItem>
+              {uniqueHours.map((hour) => (
+                <SelectItem key={hour} value={String(hour)}>
+                  {hour === 0
+                    ? '12 AM'
+                    : hour < 12
+                    ? `${hour} AM`
+                    : hour === 12
+                    ? '12 PM'
+                    : `${hour - 12} PM`}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <Select value={filterApp} onValueChange={setFilterApp}>
             <SelectTrigger className="w-[180px]">
               <SelectValue placeholder="Filter by app" />

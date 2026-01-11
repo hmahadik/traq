@@ -320,7 +320,7 @@
       "Verify only screenshots from that hour display",
       "Clear filter and verify all screenshots return"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "journey-screenshots",

@@ -241,19 +241,21 @@ export function useScreenshotsForSession(
   });
 }
 
-export function useScreenshotsForHour(date: string, hour: number) {
+export function useScreenshotsForHour(date: string, hour: number, options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: queryKeys.timeline.hourScreenshots(date, hour),
     queryFn: () => api.timeline.getScreenshotsForHour(date, hour),
     staleTime: 60_000,
+    enabled: options?.enabled,
   });
 }
 
-export function useScreenshotsForDate(date: string) {
+export function useScreenshotsForDate(date: string, options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: queryKeys.timeline.dateScreenshots(date),
     queryFn: () => api.timeline.getScreenshotsForDate(date),
     staleTime: 60_000,
+    enabled: options?.enabled,
   });
 }
 
