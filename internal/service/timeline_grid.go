@@ -18,6 +18,7 @@ type TimelineGridData struct {
 	Categories       map[string]string                         `json:"categories"` // app -> category
 	GitEvents        map[int][]GitEventDisplay                 `json:"gitEvents"`  // hour -> git events
 	ShellEvents      map[int][]ShellEventDisplay               `json:"shellEvents"` // hour -> shell commands
+	FileEvents       map[int][]FileEventDisplay                `json:"fileEvents"` // hour -> file events
 }
 
 // DayStats contains aggregated statistics for a day.
@@ -99,6 +100,23 @@ type ShellEventDisplay struct {
 	HourOffset       int     `json:"hourOffset"`      // Hour of day (0-23)
 	MinuteOffset     int     `json:"minuteOffset"`    // Minute within hour (0-59)
 	PixelPosition    float64 `json:"pixelPosition"`   // Vertical position in pixels (0-60)
+}
+
+// FileEventDisplay represents a file system event for timeline display.
+type FileEventDisplay struct {
+	ID            int64   `json:"id"`
+	Timestamp     int64   `json:"timestamp"`
+	EventType     string  `json:"eventType"`     // create, modify, delete, rename
+	FilePath      string  `json:"filePath"`
+	FileName      string  `json:"fileName"`
+	Directory     string  `json:"directory"`
+	FileExtension string  `json:"fileExtension"`
+	FileSizeBytes int64   `json:"fileSizeBytes"`
+	WatchCategory string  `json:"watchCategory"` // downloads, projects, documents
+	OldPath       string  `json:"oldPath"`       // For rename events
+	HourOffset    int     `json:"hourOffset"`    // Hour of day (0-23)
+	MinuteOffset  int     `json:"minuteOffset"`  // Minute within hour (0-59)
+	PixelPosition float64 `json:"pixelPosition"` // Vertical position in pixels (0-60)
 }
 
 // GetTimelineGridData retrieves all data needed for the v3 timeline grid view.
@@ -400,6 +418,59 @@ func (s *TimelineService) GetTimelineGridData(date string) (*TimelineGridData, e
 		shellEvents[hour] = append(shellEvents[hour], shellEvent)
 	}
 
+	// Fetch file events for the day
+	fileEvents_, err := s.store.GetFileEventsByTimeRange(dayStart.Unix(), dayEnd.Unix())
+	if err != nil {
+		// Non-fatal: log and continue with empty file events
+		fileEvents_ = []*storage.FileEvent{}
+	}
+
+	// Build file events map: hour -> events
+	fileEvents := make(map[int][]FileEventDisplay)
+
+	for _, file := range fileEvents_ {
+		fileTime := time.Unix(file.Timestamp, 0).In(time.Local)
+		hour := fileTime.Hour()
+		minute := fileTime.Minute()
+		pixelPosition := (float64(minute) / 60.0) * 60.0
+
+		// Get file extension or use empty string
+		fileExt := ""
+		if file.FileExtension.Valid {
+			fileExt = file.FileExtension.String
+		}
+
+		// Get file size or use 0
+		fileSize := int64(0)
+		if file.FileSizeBytes.Valid {
+			fileSize = file.FileSizeBytes.Int64
+		}
+
+		// Get old path for rename events or use empty string
+		oldPath := ""
+		if file.OldPath.Valid {
+			oldPath = file.OldPath.String
+		}
+
+		fileEvent := FileEventDisplay{
+			ID:            file.ID,
+			Timestamp:     file.Timestamp,
+			EventType:     file.EventType,
+			FilePath:      file.FilePath,
+			FileName:      file.FileName,
+			Directory:     file.Directory,
+			FileExtension: fileExt,
+			FileSizeBytes: fileSize,
+			WatchCategory: file.WatchCategory,
+			OldPath:       oldPath,
+			HourOffset:    hour,
+			MinuteOffset:  minute,
+			PixelPosition: pixelPosition,
+		}
+
+		fileEvents[hour] = append(fileEvents[hour], fileEvent)
+	}
+
 	return &TimelineGridData{
 		Date:             date,
 		DayStats:         dayStats,
@@ -409,6 +480,7 @@ func (s *TimelineService) GetTimelineGridData(date string) (*TimelineGridData, e
 		Categories:       friendlyCategories,
 		GitEvents:        gitEvents,
 		ShellEvents:      shellEvents,
+		FileEvents:       fileEvents,
 	}, nil
 }
 

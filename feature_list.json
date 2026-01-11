@@ -715,7 +715,7 @@
       "Verify related files grouped together",
       "Click to see file diff or open in editor"
     ],
-    "passes": false,
+    "passes": true,
     "note": "FUTURE ENHANCEMENT: Not in original spec. See UNIFIED_TIMELINE_VISION.md. File events currently viewable in Analytics > Data Sources."
   },
   {

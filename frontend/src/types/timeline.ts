@@ -10,6 +10,7 @@ export interface TimelineGridData {
   categories: Record<string, string>; // app -> category
   gitEvents: Record<number, GitEventDisplay[]>; // hour -> git events
   shellEvents: Record<number, ShellEventDisplay[]>; // hour -> shell commands
+  fileEvents: Record<number, FileEventDisplay[]>; // hour -> file events
 }
 
 export interface DayStats {
@@ -98,6 +99,22 @@ export interface ShellEventDisplay {
   workingDirectory: string;
   exitCode: number;
   durationSeconds: number;
+  hourOffset: number; // Hour of day (0-23)
+  minuteOffset: number; // Minute within hour (0-59)
+  pixelPosition: number; // Vertical position in pixels (0-60)
+}
+
+export interface FileEventDisplay {
+  id: number;
+  timestamp: number;
+  eventType: string; // create, modify, delete, rename
+  filePath: string;
+  fileName: string;
+  directory: string;
+  fileExtension: string;
+  fileSizeBytes: number;
+  watchCategory: string; // downloads, projects, documents
+  oldPath: string; // For rename events
   hourOffset: number; // Hour of day (0-23)
   minuteOffset: number; // Minute within hour (0-59)
   pixelPosition: number; // Vertical position in pixels (0-60)

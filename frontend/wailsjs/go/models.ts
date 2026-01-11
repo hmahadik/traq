@@ -1026,6 +1026,42 @@ export namespace service {
 		}
 	}
 	
+	export class FileEventDisplay {
+	    id: number;
+	    timestamp: number;
+	    eventType: string;
+	    filePath: string;
+	    fileName: string;
+	    directory: string;
+	    fileExtension: string;
+	    fileSizeBytes: number;
+	    watchCategory: string;
+	    oldPath: string;
+	    hourOffset: number;
+	    minuteOffset: number;
+	    pixelPosition: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new FileEventDisplay(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.timestamp = source["timestamp"];
+	        this.eventType = source["eventType"];
+	        this.filePath = source["filePath"];
+	        this.fileName = source["fileName"];
+	        this.directory = source["directory"];
+	        this.fileExtension = source["fileExtension"];
+	        this.fileSizeBytes = source["fileSizeBytes"];
+	        this.watchCategory = source["watchCategory"];
+	        this.oldPath = source["oldPath"];
+	        this.hourOffset = source["hourOffset"];
+	        this.minuteOffset = source["minuteOffset"];
+	        this.pixelPosition = source["pixelPosition"];
+	    }
+	}
 	
 	
 	
@@ -1633,6 +1669,7 @@ export namespace service {
 	    categories: Record<string, string>;
 	    gitEvents: Record<number, Array<GitEventDisplay>>;
 	    shellEvents: Record<number, Array<ShellEventDisplay>>;
+	    fileEvents: Record<number, Array<FileEventDisplay>>;
 	
 	    static createFrom(source: any = {}) {
 	        return new TimelineGridData(source);
@@ -1648,6 +1685,7 @@ export namespace service {
 	        this.categories = source["categories"];
 	        this.gitEvents = this.convertValues(source["gitEvents"], Array<GitEventDisplay>, true);
 	        this.shellEvents = this.convertValues(source["shellEvents"], Array<ShellEventDisplay>, true);
+	        this.fileEvents = this.convertValues(source["fileEvents"], Array<FileEventDisplay>, true);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

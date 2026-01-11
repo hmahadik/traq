@@ -6,6 +6,7 @@ import { ScreenshotColumn } from './ScreenshotColumn';
 import { AppColumn } from './AppColumn';
 import { GitColumn } from './GitColumn';
 import { ShellColumn } from './ShellColumn';
+import { FilesColumn } from './FilesColumn';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { ImageGallery } from '@/components/common/ImageGallery';
 import { useScreenshotsForDate } from '@/api/hooks';
@@ -165,6 +166,9 @@ export const TimelineGridView: React.FC<TimelineGridViewProps> = ({ data }) => {
 
           {/* Shell Column */}
           <ShellColumn shellEvents={data.shellEvents || {}} hours={activeHours} />
+
+          {/* Files Column */}
+          <FilesColumn fileEvents={data.fileEvents || {}} hours={activeHours} />
 
           {/* App Columns (Scrollable) */}
           {appColumns.map((column) => (
