@@ -16,6 +16,7 @@ type TimelineGridData struct {
 	HourlyGrid       map[int]map[string][]ActivityBlock        `json:"hourlyGrid"` // hour -> app -> blocks
 	SessionSummaries []*SessionSummaryWithPosition             `json:"sessionSummaries"`
 	Categories       map[string]string                         `json:"categories"` // app -> category
+	GitEvents        map[int][]GitEventDisplay                 `json:"gitEvents"`  // hour -> git events
 }
 
 // DayStats contains aggregated statistics for a day.
@@ -67,6 +68,22 @@ type SessionSummaryWithPosition struct {
 	PixelPosition   float64   `json:"pixelPosition"`   // Vertical position in pixels
 	PixelHeight     float64   `json:"pixelHeight"`     // Height in pixels (spans multiple hours if needed)
 	Category        string    `json:"category"`        // Dominant category for the session
+}
+
+// GitEventDisplay represents a git commit for timeline display.
+type GitEventDisplay struct {
+	ID              int64   `json:"id"`
+	Timestamp       int64   `json:"timestamp"`
+	Message         string  `json:"message"`
+	MessageSubject  string  `json:"messageSubject"`
+	ShortHash       string  `json:"shortHash"`
+	Repository      string  `json:"repository"`
+	Branch          string  `json:"branch"`
+	Insertions      int64   `json:"insertions"`
+	Deletions       int64   `json:"deletions"`
+	HourOffset      int     `json:"hourOffset"`      // Hour of day (0-23)
+	MinuteOffset    int     `json:"minuteOffset"`    // Minute within hour (0-59)
+	PixelPosition   float64 `json:"pixelPosition"`   // Vertical position in pixels (0-60)
 }
 
 // GetTimelineGridData retrieves all data needed for the v3 timeline grid view.
@@ -255,6 +272,69 @@ func (s *TimelineService) GetTimelineGridData(date string) (*TimelineGridData, e
 		friendlyCategories[friendlyName] = category
 	}
 
+	// Fetch git commits for the day
+	gitCommits, err := s.store.GetGitCommitsByTimeRange(dayStart.Unix(), dayEnd.Unix())
+	if err != nil {
+		// Non-critical: log error but continue without git events
+		gitCommits = []*storage.GitCommit{}
+	}
+
+	// Build git events map: hour -> events
+	gitEvents := make(map[int][]GitEventDisplay)
+
+	// Get repository names for display
+	repoMap := make(map[int64]string)
+	repos, _ := s.store.GetActiveGitRepositories()
+	for _, repo := range repos {
+		repoMap[repo.ID] = repo.Name
+	}
+
+	for _, commit := range gitCommits {
+		commitTime := time.Unix(commit.Timestamp, 0).In(time.Local)
+		hour := commitTime.Hour()
+		minute := commitTime.Minute()
+		pixelPosition := (float64(minute) / 60.0) * 60.0
+
+		// Get repository name or use "Unknown" if not found
+		repoName := repoMap[commit.RepositoryID]
+		if repoName == "" {
+			repoName = "Unknown"
+		}
+
+		// Get branch name
+		branch := "main"
+		if commit.Branch.Valid && commit.Branch.String != "" {
+			branch = commit.Branch.String
+		}
+
+		// Get insertions and deletions
+		insertions := int64(0)
+		if commit.Insertions.Valid {
+			insertions = commit.Insertions.Int64
+		}
+		deletions := int64(0)
+		if commit.Deletions.Valid {
+			deletions = commit.Deletions.Int64
+		}
+
+		gitEvent := GitEventDisplay{
+			ID:             commit.ID,
+			Timestamp:      commit.Timestamp,
+			Message:        commit.Message,
+			MessageSubject: commit.MessageSubject,
+			ShortHash:      commit.ShortHash,
+			Repository:     repoName,
+			Branch:         branch,
+			Insertions:     insertions,
+			Deletions:      deletions,
+			HourOffset:     hour,
+			MinuteOffset:   minute,
+			PixelPosition:  pixelPosition,
+		}
+
+		gitEvents[hour] = append(gitEvents[hour], gitEvent)
+	}
+
 	return &TimelineGridData{
 		Date:             date,
 		DayStats:         dayStats,
@@ -262,6 +342,7 @@ func (s *TimelineService) GetTimelineGridData(date string) (*TimelineGridData, e
 		HourlyGrid:       hourlyGrid,
 		SessionSummaries: sessionSummaries,
 		Categories:       friendlyCategories,
+		GitEvents:        gitEvents,
 	}, nil
 }
 

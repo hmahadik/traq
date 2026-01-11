@@ -1029,6 +1029,40 @@ export namespace service {
 	
 	
 	
+	export class GitEventDisplay {
+	    id: number;
+	    timestamp: number;
+	    message: string;
+	    messageSubject: string;
+	    shortHash: string;
+	    repository: string;
+	    branch: string;
+	    insertions: number;
+	    deletions: number;
+	    hourOffset: number;
+	    minuteOffset: number;
+	    pixelPosition: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new GitEventDisplay(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.timestamp = source["timestamp"];
+	        this.message = source["message"];
+	        this.messageSubject = source["messageSubject"];
+	        this.shortHash = source["shortHash"];
+	        this.repository = source["repository"];
+	        this.branch = source["branch"];
+	        this.insertions = source["insertions"];
+	        this.deletions = source["deletions"];
+	        this.hourOffset = source["hourOffset"];
+	        this.minuteOffset = source["minuteOffset"];
+	        this.pixelPosition = source["pixelPosition"];
+	    }
+	}
 	
 	export class HeatmapData {
 	    dayOfWeek: number;
@@ -1567,6 +1601,7 @@ export namespace service {
 	    hourlyGrid: Record<number, any>;
 	    sessionSummaries: SessionSummaryWithPosition[];
 	    categories: Record<string, string>;
+	    gitEvents: Record<number, Array<GitEventDisplay>>;
 	
 	    static createFrom(source: any = {}) {
 	        return new TimelineGridData(source);
@@ -1580,6 +1615,7 @@ export namespace service {
 	        this.hourlyGrid = source["hourlyGrid"];
 	        this.sessionSummaries = this.convertValues(source["sessionSummaries"], SessionSummaryWithPosition);
 	        this.categories = source["categories"];
+	        this.gitEvents = this.convertValues(source["gitEvents"], Array<GitEventDisplay>, true);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

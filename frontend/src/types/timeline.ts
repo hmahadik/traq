@@ -8,6 +8,7 @@ export interface TimelineGridData {
   hourlyGrid: Record<number, Record<string, ActivityBlock[]>>; // hour -> app -> blocks
   sessionSummaries: SessionSummaryWithPosition[];
   categories: Record<string, string>; // app -> category
+  gitEvents: Record<number, GitEventDisplay[]>; // hour -> git events
 }
 
 export interface DayStats {
@@ -71,6 +72,21 @@ export interface SessionSummaryWithPosition {
   pixelPosition: number; // Vertical position in pixels
   pixelHeight: number; // Height in pixels (spans multiple hours if needed)
   category: string; // Dominant category for the session
+}
+
+export interface GitEventDisplay {
+  id: number;
+  timestamp: number;
+  message: string;
+  messageSubject: string;
+  shortHash: string;
+  repository: string;
+  branch: string;
+  insertions: number;
+  deletions: number;
+  hourOffset: number; // Hour of day (0-23)
+  minuteOffset: number; // Minute within hour (0-59)
+  pixelPosition: number; // Vertical position in pixels (0-60)
 }
 
 export interface CategorizationRule {

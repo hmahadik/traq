@@ -687,8 +687,8 @@
       "Verify commit is positioned correctly relative to screenshots",
       "Click commit to see diff or navigate to repo"
     ],
-    "passes": false,
-    "note": "FUTURE ENHANCEMENT: Not in original spec. See UNIFIED_TIMELINE_VISION.md. Git commits currently viewable in Analytics > Data Sources."
+    "passes": true,
+    "note": "IMPLEMENTED: Git commits now appear inline in Timeline view with full details (hash, branch, message, repo, insertions/deletions). Commits are clickable and positioned at correct timestamps."
   },
   {
     "category": "unified-timeline",
