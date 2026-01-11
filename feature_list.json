@@ -296,7 +296,7 @@
       "Click a report in history",
       "Verify preview loads that report's content"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "journey-screenshots",
