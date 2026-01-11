@@ -504,7 +504,7 @@
       "Verify repository name captured",
       "Verify insertions/deletions tracked"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "data-sources-git",
@@ -516,7 +516,7 @@
       "Verify each repo shows commit count",
       "Verify repos ordered by activity (most active first)"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "data-sources-git",
@@ -529,7 +529,7 @@
       "Verify git stats aggregate monthly",
       "Verify totals match sum of daily commits"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "data-sources-shell",
@@ -541,7 +541,7 @@
       "Verify total command count updates",
       "Verify shell type detected (bash, zsh, etc.)"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "data-sources-shell",
@@ -553,7 +553,7 @@
       "Verify command counts accurate",
       "Verify commands ordered by frequency"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "data-sources-shell",
@@ -565,7 +565,7 @@
       "Verify bash vs zsh vs other differentiated",
       "Verify counts per shell type"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "data-sources-files",
@@ -577,7 +577,7 @@
       "Verify total file events count",
       "Verify event types tracked (create, modify, delete)"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "data-sources-files",
@@ -589,7 +589,7 @@
       "Verify create/modify/delete counts shown",
       "Verify breakdown adds up to total"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "data-sources-files",
@@ -601,7 +601,7 @@
       "Verify common extensions (.ts, .go, .md) appear",
       "Verify extensions ordered by frequency"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "data-sources-browser",
@@ -613,7 +613,7 @@
       "Verify total visits count",
       "Verify unique domains count"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "data-sources-browser",
@@ -625,7 +625,7 @@
       "Verify domains show visit counts",
       "Verify domains ordered by frequency"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "data-sources-browser",
@@ -637,7 +637,7 @@
       "Verify Chrome/Firefox/etc differentiated",
       "Verify counts per browser"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "data-sources-integration",
@@ -649,7 +649,7 @@
       "Verify each section shows summary stats",
       "Verify sections collapsible or expandable"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "data-sources-integration",
@@ -662,7 +662,7 @@
       "Verify shell activity mentioned if any",
       "Verify file changes mentioned if any"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "data-sources-integration",
@@ -674,7 +674,7 @@
       "Verify gitCommits count displayed",
       "Verify filesModified count displayed"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "unified-timeline",
