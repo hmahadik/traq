@@ -52,11 +52,12 @@ type Daemon struct {
 	files   *FileTracker
 	browser *BrowserTracker
 
-	running   bool
-	paused    bool
-	stopCh    chan struct{}
-	mu        sync.RWMutex
-	lastDHash string
+	running         bool
+	paused          bool
+	stopCh          chan struct{}
+	mu              sync.RWMutex
+	lastDHash       string
+	currentAFKID    int64 // Track ongoing AFK event ID
 }
 
 // NewDaemon creates a new tracking daemon.
@@ -107,6 +108,13 @@ func (d *Daemon) Start() error {
 	d.running = true
 	d.stopCh = make(chan struct{})
 	d.mu.Unlock()
+
+	// Close any orphaned AFK events from a previous crash
+	// We assume user returned at current time if there's an unclosed AFK event
+	if err := d.store.CloseOrphanedAFKEvents(time.Now().Unix()); err != nil {
+		// Log but don't fail startup
+		fmt.Printf("Warning: failed to close orphaned AFK events: %v\n", err)
+	}
 
 	// Start or resume a session
 	session, err := d.session.StartSession()
@@ -325,9 +333,38 @@ func (d *Daemon) onAFK() {
 
 	// Clear duplicate detection
 	d.lastDHash = ""
+
+	// Create AFK event
+	session := d.session.GetCurrentSession()
+	var sessionID sql.NullInt64
+	if session != nil {
+		sessionID = sql.NullInt64{Int64: session.ID, Valid: true}
+	}
+
+	afkEvent := &storage.AFKEvent{
+		StartTime:   time.Now().Unix(),
+		SessionID:   sessionID,
+		TriggerType: "idle_timeout",
+	}
+	id, err := d.store.CreateAFKEvent(afkEvent)
+	if err == nil {
+		d.mu.Lock()
+		d.currentAFKID = id
+		d.mu.Unlock()
+	}
 }
 
 func (d *Daemon) onReturn() {
+	// Close current AFK event
+	d.mu.Lock()
+	afkID := d.currentAFKID
+	d.currentAFKID = 0
+	d.mu.Unlock()
+
+	if afkID > 0 {
+		d.store.UpdateAFKEventEnd(afkID, time.Now().Unix())
+	}
+
 	// Start new session
 	session, err := d.session.HandleReturn()
 	if err != nil {

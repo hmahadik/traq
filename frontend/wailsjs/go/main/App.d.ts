@@ -14,6 +14,8 @@ export function DeleteScreenshot(arg1:number):Promise<void>;
 
 export function DeleteSession(arg1:number):Promise<void>;
 
+export function DeleteTimelineCategoryRule(arg1:string):Promise<void>;
+
 export function DiscoverGitRepositories(arg1:Array<string>,arg2:number):Promise<Array<storage.GitRepository>>;
 
 export function DownloadModel(arg1:string):Promise<void>;
@@ -45,6 +47,8 @@ export function GetAvailableMonitors():Promise<Array<tracker.MonitorInfo>>;
 export function GetBundledStatus():Promise<inference.BundledStatus>;
 
 export function GetCalendarHeatmap(arg1:number,arg2:number):Promise<service.CalendarData>;
+
+export function GetCategorizationRules():Promise<Array<storage.CategorizationRule>>;
 
 export function GetConfig():Promise<service.Config>;
 
@@ -114,6 +118,8 @@ export function GetSystemTheme():Promise<string>;
 
 export function GetThumbnailPath(arg1:number):Promise<string>;
 
+export function GetTimelineGridData(arg1:string):Promise<service.TimelineGridData>;
+
 export function GetTopWindows(arg1:string,arg2:number):Promise<Array<service.WindowUsage>>;
 
 export function GetTrackedRepositories():Promise<Array<storage.GitRepository>>;
@@ -145,6 +151,8 @@ export function RestartTracking():Promise<void>;
 export function ResumeCapture():Promise<void>;
 
 export function SaveAppCategory(arg1:string,arg2:string):Promise<void>;
+
+export function SetAppTimelineCategory(arg1:string,arg2:string):Promise<void>;
 
 export function SetFileAllowedExtensions(arg1:Array<string>):Promise<void>;
 

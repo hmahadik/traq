@@ -1,0 +1,1068 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Traq Timeline v3 - Vertical App Bars (Timely Style)</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #09090b;
+      color: #fafafa;
+      font-size: 13px;
+    }
+
+    .container {
+      display: flex;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    /* ===== LEFT SIDEBAR: DAILY SUMMARY ===== */
+    .sidebar {
+      width: 300px;
+      background: #0f0f0f;
+      border-right: 1px solid #27272a;
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+    }
+
+    .sidebar-header {
+      padding: 20px;
+      border-bottom: 1px solid #27272a;
+    }
+
+    .sidebar-header h1 {
+      font-size: 20px;
+      font-weight: 600;
+      margin-bottom: 2px;
+    }
+
+    .sidebar-header .date {
+      color: #71717a;
+      font-size: 13px;
+    }
+
+    /* Daily Summary Card */
+    .daily-summary {
+      padding: 16px;
+      border-bottom: 1px solid #27272a;
+    }
+
+    .summary-hero {
+      text-align: center;
+      padding: 20px 0;
+    }
+
+    .summary-hero .big-number {
+      font-size: 48px;
+      font-weight: 700;
+      letter-spacing: -2px;
+      background: linear-gradient(135deg, #22c55e 0%, #10b981 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .summary-hero .label {
+      font-size: 12px;
+      color: #71717a;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-top: 4px;
+    }
+
+    .summary-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 0;
+      border-bottom: 1px solid #1f1f23;
+    }
+
+    .summary-row:last-child {
+      border-bottom: none;
+    }
+
+    .summary-row .label {
+      color: #71717a;
+      font-size: 13px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .summary-row .label svg {
+      width: 16px;
+      height: 16px;
+      opacity: 0.6;
+    }
+
+    .summary-row .value {
+      font-weight: 500;
+      font-size: 14px;
+    }
+
+    /* Progress Ring */
+    .progress-ring {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 16px 0;
+    }
+
+    .ring-container {
+      position: relative;
+      width: 56px;
+      height: 56px;
+    }
+
+    .ring-container svg {
+      transform: rotate(-90deg);
+    }
+
+    .ring-bg {
+      fill: none;
+      stroke: #27272a;
+      stroke-width: 6;
+    }
+
+    .ring-progress {
+      fill: none;
+      stroke: #22c55e;
+      stroke-width: 6;
+      stroke-linecap: round;
+      stroke-dasharray: 138.2;
+      stroke-dashoffset: calc(138.2 - (138.2 * 78) / 100);
+      transition: stroke-dashoffset 0.5s;
+    }
+
+    .ring-text {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .progress-info {
+      flex: 1;
+    }
+
+    .progress-info .title {
+      font-weight: 500;
+      margin-bottom: 2px;
+    }
+
+    .progress-info .subtitle {
+      font-size: 12px;
+      color: #71717a;
+    }
+
+    /* Time Breakdown Mini Bar */
+    .breakdown-bar {
+      display: flex;
+      height: 8px;
+      border-radius: 4px;
+      overflow: hidden;
+      margin-top: 16px;
+    }
+
+    .breakdown-bar .segment {
+      transition: width 0.3s;
+    }
+
+    .breakdown-bar .segment.focus { background: #22c55e; }
+    .breakdown-bar .segment.meetings { background: #3b82f6; }
+    .breakdown-bar .segment.comms { background: #a855f7; }
+    .breakdown-bar .segment.other { background: #71717a; }
+
+    .breakdown-legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 12px;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      color: #a1a1aa;
+    }
+
+    .legend-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 2px;
+    }
+
+    /* Top Apps in Sidebar */
+    .top-apps {
+      padding: 16px;
+      flex: 1;
+      overflow-y: auto;
+    }
+
+    .section-title {
+      font-size: 11px;
+      color: #71717a;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 12px;
+      font-weight: 500;
+    }
+
+    .app-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 0;
+    }
+
+    .app-icon {
+      width: 24px;
+      height: 24px;
+      border-radius: 5px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      font-weight: 600;
+      color: white;
+      flex-shrink: 0;
+    }
+
+    .app-icon.vscode { background: #007acc; }
+    .app-icon.chrome { background: #4285f4; }
+    .app-icon.slack { background: #611f69; }
+    .app-icon.terminal { background: #1e1e1e; border: 1px solid #333; color: #0f0; }
+    .app-icon.meet { background: #00897b; }
+    .app-icon.github { background: #1e1e1e; border: 1px solid #333; }
+    .app-icon.linear { background: #5e6ad2; }
+
+    .app-details {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .app-name {
+      font-size: 13px;
+      font-weight: 500;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .app-time {
+      font-size: 12px;
+      color: #71717a;
+    }
+
+    .app-bar {
+      width: 50px;
+      height: 4px;
+      background: #27272a;
+      border-radius: 2px;
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+
+    .app-bar-fill {
+      height: 100%;
+      border-radius: 2px;
+    }
+
+    /* ===== MAIN TIMELINE AREA ===== */
+    .timeline-area {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* Top navigation */
+    .top-nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 20px;
+      background: #0f0f0f;
+      border-bottom: 1px solid #27272a;
+    }
+
+    .nav-left {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .view-toggle {
+      display: flex;
+      background: #18181b;
+      border-radius: 6px;
+      padding: 2px;
+      border: 1px solid #27272a;
+    }
+
+    .view-toggle button {
+      padding: 6px 14px;
+      border: none;
+      background: transparent;
+      color: #71717a;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 500;
+    }
+
+    .view-toggle button.active {
+      background: #27272a;
+      color: #fafafa;
+    }
+
+    .date-nav {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .date-nav button {
+      width: 28px;
+      height: 28px;
+      border: 1px solid #27272a;
+      background: #18181b;
+      color: #71717a;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+
+    .date-nav button:hover {
+      background: #27272a;
+      color: #fafafa;
+    }
+
+    .date-display {
+      font-weight: 500;
+      color: #fafafa;
+    }
+
+    .nav-right {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .btn-secondary {
+      padding: 6px 12px;
+      border: 1px solid #27272a;
+      background: #18181b;
+      color: #a1a1aa;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .btn-secondary:hover {
+      background: #27272a;
+      color: #fafafa;
+    }
+
+    /* Timeline Scroll Container */
+    .timeline-scroll {
+      flex: 1;
+      overflow: auto;
+      background: #09090b;
+    }
+
+    .timeline-grid {
+      display: flex;
+      min-height: 100%;
+    }
+
+    /* Hour column - sticky */
+    .hour-column {
+      width: 60px;
+      flex-shrink: 0;
+      background: #09090b;
+      position: sticky;
+      left: 0;
+      z-index: 20;
+      border-right: 1px solid #27272a;
+    }
+
+    .hour-marker {
+      height: 80px;
+      display: flex;
+      align-items: flex-start;
+      justify-content: flex-end;
+      padding: 4px 10px 0 0;
+      font-size: 12px;
+      color: #71717a;
+      font-weight: 500;
+    }
+
+    /* AI Summary Column - sticky */
+    .summary-column {
+      width: 200px;
+      flex-shrink: 0;
+      background: #0c0c0e;
+      position: sticky;
+      left: 60px;
+      z-index: 15;
+      border-right: 1px solid #27272a;
+    }
+
+    .summary-column-header {
+      height: 40px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 0 12px;
+      font-size: 12px;
+      font-weight: 500;
+      color: #a1a1aa;
+      background: #0f0f0f;
+      border-bottom: 1px solid #27272a;
+      position: sticky;
+      top: 0;
+      z-index: 5;
+    }
+
+    .summary-column-header svg {
+      width: 14px;
+      height: 14px;
+      color: #f59e0b;
+    }
+
+    .summary-hour {
+      height: 80px;
+      padding: 4px 8px;
+      border-bottom: 1px solid #1f1f23;
+    }
+
+    .summary-item {
+      background: #18181b;
+      border-radius: 6px;
+      padding: 8px 10px;
+      border-left: 3px solid;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+
+    .summary-item.code { border-color: #007acc; }
+    .summary-item.meeting { border-color: #ea4335; }
+    .summary-item.browser { border-color: #22c55e; }
+    .summary-item.comms { border-color: #a855f7; }
+
+    .summary-item .title {
+      font-size: 12px;
+      font-weight: 500;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .summary-item .time {
+      font-size: 11px;
+      color: #71717a;
+      margin-top: 3px;
+    }
+
+    /* ===== LANES AREA - VERTICAL BARS STYLE ===== */
+    .lanes-area {
+      flex: 1;
+      min-width: 500px;
+      position: relative;
+    }
+
+    .lanes-header {
+      height: 40px;
+      display: flex;
+      align-items: center;
+      padding: 0 16px;
+      font-size: 12px;
+      font-weight: 500;
+      color: #a1a1aa;
+      background: #0f0f0f;
+      border-bottom: 1px solid #27272a;
+      position: sticky;
+      top: 0;
+      z-index: 5;
+    }
+
+    /* Hour block container */
+    .hour-block {
+      height: 80px;
+      position: relative;
+      border-bottom: 1px solid #1f1f23;
+      display: flex;
+      align-items: flex-start;
+      padding: 4px 8px;
+      gap: 8px;
+    }
+
+    /* ===== VERTICAL APP BAR - Timely Style ===== */
+    .app-bar-vertical {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 8px 12px;
+      border-radius: 8px;
+      min-width: 100px;
+      max-width: 140px;
+      cursor: pointer;
+      transition: transform 0.15s, box-shadow 0.15s;
+      position: relative;
+    }
+
+    .app-bar-vertical:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+      z-index: 10;
+    }
+
+    /* App icon in vertical bar */
+    .app-bar-vertical .bar-icon {
+      width: 28px;
+      height: 28px;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 6px;
+      flex-shrink: 0;
+    }
+
+    .app-bar-vertical .bar-icon svg {
+      width: 18px;
+      height: 18px;
+    }
+
+    .app-bar-vertical .bar-icon img {
+      width: 20px;
+      height: 20px;
+    }
+
+    /* App name */
+    .app-bar-vertical .bar-name {
+      font-size: 12px;
+      font-weight: 500;
+      text-align: center;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      width: 100%;
+      margin-bottom: 4px;
+    }
+
+    /* Duration */
+    .app-bar-vertical .bar-duration {
+      font-size: 11px;
+      opacity: 0.7;
+    }
+
+    /* ===== COLOR SCHEMES FOR VERTICAL BARS ===== */
+    
+    /* VS Code - Light Blue */
+    .app-bar-vertical.vscode {
+      background: linear-gradient(180deg, #1e3a5f 0%, #1a3352 100%);
+      color: #7dd3fc;
+    }
+    .app-bar-vertical.vscode .bar-icon {
+      background: #007acc;
+      color: white;
+    }
+
+    /* Slack - Salmon/Coral */
+    .app-bar-vertical.slack {
+      background: linear-gradient(180deg, #4a2c2c 0%, #3d2424 100%);
+      color: #fca5a5;
+    }
+    .app-bar-vertical.slack .bar-icon {
+      background: #611f69;
+      color: white;
+    }
+
+    /* Linear - Purple */
+    .app-bar-vertical.linear {
+      background: linear-gradient(180deg, #3d3a5c 0%, #32304d 100%);
+      color: #c4b5fd;
+    }
+    .app-bar-vertical.linear .bar-icon {
+      background: #5e6ad2;
+      color: white;
+    }
+
+    /* Chrome - Light Green */
+    .app-bar-vertical.chrome {
+      background: linear-gradient(180deg, #1a3d2e 0%, #153326 100%);
+      color: #86efac;
+    }
+    .app-bar-vertical.chrome .bar-icon {
+      background: #4285f4;
+      color: white;
+    }
+
+    /* Terminal - Gray/Green */
+    .app-bar-vertical.terminal {
+      background: linear-gradient(180deg, #1c1c1c 0%, #171717 100%);
+      color: #4ade80;
+      border: 1px solid #333;
+    }
+    .app-bar-vertical.terminal .bar-icon {
+      background: #1e1e1e;
+      color: #4ade80;
+      border: 1px solid #444;
+    }
+
+    /* Calendar/Meet - Teal */
+    .app-bar-vertical.meet {
+      background: linear-gradient(180deg, #134e4a 0%, #0f3d3a 100%);
+      color: #5eead4;
+    }
+    .app-bar-vertical.meet .bar-icon {
+      background: #00897b;
+      color: white;
+    }
+
+    /* GitHub - Dark */
+    .app-bar-vertical.github {
+      background: linear-gradient(180deg, #1f1f1f 0%, #171717 100%);
+      color: #e5e5e5;
+      border: 1px solid #333;
+    }
+    .app-bar-vertical.github .bar-icon {
+      background: #1e1e1e;
+      color: #fff;
+      border: 1px solid #444;
+    }
+
+    /* Browser/YouTube - Amber */
+    .app-bar-vertical.browser {
+      background: linear-gradient(180deg, #422006 0%, #361a05 100%);
+      color: #fcd34d;
+    }
+    .app-bar-vertical.browser .bar-icon {
+      background: #f59e0b;
+      color: white;
+    }
+
+    /* Height variants based on duration */
+    .app-bar-vertical.duration-short {
+      /* ~10-20 minutes */
+      height: 50px;
+      padding: 6px 10px;
+    }
+    .app-bar-vertical.duration-short .bar-icon {
+      width: 22px;
+      height: 22px;
+      margin-bottom: 4px;
+    }
+    .app-bar-vertical.duration-short .bar-name {
+      font-size: 11px;
+    }
+
+    .app-bar-vertical.duration-medium {
+      /* ~30-60 minutes */
+      height: 70px;
+    }
+
+    .app-bar-vertical.duration-long {
+      /* ~1-2 hours */
+      height: 90px;
+    }
+
+    .app-bar-vertical.duration-extended {
+      /* 2+ hours */
+      height: 120px;
+    }
+
+    /* When bar spans multiple hours, position absolutely */
+    .app-bar-vertical.spanning {
+      position: absolute;
+    }
+
+    /* Current time indicator */
+    .current-time {
+      position: absolute;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: #ef4444;
+      z-index: 20;
+    }
+
+    .current-time::before {
+      content: '';
+      position: absolute;
+      left: -5px;
+      top: -4px;
+      width: 10px;
+      height: 10px;
+      background: #ef4444;
+      border-radius: 50%;
+    }
+
+    /* Empty hour block styling */
+    .hour-block.empty {
+      background: repeating-linear-gradient(
+        -45deg,
+        transparent,
+        transparent 10px,
+        #0f0f0f 10px,
+        #0f0f0f 20px
+      );
+      opacity: 0.3;
+    }
+
+    /* Grouping for concurrent activities */
+    .activity-group {
+      display: flex;
+      gap: 6px;
+      align-items: flex-start;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <!-- LEFT SIDEBAR: DAILY SUMMARY -->
+    <div class="sidebar">
+      <div class="sidebar-header">
+        <h1>Timeline</h1>
+        <div class="date">Friday, January 10, 2025</div>
+      </div>
+
+      <!-- Daily Summary -->
+      <div class="daily-summary">
+        <div class="summary-hero">
+          <div class="big-number">6:42</div>
+          <div class="label">Hours Tracked</div>
+        </div>
+
+        <div class="progress-ring">
+          <div class="ring-container">
+            <svg width="56" height="56">
+              <circle class="ring-bg" cx="28" cy="28" r="22"></circle>
+              <circle class="ring-progress" cx="28" cy="28" r="22"></circle>
+            </svg>
+            <span class="ring-text">78%</span>
+          </div>
+          <div class="progress-info">
+            <div class="title">Daily Goal</div>
+            <div class="subtitle">6h 42m of 8h target</div>
+          </div>
+        </div>
+
+        <div class="summary-row">
+          <span class="label">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12,6 12,12 16,14"/></svg>
+            Day Span
+          </span>
+          <span class="value">8:04 AM - 4:32 PM</span>
+        </div>
+
+        <div class="summary-row">
+          <span class="label">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg>
+            Breaks
+          </span>
+          <span class="value">3 (42m total)</span>
+        </div>
+
+        <div class="summary-row">
+          <span class="label">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+            Longest Focus
+          </span>
+          <span class="value">1h 48m</span>
+        </div>
+
+        <div class="breakdown-bar">
+          <div class="segment focus" style="width: 55%;"></div>
+          <div class="segment meetings" style="width: 18%;"></div>
+          <div class="segment comms" style="width: 12%;"></div>
+          <div class="segment other" style="width: 15%;"></div>
+        </div>
+
+        <div class="breakdown-legend">
+          <div class="legend-item">
+            <div class="legend-dot" style="background: #22c55e;"></div>
+            <span>Focus 3h 42m</span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-dot" style="background: #3b82f6;"></div>
+            <span>Meetings 1h 12m</span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-dot" style="background: #a855f7;"></div>
+            <span>Comms 48m</span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-dot" style="background: #71717a;"></div>
+            <span>Other 1h</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Top Apps -->
+      <div class="top-apps">
+        <div class="section-title">Top Apps</div>
+
+        <div class="app-item">
+          <div class="app-icon vscode">VS</div>
+          <div class="app-details">
+            <div class="app-name">VS Code</div>
+            <div class="app-time">3h 24m</div>
+          </div>
+          <div class="app-bar">
+            <div class="app-bar-fill" style="width: 80%; background: #007acc;"></div>
+          </div>
+        </div>
+
+        <div class="app-item">
+          <div class="app-icon chrome">G</div>
+          <div class="app-details">
+            <div class="app-name">Chrome</div>
+            <div class="app-time">1h 18m</div>
+          </div>
+          <div class="app-bar">
+            <div class="app-bar-fill" style="width: 45%; background: #4285f4;"></div>
+          </div>
+        </div>
+
+        <div class="app-item">
+          <div class="app-icon slack">S</div>
+          <div class="app-details">
+            <div class="app-name">Slack</div>
+            <div class="app-time">1h 30m</div>
+          </div>
+          <div class="app-bar">
+            <div class="app-bar-fill" style="width: 40%; background: #611f69;"></div>
+          </div>
+        </div>
+
+        <div class="app-item">
+          <div class="app-icon linear">L</div>
+          <div class="app-details">
+            <div class="app-name">Linear</div>
+            <div class="app-time">32m</div>
+          </div>
+          <div class="app-bar">
+            <div class="app-bar-fill" style="width: 18%; background: #5e6ad2;"></div>
+          </div>
+        </div>
+
+        <div class="app-item">
+          <div class="app-icon terminal">T</div>
+          <div class="app-details">
+            <div class="app-name">Terminal</div>
+            <div class="app-time">16m</div>
+          </div>
+          <div class="app-bar">
+            <div class="app-bar-fill" style="width: 10%; background: #555;"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MAIN TIMELINE -->
+    <div class="timeline-area">
+      <div class="top-nav">
+        <div class="nav-left">
+          <div class="view-toggle">
+            <button class="active">Day</button>
+            <button>Week</button>
+            <button>Month</button>
+          </div>
+          <div class="date-nav">
+            <button>&lt;</button>
+            <span class="date-display">Today, Jan 10</span>
+            <button>&gt;</button>
+          </div>
+        </div>
+        <div class="nav-right">
+          <button class="btn-secondary">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+            Calendar
+          </button>
+          <button class="btn-secondary">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            Filter
+          </button>
+        </div>
+      </div>
+
+      <div class="timeline-scroll">
+        <div class="timeline-grid">
+
+          <!-- Hour Column (sticky) -->
+          <div class="hour-column">
+            <div class="hour-marker" style="height: 40px;"></div>
+            <div class="hour-marker">2 PM</div>
+            <div class="hour-marker">3 PM</div>
+            <div class="hour-marker">4 PM</div>
+            <div class="hour-marker">5 PM</div>
+            <div class="hour-marker">6 PM</div>
+            <div class="hour-marker">7 PM</div>
+          </div>
+
+          <!-- AI Summary Column (sticky) -->
+          <div class="summary-column">
+            <div class="summary-column-header">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+              AI Summary
+            </div>
+
+            <div class="summary-hour">
+              <div class="summary-item code">
+                <div class="title">TimelinePage.tsx</div>
+                <div class="time">2:00 - 2:28 PM</div>
+              </div>
+            </div>
+
+            <div class="summary-hour">
+              <div class="summary-item code">
+                <div class="title">ActivityBlock refactor</div>
+                <div class="time">2:30 - 4:26 PM</div>
+              </div>
+            </div>
+
+            <div class="summary-hour">
+              <div class="summary-item comms">
+                <div class="title">Slack conversations</div>
+                <div class="time">3:45 - 5:05 PM</div>
+              </div>
+            </div>
+
+            <div class="summary-hour">
+              <div class="summary-item code">
+                <div class="title">Final touches</div>
+                <div class="time">5:00 - 5:59 PM</div>
+              </div>
+            </div>
+
+            <div class="summary-hour">
+              <div class="summary-item" style="border-color: #52525b; opacity: 0.5;">
+                <div class="title" style="color: #71717a;">—</div>
+              </div>
+            </div>
+
+            <div class="summary-hour"></div>
+          </div>
+
+          <!-- Dynamic Lanes Area - VERTICAL BARS -->
+          <div class="lanes-area">
+            <div class="lanes-header">Activity Detail</div>
+
+            <!-- 2 PM - Matching the screenshot layout -->
+            <div class="hour-block">
+              <!-- Small activity at top -->
+              <div class="app-bar-vertical vscode duration-short" style="height: 36px;">
+                <div class="bar-icon">
+                  <svg viewBox="0 0 24 24" fill="currentColor"><path d="M23.15 2.587L18.21.21a1.494 1.494 0 0 0-1.705.29l-9.46 8.63-4.12-3.128a.999.999 0 0 0-1.276.057L.327 7.261A1 1 0 0 0 .326 8.74L3.899 12 .326 15.26a1 1 0 0 0 .001 1.479L1.65 17.94a.999.999 0 0 0 1.276.057l4.12-3.128 9.46 8.63a1.492 1.492 0 0 0 1.704.29l4.942-2.377A1.5 1.5 0 0 0 24 20.06V3.939a1.5 1.5 0 0 0-.85-1.352zm-5.146 14.861L10.826 12l7.178-5.448v10.896z"/></svg>
+                </div>
+                <div class="bar-duration">28m</div>
+              </div>
+              
+              <div class="app-bar-vertical slack duration-short" style="height: 30px;">
+                <div class="bar-icon">
+                  <svg viewBox="0 0 24 24" fill="currentColor"><path d="M5.042 15.165a2.528 2.528 0 0 1-2.52 2.523A2.528 2.528 0 0 1 0 15.165a2.527 2.527 0 0 1 2.522-2.52h2.52v2.52zm1.271 0a2.527 2.527 0 0 1 2.521-2.52 2.527 2.527 0 0 1 2.521 2.52v6.313A2.528 2.528 0 0 1 8.834 24a2.528 2.528 0 0 1-2.521-2.522v-6.313zM8.834 5.042a2.528 2.528 0 0 1-2.521-2.52A2.528 2.528 0 0 1 8.834 0a2.528 2.528 0 0 1 2.521 2.522v2.52H8.834zm0 1.271a2.528 2.528 0 0 1 2.521 2.521 2.528 2.528 0 0 1-2.521 2.521H2.522A2.528 2.528 0 0 1 0 8.834a2.528 2.528 0 0 1 2.522-2.521h6.312zm10.122 2.521a2.528 2.528 0 0 1 2.522-2.521A2.528 2.528 0 0 1 24 8.834a2.528 2.528 0 0 1-2.522 2.521h-2.522V8.834zm-1.268 0a2.528 2.528 0 0 1-2.523 2.521 2.527 2.527 0 0 1-2.52-2.521V2.522A2.527 2.527 0 0 1 15.165 0a2.528 2.528 0 0 1 2.523 2.522v6.312zm-2.523 10.122a2.528 2.528 0 0 1 2.523 2.522A2.528 2.528 0 0 1 15.165 24a2.527 2.527 0 0 1-2.52-2.522v-2.522h2.52zm0-1.268a2.527 2.527 0 0 1-2.52-2.523 2.526 2.526 0 0 1 2.52-2.52h6.313A2.527 2.527 0 0 1 24 15.165a2.528 2.528 0 0 1-2.522 2.523h-6.313z"/></svg>
+                </div>
+                <div class="bar-duration">9m</div>
+              </div>
+            </div>
+
+            <!-- 2-3 PM - Long VS Code session with Slack overlaps -->
+            <div class="hour-block" style="position: relative;">
+              <!-- VS Code - Tall bar spanning the hour -->
+              <div class="app-bar-vertical vscode duration-extended" style="height: 140px;">
+                <div class="bar-icon">
+                  <svg viewBox="0 0 24 24" fill="currentColor"><path d="M23.15 2.587L18.21.21a1.494 1.494 0 0 0-1.705.29l-9.46 8.63-4.12-3.128a.999.999 0 0 0-1.276.057L.327 7.261A1 1 0 0 0 .326 8.74L3.899 12 .326 15.26a1 1 0 0 0 .001 1.479L1.65 17.94a.999.999 0 0 0 1.276.057l4.12-3.128 9.46 8.63a1.492 1.492 0 0 0 1.704.29l4.942-2.377A1.5 1.5 0 0 0 24 20.06V3.939a1.5 1.5 0 0 0-.85-1.352zm-5.146 14.861L10.826 12l7.178-5.448v10.896z"/></svg>
+                </div>
+                <div class="bar-name">Visual Studio Code</div>
+                <div class="bar-duration">2h 20m</div>
+              </div>
+
+              <!-- Slack - Medium bar -->
+              <div class="app-bar-vertical slack duration-short" style="height: 32px;">
+                <div class="bar-icon">
+                  <svg viewBox="0 0 24 24" fill="currentColor"><path d="M5.042 15.165a2.528 2.528 0 0 1-2.52 2.523A2.528 2.528 0 0 1 0 15.165a2.527 2.527 0 0 1 2.522-2.52h2.52v2.52zm1.271 0a2.527 2.527 0 0 1 2.521-2.52 2.527 2.527 0 0 1 2.521 2.52v6.313A2.528 2.528 0 0 1 8.834 24a2.528 2.528 0 0 1-2.521-2.522v-6.313z"/></svg>
+                </div>
+                <div class="bar-name">Slack</div>
+                <div class="bar-duration">10m</div>
+              </div>
+
+              <!-- Another Slack block -->
+              <div class="app-bar-vertical slack duration-short" style="height: 40px; margin-top: 20px;">
+                <div class="bar-icon">
+                  <svg viewBox="0 0 24 24" fill="currentColor"><path d="M5.042 15.165a2.528 2.528 0 0 1-2.52 2.523A2.528 2.528 0 0 1 0 15.165a2.527 2.527 0 0 1 2.522-2.52h2.52v2.52z"/></svg>
+                </div>
+                <div class="bar-name">Slack</div>
+                <div class="bar-duration">16m</div>
+              </div>
+            </div>
+
+            <!-- 4 PM - Slack dominates with some other apps -->
+            <div class="hour-block" style="position: relative;">
+              <!-- Slack - Long session -->
+              <div class="app-bar-vertical slack duration-long" style="height: 90px;">
+                <div class="bar-icon">
+                  <svg viewBox="0 0 24 24" fill="currentColor"><path d="M5.042 15.165a2.528 2.528 0 0 1-2.52 2.523A2.528 2.528 0 0 1 0 15.165a2.527 2.527 0 0 1 2.522-2.52h2.52v2.52zm1.271 0a2.527 2.527 0 0 1 2.521-2.52 2.527 2.527 0 0 1 2.521 2.52v6.313A2.528 2.528 0 0 1 8.834 24a2.528 2.528 0 0 1-2.521-2.522v-6.313zM8.834 5.042a2.528 2.528 0 0 1-2.521-2.52A2.528 2.528 0 0 1 8.834 0a2.528 2.528 0 0 1 2.521 2.522v2.52H8.834z"/></svg>
+                </div>
+                <div class="bar-name">Slack</div>
+                <div class="bar-duration">1h 14m</div>
+              </div>
+            </div>
+
+            <!-- 5 PM -->
+            <div class="hour-block" style="position: relative;">
+              <!-- VS Code session -->
+              <div class="app-bar-vertical vscode duration-medium" style="height: 70px;">
+                <div class="bar-icon">
+                  <svg viewBox="0 0 24 24" fill="currentColor"><path d="M23.15 2.587L18.21.21a1.494 1.494 0 0 0-1.705.29l-9.46 8.63-4.12-3.128a.999.999 0 0 0-1.276.057L.327 7.261A1 1 0 0 0 .326 8.74L3.899 12 .326 15.26a1 1 0 0 0 .001 1.479L1.65 17.94a.999.999 0 0 0 1.276.057l4.12-3.128 9.46 8.63a1.492 1.492 0 0 0 1.704.29l4.942-2.377A1.5 1.5 0 0 0 24 20.06V3.939a1.5 1.5 0 0 0-.85-1.352zm-5.146 14.861L10.826 12l7.178-5.448v10.896z"/></svg>
+                </div>
+                <div class="bar-name">Visual Studio Code</div>
+                <div class="bar-duration">59m</div>
+              </div>
+
+              <!-- Linear - short -->
+              <div class="app-bar-vertical linear duration-short" style="height: 30px;">
+                <div class="bar-icon">
+                  <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3.884 3.884c4.456-4.456 11.496-4.652 16.21-.587l-15.62 15.62c-4.066-4.714-3.87-11.754.588-16.21zm.587 16.21l15.62-15.62c4.066 4.714 3.87 11.754-.587 16.21-4.456 4.456-11.496 4.652-16.21.587z"/></svg>
+                </div>
+                <div class="bar-name">Linear</div>
+                <div class="bar-duration">6m</div>
+              </div>
+            </div>
+
+            <!-- 6 PM - empty -->
+            <div class="hour-block empty"></div>
+
+            <!-- 7 PM - empty -->
+            <div class="hour-block empty"></div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+
+</body>
+</html>

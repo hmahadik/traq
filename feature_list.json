@@ -1,374 +1,382 @@
 [
   {
     "category": "functional",
-    "description": "NEW: Unified header with global date context shared across all pages",
+    "description": "NEW: Backend - Categorization rules table exists in database",
     "steps": [
-      "Step 1: Start the app and navigate to Timeline page",
-      "Step 2: Verify header shows date picker with arrows and Today/Yesterday presets",
-      "Step 3: Navigate to Analytics page - verify same date context is maintained",
-      "Step 4: Navigate to Reports page - verify same date context is maintained",
-      "Step 5: Change date in header and verify it updates across all pages"
+      "Step 1: Connect to SQLite database at ~/.local/share/traq/data.db",
+      "Step 2: Query schema for app_categorization_rules table",
+      "Step 3: Verify table has columns: id, app_name, category, is_system_default, created_at",
+      "Step 4: Verify table is created successfully"
     ],
-    "passes": true
+    "passes": false
   },
   {
     "category": "functional",
-    "description": "NEW: Date navigation arrows work correctly with constraints",
+    "description": "NEW: Backend - Default categorization rules are seeded",
     "steps": [
-      "Step 1: Navigate to Timeline with today's date selected",
-      "Step 2: Click next arrow - verify it is disabled (cannot go past today)",
-      "Step 3: Click previous arrow - verify it navigates to yesterday",
-      "Step 4: Click previous arrow again - verify it continues going back",
-      "Step 5: Click next arrow - verify it navigates forward until today"
+      "Step 1: Navigate to Timeline page in running app",
+      "Step 2: Open browser dev tools and check network requests",
+      "Step 3: Verify GetTimelineGridData returns Categories map",
+      "Step 4: Check that common apps (VS Code, Zoom, Slack) have appropriate categories"
     ],
-    "passes": true
+    "passes": false
   },
   {
     "category": "functional",
-    "description": "NEW: Analytics page has multi-timeframe tabs (Day/Week/Month/Year/Custom)",
+    "description": "NEW: Backend - GetTimelineGridData endpoint returns grid data structure",
     "steps": [
-      "Step 1: Navigate to Analytics page",
-      "Step 2: Verify tabs are visible: Day, Week, Month, Year, Custom",
-      "Step 3: Click Day tab - verify stats show totals for selected day",
-      "Step 4: Click Week tab - verify stats show averages and trends for week",
-      "Step 5: Click Month tab - verify stats show averages and trends for month"
-    ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "NEW: Analytics charts use smart bucketing based on timeframe",
-    "steps": [
-      "Step 1: Navigate to Analytics and select Day tab",
-      "Step 2: Verify chart shows hourly buckets (24 bars for hours)",
-      "Step 3: Switch to Week tab - verify chart shows daily buckets (7 bars)",
-      "Step 4: Switch to Month tab - verify chart shows daily buckets (28-31 bars)",
-      "Step 5: Switch to Year tab - verify chart shows monthly buckets (12 bars)"
-    ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "NEW: Click Analytics chart element drills down to Timeline for that specific day",
-    "steps": [
-      "Step 1: Navigate to Analytics Week tab",
-      "Step 2: Click on a specific day bar in the activity chart",
-      "Step 3: Verify navigation to Timeline page occurs",
-      "Step 4: Verify Timeline shows the exact day that was clicked",
-      "Step 5: Verify session list loads for that selected day"
-    ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "NEW: Timeline to Analytics transition maintains date context",
-    "steps": [
-      "Step 1: Navigate to Timeline and select a specific date (e.g., Jan 5)",
-      "Step 2: Click on Analytics in sidebar",
-      "Step 3: Verify Analytics opens with Day tab selected",
-      "Step 4: Verify Analytics shows data for the same date (Jan 5)",
-      "Step 5: Switch to Week tab - verify week expands around Jan 5"
-    ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "NEW: Analytics to Timeline transition uses appropriate date logic",
-    "steps": [
-      "Step 1: Navigate to Analytics with Week tab (multi-day range)",
-      "Step 2: Click Timeline in sidebar without drilling down",
-      "Step 3: Verify Timeline shows the end date of the week range (capped at today)",
-      "Step 4: Return to Analytics, select a future week containing today",
-      "Step 5: Navigate to Timeline - verify it shows today (not future date)"
-    ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "NEW: Custom timeframe in Analytics with auto-bucketing",
-    "steps": [
-      "Step 1: Navigate to Analytics and select Custom tab",
-      "Step 2: Enter a 2-day range - verify chart uses hourly buckets",
-      "Step 3: Enter a 30-day range - verify chart uses daily buckets",
-      "Step 4: Enter a 90-day range - verify chart uses weekly buckets",
-      "Step 5: Verify stats adapt appropriately to custom range"
-    ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "NEW: Reports page integrates with global timeframe context",
-    "steps": [
-      "Step 1: Navigate to Timeline and select Jan 8",
-      "Step 2: Navigate to Reports page",
-      "Step 3: Verify the timeframe input reflects Jan 8 or is pre-filled with context",
-      "Step 4: Generate a report for a different range (e.g., last week)",
-      "Step 5: Verify report generates correctly with the specified range"
-    ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "NEW: Click report history item sets global timeframe",
-    "steps": [
-      "Step 1: Navigate to Reports and generate a report for last week",
-      "Step 2: Navigate away to Timeline",
-      "Step 3: Return to Reports and click on the report history item",
-      "Step 4: Verify the global date context updates to match the report's timeframe",
-      "Step 5: Navigate to Analytics - verify it shows data for the same timeframe"
-    ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "NEW: Date picker calendar widget allows direct date selection",
-    "steps": [
-      "Step 1: Navigate to Timeline page",
-      "Step 2: Click on the date in the header to open calendar picker",
-      "Step 3: Select a past date from the calendar",
-      "Step 4: Verify the calendar closes and Timeline updates to selected date",
-      "Step 5: Verify header shows the newly selected date"
-    ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "NEW: Quick preset buttons (Today/Yesterday) work from header",
-    "steps": [
-      "Step 1: Navigate to Timeline and select an old date (e.g., 1 week ago)",
-      "Step 2: Click 'Today' preset button in header",
-      "Step 3: Verify Timeline immediately jumps to today's date",
-      "Step 4: Click 'Yesterday' preset button",
-      "Step 5: Verify Timeline shows yesterday's date"
-    ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "NEW: Settings and Pause/Resume controls remain accessible from header",
-    "steps": [
-      "Step 1: Navigate to any page (Timeline/Analytics/Reports)",
-      "Step 2: Verify settings icon is visible in header",
-      "Step 3: Click settings icon - verify settings drawer opens",
-      "Step 4: Close settings drawer",
-      "Step 5: Verify Pause/Resume button is visible and functional in header"
-    ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "NEW: Filters persist within Timeline view across date changes",
-    "steps": [
-      "Step 1: Navigate to Timeline for today",
-      "Step 2: Apply a time period filter (e.g., Morning)",
-      "Step 3: Apply an app filter (e.g., VS Code)",
-      "Step 4: Change date to yesterday using navigation arrows",
-      "Step 5: Verify the same filters are still applied to yesterday's data"
-    ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "NEW: Analytics Day tab behaves exactly like current Timeline day view",
-    "steps": [
-      "Step 1: Navigate to Timeline and note the stats and charts for a specific day",
-      "Step 2: Navigate to Analytics and select Day tab for the same day",
-      "Step 3: Verify the metrics match (total time, session count, top app)",
-      "Step 4: Verify the activity chart shows same hourly breakdown",
-      "Step 5: Compare visual representation - should be equivalent"
-    ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "NEW: Analytics Week tab shows averages and trends",
-    "steps": [
-      "Step 1: Navigate to Analytics and select Week tab",
-      "Step 2: Verify stats show average daily time (not total for week)",
-      "Step 3: Verify stats show trends or comparisons where applicable",
-      "Step 4: Verify chart shows 7 bars representing each day",
-      "Step 5: Hover over bars - verify tooltips show date and activity"
-    ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "NEW: Analytics Month tab adapts metrics and charts",
-    "steps": [
-      "Step 1: Navigate to Analytics and select Month tab",
-      "Step 2: Verify stats show monthly totals and daily averages",
-      "Step 3: Verify chart shows 28-31 bars (one per day)",
-      "Step 4: Verify metrics include comparisons or trends if available",
-      "Step 5: Click on a day bar - verify drill-down to Timeline for that day"
-    ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "NEW: Analytics Year tab shows monthly aggregation",
-    "steps": [
-      "Step 1: Navigate to Analytics and select Year tab",
-      "Step 2: Verify chart shows 12 bars (one per month)",
-      "Step 3: Verify stats show yearly totals and monthly averages",
-      "Step 4: Hover over month bar - verify tooltip shows month name and data",
-      "Step 5: Click on a month bar - verify it either drills down or shows detail"
-    ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "NEW: Sidebar navigation reflects new structure (Timeline/Analytics/Reports)",
-    "steps": [
-      "Step 1: Open the app and check sidebar navigation items",
-      "Step 2: Verify sidebar shows: Timeline, Analytics, Reports",
-      "Step 3: Verify Settings is NOT in sidebar (should be in header)",
-      "Step 4: Click each nav item and verify correct page loads",
-      "Step 5: Verify active state highlighting works for each nav item"
-    ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "NEW: Timeline maintains master-detail layout with session list",
-    "steps": [
-      "Step 1: Navigate to Timeline for a day with multiple sessions",
-      "Step 2: Verify left panel shows session list with stats and filters",
-      "Step 3: Click on a session in the list",
-      "Step 4: Verify right panel shows session detail (screenshots, tags, AI summary)",
-      "Step 5: Verify master-detail layout is responsive"
-    ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "NEW: Global date context state is shared via context/store",
-    "steps": [
-      "Step 1: Open browser dev tools and check for date context state",
-      "Step 2: Navigate to Timeline and select a date",
-      "Step 3: Navigate to Analytics - verify state persists (same date)",
-      "Step 4: Change date in Analytics",
-      "Step 5: Navigate to Reports - verify new date persists"
-    ],
-    "passes": true
-  },
-  {
-    "category": "style",
-    "description": "NEW: Unified header has consistent design across all pages",
-    "steps": [
-      "Step 1: Navigate to Timeline and take screenshot of header",
-      "Step 2: Navigate to Analytics and take screenshot of header",
-      "Step 3: Navigate to Reports and take screenshot of header",
-      "Step 4: Compare screenshots - verify header design is identical",
-      "Step 5: Verify header contains: date picker, arrows, presets, settings, pause/resume"
-    ],
-    "passes": true
-  },
-  {
-    "category": "style",
-    "description": "NEW: Header date picker has clean, accessible design",
-    "steps": [
-      "Step 1: Navigate to Timeline page",
-      "Step 2: Take screenshot of closed date picker in header",
-      "Step 3: Click to open date picker - take screenshot",
-      "Step 4: Verify calendar widget is centered and properly styled",
-      "Step 5: Verify date format is readable (e.g., 'Fri, Jan 10')"
-    ],
-    "passes": true
-  },
-  {
-    "category": "style",
-    "description": "NEW: Analytics tabs are visually clear and accessible",
-    "steps": [
-      "Step 1: Navigate to Analytics page",
-      "Step 2: Take screenshot showing all tabs (Day/Week/Month/Year/Custom)",
-      "Step 3: Verify active tab is visually distinct (underline, color, etc.)",
-      "Step 4: Click different tabs - verify smooth transition",
-      "Step 5: Verify tab labels are readable and well-spaced"
-    ],
-    "passes": true
-  },
-  {
-    "category": "style",
-    "description": "NEW: Charts have appropriate sizing and spacing for different timeframes",
-    "steps": [
-      "Step 1: Navigate to Analytics Day tab - take screenshot of hourly chart",
-      "Step 2: Switch to Week tab - take screenshot of daily chart",
-      "Step 3: Switch to Month tab - take screenshot of daily chart",
-      "Step 4: Verify bars/elements are appropriately sized (not too crowded)",
-      "Step 5: Verify axis labels and legends are readable"
-    ],
-    "passes": true
-  },
-  {
-    "category": "style",
-    "description": "NEW: Navigation preset buttons have clear hover and active states",
-    "steps": [
-      "Step 1: Navigate to Timeline",
-      "Step 2: Hover over 'Today' button - verify hover state",
-      "Step 3: Verify active button (current selection) has distinct style",
-      "Step 4: Hover over 'Yesterday' button - verify hover state",
-      "Step 5: Take screenshot showing preset buttons in various states"
-    ],
-    "passes": true
-  },
-  {
-    "category": "style",
-    "description": "NEW: Timeline layout is responsive and usable on narrow viewports (1024px)",
-    "steps": [
-      "Step 1: Resize browser window to 1024px width",
+      "Step 1: Start the app with init.sh",
       "Step 2: Navigate to Timeline page",
-      "Step 3: Verify session list and detail panel both visible",
-      "Step 4: Verify header elements don't wrap or overflow",
-      "Step 5: Take screenshot showing responsive layout"
+      "Step 3: Open browser dev tools console",
+      "Step 4: Execute window.runtime.GetTimelineGridData(new Date().toISOString().split('T')[0])",
+      "Step 5: Verify response contains: Date, DayStats, TopApps, HourlyGrid, SessionSummaries, Categories"
     ],
-    "passes": true
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "NEW: Frontend - useTimelineGridData hook fetches and caches grid data",
+    "steps": [
+      "Step 1: Navigate to Timeline page",
+      "Step 2: Open React DevTools",
+      "Step 3: Verify useTimelineGridData hook is present in component tree",
+      "Step 4: Check that React Query cache contains 'timeline.grid' query with date key",
+      "Step 5: Verify data structure matches TimelineGridData type"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "NEW: Timeline Grid View - Hour column displays with correct hour markers",
+    "steps": [
+      "Step 1: Navigate to Timeline page for a day with activity",
+      "Step 2: Verify left sticky column shows hour markers (e.g., 8 AM, 9 AM, 10 AM)",
+      "Step 3: Verify each hour block is 60px tall",
+      "Step 4: Verify only active hours plus 1 hour buffer are shown",
+      "Step 5: Verify hour column remains sticky when scrolling horizontally"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "NEW: Timeline Grid View - App columns render for top apps with correct headers",
+    "steps": [
+      "Step 1: Navigate to Timeline page with activity",
+      "Step 2: Verify app columns appear after the AI Summary column",
+      "Step 3: Check that each app column shows: app icon, app name, total duration",
+      "Step 4: Verify columns are 140px wide",
+      "Step 5: Verify top 6 apps by duration are displayed"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "NEW: Timeline Grid View - Activity blocks positioned correctly within app columns",
+    "steps": [
+      "Step 1: Navigate to Timeline page with activity",
+      "Step 2: Identify an activity block in an app column",
+      "Step 3: Check that block vertical position matches the actual start time",
+      "Step 4: Verify block height corresponds to activity duration",
+      "Step 5: Hover over block and verify tooltip shows window title, duration, and time"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "NEW: Timeline Grid View - AI Summary column shows session summaries at correct times",
+    "steps": [
+      "Step 1: Navigate to Timeline page with sessions",
+      "Step 2: Locate the AI Summary column (sticky, after hour column)",
+      "Step 3: Verify session summary blocks appear at correct vertical positions",
+      "Step 4: Check that summary blocks have colored left borders based on category (focus=green, meetings=red, comms=purple)",
+      "Step 5: Verify summary text and time range are displayed"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "NEW: Timeline Grid View - Multi-hour sessions span across hour boundaries",
+    "steps": [
+      "Step 1: Find or create a session spanning multiple hours (e.g., 9:00-11:30)",
+      "Step 2: Navigate to Timeline page for that date",
+      "Step 3: Verify the session summary block spans vertically across all hours",
+      "Step 4: Check that the block height extends from start time to end time correctly"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "NEW: Sidebar - Daily Summary Card displays total hours and key metrics",
+    "steps": [
+      "Step 1: Navigate to Timeline page with activity",
+      "Step 2: Locate the left sidebar Daily Summary Card",
+      "Step 3: Verify large hero number shows total hours tracked",
+      "Step 4: Verify stats rows show: day span, breaks, longest focus session",
+      "Step 5: Check that gradient text styling is applied"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "NEW: Sidebar - Breakdown bar shows categorized time distribution",
+    "steps": [
+      "Step 1: Navigate to Timeline page with activity",
+      "Step 2: Locate the breakdown bar in left sidebar",
+      "Step 3: Verify bar segments appear for: focus (green), meetings (blue), comms (purple), other (gray)",
+      "Step 4: Verify legend shows category labels with durations",
+      "Step 5: Check that segment widths are proportional to time spent"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "NEW: Sidebar - Top Apps section lists apps with icons and durations",
+    "steps": [
+      "Step 1: Navigate to Timeline page with activity",
+      "Step 2: Locate Top Apps section in left sidebar",
+      "Step 3: Verify list shows top apps with icons",
+      "Step 4: Verify each app shows name and total duration",
+      "Step 5: Check that apps are ordered by duration (highest first)"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "NEW: Timeline Header - Date navigation works correctly",
+    "steps": [
+      "Step 1: Navigate to Timeline page",
+      "Step 2: Click 'Previous Day' button",
+      "Step 3: Verify date updates and grid data refreshes",
+      "Step 4: Click 'Next Day' button",
+      "Step 5: Verify date updates correctly",
+      "Step 6: Click 'Today' button and verify current date is selected"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "NEW: Timeline Header - Total time displays in header",
+    "steps": [
+      "Step 1: Navigate to Timeline page with activity",
+      "Step 2: Locate the header section",
+      "Step 3: Verify total time for the day is displayed prominently",
+      "Step 4: Verify format matches existing time formatting (e.g., '7.5h' or '7h 30m')"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "NEW: Horizontal scroll works smoothly with many app columns",
+    "steps": [
+      "Step 1: Navigate to Timeline page with 6+ active apps",
+      "Step 2: Scroll horizontally through app columns",
+      "Step 3: Verify Hour column and AI Summary column remain sticky",
+      "Step 4: Verify smooth scrolling performance",
+      "Step 5: Verify all app columns are accessible via scroll"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "NEW: Activity block tooltips show full details on hover",
+    "steps": [
+      "Step 1: Navigate to Timeline page with activity",
+      "Step 2: Hover over an activity block in an app column",
+      "Step 3: Verify tooltip appears with: window title, duration, start time, end time",
+      "Step 4: Verify tooltip positioning is correct and readable",
+      "Step 5: Move mouse away and verify tooltip disappears"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "NEW: Empty hours show diagonal line pattern",
+    "steps": [
+      "Step 1: Navigate to Timeline page",
+      "Step 2: Locate an hour block with no activity",
+      "Step 3: Verify empty hour blocks show diagonal line pattern (CSS gradient)",
+      "Step 4: Verify pattern is consistent across all empty hours"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "NEW: Very short activities (<1min) are visible with minimum height",
+    "steps": [
+      "Step 1: Find or create a very short activity (under 1 minute)",
+      "Step 2: Navigate to Timeline page for that date",
+      "Step 3: Verify the activity block is visible (min 4px height)",
+      "Step 4: Hover and verify tooltip shows correct short duration"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "NEW: Empty day shows appropriate empty state message",
+    "steps": [
+      "Step 1: Navigate to Timeline page for a date with no activity",
+      "Step 2: Verify empty state message is displayed",
+      "Step 3: Check that message is clear and helpful",
+      "Step 4: Verify sidebar still shows but with zero values"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "NEW: Categorization settings UI allows viewing rules",
+    "steps": [
+      "Step 1: Navigate to Settings page or open categorization modal",
+      "Step 2: Locate categorization rules section",
+      "Step 3: Verify list of existing rules is displayed",
+      "Step 4: Check that each rule shows: app name, category"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "NEW: Categorization settings UI allows adding new rules",
+    "steps": [
+      "Step 1: Open categorization settings",
+      "Step 2: Click 'Add Rule' button",
+      "Step 3: Enter app name (e.g., 'Firefox') and select category (e.g., 'other')",
+      "Step 4: Save the rule",
+      "Step 5: Verify rule appears in the list",
+      "Step 6: Navigate to Timeline and verify Firefox activities use new category color"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "NEW: Categorization settings UI allows editing existing rules",
+    "steps": [
+      "Step 1: Open categorization settings",
+      "Step 2: Select an existing rule",
+      "Step 3: Click 'Edit' button",
+      "Step 4: Change the category (e.g., from 'focus' to 'comms')",
+      "Step 5: Save changes",
+      "Step 6: Verify rule is updated in the list",
+      "Step 7: Navigate to Timeline and verify category change is reflected"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "NEW: Categorization settings UI allows deleting rules",
+    "steps": [
+      "Step 1: Open categorization settings",
+      "Step 2: Select an existing rule",
+      "Step 3: Click 'Delete' button",
+      "Step 4: Confirm deletion",
+      "Step 5: Verify rule is removed from the list",
+      "Step 6: Verify app falls back to default category"
+    ],
+    "passes": false
   },
   {
     "category": "style",
-    "description": "NEW: Analytics page is responsive across different viewport sizes",
+    "description": "NEW: Timeline Grid View matches reference design layout",
     "steps": [
-      "Step 1: Resize browser to 1920px width - take screenshot of Analytics",
-      "Step 2: Resize to 1366px width - verify layout adapts gracefully",
-      "Step 3: Resize to 1024px width - verify tabs and charts remain usable",
-      "Step 4: Verify no horizontal scrolling required",
-      "Step 5: Verify all interactive elements remain accessible"
+      "Step 1: Navigate to Timeline page",
+      "Step 2: Take screenshot",
+      "Step 3: Compare with reference at screenshots/references/traq-timeline-v3.html",
+      "Step 4: Verify layout matches: left sidebar + main grid area",
+      "Step 5: Verify hour column width ~50px, summary column ~160px, app columns ~140px"
     ],
-    "passes": true
+    "passes": false
   },
   {
     "category": "style",
-    "description": "NEW: Reports page integrates cleanly with new header design",
+    "description": "NEW: Activity blocks have gradient backgrounds matching design",
     "steps": [
-      "Step 1: Navigate to Reports page",
-      "Step 2: Take screenshot showing header and reports content",
-      "Step 3: Verify time range input doesn't conflict with header date picker",
-      "Step 4: Verify layout is balanced and not cluttered",
-      "Step 5: Verify report output preview is properly positioned"
+      "Step 1: Navigate to Timeline page with activity",
+      "Step 2: Take close-up screenshot of activity blocks",
+      "Step 3: Verify blocks have subtle gradient backgrounds",
+      "Step 4: Verify category colors are applied correctly",
+      "Step 5: Check that blocks have appropriate border radius and shadows"
     ],
-    "passes": true
+    "passes": false
   },
   {
     "category": "style",
-    "description": "NEW: Drill-down interactions have clear visual feedback",
+    "description": "NEW: Daily Summary Card has hero gradient text styling",
     "steps": [
-      "Step 1: Navigate to Analytics Week tab",
-      "Step 2: Hover over a chart bar - verify hover state (cursor, highlight)",
-      "Step 3: Click on the bar - verify visual feedback during navigation",
-      "Step 4: Verify smooth transition to Timeline page",
-      "Step 5: Take screenshots showing hover and click states"
+      "Step 1: Navigate to Timeline page",
+      "Step 2: Take screenshot of Daily Summary Card in sidebar",
+      "Step 3: Verify large hour number has gradient text effect",
+      "Step 4: Verify card styling matches design (background, padding, borders)"
     ],
-    "passes": true
+    "passes": false
   },
   {
     "category": "style",
-    "description": "NEW: Empty states are informative for new timeframes (e.g., future dates blocked)",
+    "description": "NEW: Breakdown bar segments have correct colors and styling",
     "steps": [
-      "Step 1: Navigate to Timeline for a date with no data",
-      "Step 2: Verify empty state message is clear and helpful",
-      "Step 3: Navigate to Analytics Year tab with sparse data",
-      "Step 4: Verify chart gracefully handles missing data (empty bars, labels)",
-      "Step 5: Take screenshots of various empty states"
+      "Step 1: Navigate to Timeline page with activity",
+      "Step 2: Take screenshot of breakdown bar",
+      "Step 3: Verify segment colors: focus=green, meetings=blue, comms=purple, other=gray",
+      "Step 4: Verify smooth transitions between segments",
+      "Step 5: Verify legend styling is clear and readable"
     ],
-    "passes": true
+    "passes": false
+  },
+  {
+    "category": "style",
+    "description": "NEW: Timeline Grid scrolls smoothly with sticky columns",
+    "steps": [
+      "Step 1: Navigate to Timeline page with multiple app columns",
+      "Step 2: Record horizontal scroll interaction",
+      "Step 3: Verify Hour and AI Summary columns remain fixed on left",
+      "Step 4: Verify app columns scroll smoothly",
+      "Step 5: Check for visual glitches or alignment issues during scroll"
+    ],
+    "passes": false
+  },
+  {
+    "category": "style",
+    "description": "NEW: Responsive layout works on different window sizes",
+    "steps": [
+      "Step 1: Navigate to Timeline page",
+      "Step 2: Resize window to narrow width (~1200px)",
+      "Step 3: Verify sidebar remains visible or collapses gracefully",
+      "Step 4: Verify grid scrolls horizontally without breaking",
+      "Step 5: Test at wide width (~1920px) and verify layout uses space well"
+    ],
+    "passes": false
+  },
+  {
+    "category": "style",
+    "description": "NEW: Loading states show skeletons for grid components",
+    "steps": [
+      "Step 1: Navigate to Timeline page",
+      "Step 2: Refresh and observe loading state",
+      "Step 3: Verify skeleton loaders appear for sidebar and grid",
+      "Step 4: Verify skeletons match final layout structure",
+      "Step 5: Verify smooth transition from loading to loaded state"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "NEW: Grid data accuracy - Total time matches sum of activities",
+    "steps": [
+      "Step 1: Navigate to Timeline page with activity",
+      "Step 2: Note total time displayed in header/sidebar",
+      "Step 3: Manually sum all activity block durations (use tooltips)",
+      "Step 4: Verify totals match within reasonable margin (±1 minute)",
+      "Step 5: Check that breakdown percentages add up to 100%"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "NEW: Session without AI summary shows placeholder",
+    "steps": [
+      "Step 1: Find or create a session without an AI-generated summary",
+      "Step 2: Navigate to Timeline page for that date",
+      "Step 3: Locate the session block in AI Summary column",
+      "Step 4: Verify placeholder text like '(No summary)' is displayed",
+      "Step 5: Verify block still shows time range correctly"
+    ],
+    "passes": false
   }
 ]

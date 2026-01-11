@@ -45,6 +45,10 @@ export const queryKeys = {
     hourScreenshots: (date: string, hour: number) =>
       ['timeline', 'hourScreenshots', date, hour] as const,
     context: (sessionId: number) => ['timeline', 'context', sessionId] as const,
+    events: (startTime: number, endTime: number, eventTypes?: string[]) =>
+      ['timeline', 'events', startTime, endTime, eventTypes] as const,
+    eventsForDate: (date: string, eventTypes?: string[]) =>
+      ['timeline', 'eventsForDate', date, eventTypes] as const,
   },
   reports: {
     history: () => ['reports', 'history'] as const,
@@ -240,6 +244,29 @@ export function useSessionContext(sessionId: number) {
   return useQuery({
     queryKey: queryKeys.timeline.context(sessionId),
     queryFn: () => api.timeline.getSessionContext(sessionId),
+    staleTime: 30_000,
+  });
+}
+
+export function useTimelineEvents(query: {
+  startTime: number;
+  endTime: number;
+  eventTypes?: string[];
+  collapseFileEvents?: boolean;
+  limit?: number;
+  offset?: number;
+}) {
+  return useQuery({
+    queryKey: queryKeys.timeline.events(query.startTime, query.endTime, query.eventTypes),
+    queryFn: () => api.timeline.getTimelineEvents(query),
+    staleTime: 30_000,
+  });
+}
+
+export function useTimelineEventsForDate(date: string, eventTypes?: string[]) {
+  return useQuery({
+    queryKey: queryKeys.timeline.eventsForDate(date, eventTypes),
+    queryFn: () => api.timeline.getTimelineEventsForDate(date, eventTypes),
     staleTime: 30_000,
   });
 }

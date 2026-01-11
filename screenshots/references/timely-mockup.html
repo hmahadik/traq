@@ -1,0 +1,845 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Timely Timeline Mockup</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f5f5f5;
+      color: #333;
+      font-size: 13px;
+    }
+
+    .container {
+      display: flex;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    /* ===== LEFT SIDEBAR: TIMESHEET PANEL ===== */
+    .timesheet-panel {
+      width: 280px;
+      background: white;
+      border-right: 1px solid #e0e0e0;
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+    }
+
+    .timesheet-header {
+      padding: 16px;
+      border-bottom: 1px solid #e0e0e0;
+    }
+
+    .timesheet-header h2 {
+      font-size: 14px;
+      font-weight: 500;
+      color: #666;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .timesheet-header .total {
+      font-size: 18px;
+      font-weight: 600;
+      color: #333;
+      margin-top: 4px;
+    }
+
+    .timesheet-entries {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px;
+    }
+
+    .logged-entry {
+      background: #0d9488; /* teal for project color */
+      color: white;
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 10px;
+    }
+
+    .logged-entry.purple {
+      background: #7c3aed;
+    }
+
+    .logged-entry.blue {
+      background: #2563eb;
+    }
+
+    .logged-entry .project-name {
+      font-weight: 600;
+      font-size: 14px;
+    }
+
+    .logged-entry .project-type {
+      font-size: 12px;
+      opacity: 0.8;
+      margin-top: 2px;
+    }
+
+    .logged-entry .entry-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 12px;
+    }
+
+    .logged-entry .amount {
+      font-size: 12px;
+      opacity: 0.9;
+    }
+
+    .logged-entry .duration {
+      font-weight: 600;
+      font-size: 15px;
+    }
+
+    .add-entry-btn {
+      margin: 12px;
+      padding: 10px;
+      border: 2px dashed #ccc;
+      border-radius: 8px;
+      text-align: center;
+      color: #888;
+      cursor: pointer;
+    }
+
+    .add-entry-btn:hover {
+      border-color: #999;
+      color: #666;
+    }
+
+    /* ===== MAIN TIMELINE AREA ===== */
+    .timeline-area {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* Top header bar */
+    .top-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 16px;
+      background: white;
+      border-bottom: 1px solid #e0e0e0;
+    }
+
+    .view-toggle {
+      display: flex;
+      gap: 2px;
+      background: #f0f0f0;
+      border-radius: 6px;
+      padding: 2px;
+    }
+
+    .view-toggle button {
+      padding: 6px 12px;
+      border: none;
+      background: transparent;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 13px;
+    }
+
+    .view-toggle button.active {
+      background: white;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+    }
+
+    .date-nav {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .date-nav button {
+      width: 28px;
+      height: 28px;
+      border: 1px solid #ddd;
+      background: white;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    .date-display {
+      font-weight: 500;
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .total-time {
+      font-weight: 600;
+      color: #666;
+    }
+
+    /* Column headers row */
+    .column-headers {
+      display: flex;
+      background: white;
+      border-bottom: 1px solid #e0e0e0;
+      flex-shrink: 0;
+    }
+
+    .hour-header {
+      width: 60px;
+      padding: 8px;
+      text-align: center;
+      font-size: 11px;
+      color: #888;
+      flex-shrink: 0;
+      border-right: 1px solid #eee;
+    }
+
+    .app-header {
+      width: 180px;
+      padding: 10px 12px;
+      border-right: 1px solid #eee;
+      flex-shrink: 0;
+    }
+
+    .app-header .app-info {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .app-header .app-icon {
+      width: 20px;
+      height: 20px;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+    }
+
+    .app-header .app-icon.vscode { background: #007acc; color: white; }
+    .app-header .app-icon.chrome { background: #4285f4; color: white; }
+    .app-header .app-icon.calendar { background: #ea4335; color: white; }
+    .app-header .app-icon.slack { background: #611f69; color: white; }
+    .app-header .app-icon.terminal { background: #333; color: #0f0; }
+    .app-header .app-icon.memories { background: #10b981; color: white; }
+
+    .app-header .app-name {
+      font-weight: 500;
+      font-size: 13px;
+    }
+
+    .app-header .app-time {
+      font-size: 11px;
+      color: #888;
+      margin-left: auto;
+    }
+
+    .memories-header {
+      flex: 1;
+      min-width: 200px;
+    }
+
+    /* Timeline grid */
+    .timeline-grid {
+      flex: 1;
+      overflow: auto;
+      display: flex;
+    }
+
+    .hour-column {
+      width: 60px;
+      flex-shrink: 0;
+      border-right: 1px solid #eee;
+      background: #fafafa;
+    }
+
+    .hour-label {
+      height: 80px;
+      padding: 4px 8px;
+      font-size: 11px;
+      color: #888;
+      text-align: right;
+      border-bottom: 1px solid #f0f0f0;
+    }
+
+    .app-column {
+      width: 180px;
+      flex-shrink: 0;
+      border-right: 1px solid #eee;
+      position: relative;
+    }
+
+    .memories-column {
+      flex: 1;
+      min-width: 200px;
+      position: relative;
+    }
+
+    .hour-row {
+      height: 80px;
+      border-bottom: 1px solid #f0f0f0;
+      position: relative;
+    }
+
+    /* Activity blocks */
+    .activity-block {
+      position: absolute;
+      left: 4px;
+      right: 4px;
+      border-radius: 6px;
+      padding: 6px 8px;
+      overflow: hidden;
+      cursor: pointer;
+      transition: box-shadow 0.15s;
+    }
+
+    .activity-block:hover {
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    }
+
+    .activity-block .block-icon {
+      width: 16px;
+      height: 16px;
+      border-radius: 3px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      margin-right: 6px;
+      vertical-align: middle;
+    }
+
+    .activity-block .block-title {
+      font-size: 12px;
+      font-weight: 500;
+    }
+
+    .activity-block .block-duration {
+      font-size: 11px;
+      color: rgba(0,0,0,0.6);
+      margin-top: 2px;
+    }
+
+    /* Block colors - pastel/muted */
+    .block-vscode { background: #cce5ff; }
+    .block-chrome { background: #d4edda; }
+    .block-calendar { background: #e2d9f3; }
+    .block-slack { background: #f8d7da; }
+    .block-terminal { background: #e9ecef; }
+    .block-meet { background: #fff3cd; }
+
+    /* Stacked activities in memories column */
+    .stacked-block {
+      position: absolute;
+      left: 4px;
+      right: 4px;
+      background: white;
+      border: 1px solid #e0e0e0;
+      border-radius: 6px;
+      padding: 6px 8px;
+    }
+
+    .stacked-icons {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+    }
+
+    .stacked-icons .mini-icon {
+      width: 20px;
+      height: 20px;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      color: white;
+    }
+
+    .stacked-block .stacked-apps {
+      font-size: 11px;
+      color: #666;
+      margin-top: 4px;
+    }
+
+    /* Grid lines */
+    .gridlines {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      pointer-events: none;
+    }
+
+    .gridline {
+      position: absolute;
+      left: 0;
+      right: 0;
+      height: 1px;
+      background: #f0f0f0;
+    }
+
+    /* Summary Lane (optional) */
+    .summary-lane {
+      background: #fefce8;
+      border-bottom: 1px solid #fde047;
+      padding: 8px 12px;
+      flex-shrink: 0;
+    }
+
+    .summary-header {
+      font-size: 12px;
+      font-weight: 500;
+      color: #854d0e;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .summary-items {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .summary-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      padding: 4px 8px;
+      background: white;
+      border-radius: 4px;
+      border-left: 3px solid;
+    }
+
+    .summary-item.code { border-color: #007acc; }
+    .summary-item.meet { border-color: #ea4335; }
+    .summary-item.browser { border-color: #4285f4; }
+
+    .summary-item .time-range {
+      margin-left: auto;
+      color: #888;
+      font-size: 11px;
+    }
+
+    /* Annotations */
+    .annotation {
+      position: fixed;
+      background: #1e1e1e;
+      color: white;
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 12px;
+      max-width: 250px;
+      z-index: 100;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    }
+
+    .annotation::before {
+      content: '';
+      position: absolute;
+      width: 0;
+      height: 0;
+      border: 8px solid transparent;
+    }
+
+    .annotation.left::before {
+      right: -16px;
+      top: 50%;
+      transform: translateY(-50%);
+      border-left-color: #1e1e1e;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <!-- LEFT SIDEBAR: TIMESHEET PANEL -->
+    <div class="timesheet-panel">
+      <div class="timesheet-header">
+        <h2>Timesheet <span style="font-size: 11px; color: #999;">i</span></h2>
+        <div class="total">3h 41m <span style="font-size: 14px; font-weight: 400; color: #666;">- $414.58</span></div>
+      </div>
+
+      <div class="timesheet-entries">
+        <!-- These are LOGGED entries tied to PROJECTS, not sessions -->
+        <div class="logged-entry">
+          <div class="project-name">Company Meeting</div>
+          <div class="project-type">Admin</div>
+          <div class="entry-footer">
+            <span class="amount">$402.08</span>
+            <span class="duration">3h 13m</span>
+          </div>
+        </div>
+
+        <div class="logged-entry purple">
+          <div class="project-name">Feature Development</div>
+          <div class="project-type">Engineering</div>
+          <div class="entry-footer">
+            <span class="amount">$12.50</span>
+            <span class="duration">25m</span>
+          </div>
+        </div>
+
+        <div class="logged-entry blue">
+          <div class="project-name">Code Review</div>
+          <div class="project-type">Engineering</div>
+          <div class="entry-footer">
+            <span class="amount">$0.00</span>
+            <span class="duration">03m</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="add-entry-btn">+ Add Entry</div>
+    </div>
+
+    <!-- MAIN TIMELINE AREA -->
+    <div class="timeline-area">
+
+      <!-- Top header -->
+      <div class="top-header">
+        <div class="view-toggle">
+          <button class="active">Day</button>
+          <button>Week</button>
+          <button>Month</button>
+        </div>
+
+        <div class="date-nav">
+          <button>&lt;</button>
+          <span class="date-display">Today, January 10</span>
+          <button>&gt;</button>
+          <button style="margin-left: 8px;">Today</button>
+        </div>
+
+        <div class="header-actions">
+          <span class="total-time">8h 15m</span>
+          <button style="padding: 6px 12px; border: 1px solid #ddd; background: white; border-radius: 4px;">Options</button>
+        </div>
+      </div>
+
+      <!-- Optional: Summary Lane -->
+      <div class="summary-lane">
+        <div class="summary-header">
+          <span>✨</span> Summary
+          <span style="margin-left: auto; font-weight: 400; font-size: 11px; cursor: pointer;">Hide</span>
+        </div>
+        <div class="summary-items">
+          <div class="summary-item code">
+            <span>PR #422: Refactor notification system</span>
+            <span class="time-range">8:00AM - 9:30AM</span>
+          </div>
+          <div class="summary-item meet">
+            <span>Engineering All-Hands</span>
+            <span class="time-range">9:30AM - 10:30AM</span>
+          </div>
+          <div class="summary-item browser">
+            <span>Research: API design patterns</span>
+            <span class="time-range">10:30AM - 11:15AM</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Column Headers -->
+      <div class="column-headers">
+        <div class="hour-header">EDT</div>
+
+        <div class="app-header">
+          <div class="app-info">
+            <div class="app-icon vscode">VS</div>
+            <span class="app-name">VS Code</span>
+            <span class="app-time">4h 32m</span>
+          </div>
+        </div>
+
+        <div class="app-header">
+          <div class="app-info">
+            <div class="app-icon chrome">G</div>
+            <span class="app-name">Chrome</span>
+            <span class="app-time">1h 45m</span>
+          </div>
+        </div>
+
+        <div class="app-header">
+          <div class="app-info">
+            <div class="app-icon calendar">C</div>
+            <span class="app-name">Calendar</span>
+            <span class="app-time">30m</span>
+          </div>
+        </div>
+
+        <div class="app-header">
+          <div class="app-info">
+            <div class="app-icon slack">S</div>
+            <span class="app-name">Slack</span>
+            <span class="app-time">48m</span>
+          </div>
+        </div>
+
+        <div class="app-header memories-header">
+          <div class="app-info">
+            <div class="app-icon memories">M</div>
+            <span class="app-name">Your Memories</span>
+            <span class="app-time">8h 15m</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Timeline Grid -->
+      <div class="timeline-grid">
+        <!-- Hour labels column -->
+        <div class="hour-column">
+          <div class="hour-label">8 AM</div>
+          <div class="hour-label">9 AM</div>
+          <div class="hour-label">10 AM</div>
+          <div class="hour-label">11 AM</div>
+          <div class="hour-label">12 PM</div>
+          <div class="hour-label">1 PM</div>
+          <div class="hour-label">2 PM</div>
+          <div class="hour-label">3 PM</div>
+        </div>
+
+        <!-- VS Code column -->
+        <div class="app-column">
+          <div class="hour-row">
+            <div class="activity-block block-vscode" style="top: 5px; height: 70px;">
+              <span class="block-icon" style="background: #007acc; color: white;">VS</span>
+              <span class="block-title">VS Code</span>
+              <div class="block-duration">55m</div>
+            </div>
+          </div>
+          <div class="hour-row">
+            <div class="activity-block block-vscode" style="top: 10px; height: 50px;">
+              <span class="block-icon" style="background: #007acc; color: white;">VS</span>
+              <span class="block-title">VS Code</span>
+              <div class="block-duration">38m</div>
+            </div>
+          </div>
+          <div class="hour-row">
+            <!-- empty -->
+          </div>
+          <div class="hour-row">
+            <div class="activity-block block-vscode" style="top: 5px; height: 140px;">
+              <span class="block-icon" style="background: #007acc; color: white;">VS</span>
+              <span class="block-title">VS Code</span>
+              <div class="block-duration">1h 45m</div>
+            </div>
+          </div>
+          <div class="hour-row"></div>
+          <div class="hour-row">
+            <div class="activity-block block-vscode" style="top: 20px; height: 55px;">
+              <span class="block-icon" style="background: #007acc; color: white;">VS</span>
+              <span class="block-title">VS Code</span>
+              <div class="block-duration">42m</div>
+            </div>
+          </div>
+          <div class="hour-row">
+            <div class="activity-block block-vscode" style="top: 5px; height: 70px;">
+              <span class="block-icon" style="background: #007acc; color: white;">VS</span>
+              <span class="block-title">VS Code</span>
+              <div class="block-duration">52m</div>
+            </div>
+          </div>
+          <div class="hour-row"></div>
+        </div>
+
+        <!-- Chrome column -->
+        <div class="app-column">
+          <div class="hour-row">
+            <div class="activity-block block-chrome" style="top: 50px; height: 25px;">
+              <span class="block-icon" style="background: #4285f4; color: white;">G</span>
+              <span class="block-title">Chrome</span>
+            </div>
+          </div>
+          <div class="hour-row">
+            <div class="activity-block block-chrome" style="top: 5px; height: 35px;">
+              <span class="block-icon" style="background: #4285f4; color: white;">G</span>
+              <span class="block-title">Chrome</span>
+              <div class="block-duration">28m</div>
+            </div>
+          </div>
+          <div class="hour-row">
+            <div class="activity-block block-chrome" style="top: 40px; height: 35px;">
+              <span class="block-icon" style="background: #4285f4; color: white;">G</span>
+              <span class="block-title">Chrome</span>
+              <div class="block-duration">25m</div>
+            </div>
+          </div>
+          <div class="hour-row"></div>
+          <div class="hour-row">
+            <div class="activity-block block-chrome" style="top: 10px; height: 65px;">
+              <span class="block-icon" style="background: #4285f4; color: white;">G</span>
+              <span class="block-title">Chrome</span>
+              <div class="block-duration">48m</div>
+            </div>
+          </div>
+          <div class="hour-row"></div>
+          <div class="hour-row"></div>
+          <div class="hour-row"></div>
+        </div>
+
+        <!-- Calendar column -->
+        <div class="app-column">
+          <div class="hour-row"></div>
+          <div class="hour-row">
+            <div class="activity-block block-calendar" style="top: 30px; height: 90px;">
+              <span class="block-icon" style="background: #ea4335; color: white;">C</span>
+              <span class="block-title">All-Hands</span>
+              <div class="block-duration">1h 00m</div>
+            </div>
+          </div>
+          <div class="hour-row"></div>
+          <div class="hour-row"></div>
+          <div class="hour-row"></div>
+          <div class="hour-row"></div>
+          <div class="hour-row"></div>
+          <div class="hour-row"></div>
+        </div>
+
+        <!-- Slack column -->
+        <div class="app-column">
+          <div class="hour-row">
+            <div class="activity-block block-slack" style="top: 20px; height: 20px;">
+              <span class="block-icon" style="background: #611f69; color: white;">S</span>
+              <span class="block-title">Slack</span>
+            </div>
+            <div class="activity-block block-slack" style="top: 55px; height: 20px;">
+              <span class="block-icon" style="background: #611f69; color: white;">S</span>
+              <span class="block-title">Slack</span>
+            </div>
+          </div>
+          <div class="hour-row">
+            <div class="activity-block block-slack" style="top: 15px; height: 18px;">
+              <span class="block-icon" style="background: #611f69; color: white;">S</span>
+              <span class="block-title">Slack</span>
+            </div>
+          </div>
+          <div class="hour-row"></div>
+          <div class="hour-row">
+            <div class="activity-block block-slack" style="top: 60px; height: 18px;">
+              <span class="block-icon" style="background: #611f69; color: white;">S</span>
+              <span class="block-title">Slack</span>
+            </div>
+          </div>
+          <div class="hour-row"></div>
+          <div class="hour-row">
+            <div class="activity-block block-slack" style="top: 5px; height: 22px;">
+              <span class="block-icon" style="background: #611f69; color: white;">S</span>
+              <span class="block-title">Slack</span>
+            </div>
+          </div>
+          <div class="hour-row"></div>
+          <div class="hour-row"></div>
+        </div>
+
+        <!-- YOUR MEMORIES column - shows ALL activities, stacked when concurrent -->
+        <div class="memories-column">
+          <div class="hour-row">
+            <!-- Multiple concurrent activities shown as stacked icons -->
+            <div class="stacked-block" style="top: 5px; height: 70px;">
+              <div class="stacked-icons">
+                <div class="mini-icon" style="background: #007acc;">VS</div>
+                <div class="mini-icon" style="background: #4285f4;">G</div>
+                <div class="mini-icon" style="background: #611f69;">S</div>
+                <div class="mini-icon" style="background: #333;">T</div>
+              </div>
+              <div class="stacked-apps">VS Code, Chrome, Slack, Terminal</div>
+            </div>
+          </div>
+          <div class="hour-row">
+            <div class="stacked-block" style="top: 5px; height: 35px;">
+              <div class="stacked-icons">
+                <div class="mini-icon" style="background: #007acc;">VS</div>
+                <div class="mini-icon" style="background: #4285f4;">G</div>
+              </div>
+              <div class="stacked-apps">VS Code, Chrome</div>
+            </div>
+            <div class="stacked-block" style="top: 45px; height: 30px;">
+              <div class="stacked-icons">
+                <div class="mini-icon" style="background: #ea4335;">C</div>
+              </div>
+              <div class="stacked-apps">Calendar - All Hands</div>
+            </div>
+          </div>
+          <div class="hour-row">
+            <div class="stacked-block" style="top: 5px; height: 25px;">
+              <div class="stacked-icons">
+                <div class="mini-icon" style="background: #ea4335;">C</div>
+              </div>
+              <div class="stacked-apps">Calendar - All Hands</div>
+            </div>
+            <div class="stacked-block" style="top: 40px; height: 35px;">
+              <div class="stacked-icons">
+                <div class="mini-icon" style="background: #4285f4;">G</div>
+              </div>
+              <div class="stacked-apps">Chrome</div>
+            </div>
+          </div>
+          <div class="hour-row">
+            <div class="stacked-block" style="top: 5px; height: 70px;">
+              <div class="stacked-icons">
+                <div class="mini-icon" style="background: #007acc;">VS</div>
+                <div class="mini-icon" style="background: #611f69;">S</div>
+                <div class="mini-icon" style="background: #333;">T</div>
+              </div>
+              <div class="stacked-apps">VS Code, Slack, Terminal</div>
+            </div>
+          </div>
+          <div class="hour-row">
+            <div class="stacked-block" style="top: 5px; height: 70px;">
+              <div class="stacked-icons">
+                <div class="mini-icon" style="background: #007acc;">VS</div>
+                <div class="mini-icon" style="background: #4285f4;">G</div>
+              </div>
+              <div class="stacked-apps">VS Code, Chrome</div>
+            </div>
+          </div>
+          <div class="hour-row">
+            <div class="stacked-block" style="top: 20px; height: 55px;">
+              <div class="stacked-icons">
+                <div class="mini-icon" style="background: #007acc;">VS</div>
+                <div class="mini-icon" style="background: #611f69;">S</div>
+              </div>
+              <div class="stacked-apps">VS Code, Slack</div>
+            </div>
+          </div>
+          <div class="hour-row">
+            <div class="stacked-block" style="top: 5px; height: 70px;">
+              <div class="stacked-icons">
+                <div class="mini-icon" style="background: #007acc;">VS</div>
+              </div>
+              <div class="stacked-apps">VS Code</div>
+            </div>
+          </div>
+          <div class="hour-row"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Annotation overlays explaining the design -->
+  <div class="annotation left" style="top: 150px; left: 20px; display: none;">
+    <strong>Timesheet Panel</strong><br>
+    Shows LOGGED time entries tied to PROJECTS.<br>
+    Colors = project colors, NOT app colors.
+  </div>
+</body>
+</html>

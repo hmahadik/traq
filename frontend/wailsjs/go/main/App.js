@@ -18,6 +18,10 @@ export function DeleteSession(arg1) {
   return window['go']['main']['App']['DeleteSession'](arg1);
 }
 
+export function DeleteTimelineCategoryRule(arg1) {
+  return window['go']['main']['App']['DeleteTimelineCategoryRule'](arg1);
+}
+
 export function DiscoverGitRepositories(arg1, arg2) {
   return window['go']['main']['App']['DiscoverGitRepositories'](arg1, arg2);
 }
@@ -80,6 +84,10 @@ export function GetBundledStatus() {
 
 export function GetCalendarHeatmap(arg1, arg2) {
   return window['go']['main']['App']['GetCalendarHeatmap'](arg1, arg2);
+}
+
+export function GetCategorizationRules() {
+  return window['go']['main']['App']['GetCategorizationRules']();
 }
 
 export function GetConfig() {
@@ -218,6 +226,10 @@ export function GetThumbnailPath(arg1) {
   return window['go']['main']['App']['GetThumbnailPath'](arg1);
 }
 
+export function GetTimelineGridData(arg1) {
+  return window['go']['main']['App']['GetTimelineGridData'](arg1);
+}
+
 export function GetTopWindows(arg1, arg2) {
   return window['go']['main']['App']['GetTopWindows'](arg1, arg2);
 }
@@ -280,6 +292,10 @@ export function ResumeCapture() {
 
 export function SaveAppCategory(arg1, arg2) {
   return window['go']['main']['App']['SaveAppCategory'](arg1, arg2);
+}
+
+export function SetAppTimelineCategory(arg1, arg2) {
+  return window['go']['main']['App']['SetAppTimelineCategory'](arg1, arg2);
 }
 
 export function SetFileAllowedExtensions(arg1) {

@@ -332,6 +332,45 @@ export const timeline = {
     await waitForReady();
     return App.DeleteSession(sessionId);
   },
+
+  getTimelineEventsForDate: async (date: string, eventTypes?: string[]) => {
+    if (isMockMode()) {
+      // Return mock timeline events
+      return {
+        events: [
+          {
+            id: 1,
+            type: 'screenshot',
+            timestamp: Math.floor(new Date(date).getTime() / 1000) + 3600,
+            endTime: Math.floor(new Date(date).getTime() / 1000) + 5400,
+            appName: 'VS Code',
+            sessionId: 1,
+            screenshot: {
+              filepath: '/path/to/screenshot.png',
+              windowTitle: 'main.go - VS Code',
+            },
+          },
+          {
+            id: 2,
+            type: 'focus_change',
+            timestamp: Math.floor(new Date(date).getTime() / 1000) + 7200,
+            endTime: Math.floor(new Date(date).getTime() / 1000) + 9000,
+            appName: 'Firefox',
+            sessionId: 1,
+            focusChange: {
+              windowTitle: 'GitHub - Pull Request',
+              durationSeconds: 1800,
+            },
+          },
+        ],
+        total: 2,
+        hasMore: false,
+        eventTypes: ['screenshot', 'git_commit', 'file_event', 'shell_command', 'browser_visit', 'focus_change', 'afk'],
+      };
+    }
+    await waitForReady();
+    return withRetry(() => App.GetTimelineEventsForDate(date, eventTypes || []));
+  },
 };
 
 /**

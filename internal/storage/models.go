@@ -154,6 +154,16 @@ type Report struct {
 	CreatedAt  int64          `json:"createdAt"`
 }
 
+// AFKEvent represents an away-from-keyboard period.
+type AFKEvent struct {
+	ID          int64         `json:"id"`
+	StartTime   int64         `json:"startTime"`
+	EndTime     sql.NullInt64 `json:"endTime"`     // NULL while AFK is ongoing
+	SessionID   sql.NullInt64 `json:"sessionId"`
+	TriggerType string        `json:"triggerType"` // idle_timeout, system_sleep, manual
+	CreatedAt   int64         `json:"createdAt"`
+}
+
 // Helper functions for JSON array fields
 
 // ParseJSONStringArray parses a JSON string array from a nullable string.

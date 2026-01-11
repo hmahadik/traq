@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Traq Timeline v7 - Flat Icons</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #ffffff;
+      color: #1a1a1a;
+      font-size: 14px;
+    }
+
+    .container {
+      display: flex;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    /* Hour column */
+    .hour-column {
+      width: 70px;
+      flex-shrink: 0;
+      background: #ffffff;
+      padding-top: 10px;
+    }
+
+    .hour-marker {
+      height: 80px;
+      display: flex;
+      align-items: flex-start;
+      justify-content: flex-end;
+      padding-right: 16px;
+      font-size: 13px;
+      color: #9ca3af;
+      font-weight: 400;
+    }
+
+    /* Activity Detail Area */
+    .activity-area {
+      flex: 1;
+      position: relative;
+      padding: 10px 20px;
+      overflow: auto;
+    }
+
+    /* The bars container */
+    .bars-container {
+      position: relative;
+      display: flex;
+      gap: 12px;
+    }
+
+    /* Each app gets a lane */
+    .app-lane {
+      position: relative;
+      width: 150px;
+      flex-shrink: 0;
+    }
+
+    /* ===== ACTIVITY BAR ===== */
+    .activity-bar {
+      position: absolute;
+      left: 0;
+      right: 0;
+      border-radius: 12px;
+      padding: 12px 14px;
+      display: flex;
+      flex-direction: column;
+      cursor: pointer;
+      transition: box-shadow 0.2s;
+    }
+
+    .activity-bar:hover {
+      box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+    }
+
+    /* Flat icon - no container */
+    .activity-bar .app-icon {
+      width: 28px;
+      height: 28px;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .activity-bar .app-icon svg {
+      width: 26px;
+      height: 26px;
+    }
+
+    /* App name */
+    .activity-bar .app-name {
+      font-size: 14px;
+      font-weight: 500;
+      color: #374151;
+      margin-bottom: 2px;
+    }
+
+    /* Duration */
+    .activity-bar .app-duration {
+      font-size: 13px;
+      color: #6b7280;
+      margin-top: auto;
+    }
+
+    /* ===== VS CODE - Very Light Blue ===== */
+    .activity-bar.vscode {
+      background: #eff6ff;
+    }
+
+    .activity-bar.vscode .app-icon {
+      color: #3b82f6;
+    }
+
+    /* ===== SLACK - Very Light Salmon/Pink ===== */
+    .activity-bar.slack {
+      background: #fff1f2;
+    }
+
+    .activity-bar.slack .app-icon {
+      color: #e11d48;
+    }
+
+    /* ===== LINEAR - Very Light Purple ===== */
+    .activity-bar.linear {
+      background: #f5f3ff;
+    }
+
+    .activity-bar.linear .app-icon {
+      color: #7c3aed;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <!-- Hour Column -->
+    <div class="hour-column">
+      <div class="hour-marker">2 PM</div>
+      <div class="hour-marker">3 PM</div>
+      <div class="hour-marker">4 PM</div>
+      <div class="hour-marker">5 PM</div>
+      <div class="hour-marker">6 PM</div>
+      <div class="hour-marker">7 PM</div>
+    </div>
+
+    <!-- Activity Detail Area -->
+    <div class="activity-area">
+
+      <!-- Bars Container -->
+      <div class="bars-container">
+
+        <!-- VS Code Lane -->
+        <div class="app-lane">
+          <!-- Short bar at 2PM (28m) -->
+          <div class="activity-bar vscode" style="top: 0; height: 45px;">
+            <div class="app-icon">
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M23.15 2.587L18.21.21a1.494 1.494 0 0 0-1.705.29l-9.46 8.63-4.12-3.128a.999.999 0 0 0-1.276.057L.327 7.261A1 1 0 0 0 .326 8.74L3.899 12 .326 15.26a1 1 0 0 0 .001 1.479L1.65 17.94a.999.999 0 0 0 1.276.057l4.12-3.128 9.46 8.63a1.492 1.492 0 0 0 1.704.29l4.942-2.377A1.5 1.5 0 0 0 24 20.06V3.939a1.5 1.5 0 0 0-.85-1.352z"/></svg>
+            </div>
+            <span class="app-duration">28m</span>
+          </div>
+
+          <!-- Long bar (2h 20m) -->
+          <div class="activity-bar vscode" style="top: 55px; height: 185px;">
+            <div class="app-icon">
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M23.15 2.587L18.21.21a1.494 1.494 0 0 0-1.705.29l-9.46 8.63-4.12-3.128a.999.999 0 0 0-1.276.057L.327 7.261A1 1 0 0 0 .326 8.74L3.899 12 .326 15.26a1 1 0 0 0 .001 1.479L1.65 17.94a.999.999 0 0 0 1.276.057l4.12-3.128 9.46 8.63a1.492 1.492 0 0 0 1.704.29l4.942-2.377A1.5 1.5 0 0 0 24 20.06V3.939a1.5 1.5 0 0 0-.85-1.352z"/></svg>
+            </div>
+            <span class="app-name">Visual Studio Code</span>
+            <span class="app-duration">2h 20m</span>
+          </div>
+
+          <!-- Bar at 5PM (59m) -->
+          <div class="activity-bar vscode" style="top: 250px; height: 80px;">
+            <div class="app-icon">
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M23.15 2.587L18.21.21a1.494 1.494 0 0 0-1.705.29l-9.46 8.63-4.12-3.128a.999.999 0 0 0-1.276.057L.327 7.261A1 1 0 0 0 .326 8.74L3.899 12 .326 15.26a1 1 0 0 0 .001 1.479L1.65 17.94a.999.999 0 0 0 1.276.057l4.12-3.128 9.46 8.63a1.492 1.492 0 0 0 1.704.29l4.942-2.377A1.5 1.5 0 0 0 24 20.06V3.939a1.5 1.5 0 0 0-.85-1.352z"/></svg>
+            </div>
+            <span class="app-name">Visual Studio Code</span>
+            <span class="app-duration">59m</span>
+          </div>
+        </div>
+
+        <!-- Slack Lane -->
+        <div class="app-lane">
+          <!-- Short bar at 2PM (9m) -->
+          <div class="activity-bar slack" style="top: 15px; height: 30px;">
+            <div class="app-icon">
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M5.042 15.165a2.528 2.528 0 0 1-2.52 2.523A2.528 2.528 0 0 1 0 15.165a2.527 2.527 0 0 1 2.522-2.52h2.52v2.52zm1.271 0a2.527 2.527 0 0 1 2.521-2.52 2.527 2.527 0 0 1 2.521 2.52v6.313A2.528 2.528 0 0 1 8.834 24a2.528 2.528 0 0 1-2.521-2.522v-6.313zM8.834 5.042a2.528 2.528 0 0 1-2.521-2.52A2.528 2.528 0 0 1 8.834 0a2.528 2.528 0 0 1 2.521 2.522v2.52H8.834zm0 1.271a2.528 2.528 0 0 1 2.521 2.521 2.528 2.528 0 0 1-2.521 2.521H2.522A2.528 2.528 0 0 1 0 8.834a2.528 2.528 0 0 1 2.522-2.521h6.312zm10.122 2.521a2.528 2.528 0 0 1 2.522-2.521A2.528 2.528 0 0 1 24 8.834a2.528 2.528 0 0 1-2.522 2.521h-2.522V8.834zm-1.268 0a2.528 2.528 0 0 1-2.523 2.521 2.527 2.527 0 0 1-2.52-2.521V2.522A2.527 2.527 0 0 1 15.165 0a2.528 2.528 0 0 1 2.523 2.522v6.312zm-2.523 10.122a2.528 2.528 0 0 1 2.523 2.522A2.528 2.528 0 0 1 15.165 24a2.527 2.527 0 0 1-2.52-2.522v-2.522h2.52zm0-1.268a2.527 2.527 0 0 1-2.52-2.523 2.526 2.526 0 0 1 2.52-2.52h6.313A2.527 2.527 0 0 1 24 15.165a2.528 2.528 0 0 1-2.522 2.523h-6.313z"/></svg>
+            </div>
+            <span class="app-duration">9m</span>
+          </div>
+
+          <!-- Bar at 3PM (10m) -->
+          <div class="activity-bar slack" style="top: 90px; height: 35px;">
+            <div class="app-icon">
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M5.042 15.165a2.528 2.528 0 0 1-2.52 2.523A2.528 2.528 0 0 1 0 15.165a2.527 2.527 0 0 1 2.522-2.52h2.52v2.52zm1.271 0a2.527 2.527 0 0 1 2.521-2.52 2.527 2.527 0 0 1 2.521 2.52v6.313A2.528 2.528 0 0 1 8.834 24a2.528 2.528 0 0 1-2.521-2.522v-6.313z"/></svg>
+            </div>
+            <span class="app-name">Slack</span>
+            <span class="app-duration">10m</span>
+          </div>
+
+          <!-- Bar at 3:20PM (16m) -->
+          <div class="activity-bar slack" style="top: 130px; height: 40px;">
+            <div class="app-icon">
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M5.042 15.165a2.528 2.528 0 0 1-2.52 2.523A2.528 2.528 0 0 1 0 15.165a2.527 2.527 0 0 1 2.522-2.52h2.52v2.52z"/></svg>
+            </div>
+            <span class="app-name">Slack</span>
+            <span class="app-duration">16m</span>
+          </div>
+
+          <!-- Long bar at 4PM (1h 14m) -->
+          <div class="activity-bar slack" style="top: 180px; height: 105px;">
+            <div class="app-icon">
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M5.042 15.165a2.528 2.528 0 0 1-2.52 2.523A2.528 2.528 0 0 1 0 15.165a2.527 2.527 0 0 1 2.522-2.52h2.52v2.52zm1.271 0a2.527 2.527 0 0 1 2.521-2.52 2.527 2.527 0 0 1 2.521 2.52v6.313A2.528 2.528 0 0 1 8.834 24a2.528 2.528 0 0 1-2.521-2.522v-6.313z"/></svg>
+            </div>
+            <span class="app-name">Slack</span>
+            <span class="app-duration">1h 14m</span>
+          </div>
+        </div>
+
+        <!-- Linear Lane -->
+        <div class="app-lane">
+          <!-- Bar at 5PM (6m) -->
+          <div class="activity-bar linear" style="top: 260px; height: 35px;">
+            <div class="app-icon">
+              <svg viewBox="0 0 100 100" fill="currentColor"><path d="M1.22541 61.5228c-.2225-.9485.90748-1.5459 1.59638-.857L39.3342 97.1782c.6889.6889.0915 1.8189-.857 1.5765C20.0515 94.4522 5.54779 79.9485 1.22541 61.5228ZM.00189135 46.8891c-.01764375.2833.08887215.5599.29652498.7676l52.045998 52.0461c.2077.2076.4843.3141.7676.2965 1.4587-.0906 2.8988-.2493 4.3172-.4734.5093-.0803.7874-.6341.5621-1.1046-.4891-.1021-.9783-.2043-1.4674-.3064-36.1451-7.5388-64.67996389-36.0733-72.21872675-72.21867C22.9552 24.8404 22.059 23.9442 21.0218 23.9442c-.22698 0-.458191.0231-.6891.0692-.230909.0461-.456343.1153-.6757.2074-.219357.0922-.433239.2078-.638147.3467-.204908.1388-.39976.3007-.582137.4829L.457615 42.9838c-.313322.3133-.48137.7386-.47572517 1.1909.00564517.4523.18247317.8808.49196217 1.1906l52.045593 52.0458c.3098.3095.7383.4864 1.1906.4921.4523.0056.8776-.1624 1.1909-.4757l18.3283-18.3284c.3654-.3653.5316-.8939.4447-1.4139-.4432-2.6511-.7011-5.3662-.7632-8.1343-.007-.3155-.1338-.6171-.3533-.8396L24.9391 20.6168c-.2224-.2195-.5241-.3463-.8396-.3533-2.76816-.0621-5.48323-.3199-8.13428-.7632-.52003-.0869-1.04857.0793-1.41388.4446L.457615 42.9838c-.313322.3133-.48137.7386-.475765 1.1909L.00189135 46.8891Z"/></svg>
+            </div>
+            <span class="app-name">Linear</span>
+            <span class="app-duration">6m</span>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+
+  </div>
+
+</body>
+</html>

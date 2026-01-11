@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Traq Timeline v4 - App Columns (Timely Style)</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f8f9fa;
+      color: #1a1a1a;
+      font-size: 13px;
+    }
+
+    .container {
+      display: flex;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    /* ===== LEFT SIDEBAR ===== */
+    .sidebar {
+      width: 280px;
+      background: #ffffff;
+      border-right: 1px solid #e5e5e5;
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+    }
+
+    .sidebar-header {
+      padding: 20px;
+      border-bottom: 1px solid #e5e5e5;
+    }
+
+    .sidebar-header h1 {
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 2px;
+    }
+
+    .sidebar-header .date {
+      color: #71717a;
+      font-size: 13px;
+    }
+
+    .top-apps {
+      padding: 16px;
+      flex: 1;
+      overflow-y: auto;
+    }
+
+    .section-title {
+      font-size: 11px;
+      color: #71717a;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 12px;
+      font-weight: 500;
+    }
+
+    .app-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 0;
+    }
+
+    .app-icon-small {
+      width: 24px;
+      height: 24px;
+      border-radius: 5px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      font-weight: 600;
+      color: white;
+      flex-shrink: 0;
+    }
+
+    .app-icon-small.vscode { background: #007acc; }
+    .app-icon-small.slack { background: #611f69; }
+    .app-icon-small.linear { background: #5e6ad2; }
+
+    .app-details {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .app-name {
+      font-size: 13px;
+      font-weight: 500;
+    }
+
+    .app-time {
+      font-size: 12px;
+      color: #71717a;
+    }
+
+    /* ===== MAIN TIMELINE AREA ===== */
+    .timeline-area {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      background: #ffffff;
+    }
+
+    .top-nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 20px;
+      background: #ffffff;
+      border-bottom: 1px solid #e5e5e5;
+    }
+
+    .nav-left {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .view-toggle {
+      display: flex;
+      background: #f4f4f5;
+      border-radius: 6px;
+      padding: 2px;
+    }
+
+    .view-toggle button {
+      padding: 6px 14px;
+      border: none;
+      background: transparent;
+      color: #71717a;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 500;
+    }
+
+    .view-toggle button.active {
+      background: #ffffff;
+      color: #1a1a1a;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+    }
+
+    .date-nav {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .date-nav button {
+      width: 28px;
+      height: 28px;
+      border: 1px solid #e5e5e5;
+      background: #ffffff;
+      color: #71717a;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+
+    .date-display {
+      font-weight: 500;
+      color: #1a1a1a;
+    }
+
+    /* ===== TIMELINE GRID ===== */
+    .timeline-scroll {
+      flex: 1;
+      overflow: auto;
+      background: #f8f9fa;
+    }
+
+    .timeline-grid {
+      display: flex;
+      min-height: 100%;
+    }
+
+    /* Hour column - sticky */
+    .hour-column {
+      width: 60px;
+      flex-shrink: 0;
+      background: #f8f9fa;
+      position: sticky;
+      left: 0;
+      z-index: 20;
+    }
+
+    .hour-column-header {
+      height: 48px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      color: #71717a;
+      background: #ffffff;
+      border-bottom: 1px solid #e5e5e5;
+    }
+
+    .hour-marker {
+      height: 80px;
+      display: flex;
+      align-items: flex-start;
+      justify-content: flex-end;
+      padding: 4px 12px 0 0;
+      font-size: 12px;
+      color: #9ca3af;
+      font-weight: 400;
+      border-right: 1px solid #e5e5e5;
+    }
+
+    /* ===== APP COLUMNS ===== */
+    .app-columns-container {
+      display: flex;
+      flex: 1;
+    }
+
+    .app-column {
+      min-width: 160px;
+      flex: 1;
+      max-width: 200px;
+      border-right: 1px solid #e5e5e5;
+      background: #ffffff;
+      position: relative;
+    }
+
+    .app-column:last-child {
+      border-right: none;
+    }
+
+    /* Column header with app icon and total time */
+    .app-column-header {
+      height: 48px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 0 12px;
+      background: #ffffff;
+      border-bottom: 1px solid #e5e5e5;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+
+    .column-icon {
+      width: 28px;
+      height: 28px;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .column-icon svg {
+      width: 16px;
+      height: 16px;
+    }
+
+    .column-icon.vscode { background: #007acc; color: white; }
+    .column-icon.slack { background: #611f69; color: white; }
+    .column-icon.linear { background: #5e6ad2; color: white; }
+
+    .column-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .column-app-name {
+      font-size: 13px;
+      font-weight: 500;
+      color: #1a1a1a;
+    }
+
+    .column-total-time {
+      font-size: 12px;
+      color: #71717a;
+    }
+
+    /* Hour rows in app columns */
+    .app-column-content {
+      position: relative;
+    }
+
+    .column-hour-row {
+      height: 80px;
+      position: relative;
+      border-bottom: 1px solid #f0f0f0;
+    }
+
+    /* ===== ACTIVITY BARS (Timely Style) ===== */
+    .activity-bar {
+      position: absolute;
+      left: 8px;
+      right: 8px;
+      border-radius: 8px;
+      padding: 8px 10px;
+      cursor: pointer;
+      transition: transform 0.15s, box-shadow 0.15s;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .activity-bar:hover {
+      transform: scale(1.02);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      z-index: 10;
+    }
+
+    /* Bar content layout */
+    .activity-bar .bar-header {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 4px;
+    }
+
+    .activity-bar .bar-icon {
+      width: 20px;
+      height: 20px;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .activity-bar .bar-icon svg {
+      width: 12px;
+      height: 12px;
+    }
+
+    .activity-bar .bar-app-name {
+      font-size: 12px;
+      font-weight: 600;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .activity-bar .bar-duration {
+      font-size: 11px;
+      opacity: 0.8;
+      margin-top: auto;
+    }
+
+    /* ===== VS CODE BARS - Light Blue ===== */
+    .activity-bar.vscode {
+      background: linear-gradient(180deg, #dbeafe 0%, #bfdbfe 100%);
+      color: #1e40af;
+      border: 1px solid #93c5fd;
+    }
+
+    .activity-bar.vscode .bar-icon {
+      background: #3b82f6;
+      color: white;
+    }
+
+    /* ===== SLACK BARS - Light Salmon/Coral ===== */
+    .activity-bar.slack {
+      background: linear-gradient(180deg, #ffe4e6 0%, #fecdd3 100%);
+      color: #9f1239;
+      border: 1px solid #fda4af;
+    }
+
+    .activity-bar.slack .bar-icon {
+      background: #e11d48;
+      color: white;
+    }
+
+    /* ===== LINEAR BARS - Light Purple ===== */
+    .activity-bar.linear {
+      background: linear-gradient(180deg, #ede9fe 0%, #ddd6fe 100%);
+      color: #5b21b6;
+      border: 1px solid #c4b5fd;
+    }
+
+    .activity-bar.linear .bar-icon {
+      background: #7c3aed;
+      color: white;
+    }
+
+    /* Hour gridlines */
+    .hour-gridline {
+      position: absolute;
+      left: 0;
+      right: 0;
+      height: 1px;
+      background: #f0f0f0;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <!-- LEFT SIDEBAR -->
+    <div class="sidebar">
+      <div class="sidebar-header">
+        <h1>Timeline</h1>
+        <div class="date">Friday, January 10, 2025</div>
+      </div>
+
+      <div class="top-apps">
+        <div class="section-title">Top Apps</div>
+
+        <div class="app-item">
+          <div class="app-icon-small vscode">VS</div>
+          <div class="app-details">
+            <div class="app-name">Visual Studio Code</div>
+            <div class="app-time">3h 19m</div>
+          </div>
+        </div>
+
+        <div class="app-item">
+          <div class="app-icon-small slack">S</div>
+          <div class="app-details">
+            <div class="app-name">Slack</div>
+            <div class="app-time">1h 30m</div>
+          </div>
+        </div>
+
+        <div class="app-item">
+          <div class="app-icon-small linear">L</div>
+          <div class="app-details">
+            <div class="app-name">Linear</div>
+            <div class="app-time">6m</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MAIN TIMELINE -->
+    <div class="timeline-area">
+      <div class="top-nav">
+        <div class="nav-left">
+          <div class="view-toggle">
+            <button class="active">Day</button>
+            <button>Week</button>
+            <button>Month</button>
+          </div>
+          <div class="date-nav">
+            <button>&lt;</button>
+            <span class="date-display">Today, Jan 10</span>
+            <button>&gt;</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="timeline-scroll">
+        <div class="timeline-grid">
+
+          <!-- Hour Column -->
+          <div class="hour-column">
+            <div class="hour-column-header"></div>
+            <div class="hour-marker">2 PM</div>
+            <div class="hour-marker">3 PM</div>
+            <div class="hour-marker">4 PM</div>
+            <div class="hour-marker">5 PM</div>
+            <div class="hour-marker">6 PM</div>
+            <div class="hour-marker">7 PM</div>
+          </div>
+
+          <!-- App Columns Container -->
+          <div class="app-columns-container">
+
+            <!-- VS Code Column -->
+            <div class="app-column">
+              <div class="app-column-header">
+                <div class="column-icon vscode">
+                  <svg viewBox="0 0 24 24" fill="currentColor"><path d="M23.15 2.587L18.21.21a1.494 1.494 0 0 0-1.705.29l-9.46 8.63-4.12-3.128a.999.999 0 0 0-1.276.057L.327 7.261A1 1 0 0 0 .326 8.74L3.899 12 .326 15.26a1 1 0 0 0 .001 1.479L1.65 17.94a.999.999 0 0 0 1.276.057l4.12-3.128 9.46 8.63a1.492 1.492 0 0 0 1.704.29l4.942-2.377A1.5 1.5 0 0 0 24 20.06V3.939a1.5 1.5 0 0 0-.85-1.352z"/></svg>
+                </div>
+                <div class="column-info">
+                  <div class="column-app-name">Visual Studio Code</div>
+                  <div class="column-total-time">3h 19m</div>
+                </div>
+              </div>
+              <div class="app-column-content">
+                <!-- 2 PM row -->
+                <div class="column-hour-row">
+                  <!-- Short bar at top of hour - 28m -->
+                  <div class="activity-bar vscode" style="top: 4px; height: 28px;">
+                    <div class="bar-duration">28m</div>
+                  </div>
+                </div>
+                <!-- 3 PM row - Long bar spanning into next hour -->
+                <div class="column-hour-row">
+                  <!-- 2h 20m bar - spans multiple hours -->
+                  <div class="activity-bar vscode" style="top: 4px; height: 140px;">
+                    <div class="bar-header">
+                      <div class="bar-icon">
+                        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M23.15 2.587L18.21.21a1.494 1.494 0 0 0-1.705.29l-9.46 8.63-4.12-3.128a.999.999 0 0 0-1.276.057L.327 7.261A1 1 0 0 0 .326 8.74L3.899 12 .326 15.26a1 1 0 0 0 .001 1.479L1.65 17.94a.999.999 0 0 0 1.276.057l4.12-3.128 9.46 8.63a1.492 1.492 0 0 0 1.704.29l4.942-2.377A1.5 1.5 0 0 0 24 20.06V3.939a1.5 1.5 0 0 0-.85-1.352z"/></svg>
+                      </div>
+                      <span class="bar-app-name">Visual Studio Code</span>
+                    </div>
+                    <div class="bar-duration">2h 20m</div>
+                  </div>
+                </div>
+                <!-- 4 PM row -->
+                <div class="column-hour-row">
+                </div>
+                <!-- 5 PM row -->
+                <div class="column-hour-row">
+                  <div class="activity-bar vscode" style="top: 4px; height: 70px;">
+                    <div class="bar-header">
+                      <div class="bar-icon">
+                        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M23.15 2.587L18.21.21a1.494 1.494 0 0 0-1.705.29l-9.46 8.63-4.12-3.128a.999.999 0 0 0-1.276.057L.327 7.261A1 1 0 0 0 .326 8.74L3.899 12 .326 15.26a1 1 0 0 0 .001 1.479L1.65 17.94a.999.999 0 0 0 1.276.057l4.12-3.128 9.46 8.63a1.492 1.492 0 0 0 1.704.29l4.942-2.377A1.5 1.5 0 0 0 24 20.06V3.939a1.5 1.5 0 0 0-.85-1.352z"/></svg>
+                      </div>
+                      <span class="bar-app-name">Visual Studio Code</span>
+                    </div>
+                    <div class="bar-duration">59m</div>
+                  </div>
+                </div>
+                <!-- 6 PM row -->
+                <div class="column-hour-row"></div>
+                <!-- 7 PM row -->
+                <div class="column-hour-row"></div>
+              </div>
+            </div>
+
+            <!-- Slack Column -->
+            <div class="app-column">
+              <div class="app-column-header">
+                <div class="column-icon slack">
+                  <svg viewBox="0 0 24 24" fill="currentColor"><path d="M5.042 15.165a2.528 2.528 0 0 1-2.52 2.523A2.528 2.528 0 0 1 0 15.165a2.527 2.527 0 0 1 2.522-2.52h2.52v2.52zm1.271 0a2.527 2.527 0 0 1 2.521-2.52 2.527 2.527 0 0 1 2.521 2.52v6.313A2.528 2.528 0 0 1 8.834 24a2.528 2.528 0 0 1-2.521-2.522v-6.313z"/></svg>
+                </div>
+                <div class="column-info">
+                  <div class="column-app-name">Slack</div>
+                  <div class="column-total-time">1h 30m</div>
+                </div>
+              </div>
+              <div class="app-column-content">
+                <!-- 2 PM row -->
+                <div class="column-hour-row">
+                  <div class="activity-bar slack" style="top: 4px; height: 18px;">
+                    <div class="bar-duration">9m</div>
+                  </div>
+                </div>
+                <!-- 3 PM row -->
+                <div class="column-hour-row">
+                  <div class="activity-bar slack" style="top: 4px; height: 20px;">
+                    <div class="bar-duration">10m</div>
+                  </div>
+                  <div class="activity-bar slack" style="top: 40px; height: 32px;">
+                    <div class="bar-duration">16m</div>
+                  </div>
+                </div>
+                <!-- 4 PM row -->
+                <div class="column-hour-row">
+                  <!-- Long Slack session - 1h 14m -->
+                  <div class="activity-bar slack" style="top: 4px; height: 92px;">
+                    <div class="bar-header">
+                      <div class="bar-icon">
+                        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M5.042 15.165a2.528 2.528 0 0 1-2.52 2.523A2.528 2.528 0 0 1 0 15.165a2.527 2.527 0 0 1 2.522-2.52h2.52v2.52z"/></svg>
+                      </div>
+                      <span class="bar-app-name">Slack</span>
+                    </div>
+                    <div class="bar-duration">1h 14m</div>
+                  </div>
+                </div>
+                <!-- 5 PM row -->
+                <div class="column-hour-row"></div>
+                <!-- 6 PM row -->
+                <div class="column-hour-row"></div>
+                <!-- 7 PM row -->
+                <div class="column-hour-row"></div>
+              </div>
+            </div>
+
+            <!-- Linear Column -->
+            <div class="app-column">
+              <div class="app-column-header">
+                <div class="column-icon linear">
+                  <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3.884 3.884c4.456-4.456 11.496-4.652 16.21-.587l-15.62 15.62c-4.066-4.714-3.87-11.754.588-16.21zm.587 16.21l15.62-15.62c4.066 4.714 3.87 11.754-.587 16.21-4.456 4.456-11.496 4.652-16.21.587z"/></svg>
+                </div>
+                <div class="column-info">
+                  <div class="column-app-name">Linear</div>
+                  <div class="column-total-time">6m</div>
+                </div>
+              </div>
+              <div class="app-column-content">
+                <!-- 2 PM row -->
+                <div class="column-hour-row"></div>
+                <!-- 3 PM row -->
+                <div class="column-hour-row"></div>
+                <!-- 4 PM row -->
+                <div class="column-hour-row"></div>
+                <!-- 5 PM row -->
+                <div class="column-hour-row">
+                  <div class="activity-bar linear" style="top: 4px; height: 18px;">
+                    <div class="bar-duration">6m</div>
+                  </div>
+                </div>
+                <!-- 6 PM row -->
+                <div class="column-hour-row"></div>
+                <!-- 7 PM row -->
+                <div class="column-hour-row"></div>
+              </div>
+            </div>
+
+          </div><!-- end app-columns-container -->
+
+        </div>
+      </div>
+    </div>
+  </div>
+
+</body>
+</html>

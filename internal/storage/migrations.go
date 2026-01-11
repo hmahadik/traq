@@ -4,7 +4,7 @@ import (
 	"fmt"
 )
 
-const schemaVersion = 3
+const schemaVersion = 5
 
 const schema = `
 -- ============================================================================
@@ -82,6 +82,19 @@ CREATE INDEX IF NOT EXISTS idx_focus_session ON window_focus_events(session_id);
 CREATE INDEX IF NOT EXISTS idx_focus_start ON window_focus_events(start_time);
 CREATE INDEX IF NOT EXISTS idx_focus_app ON window_focus_events(app_name);
 CREATE INDEX IF NOT EXISTS idx_focus_end ON window_focus_events(end_time);
+
+CREATE TABLE IF NOT EXISTS afk_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    start_time INTEGER NOT NULL,
+    end_time INTEGER,
+    session_id INTEGER REFERENCES sessions(id),
+    trigger_type TEXT NOT NULL,
+    created_at INTEGER DEFAULT (strftime('%s', 'now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_afk_start ON afk_events(start_time);
+CREATE INDEX IF NOT EXISTS idx_afk_session ON afk_events(session_id);
+CREATE INDEX IF NOT EXISTS idx_afk_end ON afk_events(end_time);
 
 -- ============================================================================
 -- Extended Data Sources
@@ -252,6 +265,18 @@ func (s *Store) Migrate() error {
 			return fmt.Errorf("failed to apply migration 3: %w", err)
 		}
 	}
+	if currentVersion < 4 {
+		// Migration v4: Add afk_events table
+		if err := s.applyMigration4(); err != nil {
+			return fmt.Errorf("failed to apply migration 4: %w", err)
+		}
+	}
+	if currentVersion < 5 {
+		// Migration v5: Add app_categorization_rules table for timeline v3 grid view
+		if err := s.applyMigration5(); err != nil {
+			return fmt.Errorf("failed to apply migration 5: %w", err)
+		}
+	}
 
 	// Record schema version
 	if currentVersion == 0 {
@@ -315,4 +340,138 @@ func (s *Store) GetSchemaVersion() (int, error) {
 	var version int
 	err := s.db.QueryRow("SELECT COALESCE(MAX(version), 0) FROM schema_version").Scan(&version)
 	return version, err
+}
+
+// applyMigration4 creates the afk_events table.
+func (s *Store) applyMigration4() error {
+	// Check if table already exists
+	var count int
+	err := s.db.QueryRow(`
+		SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='afk_events'
+	`).Scan(&count)
+	if err != nil {
+		return fmt.Errorf("failed to check table existence: %w", err)
+	}
+	if count > 0 {
+		return nil // Table already exists
+	}
+
+	// Create the afk_events table
+	_, err = s.db.Exec(`
+		CREATE TABLE IF NOT EXISTS afk_events (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			start_time INTEGER NOT NULL,
+			end_time INTEGER,
+			session_id INTEGER REFERENCES sessions(id),
+			trigger_type TEXT NOT NULL,
+			created_at INTEGER DEFAULT (strftime('%s', 'now'))
+		);
+		CREATE INDEX IF NOT EXISTS idx_afk_start ON afk_events(start_time);
+		CREATE INDEX IF NOT EXISTS idx_afk_session ON afk_events(session_id);
+		CREATE INDEX IF NOT EXISTS idx_afk_end ON afk_events(end_time);
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to create afk_events table: %w", err)
+	}
+	return nil
+}
+
+// applyMigration5 creates the app_categorization_rules table for timeline v3 grid view.
+func (s *Store) applyMigration5() error {
+	// Check if table already exists
+	var count int
+	err := s.db.QueryRow(`
+		SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='app_categorization_rules'
+	`).Scan(&count)
+	if err != nil {
+		return fmt.Errorf("failed to check table existence: %w", err)
+	}
+	if count > 0 {
+		return nil // Table already exists
+	}
+
+	// Create the app_categorization_rules table
+	_, err = s.db.Exec(`
+		CREATE TABLE IF NOT EXISTS app_categorization_rules (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			app_name TEXT NOT NULL,
+			category TEXT NOT NULL CHECK(category IN ('focus', 'meetings', 'comms', 'other')),
+			is_system_default INTEGER DEFAULT 0,
+			created_at INTEGER DEFAULT (strftime('%s', 'now')),
+			UNIQUE(app_name)
+		);
+		CREATE INDEX IF NOT EXISTS idx_categorization_app ON app_categorization_rules(app_name);
+		CREATE INDEX IF NOT EXISTS idx_categorization_category ON app_categorization_rules(category);
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to create app_categorization_rules table: %w", err)
+	}
+
+	// Seed default categorization rules
+	defaultRules := []struct {
+		appName  string
+		category string
+	}{
+		// Focus apps
+		{"Code", "focus"},
+		{"code", "focus"},
+		{"VSCode", "focus"},
+		{"Visual Studio Code", "focus"},
+		{"Vim", "focus"},
+		{"vim", "focus"},
+		{"Neovim", "focus"},
+		{"nvim", "focus"},
+		{"Terminal", "focus"},
+		{"terminal", "focus"},
+		{"Gnome-terminal", "focus"},
+		{"Konsole", "focus"},
+		{"Alacritty", "focus"},
+		{"iTerm2", "focus"},
+		{"IntelliJ IDEA", "focus"},
+		{"PyCharm", "focus"},
+		{"WebStorm", "focus"},
+		{"Sublime Text", "focus"},
+		{"Atom", "focus"},
+		{"Emacs", "focus"},
+		{"emacs", "focus"},
+
+		// Meetings apps
+		{"Zoom", "meetings"},
+		{"zoom", "meetings"},
+		{"Google Meet", "meetings"},
+		{"meet.google.com", "meetings"},
+		{"Microsoft Teams", "meetings"},
+		{"teams.microsoft.com", "meetings"},
+		{"Calendar", "meetings"},
+		{"calendar.google.com", "meetings"},
+		{"Skype", "meetings"},
+		{"WebEx", "meetings"},
+
+		// Communication apps
+		{"Slack", "comms"},
+		{"slack", "comms"},
+		{"Discord", "comms"},
+		{"discord", "comms"},
+		{"Mail", "comms"},
+		{"Thunderbird", "comms"},
+		{"Gmail", "comms"},
+		{"mail.google.com", "comms"},
+		{"Outlook", "comms"},
+		{"outlook.office.com", "comms"},
+		{"Telegram", "comms"},
+		{"WhatsApp", "comms"},
+		{"Signal", "comms"},
+	}
+
+	for _, rule := range defaultRules {
+		_, err = s.db.Exec(`
+			INSERT OR IGNORE INTO app_categorization_rules (app_name, category, is_system_default, created_at)
+			VALUES (?, ?, 1, strftime('%s', 'now'))
+		`, rule.appName, rule.category)
+		if err != nil {
+			return fmt.Errorf("failed to seed default rule for %s: %w", rule.appName, err)
+		}
+	}
+
+	return nil
 }

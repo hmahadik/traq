@@ -1,0 +1,717 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Traq Timeline v2 - Final Reference Design</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: white;
+      color: #1a1a1a;
+      font-size: 13px;
+    }
+
+    .container {
+      display: flex;
+      height: 100vh;
+      overflow: hidden;
+      gap: 0;
+    }
+
+    /* ============================================
+       LEFT SIDEBAR - Daily Summary Stats
+       ============================================ */
+    .sidebar {
+      width: 280px;
+      background: white;
+      border-right: 1px solid #e5e5e5;
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+      overflow-y: auto;
+    }
+
+    .sidebar-header {
+      padding: 20px;
+      border-bottom: 1px solid #e5e5e5;
+    }
+
+    .sidebar-date {
+      font-size: 12px;
+      color: #999;
+      margin-bottom: 8px;
+    }
+
+    /* Daily Summary Hero - Large Total Hours */
+    .daily-summary-hero {
+      padding: 16px;
+      border-bottom: 1px solid #e5e5e5;
+      text-align: center;
+    }
+
+    .hero-number {
+      font-size: 48px;
+      font-weight: 700;
+      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 4px;
+    }
+
+    .hero-label {
+      font-size: 11px;
+      color: #999;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    /* Summary Stats Rows */
+    .summary-stats {
+      padding: 16px;
+      border-bottom: 1px solid #e5e5e5;
+    }
+
+    .stat-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 10px 0;
+      border-bottom: 1px solid #f0f0f0;
+      font-size: 12px;
+    }
+
+    .stat-row:last-child {
+      border-bottom: none;
+    }
+
+    .stat-label {
+      color: #666;
+    }
+
+    .stat-value {
+      font-weight: 500;
+      color: #1a1a1a;
+    }
+
+    /* Breakdown Bar */
+    .breakdown-section {
+      padding: 16px;
+      border-bottom: 1px solid #e5e5e5;
+    }
+
+    .breakdown-bar {
+      display: flex;
+      height: 6px;
+      border-radius: 3px;
+      overflow: hidden;
+      margin-bottom: 12px;
+      gap: 0;
+    }
+
+    .segment {
+      flex: 1;
+      min-width: 1px;
+    }
+
+    .segment.focus { background: #22c55e; }
+    .segment.meetings { background: #3b82f6; }
+    .segment.comms { background: #a855f7; }
+    .segment.other { background: #d1d5db; }
+
+    .breakdown-legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      font-size: 10px;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      color: #666;
+    }
+
+    .legend-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 2px;
+      flex-shrink: 0;
+    }
+
+    /* Top Apps Section */
+    .top-apps-section {
+      padding: 16px;
+      border-bottom: 1px solid #e5e5e5;
+    }
+
+    .section-title {
+      font-size: 10px;
+      color: #999;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 10px;
+      font-weight: 600;
+    }
+
+    .app-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 0;
+    }
+
+    .app-icon {
+      width: 20px;
+      height: 20px;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 9px;
+      font-weight: 600;
+      color: white;
+      flex-shrink: 0;
+    }
+
+    .app-icon.vs { background: #10b981; }
+    .app-icon.slack { background: #611f69; }
+    .app-icon.chrome { background: #3b82f6; }
+    .app-icon.gmail { background: #ea4335; }
+
+    .app-name {
+      font-size: 12px;
+      font-weight: 500;
+      color: #1a1a1a;
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .app-time {
+      font-size: 10px;
+      color: #999;
+    }
+
+    /* Activity Cards Section */
+    .cards-section {
+      padding: 16px;
+      flex: 1;
+      overflow-y: auto;
+    }
+
+    .activity-card {
+      border-radius: 8px;
+      padding: 12px 16px;
+      margin-bottom: 12px;
+      color: white;
+      font-weight: 600;
+      font-size: 12px;
+      cursor: pointer;
+      transition: transform 0.2s;
+    }
+
+    .activity-card:hover {
+      transform: translateY(-2px);
+    }
+
+    .activity-card.focus { background: #22c55e; }
+    .activity-card.meetings { background: #3b82f6; }
+    .activity-card.comms { background: #a855f7; }
+
+    .activity-card-title {
+      display: block;
+      margin-bottom: 2px;
+    }
+
+    .activity-card-time {
+      font-size: 10px;
+      opacity: 0.9;
+    }
+
+    /* ============================================
+       MAIN TIMELINE GRID
+       ============================================ */
+    .timeline-area {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      background: white;
+    }
+
+    /* Header with title and controls */
+    .timeline-header {
+      padding: 16px;
+      border-bottom: 1px solid #e5e5e5;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .header-title {
+      font-size: 18px;
+      font-weight: 600;
+    }
+
+    .view-toggle {
+      display: flex;
+      gap: 4px;
+      background: #f3f3f3;
+      padding: 4px;
+      border-radius: 6px;
+    }
+
+    .toggle-btn {
+      padding: 6px 12px;
+      border: none;
+      background: white;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 500;
+      color: #666;
+    }
+
+    .toggle-btn.active {
+      background: white;
+      color: #1a1a1a;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+
+    /* Grid Container */
+    .timeline-grid-container {
+      flex: 1;
+      display: flex;
+      overflow: hidden;
+    }
+
+    /* Hour Axis - Sticky */
+    .hour-axis {
+      width: 50px;
+      flex-shrink: 0;
+      background: white;
+      border-right: 1px solid #e5e5e5;
+      display: flex;
+      flex-direction: column;
+      position: sticky;
+      left: 0;
+      z-index: 20;
+      overflow: hidden;
+    }
+
+    .hour-marker {
+      height: 60px;
+      display: flex;
+      align-items: flex-start;
+      justify-content: flex-end;
+      padding: 2px 8px 0 0;
+      font-size: 11px;
+      color: #999;
+      font-weight: 500;
+      border-bottom: 1px solid #f0f0f0;
+      position: relative;
+    }
+
+    .hour-label {
+      position: absolute;
+      top: -7px;
+      right: 8px;
+    }
+
+    /* Main Timeline Scrollable Area */
+    .timeline-scroll {
+      flex: 1;
+      overflow-y: auto;
+      overflow-x: auto;
+      position: relative;
+      background: white;
+    }
+
+    .timeline-content {
+      position: relative;
+      min-width: 100%;
+    }
+
+    /* Grid Lines */
+    .grid-lines {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      pointer-events: none;
+    }
+
+    .grid-line {
+      position: absolute;
+      left: 0;
+      right: 0;
+      height: 1px;
+      background: #f0f0f0;
+    }
+
+    /* Activities Container */
+    .activities-container {
+      position: relative;
+      padding: 16px;
+      padding-left: 16px;
+    }
+
+    /* Activity Block - Parent Container */
+    .activity-block {
+      position: absolute;
+      display: flex;
+      align-items: flex-start;
+      gap: 0;
+      cursor: pointer;
+      transition: transform 0.15s, box-shadow 0.15s;
+    }
+
+    .activity-block:hover {
+      transform: scale(1.05);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      z-index: 10;
+    }
+
+    /* Activity Bar - Child Element (Skinny Vertical) */
+    .activity-bar {
+      width: 28px;
+      border-radius: 6px;
+      flex-shrink: 0;
+      opacity: 0.9;
+      transition: opacity 0.15s;
+    }
+
+    .activity-block:hover .activity-bar {
+      opacity: 1;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    }
+
+    /* Activity Info - Child Element */
+    .activity-info {
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-start;
+      padding-left: 12px;
+      padding-top: 0;
+    }
+
+    .activity-icon {
+      width: 24px;
+      height: 24px;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      font-weight: 600;
+      color: white;
+      margin-bottom: 4px;
+      flex-shrink: 0;
+    }
+
+    .activity-title {
+      font-weight: 500;
+      font-size: 12px;
+      color: #1a1a1a;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 120px;
+    }
+
+    .activity-duration {
+      font-size: 11px;
+      color: #999;
+      margin-top: 2px;
+    }
+
+    /* Activity Icon Only - For short activities */
+    .activity-icon-only {
+      position: absolute;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: white;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: transform 0.15s, box-shadow 0.15s;
+    }
+
+    .activity-icon-only:hover {
+      transform: scale(1.2);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+      z-index: 10;
+    }
+
+    .icon-badge {
+      width: 20px;
+      height: 20px;
+      border-radius: 3px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 9px;
+      font-weight: 600;
+      color: white;
+    }
+
+    /* Color Classes */
+    .bar-vscode { background: linear-gradient(180deg, #10b981 0%, #059669 100%); }
+    .bar-slack { background: linear-gradient(180deg, #611f69 0%, #4a1555 100%); }
+    .bar-chrome { background: linear-gradient(180deg, #3b82f6 0%, #2563eb 100%); }
+    .bar-gmail { background: linear-gradient(180deg, #ea4335 0%, #d32f2f 100%); }
+
+    /* Scrollbar Styling */
+    .sidebar::-webkit-scrollbar,
+    .timeline-scroll::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    .sidebar::-webkit-scrollbar-track,
+    .timeline-scroll::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    .sidebar::-webkit-scrollbar-thumb,
+    .timeline-scroll::-webkit-scrollbar-thumb {
+      background: #d1d5db;
+      border-radius: 3px;
+    }
+
+    .sidebar::-webkit-scrollbar-thumb:hover,
+    .timeline-scroll::-webkit-scrollbar-thumb:hover {
+      background: #9ca3af;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- LEFT SIDEBAR -->
+    <div class="sidebar">
+      <div class="sidebar-header">
+        <div class="sidebar-date">Friday, January 10th</div>
+      </div>
+
+      <!-- Hero - Total Hours -->
+      <div class="daily-summary-hero">
+        <div class="hero-number">6h 42m</div>
+        <div class="hero-label">Total Time</div>
+      </div>
+
+      <!-- Summary Stats -->
+      <div class="summary-stats">
+        <div class="stat-row">
+          <span class="stat-label">Day Span</span>
+          <span class="stat-value">8:00 AM - 10:00 PM</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-label">Breaks</span>
+          <span class="stat-value">3x</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-label">Longest Focus</span>
+          <span class="stat-value">2h 20m</span>
+        </div>
+      </div>
+
+      <!-- Breakdown Bar -->
+      <div class="breakdown-section">
+        <div class="breakdown-bar">
+          <div class="segment focus" style="flex: 3.5;"></div>
+          <div class="segment meetings" style="flex: 2;"></div>
+          <div class="segment comms" style="flex: 1.5;"></div>
+          <div class="segment other" style="flex: 0.5;"></div>
+        </div>
+        <div class="breakdown-legend">
+          <div class="legend-item">
+            <span class="legend-dot focus"></span>
+            <span>Focus 3h 24m</span>
+          </div>
+          <div class="legend-item">
+            <span class="legend-dot meetings"></span>
+            <span>Meetings 2h 10m</span>
+          </div>
+          <div class="legend-item">
+            <span class="legend-dot comms"></span>
+            <span>Comms 1h 8m</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Top Apps -->
+      <div class="top-apps-section">
+        <div class="section-title">Top Apps</div>
+        <div class="app-item">
+          <div class="app-icon vs">VS</div>
+          <div class="app-name">Visual Studio Code</div>
+          <div class="app-time">3h 24m</div>
+        </div>
+        <div class="app-item">
+          <div class="app-icon slack">S</div>
+          <div class="app-name">Slack</div>
+          <div class="app-time">2h 10m</div>
+        </div>
+        <div class="app-item">
+          <div class="app-icon chrome">C</div>
+          <div class="app-name">Chrome</div>
+          <div class="app-time">28m</div>
+        </div>
+      </div>
+
+      <!-- Activity Cards -->
+      <div class="cards-section">
+        <div class="section-title">Activities</div>
+        <div class="activity-card focus">
+          <span class="activity-card-title">Feature Development</span>
+          <span class="activity-card-time">3h 24m</span>
+        </div>
+        <div class="activity-card meetings">
+          <span class="activity-card-title">Team Standup</span>
+          <span class="activity-card-time">45m</span>
+        </div>
+        <div class="activity-card comms">
+          <span class="activity-card-title">Slack Messages</span>
+          <span class="activity-card-time">1h 8m</span>
+        </div>
+        <div class="activity-card focus">
+          <span class="activity-card-title">Code Review</span>
+          <span class="activity-card-time">52m</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- MAIN TIMELINE AREA -->
+    <div class="timeline-area">
+      <!-- Header -->
+      <div class="timeline-header">
+        <div class="header-title">Today's Timeline</div>
+        <div class="view-toggle">
+          <button class="toggle-btn active">Timeline</button>
+          <button class="toggle-btn">List</button>
+        </div>
+      </div>
+
+      <!-- Grid Container -->
+      <div class="timeline-grid-container">
+        <!-- Hour Axis (Sticky) -->
+        <div class="hour-axis">
+          <div class="hour-marker"><span class="hour-label">2 PM</span></div>
+          <div class="hour-marker"><span class="hour-label">3 PM</span></div>
+          <div class="hour-marker"><span class="hour-label">4 PM</span></div>
+          <div class="hour-marker"><span class="hour-label">5 PM</span></div>
+          <div class="hour-marker"><span class="hour-label">6 PM</span></div>
+          <div class="hour-marker"><span class="hour-label">7 PM</span></div>
+          <div class="hour-marker"><span class="hour-label">8 PM</span></div>
+          <div class="hour-marker"><span class="hour-label">9 PM</span></div>
+          <div class="hour-marker"><span class="hour-label">10 PM</span></div>
+          <div class="hour-marker"><span class="hour-label">11 PM</span></div>
+          <div class="hour-marker"><span class="hour-label">12 AM</span></div>
+          <div class="hour-marker"><span class="hour-label">1 AM</span></div>
+        </div>
+
+        <!-- Main Timeline Scroll Area -->
+        <div class="timeline-scroll">
+          <div class="timeline-content" style="height: 720px; position: relative;">
+            <!-- Grid Lines -->
+            <div class="grid-lines" style="height: 720px;">
+              <div class="grid-line" style="top: 0px;"></div>
+              <div class="grid-line" style="top: 60px;"></div>
+              <div class="grid-line" style="top: 120px;"></div>
+              <div class="grid-line" style="top: 180px;"></div>
+              <div class="grid-line" style="top: 240px;"></div>
+              <div class="grid-line" style="top: 300px;"></div>
+              <div class="grid-line" style="top: 360px;"></div>
+              <div class="grid-line" style="top: 420px;"></div>
+              <div class="grid-line" style="top: 480px;"></div>
+              <div class="grid-line" style="top: 540px;"></div>
+              <div class="grid-line" style="top: 600px;"></div>
+              <div class="grid-line" style="top: 660px;"></div>
+            </div>
+
+            <!-- Activities Container -->
+            <div class="activities-container" style="height: 720px;">
+              <!-- Activity 1: VS Code 2:00 PM - 4:20 PM (140px) -->
+              <div class="activity-block" style="left: 0; top: 0;">
+                <div class="activity-bar bar-vscode" style="height: 140px;"></div>
+                <div class="activity-info">
+                  <div class="activity-icon" style="background: #10b981;">VS</div>
+                  <div class="activity-title">Visual Studio Code</div>
+                  <div class="activity-duration">2h 20m</div>
+                </div>
+              </div>
+
+              <!-- Activity 2: Slack 2:00 PM - 2:28 PM (28px) - Overlaps, offset left 40px -->
+              <div class="activity-block" style="left: 40px; top: 0;">
+                <div class="activity-bar bar-slack" style="height: 28px;"></div>
+                <div class="activity-info">
+                  <div class="activity-icon" style="background: #611f69;">S</div>
+                  <div class="activity-title">Slack</div>
+                  <div class="activity-duration">28m</div>
+                </div>
+              </div>
+
+              <!-- Activity 3: Gmail 2:10 PM - 2:12 PM (12px) - Very short, icon-only -->
+              <div class="activity-icon-only" style="left: 92px; top: 10px;">
+                <div class="icon-badge" style="background: #ea4335;">G</div>
+              </div>
+
+              <!-- Activity 4: Slack 3:45 PM - 5:00 PM (75px) - offset left 40px -->
+              <div class="activity-block" style="left: 40px; top: 225px;">
+                <div class="activity-bar bar-slack" style="height: 75px;"></div>
+                <div class="activity-info">
+                  <div class="activity-icon" style="background: #611f69;">S</div>
+                  <div class="activity-title">Slack Chat</div>
+                  <div class="activity-duration">1h 15m</div>
+                </div>
+              </div>
+
+              <!-- Activity 5: Chrome 4:15 PM - 5:30 PM (75px) - offset left 92px -->
+              <div class="activity-block" style="left: 92px; top: 255px;">
+                <div class="activity-bar bar-chrome" style="height: 75px;"></div>
+                <div class="activity-info">
+                  <div class="activity-icon" style="background: #3b82f6;">C</div>
+                  <div class="activity-title">Chrome Browser</div>
+                  <div class="activity-duration">1h 15m</div>
+                </div>
+              </div>
+
+              <!-- Activity 6: VS Code 5:30 PM - 7:15 PM (105px) -->
+              <div class="activity-block" style="left: 0; top: 330px;">
+                <div class="activity-bar bar-vscode" style="height: 105px;"></div>
+                <div class="activity-info">
+                  <div class="activity-icon" style="background: #10b981;">VS</div>
+                  <div class="activity-title">VS Code - Coding</div>
+                  <div class="activity-duration">1h 45m</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Demo note - showing layout only
+    console.log('Timeline layout demo - showing sidebar + unified grid with vertical bars');
+    console.log('Key features:');
+    console.log('- Overlapping activities positioned side-by-side (left offset: 0px, 40px, 92px, etc.)');
+    console.log('- NO "Memories" column - unified timeline only');
+    console.log('- 60px = 1 hour');
+    console.log('- 28px wide activity bars');
+    console.log('- Icon-only markers for activities < 20px');
+  </script>
+</body>
+</html>

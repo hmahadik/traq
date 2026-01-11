@@ -148,6 +148,38 @@ export namespace service {
 	        this.minSessionMinutes = source["minSessionMinutes"];
 	    }
 	}
+	export class ActivityBlock {
+	    id: number;
+	    windowTitle: string;
+	    appName: string;
+	    startTime: number;
+	    endTime: number;
+	    durationSeconds: number;
+	    category: string;
+	    hourOffset: number;
+	    minuteOffset: number;
+	    pixelPosition: number;
+	    pixelHeight: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new ActivityBlock(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.windowTitle = source["windowTitle"];
+	        this.appName = source["appName"];
+	        this.startTime = source["startTime"];
+	        this.endTime = source["endTime"];
+	        this.durationSeconds = source["durationSeconds"];
+	        this.category = source["category"];
+	        this.hourOffset = source["hourOffset"];
+	        this.minuteOffset = source["minuteOffset"];
+	        this.pixelPosition = source["pixelPosition"];
+	        this.pixelHeight = source["pixelHeight"];
+	    }
+	}
 	export class AppUsage {
 	    appName: string;
 	    durationSeconds: number;
@@ -917,6 +949,66 @@ export namespace service {
 		}
 	}
 	
+	export class DaySpan {
+	    startTime: number;
+	    endTime: number;
+	    spanHours: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new DaySpan(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.startTime = source["startTime"];
+	        this.endTime = source["endTime"];
+	        this.spanHours = source["spanHours"];
+	    }
+	}
+	export class DayStats {
+	    totalSeconds: number;
+	    totalHours: number;
+	    breakCount: number;
+	    breakDuration: number;
+	    longestFocus: number;
+	    daySpan?: DaySpan;
+	    breakdown: Record<string, number>;
+	    breakdownPercent: Record<string, number>;
+	
+	    static createFrom(source: any = {}) {
+	        return new DayStats(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.totalSeconds = source["totalSeconds"];
+	        this.totalHours = source["totalHours"];
+	        this.breakCount = source["breakCount"];
+	        this.breakDuration = source["breakDuration"];
+	        this.longestFocus = source["longestFocus"];
+	        this.daySpan = this.convertValues(source["daySpan"], DaySpan);
+	        this.breakdown = source["breakdown"];
+	        this.breakdownPercent = source["breakdownPercent"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	
 	
 	
@@ -1228,6 +1320,56 @@ export namespace service {
 	        this.hasBrowser = source["hasBrowser"];
 	    }
 	}
+	export class SessionSummaryWithPosition {
+	    id: number;
+	    startTime: number;
+	    endTime?: number;
+	    durationSeconds?: number;
+	    isOngoing: boolean;
+	    screenshotCount: number;
+	    summary: string;
+	    explanation: string;
+	    confidence: string;
+	    tags: string[];
+	    topApps: string[];
+	    hasShell: boolean;
+	    hasGit: boolean;
+	    hasFiles: boolean;
+	    hasBrowser: boolean;
+	    hourOffset: number;
+	    minuteOffset: number;
+	    pixelPosition: number;
+	    pixelHeight: number;
+	    category: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new SessionSummaryWithPosition(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.startTime = source["startTime"];
+	        this.endTime = source["endTime"];
+	        this.durationSeconds = source["durationSeconds"];
+	        this.isOngoing = source["isOngoing"];
+	        this.screenshotCount = source["screenshotCount"];
+	        this.summary = source["summary"];
+	        this.explanation = source["explanation"];
+	        this.confidence = source["confidence"];
+	        this.tags = source["tags"];
+	        this.topApps = source["topApps"];
+	        this.hasShell = source["hasShell"];
+	        this.hasGit = source["hasGit"];
+	        this.hasFiles = source["hasFiles"];
+	        this.hasBrowser = source["hasBrowser"];
+	        this.hourOffset = source["hourOffset"];
+	        this.minuteOffset = source["minuteOffset"];
+	        this.pixelPosition = source["pixelPosition"];
+	        this.pixelHeight = source["pixelHeight"];
+	        this.category = source["category"];
+	    }
+	}
 	
 	
 	export class StorageStats {
@@ -1297,6 +1439,63 @@ export namespace service {
 	        this.label = source["label"];
 	    }
 	}
+	export class TopApp {
+	    appName: string;
+	    duration: number;
+	    category: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new TopApp(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.appName = source["appName"];
+	        this.duration = source["duration"];
+	        this.category = source["category"];
+	    }
+	}
+	export class TimelineGridData {
+	    date: string;
+	    dayStats?: DayStats;
+	    topApps: TopApp[];
+	    hourlyGrid: Record<number, any>;
+	    sessionSummaries: SessionSummaryWithPosition[];
+	    categories: Record<string, string>;
+	
+	    static createFrom(source: any = {}) {
+	        return new TimelineGridData(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.date = source["date"];
+	        this.dayStats = this.convertValues(source["dayStats"], DayStats);
+	        this.topApps = this.convertValues(source["topApps"], TopApp);
+	        this.hourlyGrid = source["hourlyGrid"];
+	        this.sessionSummaries = this.convertValues(source["sessionSummaries"], SessionSummaryWithPosition);
+	        this.categories = source["categories"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
 	
 	
 	
@@ -1519,6 +1718,26 @@ export namespace storage {
 		    }
 		    return a;
 		}
+	}
+	export class CategorizationRule {
+	    id: number;
+	    appName: string;
+	    category: string;
+	    isSystemDefault: boolean;
+	    createdAt: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new CategorizationRule(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.appName = source["appName"];
+	        this.category = source["category"];
+	        this.isSystemDefault = source["isSystemDefault"];
+	        this.createdAt = source["createdAt"];
+	    }
 	}
 	export class FileEvent {
 	    id: number;

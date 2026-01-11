@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Traq Timeline - Correct Layout</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #ffffff;
+      color: #1a1a1a;
+      font-size: 14px;
+    }
+
+    .container {
+      display: flex;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    /* Hour column */
+    .hour-column {
+      width: 60px;
+      flex-shrink: 0;
+      background: #f9fafb;
+      padding: 10px 0;
+      display: flex;
+      flex-direction: column;
+      border-right: 1px solid #e5e7eb;
+    }
+
+    .hour-marker {
+      height: 80px;
+      display: flex;
+      align-items: flex-start;
+      justify-content: flex-end;
+      padding-right: 12px;
+      font-size: 13px;
+      color: #9ca3af;
+      font-weight: 400;
+    }
+
+    /* Activity Detail Area */
+    .activity-area {
+      flex: 1;
+      position: relative;
+      overflow: auto;
+      padding: 10px 20px;
+      display: flex;
+      gap: 20px;
+    }
+
+    /* ===== APP COLUMN ===== */
+    .app-column {
+      position: relative;
+      width: 200px;
+      flex-shrink: 0;
+    }
+
+    .app-column.vscode .bar {
+      background: #eff6ff;
+    }
+
+    .app-column.slack .bar {
+      background: #fff1f2;
+    }
+
+    .app-column.linear .bar {
+      background: #f5f3ff;
+    }
+
+    /* ===== ACTIVITY ITEM ===== */
+    .activity-item {
+      position: absolute;
+      left: 0;
+      display: flex;
+      gap: 8px;
+      align-items: flex-start;
+    }
+
+    /* Skinny vertical bar */
+    .activity-item .bar {
+      width: 24px;
+      border-radius: 4px;
+      flex-shrink: 0;
+    }
+
+    /* Text label */
+    .activity-item .label {
+      padding-top: 2px;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .activity-item .app-name {
+      font-size: 13px;
+      font-weight: 500;
+      color: #1f2937;
+      line-height: 1.2;
+    }
+
+    .activity-item .app-duration {
+      font-size: 12px;
+      color: #6b7280;
+      line-height: 1.2;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <!-- Hour Column -->
+    <div class="hour-column">
+      <div class="hour-marker">2 PM</div>
+      <div class="hour-marker">3 PM</div>
+      <div class="hour-marker">4 PM</div>
+      <div class="hour-marker">5 PM</div>
+      <div class="hour-marker">6 PM</div>
+      <div class="hour-marker">7 PM</div>
+    </div>
+
+    <!-- Activity Area with App Columns -->
+    <div class="activity-area">
+
+      <!-- VS CODE COLUMN -->
+      <div class="app-column vscode">
+        <!-- 2 PM: VS Code (28m) - 28 minutes = ~37px height -->
+        <div class="activity-item" style="top: 0px;">
+          <div class="bar" style="height: 37px;"></div>
+          <div class="label">
+            <div class="app-name">VS Code</div>
+            <div class="app-duration">28m</div>
+          </div>
+        </div>
+
+        <!-- 2:30 PM: VS Code (2h 20m) - 140 minutes = ~187px height, spanning across 3 hours -->
+        <div class="activity-item" style="top: 40px;">
+          <div class="bar" style="height: 187px;"></div>
+          <div class="label">
+            <div class="app-name">VS Code</div>
+            <div class="app-duration">2h 20m</div>
+          </div>
+        </div>
+
+        <!-- 5 PM: VS Code (59m) - 59 minutes = ~79px height -->
+        <div class="activity-item" style="top: 330px;">
+          <div class="bar" style="height: 79px;"></div>
+          <div class="label">
+            <div class="app-name">VS Code</div>
+            <div class="app-duration">59m</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SLACK COLUMN -->
+      <div class="app-column slack">
+        <!-- 2 PM: Slack (9m) - 9 minutes = ~12px height -->
+        <div class="activity-item" style="top: 15px;">
+          <div class="bar" style="height: 12px;"></div>
+          <div class="label">
+            <div class="app-name">Slack</div>
+            <div class="app-duration">9m</div>
+          </div>
+        </div>
+
+        <!-- 3 PM: Slack (10m) - 10 minutes = ~13px height -->
+        <div class="activity-item" style="top: 90px;">
+          <div class="bar" style="height: 13px;"></div>
+          <div class="label">
+            <div class="app-name">Slack</div>
+            <div class="app-duration">10m</div>
+          </div>
+        </div>
+
+        <!-- 3:20 PM: Slack (16m) - 16 minutes = ~21px height -->
+        <div class="activity-item" style="top: 110px;">
+          <div class="bar" style="height: 21px;"></div>
+          <div class="label">
+            <div class="app-name">Slack</div>
+            <div class="app-duration">16m</div>
+          </div>
+        </div>
+
+        <!-- 4 PM: Slack (1h 14m) - 74 minutes = ~99px height, spanning across 2 hours -->
+        <div class="activity-item" style="top: 165px;">
+          <div class="bar" style="height: 99px;"></div>
+          <div class="label">
+            <div class="app-name">Slack</div>
+            <div class="app-duration">1h 14m</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- LINEAR COLUMN -->
+      <div class="app-column linear">
+        <!-- 5 PM: Linear (6m) - 6 minutes = ~8px height -->
+        <div class="activity-item" style="top: 330px;">
+          <div class="bar" style="height: 8px;"></div>
+          <div class="label">
+            <div class="app-name">Linear</div>
+            <div class="app-duration">6m</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+</body>
+</html>

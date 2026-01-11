@@ -457,6 +457,20 @@ func (a *App) GetSessionsForDate(date string) (result []*service.SessionSummary,
 	return a.Timeline.GetSessionsForDate(date)
 }
 
+// GetTimelineGridData returns all data for the v3 timeline grid view.
+func (a *App) GetTimelineGridData(date string) (result *service.TimelineGridData, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			result = nil
+			err = fmt.Errorf("internal error: %v", r)
+		}
+	}()
+	if a == nil || !a.ready || a.Timeline == nil {
+		return nil, nil
+	}
+	return a.Timeline.GetTimelineGridData(date)
+}
+
 // GetScreenshotsForSession returns paginated screenshots for a session.
 func (a *App) GetScreenshotsForSession(sessionID int64, page, perPage int) (*service.ScreenshotPage, error) {
 	if a.Timeline == nil {
@@ -510,6 +524,28 @@ func (a *App) DeleteSession(sessionID int64) error {
 	}
 	return a.store.DeleteSession(sessionID)
 }
+
+// GetTimelineEventsForDate returns all timeline events for a specific date.
+// TODO: This is a stub that needs to be properly implemented
+// func (a *App) GetTimelineEventsForDate(date string, eventTypes []string) (result *service.TimelineResponse, err error) {
+// 	defer func() {
+// 		if r := recover(); r != nil {
+// 			result = nil
+// 			err = fmt.Errorf("internal error: %v", r)
+// 		}
+// 	}()
+// 	if a == nil || !a.ready || a.Timeline == nil {
+// 		return nil, nil
+// 	}
+//
+// 	// Convert string event types to service EventType
+// 	var serviceEventTypes []service.EventType
+// 	for _, eventType := range eventTypes {
+// 		serviceEventTypes = append(serviceEventTypes, service.EventType(eventType))
+// 	}
+//
+// 	return a.Timeline.GetTimelineEventsForDate(date, serviceEventTypes)
+// }
 
 // ============================================================================
 // Screenshot Methods (exposed to frontend)
@@ -696,6 +732,30 @@ func (a *App) OptimizeDatabase() (int64, error) {
 		return 0, fmt.Errorf("config service not initialized")
 	}
 	return a.Config.OptimizeDatabase()
+}
+
+// GetCategorizationRules retrieves all app categorization rules.
+func (a *App) GetCategorizationRules() ([]storage.CategorizationRule, error) {
+	if a.store == nil {
+		return nil, fmt.Errorf("store not initialized")
+	}
+	return a.store.GetCategorizationRules()
+}
+
+// SetAppTimelineCategory creates or updates a timeline v3 categorization rule for an app.
+func (a *App) SetAppTimelineCategory(appName, category string) error {
+	if a.store == nil {
+		return fmt.Errorf("store not initialized")
+	}
+	return a.store.SetAppTimelineCategory(appName, category)
+}
+
+// DeleteTimelineCategoryRule deletes a timeline v3 categorization rule for an app.
+func (a *App) DeleteTimelineCategoryRule(appName string) error {
+	if a.store == nil {
+		return fmt.Errorf("store not initialized")
+	}
+	return a.store.DeleteTimelineCategoryRule(appName)
 }
 
 // ============================================================================

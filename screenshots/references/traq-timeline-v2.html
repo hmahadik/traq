@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Traq Timeline v2 - Timely Style</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f5f5f7;
+      color: #1a1a1a;
+      font-size: 13px;
+    }
+
+    .container {
+      display: flex;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    /* ===== LEFT SIDEBAR ===== */
+    .sidebar {
+      width: 340px;
+      background: white;
+      border-right: 1px solid #e5e5e5;
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+    }
+
+    .sidebar-header {
+      padding: 20px;
+      border-bottom: 1px solid #e5e5e5;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+    }
+
+    .sidebar-header .date-info h2 {
+      font-size: 14px;
+      font-weight: 400;
+      color: #666;
+      margin-bottom: 4px;
+    }
+
+    .sidebar-header .date-info .total {
+      font-size: 28px;
+      font-weight: 600;
+    }
+
+    .show-memories {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      color: #00a99d;
+      font-size: 12px;
+      cursor: pointer;
+    }
+
+    /* Entry Cards */
+    .entries {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px;
+    }
+
+    .entry-card {
+      border-radius: 8px;
+      padding: 12px 16px;
+      margin-bottom: 12px;
+      color: white;
+    }
+
+    .entry-card .title {
+      font-weight: 600;
+      font-size: 14px;
+      margin-bottom: 2px;
+    }
+
+    .entry-card .subtitle {
+      font-size: 12px;
+      opacity: 0.8;
+    }
+
+    .entry-card .duration {
+      font-size: 20px;
+      font-weight: 600;
+      margin-top: 8px;
+    }
+
+    .entry-card.teal { background: #00a99d; }
+    .entry-card.purple { background: #6366f1; }
+    .entry-card.cyan { background: #22d3ee; }
+
+    /* ===== MAIN TIMELINE ===== */
+    .timeline-area {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      background: white;
+    }
+
+    .timeline-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 24px;
+      border-bottom: 1px solid #e5e5e5;
+    }
+
+    .timeline-header h1 {
+      font-size: 18px;
+      font-weight: 500;
+    }
+
+    .view-toggle {
+      display: flex;
+      background: #f0f0f0;
+      border-radius: 6px;
+      padding: 2px;
+    }
+
+    .view-toggle button {
+      padding: 6px 16px;
+      border: none;
+      background: transparent;
+      color: #666;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 13px;
+    }
+
+    .view-toggle button.active {
+      background: #1a1a1a;
+      color: white;
+    }
+
+    /* Timeline Grid */
+    .timeline-scroll {
+      flex: 1;
+      overflow-y: auto;
+      padding: 0 24px;
+      background: white;
+    }
+
+    .timeline-grid {
+      display: flex;
+      position: relative;
+      min-height: 720px; /* 12 hours * 60px */
+    }
+
+    /* Hour labels */
+    .hour-labels {
+      width: 50px;
+      flex-shrink: 0;
+      position: relative;
+    }
+
+    .hour-label {
+      position: absolute;
+      right: 12px;
+      font-size: 13px;
+      color: #999;
+      font-weight: 500;
+      transform: translateY(-50%);
+    }
+
+    /* Hour grid lines */
+    .hour-lines {
+      position: absolute;
+      left: 50px;
+      right: 0;
+      top: 0;
+      bottom: 0;
+      pointer-events: none;
+    }
+
+    .hour-line {
+      position: absolute;
+      left: 0;
+      right: 0;
+      height: 1px;
+      background: #f0f0f0;
+    }
+
+    /* Activity lanes container */
+    .lanes-container {
+      flex: 1;
+      position: relative;
+      margin-left: 16px;
+    }
+
+    /* ===== ACTIVITY BLOCKS ===== */
+    .activity-block {
+      position: absolute;
+      display: flex;
+      align-items: flex-start;
+      gap: 0;
+    }
+
+    /* The skinny bar (left child) */
+    .activity-bar {
+      position: relative;
+      width: 28px;
+      border-radius: 6px;
+      flex-shrink: 0;
+      transition: transform 0.15s, box-shadow 0.15s;
+      cursor: pointer;
+    }
+
+    .activity-bar:hover {
+      transform: scale(1.05);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      z-index: 10;
+    }
+
+    /* Activity info (right child) */
+    .activity-info {
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-start;
+      padding-left: 12px;
+      padding-top: 0;
+    }
+
+    .activity-icon {
+      width: 24px;
+      height: 24px;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      font-weight: 600;
+      color: white;
+      margin-bottom: 4px;
+    }
+
+    .activity-title {
+      font-weight: 500;
+      font-size: 12px;
+      color: #1a1a1a;
+      white-space: nowrap;
+    }
+
+    .activity-duration {
+      font-size: 11px;
+      color: #999;
+      margin-top: 2px;
+    }
+
+    /* Bar colors */
+    .bar-green { background: linear-gradient(180deg, #10b981 0%, #059669 100%); }
+    .bar-blue { background: linear-gradient(180deg, #3b82f6 0%, #2563eb 100%); }
+    .bar-purple { background: linear-gradient(180deg, #8b5cf6 0%, #7c3aed 100%); }
+    .bar-teal { background: linear-gradient(180deg, #14b8a6 0%, #0d9488 100%); }
+    .bar-orange { background: linear-gradient(180deg, #f97316 0%, #ea580c 100%); }
+    .bar-gray { background: linear-gradient(180deg, #6b7280 0%, #4b5563 100%); }
+
+    /* Small icon markers for very short activities */
+    .activity-icon-only {
+      position: absolute;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: white;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: transform 0.15s;
+    }
+
+    .activity-icon-only:hover {
+      transform: scale(1.2);
+      z-index: 10;
+    }
+
+    .activity-icon-only .icon {
+      width: 20px;
+      height: 20px;
+      border-radius: 3px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 9px;
+      font-weight: 600;
+      color: white;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <!-- LEFT SIDEBAR -->
+    <div class="sidebar">
+      <div class="sidebar-header">
+        <div class="date-info">
+          <h2>Friday, January 10th</h2>
+          <div class="total">6h 42m</div>
+        </div>
+        <div class="show-memories">
+          <span>👁</span> Show memories
+        </div>
+      </div>
+
+      <div class="entries">
+        <div class="entry-card teal">
+          <div class="title">Feature Development</div>
+          <div class="subtitle">Engineering</div>
+          <div class="duration">3:24</div>
+        </div>
+
+        <div class="entry-card purple">
+          <div class="title">Meetings</div>
+          <div class="subtitle">Engineering</div>
+          <div class="duration">2:10</div>
+        </div>
+
+        <div class="entry-card cyan">
+          <div class="title">Communication</div>
+          <div class="subtitle">Slack / Email</div>
+          <div class="duration">1:08</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MAIN TIMELINE -->
+    <div class="timeline-area">
+      <div class="timeline-header">
+        <h1>Today's memories</h1>
+        <div style="display: flex; align-items: center; gap: 16px;">
+          <div class="view-toggle">
+            <button>List</button>
+            <button class="active">Timeline</button>
+          </div>
+          <button style="background: none; border: 1px solid #ddd; border-radius: 6px; padding: 6px 10px; cursor: pointer;">🔍</button>
+        </div>
+      </div>
+
+      <div class="timeline-scroll">
+        <div class="timeline-grid" style="height: 720px;">
+
+          <!-- Hour labels -->
+          <div class="hour-labels">
+            <div class="hour-label" style="top: 0px;">2 PM</div>
+            <div class="hour-label" style="top: 60px;">3 PM</div>
+            <div class="hour-label" style="top: 120px;">4 PM</div>
+            <div class="hour-label" style="top: 180px;">5 PM</div>
+            <div class="hour-label" style="top: 240px;">6 PM</div>
+            <div class="hour-label" style="top: 300px;">7 PM</div>
+            <div class="hour-label" style="top: 360px;">8 PM</div>
+            <div class="hour-label" style="top: 420px;">9 PM</div>
+            <div class="hour-label" style="top: 480px;">10 PM</div>
+            <div class="hour-label" style="top: 540px;">11 PM</div>
+            <div class="hour-label" style="top: 600px;">12 AM</div>
+            <div class="hour-label" style="top: 660px;">1 AM</div>
+          </div>
+
+          <!-- Hour grid lines -->
+          <div class="hour-lines">
+            <div class="hour-line" style="top: 0px;"></div>
+            <div class="hour-line" style="top: 60px;"></div>
+            <div class="hour-line" style="top: 120px;"></div>
+            <div class="hour-line" style="top: 180px;"></div>
+            <div class="hour-line" style="top: 240px;"></div>
+            <div class="hour-line" style="top: 300px;"></div>
+            <div class="hour-line" style="top: 360px;"></div>
+            <div class="hour-line" style="top: 420px;"></div>
+            <div class="hour-line" style="top: 480px;"></div>
+            <div class="hour-line" style="top: 540px;"></div>
+            <div class="hour-line" style="top: 600px;"></div>
+            <div class="hour-line" style="top: 660px;"></div>
+          </div>
+
+          <!-- Activity lanes -->
+          <div class="lanes-container">
+
+            <!-- VS Code: 2:00 PM - 4:20 PM (2h 20m = 140px) -->
+            <div class="activity-block" style="left: 0; top: 0;">
+              <div class="activity-bar bar-green" style="height: 140px;"></div>
+              <div class="activity-info">
+                <div class="activity-icon" style="background: #007acc;">VS</div>
+                <div class="activity-title">Visual Studio Code</div>
+                <div class="activity-duration">2h 20m</div>
+              </div>
+            </div>
+
+            <!-- Slack: 2:00 PM - 2:28 PM (28m = 28px) -->
+            <div class="activity-block" style="left: 40px; top: 0;">
+              <div class="activity-bar bar-purple" style="height: 28px;"></div>
+              <div class="activity-info">
+                <div class="activity-icon" style="background: #611f69;">S</div>
+                <div class="activity-title">Slack</div>
+                <div class="activity-duration">28m</div>
+              </div>
+            </div>
+
+            <!-- Slack: 2:30 PM - 2:39 PM (9m) -->
+            <div class="activity-icon-only" style="left: 92px; top: 30px;">
+              <div class="icon" style="background: #611f69;">S</div>
+            </div>
+
+            <!-- Slack: 3:00 PM - 3:10 PM (10m) -->
+            <div class="activity-icon-only" style="left: 92px; top: 90px;">
+              <div class="icon" style="background: #611f69;">S</div>
+            </div>
+
+            <!-- Slack: 3:15 PM - 3:31 PM (16m) -->
+            <div class="activity-icon-only" style="left: 92px; top: 105px;">
+              <div class="icon" style="background: #611f69;">S</div>
+            </div>
+
+            <!-- Slack: 4:00 PM - 5:14 PM (1h 14m = 74px) -->
+            <div class="activity-block" style="left: 40px; top: 180px;">
+              <div class="activity-bar bar-purple" style="height: 74px;"></div>
+              <div class="activity-info">
+                <div class="activity-icon" style="background: #611f69;">S</div>
+                <div class="activity-title">Slack</div>
+                <div class="activity-duration">1h 14m</div>
+              </div>
+            </div>
+
+            <!-- Gmail: 2:10 PM (just icon) -->
+            <div class="activity-icon-only" style="left: 144px; top: 20px;">
+              <div class="icon" style="background: #ea4335;">M</div>
+            </div>
+
+            <!-- Gmail: 3:30 PM (just icon) -->
+            <div class="activity-icon-only" style="left: 144px; top: 150px;">
+              <div class="icon" style="background: #ea4335;">M</div>
+            </div>
+
+            <!-- Linear: 5:20 PM - 5:26 PM (6m) -->
+            <div class="activity-icon-only" style="left: 196px; top: 280px;">
+              <div class="icon" style="background: #6366f1;">L</div>
+            </div>
+
+            <!-- VS Code: 5:00 PM - 6:00 PM (1h = 60px) -->
+            <div class="activity-block" style="left: 0; top: 300px;">
+              <div class="activity-bar bar-green" style="height: 60px;"></div>
+              <div class="activity-info">
+                <div class="activity-icon" style="background: #007acc;">VS</div>
+                <div class="activity-title">Visual Studio Code</div>
+                <div class="activity-duration">1h 0m</div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</body>
+</html>
