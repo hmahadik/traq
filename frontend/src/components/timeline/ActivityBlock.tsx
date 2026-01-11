@@ -11,9 +11,10 @@ import {
 interface ActivityBlockProps {
   block: ActivityBlockType;
   hours: number[]; // Array of displayed hours for position calculation
+  onClick?: (block: ActivityBlockType) => void;
 }
 
-export const ActivityBlock: React.FC<ActivityBlockProps> = ({ block, hours }) => {
+export const ActivityBlock: React.FC<ActivityBlockProps> = ({ block, hours, onClick }) => {
   const { pixelPosition, pixelHeight, windowTitle, appName, durationSeconds, startTime, hourOffset } = block;
 
   // Calculate absolute position: which row + position within that row
@@ -78,6 +79,9 @@ export const ActivityBlock: React.FC<ActivityBlockProps> = ({ block, hours }) =>
               top: `${absoluteTop}px`,
               height: `${actualHeight}px`,
             }}
+            onClick={() => onClick?.(block)}
+            role="button"
+            aria-label={`${getAppDisplayName(appName)} activity from ${formatTime(startTime)} for ${formatDuration(durationSeconds)}`}
           >
             {showIcon && (
               <div className="flex items-start gap-1.5 p-1.5">

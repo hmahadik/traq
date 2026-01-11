@@ -5,6 +5,12 @@ export interface Config {
   dataSources: DataSourcesConfig;
   ui: UIConfig;
   system: SystemConfig;
+  issues?: IssuesConfig;
+}
+
+export interface IssuesConfig {
+  webhookEnabled: boolean;
+  webhookUrl: string;
 }
 
 export interface CaptureConfig {

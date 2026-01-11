@@ -14,6 +14,10 @@ export function DeleteHierarchicalSummary(arg1) {
   return window['go']['main']['App']['DeleteHierarchicalSummary'](arg1);
 }
 
+export function DeleteIssueReport(arg1) {
+  return window['go']['main']['App']['DeleteIssueReport'](arg1);
+}
+
 export function DeleteModel(arg1) {
   return window['go']['main']['App']['DeleteModel'](arg1);
 }
@@ -164,6 +168,14 @@ export function GetInferenceSetupStatus() {
 
 export function GetInferenceStatus() {
   return window['go']['main']['App']['GetInferenceStatus']();
+}
+
+export function GetIssueReport(arg1) {
+  return window['go']['main']['App']['GetIssueReport'](arg1);
+}
+
+export function GetIssueReports(arg1) {
+  return window['go']['main']['App']['GetIssueReports'](arg1);
 }
 
 export function GetLatestHierarchicalSummaries() {
@@ -322,6 +334,10 @@ export function RenameTag(arg1, arg2) {
   return window['go']['main']['App']['RenameTag'](arg1, arg2);
 }
 
+export function ReportIssue(arg1, arg2, arg3, arg4, arg5) {
+  return window['go']['main']['App']['ReportIssue'](arg1, arg2, arg3, arg4, arg5);
+}
+
 export function RestartTracking() {
   return window['go']['main']['App']['RestartTracking']();
 }
@@ -352,6 +368,10 @@ export function StartTracking() {
 
 export function StopTracking() {
   return window['go']['main']['App']['StopTracking']();
+}
+
+export function TestIssueWebhook() {
+  return window['go']['main']['App']['TestIssueWebhook']();
 }
 
 export function UnregisterGitRepository(arg1) {

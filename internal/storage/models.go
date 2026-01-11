@@ -190,6 +190,21 @@ type TagUsageInfo struct {
 	Count int    `json:"count"`
 }
 
+// IssueReport represents a crash or manual issue report.
+type IssueReport struct {
+	ID              int64          `json:"id"`
+	ReportType      string         `json:"reportType"` // "crash" or "manual"
+	ErrorMessage    sql.NullString `json:"errorMessage"`
+	StackTrace      sql.NullString `json:"stackTrace"`
+	ScreenshotIDs   []int64        `json:"screenshotIds"`
+	SessionID       sql.NullInt64  `json:"sessionId"`
+	UserDescription sql.NullString `json:"userDescription"`
+	AppVersion      sql.NullString `json:"appVersion"`
+	PageRoute       sql.NullString `json:"pageRoute"`
+	WebhookSent     bool           `json:"webhookSent"`
+	CreatedAt       int64          `json:"createdAt"`
+}
+
 // Helper functions for JSON array fields
 
 // ParseJSONStringArray parses a JSON string array from a nullable string.

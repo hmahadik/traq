@@ -35,14 +35,63 @@ type SessionSummary struct {
 	HasBrowser      bool     `json:"hasBrowser"`
 }
 
+// ScreenshotDisplay is the service-layer type for screenshots with friendly app names.
+type ScreenshotDisplay struct {
+	ID            int64  `json:"id"`
+	Timestamp     int64  `json:"timestamp"`
+	Filepath      string `json:"filepath"`
+	WindowTitle   string `json:"windowTitle"`
+	AppName       string `json:"appName"`
+	SessionID     int64  `json:"sessionId"`
+	MonitorWidth  int64  `json:"monitorWidth"`
+	MonitorHeight int64  `json:"monitorHeight"`
+}
+
+// toScreenshotDisplay converts a storage screenshot to a display screenshot with friendly app name.
+func toScreenshotDisplay(s *storage.Screenshot) *ScreenshotDisplay {
+	if s == nil {
+		return nil
+	}
+	d := &ScreenshotDisplay{
+		ID:        s.ID,
+		Timestamp: s.Timestamp,
+		Filepath:  s.Filepath,
+	}
+	if s.WindowTitle.Valid {
+		d.WindowTitle = s.WindowTitle.String
+	}
+	if s.AppName.Valid {
+		d.AppName = GetFriendlyAppName(s.AppName.String)
+	}
+	if s.SessionID.Valid {
+		d.SessionID = s.SessionID.Int64
+	}
+	if s.MonitorWidth.Valid {
+		d.MonitorWidth = s.MonitorWidth.Int64
+	}
+	if s.MonitorHeight.Valid {
+		d.MonitorHeight = s.MonitorHeight.Int64
+	}
+	return d
+}
+
+// toScreenshotDisplaySlice converts a slice of storage screenshots to display screenshots.
+func toScreenshotDisplaySlice(screenshots []*storage.Screenshot) []*ScreenshotDisplay {
+	result := make([]*ScreenshotDisplay, len(screenshots))
+	for i, s := range screenshots {
+		result[i] = toScreenshotDisplay(s)
+	}
+	return result
+}
+
 // ScreenshotPage contains paginated screenshot results.
 type ScreenshotPage struct {
-	Screenshots []*storage.Screenshot `json:"screenshots"`
-	Total       int64                 `json:"total"`
-	Page        int                   `json:"page"`
-	PerPage     int                   `json:"perPage"`
-	TotalPages  int                   `json:"totalPages"`
-	HasMore     bool                  `json:"hasMore"`
+	Screenshots []*ScreenshotDisplay `json:"screenshots"`
+	Total       int64                `json:"total"`
+	Page        int                  `json:"page"`
+	PerPage     int                  `json:"perPage"`
+	TotalPages  int                  `json:"totalPages"`
+	HasMore     bool                 `json:"hasMore"`
 }
 
 // SessionContext contains all data for a session.
@@ -160,14 +209,17 @@ func (s *TimelineService) GetScreenshotsForSession(sessionID int64, page, perPag
 		return nil, err
 	}
 
-	total := int64(len(screenshots))
+	// Convert to display screenshots with friendly app names
+	displayScreenshots := toScreenshotDisplaySlice(screenshots)
+
+	total := int64(len(displayScreenshots))
 	totalPages := int((total + int64(perPage) - 1) / int64(perPage))
 
 	start := (page - 1) * perPage
 	end := start + perPage
-	if start >= len(screenshots) {
+	if start >= len(displayScreenshots) {
 		return &ScreenshotPage{
-			Screenshots: []*storage.Screenshot{},
+			Screenshots: []*ScreenshotDisplay{},
 			Total:       total,
 			Page:        page,
 			PerPage:     perPage,
@@ -175,12 +227,12 @@ func (s *TimelineService) GetScreenshotsForSession(sessionID int64, page, perPag
 			HasMore:     false,
 		}, nil
 	}
-	if end > len(screenshots) {
-		end = len(screenshots)
+	if end > len(displayScreenshots) {
+		end = len(displayScreenshots)
 	}
 
 	return &ScreenshotPage{
-		Screenshots: screenshots[start:end],
+		Screenshots: displayScreenshots[start:end],
 		Total:       total,
 		Page:        page,
 		PerPage:     perPage,
@@ -189,8 +241,8 @@ func (s *TimelineService) GetScreenshotsForSession(sessionID int64, page, perPag
 	}, nil
 }
 
-// GetScreenshotsForHour returns screenshots for a specific hour.
-func (s *TimelineService) GetScreenshotsForHour(date string, hour int) ([]*storage.Screenshot, error) {
+// GetScreenshotsForHour returns screenshots for a specific hour with friendly app names.
+func (s *TimelineService) GetScreenshotsForHour(date string, hour int) ([]*ScreenshotDisplay, error) {
 	t, err := time.ParseInLocation("2006-01-02", date, time.Local)
 	if err != nil {
 		return nil, err
@@ -199,11 +251,15 @@ func (s *TimelineService) GetScreenshotsForHour(date string, hour int) ([]*stora
 	hourStart := time.Date(t.Year(), t.Month(), t.Day(), hour, 0, 0, 0, time.Local)
 	hourEnd := hourStart.Add(time.Hour)
 
-	return s.store.GetScreenshotsByTimeRange(hourStart.Unix(), hourEnd.Unix()-1)
+	screenshots, err := s.store.GetScreenshotsByTimeRange(hourStart.Unix(), hourEnd.Unix()-1)
+	if err != nil {
+		return nil, err
+	}
+	return toScreenshotDisplaySlice(screenshots), nil
 }
 
-// GetScreenshotsForDate returns all screenshots for a specific date.
-func (s *TimelineService) GetScreenshotsForDate(date string) ([]*storage.Screenshot, error) {
+// GetScreenshotsForDate returns all screenshots for a specific date with friendly app names.
+func (s *TimelineService) GetScreenshotsForDate(date string) ([]*ScreenshotDisplay, error) {
 	t, err := time.ParseInLocation("2006-01-02", date, time.Local)
 	if err != nil {
 		return nil, err
@@ -212,7 +268,11 @@ func (s *TimelineService) GetScreenshotsForDate(date string) ([]*storage.Screens
 	dayStart := time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, time.Local)
 	dayEnd := dayStart.AddDate(0, 0, 1)
 
-	return s.store.GetScreenshotsByTimeRange(dayStart.Unix(), dayEnd.Unix()-1)
+	screenshots, err := s.store.GetScreenshotsByTimeRange(dayStart.Unix(), dayEnd.Unix()-1)
+	if err != nil {
+		return nil, err
+	}
+	return toScreenshotDisplaySlice(screenshots), nil
 }
 
 // GetSessionContext returns all context for a session.

@@ -391,6 +391,20 @@ export namespace service {
 	        this.count = source["count"];
 	    }
 	}
+	export class IssuesConfig {
+	    webhookEnabled: boolean;
+	    webhookUrl: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new IssuesConfig(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.webhookEnabled = source["webhookEnabled"];
+	        this.webhookUrl = source["webhookUrl"];
+	    }
+	}
 	export class SystemConfig {
 	    autoStart: boolean;
 	    startOnLogin: boolean;
@@ -602,6 +616,7 @@ export namespace service {
 	    dataSources?: DataSourcesConfig;
 	    ui?: UIConfig;
 	    system?: SystemConfig;
+	    issues?: IssuesConfig;
 	
 	    static createFrom(source: any = {}) {
 	        return new Config(source);
@@ -615,6 +630,7 @@ export namespace service {
 	        this.dataSources = this.convertValues(source["dataSources"], DataSourcesConfig);
 	        this.ui = this.convertValues(source["ui"], UIConfig);
 	        this.system = this.convertValues(source["system"], SystemConfig);
+	        this.issues = this.convertValues(source["issues"], IssuesConfig);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -1050,6 +1066,39 @@ export namespace service {
 	    }
 	}
 	
+	export class IssueReport {
+	    id: number;
+	    reportType: string;
+	    errorMessage: string;
+	    stackTrace: string;
+	    screenshotIds: number[];
+	    sessionId: number;
+	    userDescription: string;
+	    appVersion: string;
+	    pageRoute: string;
+	    webhookSent: boolean;
+	    createdAt: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new IssueReport(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.reportType = source["reportType"];
+	        this.errorMessage = source["errorMessage"];
+	        this.stackTrace = source["stackTrace"];
+	        this.screenshotIds = source["screenshotIds"];
+	        this.sessionId = source["sessionId"];
+	        this.userDescription = source["userDescription"];
+	        this.appVersion = source["appVersion"];
+	        this.pageRoute = source["pageRoute"];
+	        this.webhookSent = source["webhookSent"];
+	        this.createdAt = source["createdAt"];
+	    }
+	}
+	
 	export class MonthStats {
 	    monthNumber: number;
 	    monthName: string;
@@ -1144,6 +1193,36 @@ export namespace service {
 	    }
 	}
 	
+	export class Report {
+	    id: number;
+	    title: string;
+	    timeRange: string;
+	    reportType: string;
+	    format: string;
+	    content: string;
+	    filepath: string;
+	    startTime: number;
+	    endTime: number;
+	    createdAt: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new Report(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.title = source["title"];
+	        this.timeRange = source["timeRange"];
+	        this.reportType = source["reportType"];
+	        this.format = source["format"];
+	        this.content = source["content"];
+	        this.filepath = source["filepath"];
+	        this.startTime = source["startTime"];
+	        this.endTime = source["endTime"];
+	        this.createdAt = source["createdAt"];
+	    }
+	}
 	export class ReportMeta {
 	    id: number;
 	    title: string;
@@ -1164,6 +1243,32 @@ export namespace service {
 	        this.reportType = source["reportType"];
 	        this.format = source["format"];
 	        this.createdAt = source["createdAt"];
+	    }
+	}
+	export class ScreenshotDisplay {
+	    id: number;
+	    timestamp: number;
+	    filepath: string;
+	    windowTitle: string;
+	    appName: string;
+	    sessionId: number;
+	    monitorWidth: number;
+	    monitorHeight: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new ScreenshotDisplay(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.timestamp = source["timestamp"];
+	        this.filepath = source["filepath"];
+	        this.windowTitle = source["windowTitle"];
+	        this.appName = source["appName"];
+	        this.sessionId = source["sessionId"];
+	        this.monitorWidth = source["monitorWidth"];
+	        this.monitorHeight = source["monitorHeight"];
 	    }
 	}
 	export class ScreenshotInfo {
@@ -1197,7 +1302,7 @@ export namespace service {
 	    }
 	}
 	export class ScreenshotPage {
-	    screenshots: storage.Screenshot[];
+	    screenshots: ScreenshotDisplay[];
 	    total: number;
 	    page: number;
 	    perPage: number;
@@ -1210,7 +1315,7 @@ export namespace service {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.screenshots = this.convertValues(source["screenshots"], storage.Screenshot);
+	        this.screenshots = this.convertValues(source["screenshots"], ScreenshotDisplay);
 	        this.total = source["total"];
 	        this.page = source["page"];
 	        this.perPage = source["perPage"];
@@ -1916,54 +2021,6 @@ export namespace storage {
 	        this.generatedAt = source["generatedAt"];
 	        this.createdAt = source["createdAt"];
 	    }
-	}
-	export class Report {
-	    id: number;
-	    title: string;
-	    timeRange: string;
-	    reportType: string;
-	    format: string;
-	    content: sql.NullString;
-	    filepath: sql.NullString;
-	    startTime: sql.NullInt64;
-	    endTime: sql.NullInt64;
-	    createdAt: number;
-	
-	    static createFrom(source: any = {}) {
-	        return new Report(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.id = source["id"];
-	        this.title = source["title"];
-	        this.timeRange = source["timeRange"];
-	        this.reportType = source["reportType"];
-	        this.format = source["format"];
-	        this.content = this.convertValues(source["content"], sql.NullString);
-	        this.filepath = this.convertValues(source["filepath"], sql.NullString);
-	        this.startTime = this.convertValues(source["startTime"], sql.NullInt64);
-	        this.endTime = this.convertValues(source["endTime"], sql.NullInt64);
-	        this.createdAt = source["createdAt"];
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
 	}
 	export class Screenshot {
 	    id: number;

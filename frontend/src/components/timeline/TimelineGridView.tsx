@@ -1,10 +1,13 @@
-import React, { useMemo, useState, useEffect } from 'react';
-import { TimelineGridData, GRID_CONSTANTS } from '@/types/timeline';
+import React, { useMemo, useState, useEffect, useCallback } from 'react';
+import { TimelineGridData, GRID_CONSTANTS, ActivityBlock as ActivityBlockType, SessionSummaryWithPosition } from '@/types/timeline';
 import { HourColumn } from './HourColumn';
 import { AISummaryColumn } from './AISummaryColumn';
 import { ScreenshotColumn } from './ScreenshotColumn';
 import { AppColumn } from './AppColumn';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { ImageGallery } from '@/components/common/ImageGallery';
+import { useScreenshotsForDate } from '@/api/hooks';
+import type { Screenshot } from '@/types';
 
 interface TimelineGridViewProps {
   data: TimelineGridData;
@@ -15,6 +18,13 @@ const HEADER_HEIGHT_PX = 44;
 
 export const TimelineGridView: React.FC<TimelineGridViewProps> = ({ data }) => {
   const { hourlyGrid, sessionSummaries, topApps } = data;
+
+  // Fetch all screenshots for this date
+  const { data: allScreenshots } = useScreenshotsForDate(data.date);
+
+  // ImageGallery state
+  const [galleryOpen, setGalleryOpen] = useState(false);
+  const [galleryScreenshots, setGalleryScreenshots] = useState<Screenshot[]>([]);
 
   // Check if viewing today for the "now" indicator
   const isToday = useMemo(() => {
@@ -72,6 +82,49 @@ export const TimelineGridView: React.FC<TimelineGridViewProps> = ({ data }) => {
     });
   }, [topApps, hourlyGrid]);
 
+  // Handle activity block click - filter screenshots by time range and open gallery
+  const handleActivityBlockClick = useCallback((block: ActivityBlockType) => {
+    if (!allScreenshots || allScreenshots.length === 0) {
+      return;
+    }
+
+    // Calculate end time from start time and duration
+    const startTime = block.startTime;
+    const endTime = startTime + block.durationSeconds;
+
+    // Filter screenshots within this time range
+    // The API returns ScreenshotDisplay | Screenshot union, but both have id/timestamp
+    const filtered = allScreenshots.filter((s: any) =>
+      s.timestamp >= startTime && s.timestamp <= endTime
+    ) as Screenshot[];
+
+    if (filtered.length > 0) {
+      setGalleryScreenshots(filtered);
+      setGalleryOpen(true);
+    }
+  }, [allScreenshots]);
+
+  // Handle session click - filter screenshots by session time range and open gallery
+  const handleSessionClick = useCallback((session: SessionSummaryWithPosition) => {
+    if (!allScreenshots || allScreenshots.length === 0) {
+      return;
+    }
+
+    const startTime = session.startTime;
+    const endTime = session.endTime || (startTime + (session.durationSeconds || 0));
+
+    // Filter screenshots within this session's time range
+    // The API returns ScreenshotDisplay | Screenshot union, but both have id/timestamp
+    const filtered = allScreenshots.filter((s: any) =>
+      s.timestamp >= startTime && s.timestamp <= endTime
+    ) as Screenshot[];
+
+    if (filtered.length > 0) {
+      setGalleryScreenshots(filtered);
+      setGalleryOpen(true);
+    }
+  }, [allScreenshots]);
+
   if (topApps.length === 0) {
     return (
       <div className="flex items-center justify-center h-64 text-muted-foreground bg-muted/50 rounded-lg">
@@ -96,7 +149,11 @@ export const TimelineGridView: React.FC<TimelineGridViewProps> = ({ data }) => {
           <HourColumn hours={activeHours} />
 
           {/* AI Summary Column (Sticky) */}
-          <AISummaryColumn sessionSummaries={sessionSummaries} hours={activeHours} />
+          <AISummaryColumn
+            sessionSummaries={sessionSummaries}
+            hours={activeHours}
+            onSessionClick={handleSessionClick}
+          />
 
           {/* Screenshot Column */}
           <ScreenshotColumn date={data.date} hours={activeHours} />
@@ -110,6 +167,7 @@ export const TimelineGridView: React.FC<TimelineGridViewProps> = ({ data }) => {
               totalDuration={column.totalDuration}
               activityBlocks={column.activityBlocks}
               hours={activeHours}
+              onBlockClick={handleActivityBlockClick}
             />
           ))}
 
@@ -127,6 +185,14 @@ export const TimelineGridView: React.FC<TimelineGridViewProps> = ({ data }) => {
           )}
         </div>
       </ScrollArea>
+
+      {/* ImageGallery modal for activity block and session clicks */}
+      <ImageGallery
+        screenshots={galleryScreenshots}
+        initialIndex={0}
+        open={galleryOpen}
+        onOpenChange={setGalleryOpen}
+      />
     </div>
   );
 };

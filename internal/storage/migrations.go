@@ -4,7 +4,7 @@ import (
 	"fmt"
 )
 
-const schemaVersion = 6
+const schemaVersion = 7
 
 const schema = `
 -- ============================================================================
@@ -283,6 +283,12 @@ func (s *Store) Migrate() error {
 			return fmt.Errorf("failed to apply migration 6: %w", err)
 		}
 	}
+	if currentVersion < 7 {
+		// Migration v7: Add issue_reports table for crash/manual issue reporting
+		if err := s.applyMigration7(); err != nil {
+			return fmt.Errorf("failed to apply migration 7: %w", err)
+		}
+	}
 
 	// Record schema version
 	if currentVersion == 0 {
@@ -515,6 +521,33 @@ func (s *Store) applyMigration6() error {
 	`)
 	if err != nil {
 		return fmt.Errorf("failed to create projects table: %w", err)
+	}
+
+	return nil
+}
+
+// applyMigration7 creates the issue_reports table for crash/manual issue reporting.
+func (s *Store) applyMigration7() error {
+	// Create issue_reports table
+	_, err := s.db.Exec(`
+		CREATE TABLE IF NOT EXISTS issue_reports (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			report_type TEXT NOT NULL CHECK(report_type IN ('crash', 'manual')),
+			error_message TEXT,
+			stack_trace TEXT,
+			screenshot_ids TEXT,
+			session_id INTEGER REFERENCES sessions(id),
+			user_description TEXT,
+			app_version TEXT,
+			page_route TEXT,
+			webhook_sent INTEGER DEFAULT 0,
+			created_at INTEGER DEFAULT (strftime('%s', 'now'))
+		);
+		CREATE INDEX IF NOT EXISTS idx_issue_reports_type ON issue_reports(report_type);
+		CREATE INDEX IF NOT EXISTS idx_issue_reports_created ON issue_reports(created_at);
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to create issue_reports table: %w", err)
 	}
 
 	return nil

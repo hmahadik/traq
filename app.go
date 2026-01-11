@@ -36,6 +36,7 @@ type App struct {
 	Config      *service.ConfigService
 	Screenshots *service.ScreenshotService
 	Summary     *service.SummaryService
+	Issues      *service.IssueService
 
 	// Inference engine
 	inference *inference.Service
@@ -114,6 +115,9 @@ func (a *App) startup(ctx context.Context) {
 
 	// Initialize summary service
 	a.Summary = service.NewSummaryService(a.store, a.inference)
+
+	// Initialize issues service (for crash/manual reporting)
+	a.Issues = service.NewIssueService(a.store, "dev") // TODO: pass actual version
 
 	// Start screenshot server for dev mode (Vite proxies to this)
 	go startScreenshotServer(dataDir)
@@ -480,7 +484,7 @@ func (a *App) GetScreenshotsForSession(sessionID int64, page, perPage int) (*ser
 }
 
 // GetScreenshotsForHour returns screenshots for a specific hour.
-func (a *App) GetScreenshotsForHour(date string, hour int) ([]*storage.Screenshot, error) {
+func (a *App) GetScreenshotsForHour(date string, hour int) ([]*service.ScreenshotDisplay, error) {
 	if a.Timeline == nil {
 		return nil, nil
 	}
@@ -488,7 +492,7 @@ func (a *App) GetScreenshotsForHour(date string, hour int) ([]*storage.Screensho
 }
 
 // GetScreenshotsForDate returns all screenshots for a specific date.
-func (a *App) GetScreenshotsForDate(date string) ([]*storage.Screenshot, error) {
+func (a *App) GetScreenshotsForDate(date string) ([]*service.ScreenshotDisplay, error) {
 	if a.Timeline == nil {
 		return nil, nil
 	}
@@ -608,7 +612,7 @@ func (a *App) DeleteScreenshot(id int64) error {
 // ============================================================================
 
 // GenerateReport generates a new report for the given time range.
-func (a *App) GenerateReport(timeRange, reportType string, includeScreenshots bool) (*storage.Report, error) {
+func (a *App) GenerateReport(timeRange, reportType string, includeScreenshots bool) (*service.Report, error) {
 	if a.Reports == nil {
 		return nil, nil
 	}
@@ -616,7 +620,7 @@ func (a *App) GenerateReport(timeRange, reportType string, includeScreenshots bo
 }
 
 // GetReport returns a report by ID with full content.
-func (a *App) GetReport(id int64) (*storage.Report, error) {
+func (a *App) GetReport(id int64) (*service.Report, error) {
 	if a.Reports == nil {
 		return nil, nil
 	}
@@ -1181,6 +1185,74 @@ func (a *App) DeleteHierarchicalSummary(id int64) error {
 		return nil
 	}
 	return a.store.DeleteHierarchicalSummary(id)
+}
+
+// ============================================================================
+// Issue Reporting Methods (exposed to frontend)
+// ============================================================================
+
+// ReportIssue creates a new issue report (crash or manual).
+func (a *App) ReportIssue(reportType, errorMessage, stackTrace, userDescription, pageRoute string) (result *service.IssueReport, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			result = nil
+			err = fmt.Errorf("internal error: %v", r)
+		}
+	}()
+	if a == nil || !a.ready || a.Issues == nil {
+		return nil, nil
+	}
+	return a.Issues.CreateIssueReport(service.CreateIssueRequest{
+		ReportType:      reportType,
+		ErrorMessage:    errorMessage,
+		StackTrace:      stackTrace,
+		UserDescription: userDescription,
+		PageRoute:       pageRoute,
+	})
+}
+
+// GetIssueReports returns recent issue reports.
+func (a *App) GetIssueReports(limit int) (result []*service.IssueReport, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			result = nil
+			err = fmt.Errorf("internal error: %v", r)
+		}
+	}()
+	if a == nil || !a.ready || a.Issues == nil {
+		return nil, nil
+	}
+	return a.Issues.GetIssueReports(limit)
+}
+
+// GetIssueReport returns a single issue report by ID.
+func (a *App) GetIssueReport(id int64) (result *service.IssueReport, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			result = nil
+			err = fmt.Errorf("internal error: %v", r)
+		}
+	}()
+	if a == nil || !a.ready || a.Issues == nil {
+		return nil, nil
+	}
+	return a.Issues.GetIssueReport(id)
+}
+
+// DeleteIssueReport deletes an issue report.
+func (a *App) DeleteIssueReport(id int64) error {
+	if a == nil || !a.ready || a.Issues == nil {
+		return nil
+	}
+	return a.Issues.DeleteIssueReport(id)
+}
+
+// TestIssueWebhook sends a test notification to the configured webhook.
+func (a *App) TestIssueWebhook() error {
+	if a == nil || !a.ready || a.Issues == nil {
+		return fmt.Errorf("issues service not initialized")
+	}
+	return a.Issues.TestWebhook()
 }
 
 // ============================================================================

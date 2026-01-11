@@ -145,10 +145,13 @@ func (s *TimelineService) GetTimelineGridData(date string) (*TimelineGridData, e
 			pixelHeight = 4
 		}
 
+		// Get friendly display name for the app
+		friendlyName := GetFriendlyAppName(event.AppName)
+
 		block := ActivityBlock{
 			ID:              event.ID,
 			WindowTitle:     event.WindowTitle,
-			AppName:         event.AppName,
+			AppName:         friendlyName,
 			StartTime:       effectiveStart,
 			EndTime:         effectiveEnd,
 			DurationSeconds: durationSeconds,
@@ -162,14 +165,14 @@ func (s *TimelineService) GetTimelineGridData(date string) (*TimelineGridData, e
 		if hourlyGrid[hour] == nil {
 			hourlyGrid[hour] = make(map[string][]ActivityBlock)
 		}
-		hourlyGrid[hour][event.AppName] = append(hourlyGrid[hour][event.AppName], block)
+		hourlyGrid[hour][friendlyName] = append(hourlyGrid[hour][friendlyName], block)
 	}
 
-	// Build top apps list with categories
+	// Build top apps list with categories (use friendly names)
 	topApps := make([]TopApp, 0, len(topAppsData))
 	for _, app := range topAppsData {
 		topApps = append(topApps, TopApp{
-			AppName:  app.AppName,
+			AppName:  GetFriendlyAppName(app.AppName),
 			Duration: app.Duration,
 			Category: categories[app.AppName],
 		})
@@ -245,13 +248,20 @@ func (s *TimelineService) GetTimelineGridData(date string) (*TimelineGridData, e
 	// Calculate day stats
 	dayStats := s.calculateDayStats(focusEvents, categories, dayStart, dayEnd)
 
+	// Transform categories to use friendly names as keys (for frontend matching)
+	friendlyCategories := make(map[string]string)
+	for rawName, category := range categories {
+		friendlyName := GetFriendlyAppName(rawName)
+		friendlyCategories[friendlyName] = category
+	}
+
 	return &TimelineGridData{
 		Date:             date,
 		DayStats:         dayStats,
 		TopApps:          topApps,
 		HourlyGrid:       hourlyGrid,
 		SessionSummaries: sessionSummaries,
-		Categories:       categories,
+		Categories:       friendlyCategories,
 	}, nil
 }
 

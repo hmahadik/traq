@@ -859,7 +859,7 @@ func (s *AnalyticsService) sortAppUsage(appDurations map[string]float64) []*AppU
 			pct = (dur / totalDuration) * 100
 		}
 		apps = append(apps, &AppUsage{
-			AppName:         app,
+			AppName:         GetFriendlyAppName(app),
 			DurationSeconds: dur,
 			Percentage:      pct,
 		})
@@ -1085,7 +1085,7 @@ func (s *AnalyticsService) GetTopWindows(start, end int64, limit int) ([]*Window
 
 		windows = append(windows, &WindowUsage{
 			WindowTitle:     windowTitle,
-			AppName:         windowApps[windowTitle],
+			AppName:         GetFriendlyAppName(windowApps[windowTitle]),
 			DurationSeconds: duration,
 			Percentage:      percentage,
 			FocusCount:      windowCounts[windowTitle],

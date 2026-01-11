@@ -12,6 +12,8 @@ export function DeleteAppCategory(arg1:string):Promise<void>;
 
 export function DeleteHierarchicalSummary(arg1:number):Promise<void>;
 
+export function DeleteIssueReport(arg1:number):Promise<void>;
+
 export function DeleteModel(arg1:string):Promise<void>;
 
 export function DeleteScreenshot(arg1:number):Promise<void>;
@@ -34,7 +36,7 @@ export function ExportReport(arg1:number,arg2:string):Promise<string>;
 
 export function ForceCapture():Promise<string>;
 
-export function GenerateReport(arg1:string,arg2:string,arg3:boolean):Promise<storage.Report>;
+export function GenerateReport(arg1:string,arg2:string,arg3:boolean):Promise<service.Report>;
 
 export function GenerateSummary(arg1:number):Promise<storage.Summary>;
 
@@ -88,6 +90,10 @@ export function GetInferenceSetupStatus():Promise<inference.SetupStatus>;
 
 export function GetInferenceStatus():Promise<inference.InferenceStatus>;
 
+export function GetIssueReport(arg1:number):Promise<service.IssueReport>;
+
+export function GetIssueReports(arg1:number):Promise<Array<service.IssueReport>>;
+
 export function GetLatestHierarchicalSummaries():Promise<Record<string, storage.HierarchicalSummary>>;
 
 export function GetMonthlyStats(arg1:number,arg2:number):Promise<service.MonthlyStats>;
@@ -96,7 +102,7 @@ export function GetProductivityScore(arg1:string):Promise<service.ProductivitySc
 
 export function GetRecentSessions(arg1:number):Promise<Array<storage.Session>>;
 
-export function GetReport(arg1:number):Promise<storage.Report>;
+export function GetReport(arg1:number):Promise<service.Report>;
 
 export function GetReportHistory():Promise<Array<service.ReportMeta>>;
 
@@ -106,9 +112,9 @@ export function GetScreenshotInfo(arg1:number):Promise<service.ScreenshotInfo>;
 
 export function GetScreenshotPath(arg1:number):Promise<string>;
 
-export function GetScreenshotsForDate(arg1:string):Promise<Array<storage.Screenshot>>;
+export function GetScreenshotsForDate(arg1:string):Promise<Array<service.ScreenshotDisplay>>;
 
-export function GetScreenshotsForHour(arg1:string,arg2:number):Promise<Array<storage.Screenshot>>;
+export function GetScreenshotsForHour(arg1:string,arg2:number):Promise<Array<service.ScreenshotDisplay>>;
 
 export function GetScreenshotsForSession(arg1:number,arg2:number,arg3:number):Promise<service.ScreenshotPage>;
 
@@ -166,6 +172,8 @@ export function RemoveTagFromSession(arg1:number,arg2:string):Promise<void>;
 
 export function RenameTag(arg1:string,arg2:string):Promise<number>;
 
+export function ReportIssue(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string):Promise<service.IssueReport>;
+
 export function RestartTracking():Promise<void>;
 
 export function ResumeCapture():Promise<void>;
@@ -181,6 +189,8 @@ export function SetTagsForSession(arg1:number,arg2:Array<string>):Promise<void>;
 export function StartTracking():Promise<void>;
 
 export function StopTracking():Promise<void>;
+
+export function TestIssueWebhook():Promise<void>;
 
 export function UnregisterGitRepository(arg1:number):Promise<void>;
 

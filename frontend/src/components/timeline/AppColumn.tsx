@@ -9,6 +9,7 @@ interface AppColumnProps {
   totalDuration: number; // seconds
   activityBlocks: ActivityBlockType[];
   hours: number[]; // Array of hours for grid alignment
+  onBlockClick?: (block: ActivityBlockType) => void;
 }
 
 export const AppColumn: React.FC<AppColumnProps> = ({
@@ -17,6 +18,7 @@ export const AppColumn: React.FC<AppColumnProps> = ({
   totalDuration,
   activityBlocks,
   hours,
+  onBlockClick,
 }) => {
   // Group adjacent activities with small gaps (5 minutes or less) for cleaner display
   const groupedBlocks = useMemo(() => {
@@ -98,7 +100,7 @@ export const AppColumn: React.FC<AppColumnProps> = ({
         {/* Activity Blocks (absolutely positioned) - using grouped blocks for cleaner display */}
         <div className="absolute inset-0">
           {groupedBlocks.map((block) => (
-            <ActivityBlock key={block.id} block={block} hours={hours} />
+            <ActivityBlock key={block.id} block={block} hours={hours} onClick={onBlockClick} />
           ))}
         </div>
       </div>

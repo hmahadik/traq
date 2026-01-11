@@ -9,7 +9,7 @@
       "Verify each hour block is 80px tall",
       "Verify only active hours plus buffer are displayed"
     ],
-    "passes": true
+    "passes": false
   },
   {
     "category": "journey-daily-review",
@@ -21,7 +21,7 @@
       "Verify block height corresponds to activity duration",
       "Verify minimum height of 4px for short activities"
     ],
-    "passes": true
+    "passes": false
   },
   {
     "category": "journey-daily-review",
@@ -47,7 +47,7 @@
       "Verify summary text is visible or '(No summary)' placeholder shown",
       "Verify time range displayed on each block"
     ],
-    "passes": true
+    "passes": false
   },
   {
     "category": "journey-daily-review",
@@ -73,7 +73,7 @@
       "Verify '+N more' badge shows when more than 2 screenshots",
       "Verify clicking thumbnail opens ImageGallery"
     ],
-    "passes": true
+    "passes": false
   },
   {
     "category": "journey-daily-review",
@@ -85,7 +85,7 @@
       "Click 'Next Day' button",
       "Click 'Today' button and verify current date selected"
     ],
-    "passes": true
+    "passes": false
   },
   {
     "category": "journey-daily-review",
@@ -97,7 +97,7 @@
       "Verify 'VS Code' not 'code'",
       "Verify 'Terminal' not 'tilix' or 'gnome-terminal'"
     ],
-    "passes": true
+    "passes": false
   },
   {
     "category": "journey-daily-review",
@@ -109,7 +109,7 @@
       "Verify start/end times match actual activity span",
       "Verify break count and longest focus session shown"
     ],
-    "passes": true
+    "passes": false
   },
   {
     "category": "journey-daily-review",
@@ -121,7 +121,7 @@
       "Verify legend shows category labels with durations",
       "Verify segment widths proportional to time"
     ],
-    "passes": true
+    "passes": false
   },
   {
     "category": "journey-analytics",
@@ -133,7 +133,7 @@
       "Verify hover shows app name and duration",
       "Verify friendly app names display"
     ],
-    "passes": true
+    "passes": false
   },
   {
     "category": "journey-analytics",
@@ -182,7 +182,7 @@
       "Switch to Month view",
       "Verify aggregated data displays correctly"
     ],
-    "passes": true
+    "passes": false
   },
   {
     "category": "journey-analytics",
@@ -208,7 +208,7 @@
       "Verify report appears in preview",
       "Repeat for 'Detailed' and 'Standup' types"
     ],
-    "passes": true
+    "passes": false
   },
   {
     "category": "journey-reports",
@@ -220,7 +220,7 @@
       "Enter 'last week' and generate - verify 7-day range",
       "Enter 'past 3 days' and generate - verify 3-day range"
     ],
-    "passes": true
+    "passes": false
   },
   {
     "category": "journey-reports",
@@ -232,7 +232,7 @@
       "Verify *italic* text renders as italic",
       "Verify `code` renders with background styling"
     ],
-    "passes": true
+    "passes": false
   },
   {
     "category": "journey-reports",
@@ -296,7 +296,7 @@
       "Click a report in history",
       "Verify preview loads that report's content"
     ],
-    "passes": true
+    "passes": false
   },
   {
     "category": "journey-screenshots",
@@ -308,7 +308,7 @@
       "Verify date selector shows current date",
       "Verify lazy loading works (images load on scroll)"
     ],
-    "passes": true
+    "passes": false
   },
   {
     "category": "journey-screenshots",
@@ -332,7 +332,7 @@
       "Select an app",
       "Verify only screenshots from that app display"
     ],
-    "passes": true
+    "passes": false
   },
   {
     "category": "journey-screenshots",
@@ -344,7 +344,7 @@
       "Verify search is case-insensitive",
       "Clear search and verify all screenshots return"
     ],
-    "passes": true
+    "passes": false
   },
   {
     "category": "journey-screenshots",
@@ -357,7 +357,7 @@
       "Verify window title displayed",
       "Verify timestamp displayed"
     ],
-    "passes": true
+    "passes": false
   },
   {
     "category": "journey-screenshots",
@@ -394,7 +394,7 @@
       "Confirm deletion in dialog",
       "Verify selected screenshots removed from grid"
     ],
-    "passes": true
+    "passes": false
   },
   {
     "category": "security",
@@ -418,7 +418,7 @@
       "Verify totals match within 1-minute margin",
       "Verify category breakdown percentages sum to 100%"
     ],
-    "passes": true
+    "passes": false
   },
   {
     "category": "accessibility",
@@ -442,7 +442,7 @@
       "Verify load time is under 2 seconds",
       "Verify no visible lag during scroll"
     ],
-    "passes": true
+    "passes": false
   },
   {
     "category": "navigation",
@@ -454,7 +454,7 @@
       "Verify grid updates with that date's data",
       "Verify future dates are not selectable"
     ],
-    "passes": true
+    "passes": false
   },
   {
     "category": "settings",
@@ -467,7 +467,7 @@
       "Save and verify rule persists",
       "Delete rule and verify removal"
     ],
-    "passes": true
+    "passes": false
   },
   {
     "category": "settings",
@@ -480,7 +480,7 @@
       "Verify success toast appears",
       "If webhook configured, verify Slack receives message"
     ],
-    "passes": true
+    "passes": false
   },
   {
     "category": "empty-states",
@@ -491,7 +491,7 @@
       "Verify message is helpful (not just blank)",
       "Verify sidebar shows zero values appropriately"
     ],
-    "passes": true
+    "passes": false
   },
   {
     "category": "data-sources-git",
@@ -504,7 +504,7 @@
       "Verify repository name captured",
       "Verify insertions/deletions tracked"
     ],
-    "passes": true
+    "passes": false
   },
   {
     "category": "data-sources-git",
@@ -516,7 +516,7 @@
       "Verify each repo shows commit count",
       "Verify repos ordered by activity (most active first)"
     ],
-    "passes": true
+    "passes": false
   },
   {
     "category": "data-sources-git",
@@ -529,7 +529,7 @@
       "Verify git stats aggregate monthly",
       "Verify totals match sum of daily commits"
     ],
-    "passes": true
+    "passes": false
   },
   {
     "category": "data-sources-shell",
@@ -541,7 +541,7 @@
       "Verify total command count updates",
       "Verify shell type detected (bash, zsh, etc.)"
     ],
-    "passes": true
+    "passes": false
   },
   {
     "category": "data-sources-shell",
@@ -553,7 +553,7 @@
       "Verify command counts accurate",
       "Verify commands ordered by frequency"
     ],
-    "passes": true
+    "passes": false
   },
   {
     "category": "data-sources-shell",
@@ -565,7 +565,7 @@
       "Verify bash vs zsh vs other differentiated",
       "Verify counts per shell type"
     ],
-    "passes": true
+    "passes": false
   },
   {
     "category": "data-sources-files",
@@ -577,7 +577,7 @@
       "Verify total file events count",
       "Verify event types tracked (create, modify, delete)"
     ],
-    "passes": true
+    "passes": false
   },
   {
     "category": "data-sources-files",
@@ -589,7 +589,7 @@
       "Verify create/modify/delete counts shown",
       "Verify breakdown adds up to total"
     ],
-    "passes": true
+    "passes": false
   },
   {
     "category": "data-sources-files",
@@ -601,7 +601,7 @@
       "Verify common extensions (.ts, .go, .md) appear",
       "Verify extensions ordered by frequency"
     ],
-    "passes": true
+    "passes": false
   },
   {
     "category": "data-sources-browser",
@@ -613,7 +613,7 @@
       "Verify total visits count",
       "Verify unique domains count"
     ],
-    "passes": true
+    "passes": false
   },
   {
     "category": "data-sources-browser",
@@ -625,7 +625,7 @@
       "Verify domains show visit counts",
       "Verify domains ordered by frequency"
     ],
-    "passes": true
+    "passes": false
   },
   {
     "category": "data-sources-browser",
@@ -637,7 +637,7 @@
       "Verify Chrome/Firefox/etc differentiated",
       "Verify counts per browser"
     ],
-    "passes": true
+    "passes": false
   },
   {
     "category": "data-sources-integration",
@@ -649,7 +649,7 @@
       "Verify each section shows summary stats",
       "Verify sections collapsible or expandable"
     ],
-    "passes": true
+    "passes": false
   },
   {
     "category": "data-sources-integration",
@@ -662,7 +662,7 @@
       "Verify shell activity mentioned if any",
       "Verify file changes mentioned if any"
     ],
-    "passes": true
+    "passes": false
   },
   {
     "category": "data-sources-integration",
@@ -674,7 +674,7 @@
       "Verify gitCommits count displayed",
       "Verify filesModified count displayed"
     ],
-    "passes": true
+    "passes": false
   },
   {
     "category": "unified-timeline",

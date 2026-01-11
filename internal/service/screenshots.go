@@ -200,7 +200,7 @@ func (s *ScreenshotService) GetScreenshotInfo(id int64) (*ScreenshotInfo, error)
 		info.WindowTitle = screenshot.WindowTitle.String
 	}
 	if screenshot.AppName.Valid {
-		info.AppName = screenshot.AppName.String
+		info.AppName = GetFriendlyAppName(screenshot.AppName.String)
 	}
 	if screenshot.SessionID.Valid {
 		info.SessionID = screenshot.SessionID.Int64

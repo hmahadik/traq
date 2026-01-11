@@ -1,4 +1,4 @@
-import { Database, FolderOpen, HardDrive, Image, Monitor, Sparkles } from 'lucide-react';
+import { Database, FolderOpen, HardDrive, Image, Monitor, Sparkles, Bell, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   Dialog,
@@ -20,7 +20,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Progress } from '@/components/ui/progress';
-import { useConfig, useUpdateConfig, useInferenceStatus, useAvailableModels, useDownloadModel, useServerStatus, useDownloadServer, useStorageStats, useOpenDataDir, useDataDir, useOptimizeDatabase, useAvailableMonitors } from '@/api/hooks';
+import { useConfig, useUpdateConfig, useInferenceStatus, useAvailableModels, useDownloadModel, useServerStatus, useDownloadServer, useStorageStats, useOpenDataDir, useDataDir, useOptimizeDatabase, useAvailableMonitors, useTestIssueWebhook } from '@/api/hooks';
 import { formatBytes } from '@/lib/utils';
 import { CategoriesTab } from '@/components/settings/CategoriesTab';
 import { TimelineCategoriesTab } from '@/components/settings/TimelineCategoriesTab';
@@ -46,6 +46,7 @@ export function SettingsDrawer({ open, onOpenChange }: SettingsDrawerProps) {
   const updateConfig = useUpdateConfig();
   const openDataDir = useOpenDataDir();
   const optimizeDatabase = useOptimizeDatabase();
+  const testWebhook = useTestIssueWebhook();
 
   const handleOptimizeDatabase = async () => {
     try {
@@ -1012,6 +1013,57 @@ export function SettingsDrawer({ open, onOpenChange }: SettingsDrawerProps) {
                   })
                 }
               />
+            </div>
+
+            {/* Crash Report Webhook */}
+            <div className="space-y-3 pt-4 border-t">
+              <div className="flex items-center gap-2">
+                <Bell className="h-4 w-4" />
+                <label className="text-sm font-medium">Crash Report Notifications</label>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Get notified when the app crashes via webhook (Slack, Discord, Teams, etc.)
+              </p>
+              <div className="flex items-center justify-between">
+                <span className="text-sm">Enable webhook</span>
+                <Switch
+                  checked={config.issues?.webhookEnabled || false}
+                  onCheckedChange={(enabled) =>
+                    updateConfig.mutate({
+                      issues: { ...config.issues, webhookEnabled: enabled },
+                    })
+                  }
+                />
+              </div>
+              {(config.issues?.webhookEnabled || false) && (
+                <div className="space-y-2">
+                  <Input
+                    placeholder="https://hooks.slack.com/services/..."
+                    value={config.issues?.webhookUrl || ''}
+                    onChange={(e) =>
+                      updateConfig.mutate({
+                        issues: { ...config.issues, webhookUrl: e.target.value },
+                      })
+                    }
+                  />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full"
+                    onClick={() => testWebhook.mutate()}
+                    disabled={testWebhook.isPending || !config.issues?.webhookUrl}
+                  >
+                    {testWebhook.isPending ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Sending...
+                      </>
+                    ) : (
+                      'Send Test Notification'
+                    )}
+                  </Button>
+                </div>
+              )}
             </div>
 
             <div className="pt-4 space-y-2">

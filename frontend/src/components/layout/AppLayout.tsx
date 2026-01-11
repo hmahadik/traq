@@ -5,6 +5,7 @@ import { useTheme } from '../../hooks/useTheme';
 import { Sidebar } from './Sidebar';
 import { SettingsDrawer } from './SettingsDrawer';
 import { DateProvider } from '@/contexts';
+import { GlobalErrorHandler } from '@/components/common/GlobalErrorHandler';
 
 export function AppLayout() {
   useTheme();
@@ -12,17 +13,19 @@ export function AppLayout() {
 
   return (
     <DateProvider>
-      <div className="relative min-h-screen bg-background">
-        <Sidebar onSettingsClick={() => setSettingsOpen(true)} />
-        {/* Main content - offset by sidebar width on desktop */}
-        <main className="lg:pl-20 min-h-screen">
-          <div className="px-4 sm:px-6 py-6">
-            <Outlet />
-          </div>
-        </main>
-        <SettingsDrawer open={settingsOpen} onOpenChange={setSettingsOpen} />
-        <Toaster position="bottom-right" />
-      </div>
+      <GlobalErrorHandler>
+        <div className="relative min-h-screen bg-background">
+          <Sidebar onSettingsClick={() => setSettingsOpen(true)} />
+          {/* Main content - offset by sidebar width on desktop */}
+          <main className="lg:pl-20 min-h-screen">
+            <div className="px-4 sm:px-6 py-6">
+              <Outlet />
+            </div>
+          </main>
+          <SettingsDrawer open={settingsOpen} onOpenChange={setSettingsOpen} />
+          <Toaster position="bottom-right" />
+        </div>
+      </GlobalErrorHandler>
     </DateProvider>
   );
 }

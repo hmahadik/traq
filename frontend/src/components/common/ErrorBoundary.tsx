@@ -1,10 +1,16 @@
-import { useRouteError, isRouteErrorResponse, useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useRouteError, isRouteErrorResponse, useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { AlertTriangle, Home, RefreshCw } from 'lucide-react';
+import { AlertTriangle, Home, RefreshCw, Bug } from 'lucide-react';
+import { api } from '@/api/client';
+import { ReportIssueDialog } from './ReportIssueDialog';
 
 export function RouteErrorBoundary() {
   const error = useRouteError();
   const navigate = useNavigate();
+  const location = useLocation();
+  const [reportDialogOpen, setReportDialogOpen] = useState(false);
+  const [hasAutoReported, setHasAutoReported] = useState(false);
 
   let title = 'Unexpected Application Error';
   let message = 'Something went wrong. Please try again.';
@@ -20,12 +26,26 @@ export function RouteErrorBoundary() {
     message = error;
   }
 
+  // Auto-report crash on mount (once)
+  useEffect(() => {
+    if (!hasAutoReported) {
+      setHasAutoReported(true);
+      api.issues
+        .report('crash', message, details || '', 'Auto-captured from route error boundary', location.pathname)
+        .catch((err) => console.error('[ErrorBoundary] Failed to auto-report:', err));
+    }
+  }, [hasAutoReported, message, details, location.pathname]);
+
   const handleRetry = () => {
     window.location.reload();
   };
 
   const handleGoHome = () => {
     navigate('/', { replace: true });
+  };
+
+  const handleReportIssue = () => {
+    setReportDialogOpen(true);
   };
 
   return (
@@ -53,17 +73,31 @@ export function RouteErrorBoundary() {
           </details>
         )}
 
-        <div className="flex gap-3 justify-center">
+        <div className="flex flex-wrap gap-3 justify-center">
           <Button variant="outline" onClick={handleGoHome}>
             <Home className="mr-2 h-4 w-4" />
             Go Home
+          </Button>
+          <Button variant="outline" onClick={handleReportIssue}>
+            <Bug className="mr-2 h-4 w-4" />
+            Report Issue
           </Button>
           <Button onClick={handleRetry}>
             <RefreshCw className="mr-2 h-4 w-4" />
             Try Again
           </Button>
         </div>
+
+        <p className="text-xs text-muted-foreground">
+          This error has been automatically reported.
+        </p>
       </div>
+
+      <ReportIssueDialog
+        open={reportDialogOpen}
+        onOpenChange={setReportDialogOpen}
+        prefillError={{ message, stack: details }}
+      />
     </div>
   );
 }

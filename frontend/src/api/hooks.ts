@@ -755,3 +755,82 @@ export function useDeleteHierarchicalSummary() {
     },
   });
 }
+
+// ============================================================================
+// Issue Reporting Hooks
+// ============================================================================
+
+export function useIssueReports(limit: number = 50) {
+  return useQuery({
+    queryKey: ['issues', 'all', limit],
+    queryFn: () => api.issues.getAll(limit),
+    staleTime: 30_000,
+  });
+}
+
+export function useIssueReport(id: number) {
+  return useQuery({
+    queryKey: ['issues', id],
+    queryFn: () => api.issues.get(id),
+    enabled: id > 0,
+    staleTime: 60_000,
+  });
+}
+
+export function useReportIssue() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      reportType,
+      errorMessage,
+      stackTrace,
+      userDescription,
+      pageRoute,
+    }: {
+      reportType: 'crash' | 'manual';
+      errorMessage: string;
+      stackTrace: string;
+      userDescription: string;
+      pageRoute: string;
+    }) => api.issues.report(reportType, errorMessage, stackTrace, userDescription, pageRoute),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['issues'] });
+      toast.success('Issue reported successfully');
+    },
+    onError: (error: unknown) => {
+      console.error('Report issue failed:', error);
+      const message = error instanceof Error ? error.message : String(error);
+      toast.error(`Failed to report issue: ${message}`);
+    },
+  });
+}
+
+export function useDeleteIssueReport() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: number) => api.issues.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['issues'] });
+      toast.success('Issue report deleted');
+    },
+    onError: (error: unknown) => {
+      console.error('Delete issue failed:', error);
+      toast.error('Failed to delete issue report');
+    },
+  });
+}
+
+export function useTestIssueWebhook() {
+  return useMutation({
+    mutationFn: () => api.issues.testWebhook(),
+    onSuccess: () => {
+      toast.success('Test notification sent');
+    },
+    onError: (error: unknown) => {
+      const message = error instanceof Error ? error.message : String(error);
+      toast.error(`Webhook test failed: ${message}`);
+    },
+  });
+}

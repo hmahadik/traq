@@ -2,11 +2,19 @@ import { test as base } from '@playwright/test';
 import { TimelinePage } from '../pages/timeline.page';
 import { DayPage } from '../pages/day.page';
 import { SettingsDrawer } from '../pages/settings-drawer';
+import { AnalyticsPage } from '../pages/analytics.page';
+import { ReportsPage } from '../pages/reports.page';
+import { ScreenshotsPage } from '../pages/screenshots.page';
+import { IssueReportDialog } from '../pages/issue-dialog';
 
 type Fixtures = {
   timelinePage: TimelinePage;
   dayPage: DayPage;
   settingsDrawer: SettingsDrawer;
+  analyticsPage: AnalyticsPage;
+  reportsPage: ReportsPage;
+  screenshotsPage: ScreenshotsPage;
+  issueDialog: IssueReportDialog;
 };
 
 export const test = base.extend<Fixtures>({
@@ -18,6 +26,18 @@ export const test = base.extend<Fixtures>({
   },
   settingsDrawer: async ({ page }, use) => {
     await use(new SettingsDrawer(page));
+  },
+  analyticsPage: async ({ page }, use) => {
+    await use(new AnalyticsPage(page));
+  },
+  reportsPage: async ({ page }, use) => {
+    await use(new ReportsPage(page));
+  },
+  screenshotsPage: async ({ page }, use) => {
+    await use(new ScreenshotsPage(page));
+  },
+  issueDialog: async ({ page }, use) => {
+    await use(new IssueReportDialog(page));
   },
 });
 

@@ -42,6 +42,13 @@ type Config struct {
 	DataSources *DataSourcesConfig `json:"dataSources"`
 	UI          *UIConfig          `json:"ui"`
 	System      *SystemConfig      `json:"system"`
+	Issues      *IssuesConfig      `json:"issues"`
+}
+
+// IssuesConfig contains issue reporting settings.
+type IssuesConfig struct {
+	WebhookEnabled bool   `json:"webhookEnabled"`
+	WebhookUrl     string `json:"webhookUrl"`
 }
 
 // InferenceConfig contains AI inference settings.
@@ -255,6 +262,18 @@ func (s *ConfigService) GetConfig() (*Config, error) {
 		}
 	}
 
+	// Issues settings
+	config.Issues = &IssuesConfig{
+		WebhookEnabled: false,
+		WebhookUrl:     "",
+	}
+	if val, err := s.store.GetConfig("issues.webhookEnabled"); err == nil {
+		config.Issues.WebhookEnabled = val == "true"
+	}
+	if val, err := s.store.GetConfig("issues.webhookUrl"); err == nil && val != "" {
+		config.Issues.WebhookUrl = val
+	}
+
 	// Inference settings
 	if val, err := s.store.GetConfig("inference.engine"); err == nil && val != "" {
 		config.Inference.Engine = val
@@ -412,6 +431,10 @@ func mapToStorageKey(frontendKey string) string {
 		"inference.cloud.apiKey":   "inference.cloud.apiKey",
 		"inference.cloud.model":    "inference.cloud.model",
 		"inference.cloud.endpoint": "inference.cloud.endpoint",
+
+		// Issues settings
+		"issues.webhookEnabled": "issues.webhookEnabled",
+		"issues.webhookUrl":     "issues.webhookUrl",
 	}
 
 	if storageKey, ok := keyMap[frontendKey]; ok {

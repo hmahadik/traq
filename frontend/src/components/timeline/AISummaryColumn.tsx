@@ -11,6 +11,7 @@ import {
 interface AISummaryColumnProps {
   sessionSummaries: SessionSummaryWithPosition[];
   hours: number[]; // Array of hours for grid alignment
+  onSessionClick?: (session: SessionSummaryWithPosition) => void;
 }
 
 // Category to border color mapping (Timely-style)
@@ -24,6 +25,7 @@ const CATEGORY_BORDERS: Record<string, string> = {
 export const AISummaryColumn: React.FC<AISummaryColumnProps> = ({
   sessionSummaries,
   hours,
+  onSessionClick,
 }) => {
   // Process sessions to snap to 15-minute boundaries for cleaner display
   const snappedSessions = useMemo(() => {
@@ -147,6 +149,9 @@ export const AISummaryColumn: React.FC<AISummaryColumnProps> = ({
                         top: `${absoluteTop}px`,
                         height: `${actualHeight}px`,
                       }}
+                      onClick={() => onSessionClick?.(session)}
+                      role="button"
+                      aria-label={`Session from ${formatTime(session.startTime)} - ${session.summary || 'No summary'}`}
                     >
                       <div className="p-2 h-full flex flex-col">
                         {showTime && (

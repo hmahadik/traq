@@ -45,8 +45,41 @@ type ReportMeta struct {
 	CreatedAt  int64  `json:"createdAt"`
 }
 
+// Report is the service-layer report type with plain strings (not sql.Null types).
+type Report struct {
+	ID         int64  `json:"id"`
+	Title      string `json:"title"`
+	TimeRange  string `json:"timeRange"`
+	ReportType string `json:"reportType"`
+	Format     string `json:"format"`
+	Content    string `json:"content"`
+	Filepath   string `json:"filepath"`
+	StartTime  int64  `json:"startTime"`
+	EndTime    int64  `json:"endTime"`
+	CreatedAt  int64  `json:"createdAt"`
+}
+
+// toServiceReport converts a storage report to a service report.
+func toServiceReport(r *storage.Report) *Report {
+	if r == nil {
+		return nil
+	}
+	return &Report{
+		ID:         r.ID,
+		Title:      r.Title,
+		TimeRange:  r.TimeRange,
+		ReportType: r.ReportType,
+		Format:     r.Format,
+		Content:    r.Content.String,
+		Filepath:   r.Filepath.String,
+		StartTime:  r.StartTime.Int64,
+		EndTime:    r.EndTime.Int64,
+		CreatedAt:  r.CreatedAt,
+	}
+}
+
 // GenerateReport generates a new report for the given time range.
-func (s *ReportsService) GenerateReport(timeRange, reportType string, includeScreenshots bool) (*storage.Report, error) {
+func (s *ReportsService) GenerateReport(timeRange, reportType string, includeScreenshots bool) (*Report, error) {
 	// Parse time range
 	tr, err := s.ParseTimeRange(timeRange)
 	if err != nil {
@@ -69,7 +102,7 @@ func (s *ReportsService) GenerateReport(timeRange, reportType string, includeScr
 	}
 
 	// Save report
-	report := &storage.Report{
+	storageReport := &storage.Report{
 		Title:      fmt.Sprintf("%s Report: %s", strings.Title(reportType), tr.Label),
 		TimeRange:  timeRange,
 		ReportType: reportType,
@@ -79,13 +112,13 @@ func (s *ReportsService) GenerateReport(timeRange, reportType string, includeScr
 		EndTime:    storage.NullInt64(tr.End),
 	}
 
-	id, err := s.store.SaveReport(report)
+	id, err := s.store.SaveReport(storageReport)
 	if err != nil {
 		return nil, err
 	}
-	report.ID = id
+	storageReport.ID = id
 
-	return report, nil
+	return toServiceReport(storageReport), nil
 }
 
 // generateSummaryReport creates a brief summary report.
@@ -153,7 +186,7 @@ func (s *ReportsService) generateSummaryReport(tr *TimeRange, includeScreenshots
 			for i := 0; i < len(screenshots) && count < 5; i += step {
 				ss := screenshots[i]
 				timestamp := time.Unix(ss.Timestamp, 0).Format("3:04 PM")
-				sb.WriteString(fmt.Sprintf("- **%s** - %s\n", timestamp, ss.AppName.String))
+				sb.WriteString(fmt.Sprintf("- **%s** - %s\n", timestamp, GetFriendlyAppName(ss.AppName.String)))
 				sb.WriteString(fmt.Sprintf("  ![Screenshot](%s)\n\n", ss.Filepath))
 				count++
 			}
@@ -212,7 +245,7 @@ func (s *ReportsService) generateDetailedReport(tr *TimeRange, includeScreenshot
 			}
 			for app, dur := range appDurations {
 				minutes := int(dur / 60)
-				sb.WriteString(fmt.Sprintf("| %s | %dm |\n", app, minutes))
+				sb.WriteString(fmt.Sprintf("| %s | %dm |\n", GetFriendlyAppName(app), minutes))
 			}
 			sb.WriteString("\n")
 		}
@@ -280,10 +313,11 @@ func (s *ReportsService) generateStandupReport(tr *TimeRange, includeScreenshots
 	for app, dur := range appDurations {
 		hours := int(dur / 3600)
 		minutes := int((dur - float64(hours*3600)) / 60)
+		friendlyApp := GetFriendlyAppName(app)
 		if hours > 0 {
-			sb.WriteString(fmt.Sprintf("- **%s:** %dh %dm\n", app, hours, minutes))
+			sb.WriteString(fmt.Sprintf("- **%s:** %dh %dm\n", friendlyApp, hours, minutes))
 		} else {
-			sb.WriteString(fmt.Sprintf("- **%s:** %dm\n", app, minutes))
+			sb.WriteString(fmt.Sprintf("- **%s:** %dm\n", friendlyApp, minutes))
 		}
 	}
 
@@ -424,8 +458,12 @@ func (s *ReportsService) markdownToPDF(title, md string) (string, error) {
 }
 
 // GetReport returns a report by ID with full content.
-func (s *ReportsService) GetReport(id int64) (*storage.Report, error) {
-	return s.store.GetReport(id)
+func (s *ReportsService) GetReport(id int64) (*Report, error) {
+	storageReport, err := s.store.GetReport(id)
+	if err != nil {
+		return nil, err
+	}
+	return toServiceReport(storageReport), nil
 }
 
 // DailySummary represents a daily summary report for the list view.

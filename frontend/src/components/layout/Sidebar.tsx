@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Clock, PieChart, ClipboardList, Camera, Image, Loader2, Menu, X, Pause, Play, Settings } from 'lucide-react';
+import { Clock, PieChart, ClipboardList, Camera, Image, Loader2, Menu, X, Pause, Play, Settings, Bug } from 'lucide-react';
 import logoSrc from '@/assets/logo-minimal.svg';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
 import { system, api } from '@/api/client';
+import { ReportIssueDialog } from '@/components/common/ReportIssueDialog';
 
 const navItems = [
   { to: '/', label: 'Timeline', icon: Clock },
@@ -24,6 +25,7 @@ export function Sidebar({ onSettingsClick }: SidebarProps) {
   const [isCapturing, setIsCapturing] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [reportDialogOpen, setReportDialogOpen] = useState(false);
 
   // Fetch initial pause state and poll for updates
   useEffect(() => {
@@ -174,6 +176,25 @@ export function Sidebar({ onSettingsClick }: SidebarProps) {
             <TooltipTrigger asChild>
               <Button
                 variant="ghost"
+                className="w-full flex flex-col items-center gap-1 h-auto py-2 transition-colors duration-75 text-orange-500 hover:text-orange-600"
+                onClick={() => {
+                  setReportDialogOpen(true);
+                  setMobileMenuOpen(false);
+                }}
+                aria-label="Report Issue"
+              >
+                <Bug className="h-5 w-5" />
+                <span className="text-xs font-medium">Report</span>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="right">
+              <p>Report an issue or bug</p>
+            </TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
                 className="w-full flex flex-col items-center gap-1 h-auto py-2 transition-colors duration-75"
                 onClick={() => {
                   onSettingsClick?.();
@@ -229,6 +250,12 @@ export function Sidebar({ onSettingsClick }: SidebarProps) {
       >
         {sidebarContent}
       </aside>
+
+      {/* Report Issue Dialog */}
+      <ReportIssueDialog
+        open={reportDialogOpen}
+        onOpenChange={setReportDialogOpen}
+      />
     </>
   );
 }

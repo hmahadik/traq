@@ -33,7 +33,7 @@ export const TopAppsSection: React.FC<TopAppsSectionProps> = ({ topApps }) => {
   if (topApps.length === 0) {
     return (
       <Card className="p-4">
-        <div className="text-sm font-semibold mb-3">📊 Top Apps</div>
+        <div className="text-sm font-semibold mb-3">Top Apps</div>
         <div className="text-sm text-muted-foreground">No apps tracked yet</div>
       </Card>
     );
@@ -41,7 +41,7 @@ export const TopAppsSection: React.FC<TopAppsSectionProps> = ({ topApps }) => {
 
   return (
     <Card className="p-4">
-      <div className="text-sm font-semibold mb-3">📊 Top Apps</div>
+      <div className="text-sm font-semibold mb-3">Top Apps</div>
       <div className="space-y-2">
         {topApps.map((app, index) => {
           const colorClass =

@@ -798,6 +798,64 @@ export const hierarchicalSummaries = {
   },
 };
 
+/**
+ * Issue Reporting API - Crash reports and manual issue flagging
+ */
+export interface IssueReport {
+  id: number;
+  reportType: 'crash' | 'manual';
+  errorMessage: string;
+  stackTrace: string;
+  screenshotIds: number[];
+  sessionId: number;
+  userDescription: string;
+  appVersion: string;
+  pageRoute: string;
+  webhookSent: boolean;
+  createdAt: number;
+}
+
+export const issues = {
+  /** Report an issue (crash or manual) */
+  report: async (
+    reportType: 'crash' | 'manual',
+    errorMessage: string,
+    stackTrace: string,
+    userDescription: string,
+    pageRoute: string
+  ): Promise<IssueReport | null> => {
+    await waitForReady();
+    return withRetry(() =>
+      App.ReportIssue(reportType, errorMessage, stackTrace, userDescription, pageRoute)
+    );
+  },
+
+  /** Get recent issue reports */
+  getAll: async (limit: number = 50): Promise<IssueReport[]> => {
+    await waitForReady();
+    const reports = await withRetry(() => App.GetIssueReports(limit));
+    return reports || [];
+  },
+
+  /** Get a single issue report by ID */
+  get: async (id: number): Promise<IssueReport | null> => {
+    await waitForReady();
+    return withRetry(() => App.GetIssueReport(id));
+  },
+
+  /** Delete an issue report */
+  delete: async (id: number): Promise<void> => {
+    await waitForReady();
+    return App.DeleteIssueReport(id);
+  },
+
+  /** Test the webhook configuration */
+  testWebhook: async (): Promise<void> => {
+    await waitForReady();
+    return App.TestIssueWebhook();
+  },
+};
+
 // Unified API export
 export const api = {
   analytics,
@@ -811,4 +869,5 @@ export const api = {
   fileWatch,
   tags,
   hierarchicalSummaries,
+  issues,
 };
