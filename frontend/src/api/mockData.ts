@@ -660,4 +660,200 @@ export const mockData = {
   getThumbnailUrl: (id: number): string => {
     return `https://via.placeholder.com/200x112/1a1a2e/16213e?text=${id}`;
   },
+
+  getTimelineGridData: (date: string) => {
+    const dayStart = dateToTimestamp(date);
+
+    // Timeline v3 Reference Data (8:04 AM - 4:32 PM)
+    const startTime = dayStart + 8 * hour + 4 * 60;  // 8:04 AM
+    const endTime = dayStart + 16 * hour + 32 * 60;  // 4:32 PM
+
+    // Helper to create activity blocks
+    const createBlock = (
+      id: number,
+      appName: string,
+      windowTitle: string,
+      start: number,
+      end: number,
+      category: string
+    ) => {
+      const duration = end - start;
+      const hourOffset = Math.floor((start - dayStart) / hour);
+      const minuteOffset = Math.floor(((start - dayStart) % hour) / 60);
+      const pixelPosition = (minuteOffset / 60) * 60; // 0-60 pixels within the hour
+      const pixelHeight = Math.max(4, (duration / hour) * 60); // Min 4px
+
+      return {
+        id,
+        windowTitle,
+        appName,
+        startTime: start,
+        endTime: end,
+        durationSeconds: duration,
+        category,
+        hourOffset,
+        minuteOffset,
+        pixelPosition,
+        pixelHeight,
+      };
+    };
+
+    const dayStats = {
+      totalSeconds: 6 * 3600 + 42 * 60, // 6h 42m
+      totalHours: 6.7,
+      breakCount: 3,
+      breakDuration: 42 * 60, // 42m
+      longestFocus: 1 * 3600 + 48 * 60, // 1h 48m
+      daySpan: {
+        startTime,
+        endTime,
+        spanHours: 8.5, // ~8.5 hours from 8:04 AM to 4:32 PM
+      },
+      breakdown: {
+        focus: 3 * 3600 + 42 * 60, // 3h 42m
+        meetings: 1 * 3600 + 12 * 60, // 1h 12m
+        comms: 48 * 60, // 48m
+        other: 0,
+      },
+      breakdownPercent: {
+        focus: 55,
+        meetings: 18,
+        comms: 12,
+        other: 15, // Includes breaks
+      },
+    };
+
+    const topApps = [
+      { appName: 'VS Code', duration: 3 * 3600 + 24 * 60, category: 'focus' }, // 3h 24m
+      { appName: 'Chrome', duration: 1 * 3600 + 18 * 60, category: 'focus' }, // 1h 18m
+      { appName: 'Calendar', duration: 1 * 3600 + 15 * 60, category: 'meetings' }, // 1h 15m
+      { appName: 'Slack', duration: 32 * 60, category: 'comms' }, // 32m
+      { appName: 'Terminal', duration: 16 * 60, category: 'focus' }, // 16m
+    ];
+
+    // Activity blocks for Summary column
+    const summaryBlocks = [
+      createBlock(1, 'TimelinePage.tsx', 'TimelinePage.tsx', dayStart + 8 * hour + 4 * 60, dayStart + 8 * hour + 59 * 60, 'focus'), // 8:04-8:59
+      createBlock(2, 'Eng All-Hands', 'Eng All-Hands', dayStart + 9 * hour, dayStart + 10 * hour + 15 * 60, 'meetings'), // 9:00-10:15
+      createBlock(3, '(cont.)', '(cont.)', dayStart + 10 * hour, dayStart + 10 * hour + 15 * 60, 'meetings'), // 10:00-10:15 continuation
+      createBlock(4, 'React Query Docs', 'React Query Docs', dayStart + 10 * hour + 18 * 60, dayStart + 10 * hour + 52 * 60, 'focus'), // 10:18-10:52
+      createBlock(5, 'MultiLaneTimeline', 'MultiLaneTimeline', dayStart + 11 * hour, dayStart + 11 * hour + 58 * 60, 'focus'), // 11:00-11:58
+      createBlock(6, 'Lunch + Slack', 'Lunch + Slack', dayStart + 12 * hour, dayStart + 12 * hour + 45 * 60, 'comms'), // 12:00-12:45
+      createBlock(7, 'ActivityBlock.tsx', 'ActivityBlock.tsx', dayStart + 13 * hour, dayStart + 13 * hour + 55 * 60, 'focus'), // 1:00-1:55
+      createBlock(8, 'Pair w/ Alex', 'Pair w/ Alex', dayStart + 14 * hour, dayStart + 14 * hour + 55 * 60, 'meetings'), // 2:00-2:55
+      createBlock(9, 'Final touches', 'Final touches', dayStart + 15 * hour, dayStart + 15 * hour + 32 * 60, 'focus'), // 3:00-3:32
+    ];
+
+    // VS Code blocks
+    const vsCodeBlocks = [
+      createBlock(11, 'VS Code', 'TimelinePage.tsx', dayStart + 8 * hour + 4 * 60, dayStart + 8 * hour + 59 * 60, 'focus'), // 55m
+      createBlock(12, 'VS Code', 'hooks.ts', dayStart + 10 * hour + 42 * 60, dayStart + 10 * hour + 56 * 60, 'focus'), // 14m
+      createBlock(13, 'VS Code', 'MultiLaneTimeline', dayStart + 11 * hour, dayStart + 11 * hour + 58 * 60, 'focus'), // 58m
+      createBlock(14, 'VS Code', 'ActivityBlock.tsx', dayStart + 13 * hour, dayStart + 13 * hour + 48 * 60, 'focus'), // 48m
+      createBlock(15, 'VS Code', 'Pair session', dayStart + 14 * hour, dayStart + 14 * hour + 55 * 60, 'focus'), // 55m
+      createBlock(16, 'VS Code', 'Final cleanup', dayStart + 15 * hour, dayStart + 15 * hour + 32 * 60, 'focus'), // 32m
+    ];
+
+    // Chrome blocks
+    const chromeBlocks = [
+      createBlock(21, 'Chrome', 'Stack Overflow', dayStart + 8 * hour + 8 * 60, dayStart + 8 * hour + 28 * 60, 'focus'), // 20m
+      createBlock(22, 'Chrome', 'GitHub PR', dayStart + 8 * hour + 34 * 60, dayStart + 8 * hour + 52 * 60, 'focus'), // 18m
+      createBlock(23, 'Chrome', 'Meeting notes', dayStart + 9 * hour + 36 * 60, dayStart + 9 * hour + 56 * 60, 'focus'), // 20m
+      createBlock(24, 'Chrome', 'React Query Docs', dayStart + 10 * hour + 18 * 60, dayStart + 10 * hour + 52 * 60, 'focus'), // 34m
+      createBlock(25, 'Chrome', 'MDN Web Docs', dayStart + 11 * hour + 40 * 60, dayStart + 11 * hour + 56 * 60, 'focus'), // 16m
+      createBlock(26, 'Chrome', 'Hacker News', dayStart + 12 * hour + 10 * 60, dayStart + 12 * hour + 40 * 60, 'comms'), // 30m
+      createBlock(27, 'Chrome', 'Docs', dayStart + 13 * hour + 50 * 60, dayStart + 13 * hour + 58 * 60, 'focus'), // 8m
+    ];
+
+    // Calendar blocks
+    const calendarBlocks = [
+      createBlock(31, 'Calendar', 'Eng All-Hands', dayStart + 9 * hour, dayStart + 10 * hour + 15 * 60, 'meetings'), // 1h 15m
+      createBlock(32, 'Calendar', '(cont.)', dayStart + 10 * hour, dayStart + 10 * hour + 15 * 60, 'meetings'), // continuation
+    ];
+
+    // Slack blocks
+    const slackBlocks = [
+      createBlock(41, 'Slack', '#dev', dayStart + 8 * hour + 32 * 60, dayStart + 8 * hour + 48 * 60, 'comms'), // 16m
+      createBlock(42, 'Slack', '#general', dayStart + 9 * hour + 20 * 60, dayStart + 9 * hour + 32 * 60, 'comms'), // 12m
+      createBlock(43, 'Slack', '#random', dayStart + 12 * hour, dayStart + 12 * hour + 18 * 60, 'comms'), // 18m
+      createBlock(44, 'Slack', 'DM Alex', dayStart + 14 * hour + 42 * 60, dayStart + 14 * hour + 56 * 60, 'comms'), // 14m
+      createBlock(45, 'Slack', '#dev - Done!', dayStart + 15 * hour + 28 * 60, dayStart + 15 * hour + 42 * 60, 'comms'), // 14m
+    ];
+
+    // Terminal blocks
+    const terminalBlocks = [
+      createBlock(51, 'Terminal', 'npm run dev', dayStart + 8 * hour + 6 * 60, dayStart + 8 * hour + 20 * 60, 'focus'), // 14m
+      createBlock(52, 'Terminal', 'git status', dayStart + 11 * hour + 36 * 60, dayStart + 11 * hour + 48 * 60, 'focus'), // 12m
+      createBlock(53, 'Terminal', 'npm test', dayStart + 13 * hour + 48 * 60, dayStart + 13 * hour + 58 * 60, 'focus'), // 10m
+      createBlock(54, 'Terminal', 'git push', dayStart + 15 * hour + 30 * 60, dayStart + 15 * hour + 40 * 60, 'focus'), // 10m
+    ];
+
+    // Build hourly grid - organize blocks by hour and app name
+    const hourlyGrid: Record<number, Record<string, any[]>> = {};
+    const allBlocks = [
+      ...vsCodeBlocks,
+      ...chromeBlocks,
+      ...calendarBlocks,
+      ...slackBlocks,
+      ...terminalBlocks,
+    ];
+
+    allBlocks.forEach((block) => {
+      const hour = block.hourOffset;
+      if (!hourlyGrid[hour]) {
+        hourlyGrid[hour] = {};
+      }
+
+      const appName = block.appName;
+      if (!hourlyGrid[hour][appName]) {
+        hourlyGrid[hour][appName] = [];
+      }
+      hourlyGrid[hour][appName].push(block);
+    });
+
+    // Session summaries for the day
+    const sessionSummaries = [
+      {
+        id: 1,
+        startTime: dayStart + 8 * hour + 4 * 60,
+        endTime: dayStart + 8 * hour + 59 * 60,
+        durationSeconds: 55 * 60,
+        isOngoing: false,
+        screenshotCount: 10,
+        summary: 'Morning development on TimelinePage component',
+        explanation: 'Focused coding session',
+        confidence: 'high',
+        tags: ['coding', 'frontend'],
+        topApps: ['VS Code', 'Chrome'],
+        hasShell: true,
+        hasGit: false,
+        hasFiles: false,
+        hasBrowser: false,
+        hourOffset: 8,
+        minuteOffset: 4,
+        pixelPosition: 4,
+        pixelHeight: 55,
+        category: 'focus',
+      },
+    ];
+
+    return {
+      date,
+      dayStats,
+      topApps,
+      hourlyGrid,
+      sessionSummaries,
+      categories: {
+        'VS Code': 'focus',
+        'Chrome': 'focus',
+        'Calendar': 'meetings',
+        'Slack': 'comms',
+        'Terminal': 'focus',
+        'code': 'focus',
+        'meeting': 'meetings',
+        'browser': 'focus',
+        'comms': 'comms',
+      },
+    };
+  },
 };

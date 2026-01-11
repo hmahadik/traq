@@ -41,7 +41,7 @@ export const DailySummaryCard: React.FC<DailySummaryCardProps> = ({ stats }) => 
       <div className="mb-6">
         <div className="text-sm text-muted-foreground mb-2">⏱️ Hours Worked</div>
         <div className="text-5xl font-bold bg-gradient-to-r from-primary via-purple-500 to-pink-500 bg-clip-text text-transparent">
-          {stats.totalHours.toFixed(1)}h
+          {formatDuration(stats.totalSeconds)}
         </div>
         <div className="text-sm text-muted-foreground mt-1">
           {Math.floor(stats.totalSeconds / 60)} minutes total
