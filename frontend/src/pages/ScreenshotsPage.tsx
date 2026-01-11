@@ -26,6 +26,8 @@ import {
   X,
   ZoomIn,
   Check,
+  ImageOff,
+  AlertCircle,
 } from 'lucide-react';
 import { useScreenshotsForDate, useScreenshotsForHour, useDeleteScreenshot } from '@/api/hooks';
 import { toast } from 'sonner';
@@ -70,6 +72,7 @@ export function ScreenshotsPage() {
   const [filterApp, setFilterApp] = useState<string>('all');
   const [filterHour, setFilterHour] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [failedImages, setFailedImages] = useState<Set<number>>(new Set());
   const [previewScreenshot, setPreviewScreenshot] = useState<{
     id: number;
     timestamp: number;
@@ -141,6 +144,7 @@ export function ScreenshotsPage() {
     setSelectedDate((d) => addDays(d, -1));
     setSelectedScreenshots(new Set());
     setFilterHour('all');
+    setFailedImages(new Set());
   }, []);
 
   const goToNextDay = useCallback(() => {
@@ -148,6 +152,7 @@ export function ScreenshotsPage() {
       setSelectedDate((d) => addDays(d, 1));
       setSelectedScreenshots(new Set());
       setFilterHour('all');
+      setFailedImages(new Set());
     }
   }, [isToday]);
 
@@ -218,6 +223,15 @@ export function ScreenshotsPage() {
     }
     return filepath;
   };
+
+  // Handle image load error
+  const handleImageError = useCallback((screenshotId: number) => {
+    setFailedImages((prev) => {
+      const next = new Set(prev);
+      next.add(screenshotId);
+      return next;
+    });
+  }, []);
 
   const formattedDate = selectedDate.toLocaleDateString('en-US', {
     weekday: 'long',
@@ -395,13 +409,21 @@ export function ScreenshotsPage() {
                     </div>
 
                     {/* Thumbnail */}
-                    <div className="aspect-video bg-muted rounded-t-lg overflow-hidden">
-                      <img
-                        src={getImageUrl(screenshot.filepath)}
-                        alt={windowTitle || 'Screenshot'}
-                        className="w-full h-full object-cover"
-                        loading="lazy"
-                      />
+                    <div className="aspect-video bg-muted rounded-t-lg overflow-hidden flex items-center justify-center">
+                      {failedImages.has(screenshot.id) ? (
+                        <div className="flex flex-col items-center justify-center gap-2 text-muted-foreground p-4">
+                          <ImageOff className="h-8 w-8" />
+                          <p className="text-xs text-center">File not found</p>
+                        </div>
+                      ) : (
+                        <img
+                          src={getImageUrl(screenshot.filepath)}
+                          alt={windowTitle || 'Screenshot'}
+                          className="w-full h-full object-cover"
+                          loading="lazy"
+                          onError={() => handleImageError(screenshot.id)}
+                        />
+                      )}
                     </div>
 
                     {/* Info */}
@@ -443,12 +465,24 @@ export function ScreenshotsPage() {
           </DialogHeader>
           {previewScreenshot && (
             <div className="space-y-4">
-              <div className="bg-muted rounded-lg overflow-hidden">
-                <img
-                  src={getImageUrl(previewScreenshot.filepath)}
-                  alt="Screenshot preview"
-                  className="w-full h-auto max-h-[70vh] object-contain"
-                />
+              <div className="bg-muted rounded-lg overflow-hidden flex items-center justify-center min-h-[300px]">
+                {failedImages.has(previewScreenshot.id) ? (
+                  <div className="flex flex-col items-center justify-center gap-3 text-muted-foreground p-8">
+                    <AlertCircle className="h-12 w-12" />
+                    <div className="text-center">
+                      <p className="text-lg font-medium">Screenshot file not found</p>
+                      <p className="text-sm mt-1">The file may have been moved or deleted</p>
+                      <p className="text-xs mt-2 font-mono text-muted-foreground/70">{previewScreenshot.filepath}</p>
+                    </div>
+                  </div>
+                ) : (
+                  <img
+                    src={getImageUrl(previewScreenshot.filepath)}
+                    alt="Screenshot preview"
+                    className="w-full h-auto max-h-[70vh] object-contain"
+                    onError={() => handleImageError(previewScreenshot.id)}
+                  />
+                )}
               </div>
               {extractString(previewScreenshot.windowTitle) && (
                 <p className="text-sm text-muted-foreground">

@@ -381,7 +381,7 @@
       "Verify 'File not found' or similar message shown",
       "Verify UI doesn't crash"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "journey-screenshots",
