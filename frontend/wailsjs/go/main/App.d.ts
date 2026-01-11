@@ -16,6 +16,8 @@ export function DeleteIssueReport(arg1:number):Promise<void>;
 
 export function DeleteModel(arg1:string):Promise<void>;
 
+export function DeleteReport(arg1:number):Promise<void>;
+
 export function DeleteScreenshot(arg1:number):Promise<void>;
 
 export function DeleteSession(arg1:number):Promise<void>;

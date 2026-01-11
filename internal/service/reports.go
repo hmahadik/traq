@@ -2,6 +2,7 @@ package service
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"regexp"
 	"strconv"
@@ -340,7 +341,19 @@ func (s *ReportsService) ExportReport(reportID int64, format string) (string, er
 	case "html":
 		return s.markdownToHTML(content), nil
 	case "json":
-		return fmt.Sprintf(`{"title":"%s","content":"%s"}`, report.Title, content), nil
+		// Use proper JSON encoding to handle special characters
+		jsonData := map[string]interface{}{
+			"title":     report.Title,
+			"content":   content,
+			"timeRange": report.TimeRange,
+			"type":      report.ReportType,
+			"createdAt": report.CreatedAt,
+		}
+		jsonBytes, err := json.Marshal(jsonData)
+		if err != nil {
+			return "", fmt.Errorf("failed to marshal JSON: %w", err)
+		}
+		return string(jsonBytes), nil
 	case "pdf":
 		return s.markdownToPDF(report.Title, content)
 	default: // markdown
@@ -688,4 +701,9 @@ func (s *ReportsService) ParseTimeRange(input string) (*TimeRange, error) {
 		EndDate:   end.Add(-time.Second).Format("2006-01-02"),
 		Label:     label,
 	}, nil
+}
+
+// DeleteReport deletes a report by ID.
+func (s *ReportsService) DeleteReport(reportID int64) error {
+	return s.store.DeleteReport(reportID)
 }

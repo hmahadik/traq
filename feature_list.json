@@ -208,7 +208,7 @@
       "Verify report appears in preview",
       "Repeat for 'Detailed' and 'Standup' types"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "journey-reports",
@@ -220,7 +220,7 @@
       "Enter 'last week' and generate - verify 7-day range",
       "Enter 'past 3 days' and generate - verify 3-day range"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "journey-reports",
@@ -232,7 +232,7 @@
       "Verify *italic* text renders as italic",
       "Verify `code` renders with background styling"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "journey-reports",
@@ -244,7 +244,7 @@
       "Verify not displaying raw pipe characters (| text |)",
       "Verify table is readable and aligned"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "journey-reports",
@@ -258,7 +258,7 @@
       "Click 'JSON' export button",
       "Verify browser downloads a .json file"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "journey-reports",
@@ -271,7 +271,7 @@
       "Verify no parse errors occur",
       "Verify content with special characters preserved correctly"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "journey-reports",
@@ -284,7 +284,7 @@
       "Verify report removed from history list",
       "Refresh page and verify report still gone"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "journey-reports",

@@ -157,9 +157,67 @@ function RenderedMarkdown({ content }: { content: string | null }) {
   const elements: React.ReactNode[] = [];
   let inCodeBlock = false;
   let codeBlockContent = '';
+  let inTable = false;
+  let tableRows: string[] = [];
+
+  const flushTable = (startIndex: number) => {
+    if (tableRows.length === 0) return;
+
+    // First row is header, second is separator, rest are data
+    const headerRow = tableRows[0];
+    const dataRows = tableRows.slice(2); // Skip separator row
+
+    // Parse header
+    const headers = headerRow
+      .split('|')
+      .map((h) => h.trim())
+      .filter((h) => h);
+
+    // Parse data rows
+    const rows = dataRows.map((row) =>
+      row
+        .split('|')
+        .map((cell) => cell.trim())
+        .filter((cell) => cell)
+    );
+
+    elements.push(
+      <div key={`table-${startIndex}`} className="my-4 overflow-x-auto">
+        <table className="min-w-full border-collapse">
+          <thead>
+            <tr className="border-b border-border">
+              {headers.map((header, i) => (
+                <th
+                  key={i}
+                  className="px-4 py-2 text-left font-semibold bg-muted/50"
+                >
+                  {header}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row, rowIndex) => (
+              <tr key={rowIndex} className="border-b border-border/50">
+                {row.map((cell, cellIndex) => (
+                  <td key={cellIndex} className="px-4 py-2">
+                    {cell}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    );
+
+    tableRows = [];
+    inTable = false;
+  };
 
   lines.forEach((line, index) => {
     if (line.startsWith('```')) {
+      if (inTable) flushTable(index);
       if (inCodeBlock) {
         elements.push(
           <pre key={index} className="bg-muted p-3 rounded-lg overflow-x-auto text-sm">
@@ -175,6 +233,18 @@ function RenderedMarkdown({ content }: { content: string | null }) {
     if (inCodeBlock) {
       codeBlockContent += line + '\n';
       return;
+    }
+
+    // Detect table rows (lines with pipes)
+    if (line.trim().startsWith('|') && line.trim().endsWith('|')) {
+      if (!inTable) {
+        inTable = true;
+      }
+      tableRows.push(line);
+      return;
+    } else if (inTable) {
+      // End of table
+      flushTable(index);
     }
 
     // Headers
@@ -221,6 +291,9 @@ function RenderedMarkdown({ content }: { content: string | null }) {
       );
     }
   });
+
+  // Flush any remaining table
+  if (inTable) flushTable(lines.length);
 
   return <div className="space-y-1">{elements}</div>;
 }

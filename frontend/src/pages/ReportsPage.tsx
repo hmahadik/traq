@@ -15,6 +15,7 @@ import {
   useDailySummaries,
   useGenerateReport,
   useExportReport,
+  useDeleteReport,
   useParseTimeRange,
 } from '@/api/hooks';
 import { api } from '@/api/client';
@@ -67,6 +68,7 @@ export function ReportsPage() {
   const { data: parsedRange } = useParseTimeRange(timeRange);
   const generateReport = useGenerateReport();
   const exportReport = useExportReport();
+  const deleteReport = useDeleteReport();
 
   const handleGenerate = async () => {
     const result = await generateReport.mutateAsync({ timeRange, reportType, includeScreenshots });
@@ -141,9 +143,16 @@ export function ReportsPage() {
     await exportReport.mutateAsync({ reportId, format });
   };
 
-  const handleDeleteReport = (reportId: number) => {
-    // In a real implementation, this would call a delete API
-    console.log('Delete report:', reportId);
+  const handleDeleteReport = async (reportId: number) => {
+    try {
+      await deleteReport.mutateAsync(reportId);
+      // If the deleted report is currently displayed, clear it
+      if (generatedReport?.id === reportId) {
+        setGeneratedReport(undefined);
+      }
+    } catch (error) {
+      console.error('Failed to delete report:', error);
+    }
   };
 
   return (

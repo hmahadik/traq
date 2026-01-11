@@ -339,8 +339,55 @@ export function useGenerateReport() {
 
 export function useExportReport() {
   return useMutation({
-    mutationFn: ({ reportId, format }: { reportId: number; format: string }) =>
-      api.reports.exportReport(reportId, format),
+    mutationFn: async ({ reportId, format }: { reportId: number; format: string }) => {
+      const content = await api.reports.exportReport(reportId, format);
+
+      // Determine MIME type and file extension
+      let mimeType = 'text/plain';
+      let extension = format;
+
+      switch (format) {
+        case 'html':
+          mimeType = 'text/html';
+          break;
+        case 'json':
+          mimeType = 'application/json';
+          break;
+        case 'pdf':
+          mimeType = 'application/pdf';
+          break;
+        case 'md':
+        default:
+          mimeType = 'text/markdown';
+          extension = 'md';
+          break;
+      }
+
+      // Create blob and trigger download
+      const blob = new Blob([content], { type: mimeType });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `report-${reportId}.${extension}`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      return content;
+    },
+  });
+}
+
+export function useDeleteReport() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (reportId: number) => api.reports.deleteReport(reportId),
+    onSuccess: () => {
+      // Invalidate report history to refresh the list
+      queryClient.invalidateQueries({ queryKey: queryKeys.reports.history() });
+    },
   });
 }
 

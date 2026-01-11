@@ -401,6 +401,12 @@ export const reports = {
     return withRetry(() => App.ExportReport(reportId, format));
   },
 
+  deleteReport: async (reportId: number) => {
+    if (isMockMode()) return Promise.resolve();
+    await waitForReady();
+    return withRetry(() => App.DeleteReport(reportId));
+  },
+
   getReportHistory: async () => {
     if (isMockMode()) return mockData.getReportHistory();
     await waitForReady();

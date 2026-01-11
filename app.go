@@ -635,6 +635,14 @@ func (a *App) ExportReport(reportID int64, format string) (string, error) {
 	return a.Reports.ExportReport(reportID, format)
 }
 
+// DeleteReport deletes a report by ID.
+func (a *App) DeleteReport(reportID int64) error {
+	if a.Reports == nil {
+		return nil
+	}
+	return a.Reports.DeleteReport(reportID)
+}
+
 // GetReportHistory returns past generated reports.
 func (a *App) GetReportHistory() ([]*service.ReportMeta, error) {
 	if a.Reports == nil {

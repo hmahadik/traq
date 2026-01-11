@@ -22,6 +22,10 @@ export function DeleteModel(arg1) {
   return window['go']['main']['App']['DeleteModel'](arg1);
 }
 
+export function DeleteReport(arg1) {
+  return window['go']['main']['App']['DeleteReport'](arg1);
+}
+
 export function DeleteScreenshot(arg1) {
   return window['go']['main']['App']['DeleteScreenshot'](arg1);
 }
