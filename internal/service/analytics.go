@@ -547,10 +547,7 @@ func (s *AnalyticsService) GetAppUsage(start, end int64) ([]*AppUsage, error) {
 		appCounts[evt.AppName]++
 	}
 
-	apps := s.sortAppUsage(appDurations)
-	for _, app := range apps {
-		app.FocusCount = appCounts[app.AppName]
-	}
+	apps := s.sortAppUsageWithCounts(appDurations, appCounts)
 
 	return apps, nil
 }
@@ -847,6 +844,11 @@ func (s *AnalyticsService) GetProductivityScore(date string) (*ProductivityScore
 
 // sortAppUsage converts duration map to sorted slice with percentages.
 func (s *AnalyticsService) sortAppUsage(appDurations map[string]float64) []*AppUsage {
+	return s.sortAppUsageWithCounts(appDurations, nil)
+}
+
+// sortAppUsageWithCounts converts duration map to sorted slice with percentages and focus counts.
+func (s *AnalyticsService) sortAppUsageWithCounts(appDurations map[string]float64, appCounts map[string]int64) []*AppUsage {
 	var totalDuration float64
 	for _, dur := range appDurations {
 		totalDuration += dur
@@ -858,10 +860,15 @@ func (s *AnalyticsService) sortAppUsage(appDurations map[string]float64) []*AppU
 		if totalDuration > 0 {
 			pct = (dur / totalDuration) * 100
 		}
+		focusCount := int64(0)
+		if appCounts != nil {
+			focusCount = appCounts[app]
+		}
 		apps = append(apps, &AppUsage{
 			AppName:         GetFriendlyAppName(app),
 			DurationSeconds: dur,
 			Percentage:      pct,
+			FocusCount:      focusCount,
 		})
 	}
 

@@ -145,7 +145,7 @@
       "Verify Duration column shows formatted time",
       "Verify Sessions column shows numeric value (not undefined)"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "journey-analytics",
@@ -158,7 +158,7 @@
       "Verify hour labels on X axis",
       "Verify color intensity reflects activity level"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "journey-analytics",
@@ -170,7 +170,7 @@
       "Verify inactive hours shown with different styling",
       "Verify active hours show focus quality colors"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "journey-analytics",

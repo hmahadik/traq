@@ -13,7 +13,7 @@ interface AppUsageTableProps {
   onAppClick?: (appName: string) => void;
 }
 
-type SortKey = 'appName' | 'durationSeconds' | 'sessionCount' | 'percentage';
+type SortKey = 'appName' | 'durationSeconds' | 'focusCount' | 'percentage';
 type SortOrder = 'asc' | 'desc';
 
 export function AppUsageTable({ data, isLoading, onAppClick }: AppUsageTableProps) {
@@ -105,10 +105,10 @@ export function AppUsageTable({ data, isLoading, onAppClick }: AppUsageTableProp
                     variant="ghost"
                     size="sm"
                     className="h-8 font-medium"
-                    onClick={() => handleSort('sessionCount')}
+                    onClick={() => handleSort('focusCount')}
                   >
-                    Sessions
-                    <SortIcon columnKey="sessionCount" />
+                    Focuses
+                    <SortIcon columnKey="focusCount" />
                   </Button>
                 </th>
                 <th className="text-right py-2 px-2">
@@ -138,7 +138,7 @@ export function AppUsageTable({ data, isLoading, onAppClick }: AppUsageTableProp
                     {formatDuration(app.durationSeconds)}
                   </td>
                   <td className="py-3 px-2 text-right text-muted-foreground">
-                    {app.sessionCount}
+                    {app.focusCount}
                   </td>
                   <td className="py-3 px-2 text-right">
                     <div className="flex items-center justify-end gap-2">

@@ -46,15 +46,25 @@ export function FocusDistributionChart({ data, isLoading }: FocusDistributionCha
     );
   }
 
-  // Filter out hours with no activity and format for display
-  const chartData = data
-    ?.filter((d) => d.focusQuality > 0)
-    .map((d) => ({
-      ...d,
-      hourLabel: `${d.hour.toString().padStart(2, '0')}:00`,
-    })) || [];
+  // Show all 24 hours with inactive hours having different styling
+  // Generate all 24 hours if data is missing hours
+  const allHours = Array.from({ length: 24 }, (_, i) => i);
+  const dataMap = new Map(data?.map(d => [d.hour, d]) || []);
 
-  if (chartData.length === 0) {
+  const chartData = allHours.map((hour) => {
+    const existing = dataMap.get(hour);
+    return {
+      hour,
+      hourLabel: `${hour.toString().padStart(2, '0')}:00`,
+      contextSwitches: existing?.contextSwitches ?? 0,
+      focusQuality: existing?.focusQuality ?? 0,
+      focusLabel: existing?.focusLabel ?? 'No activity',
+    };
+  });
+
+  // Check if there's any activity at all
+  const hasActivity = chartData.some(d => d.focusQuality > 0);
+  if (!hasActivity && (!data || data.length === 0)) {
     return (
       <Card>
         <CardHeader>

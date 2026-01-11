@@ -41,7 +41,7 @@ export interface AppUsage {
   appName: string;
   durationSeconds: number;
   percentage: number;
-  sessionCount: number;
+  focusCount: number;
 }
 
 export interface WindowUsage {

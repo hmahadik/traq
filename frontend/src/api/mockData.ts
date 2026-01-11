@@ -172,11 +172,11 @@ export const mockData = {
     totalSessions: 8,
     activeMinutes: 420,
     topApps: [
-      { appName: 'VS Code', durationSeconds: 8400, percentage: 49, sessionCount: 6 },
-      { appName: 'Firefox', durationSeconds: 3600, percentage: 21, sessionCount: 8 },
-      { appName: 'Terminal', durationSeconds: 2700, percentage: 16, sessionCount: 5 },
-      { appName: 'Slack', durationSeconds: 1500, percentage: 9, sessionCount: 4 },
-      { appName: 'Chrome', durationSeconds: 900, percentage: 5, sessionCount: 2 },
+      { appName: 'VS Code', durationSeconds: 8400, percentage: 49, focusCount: 6 },
+      { appName: 'Firefox', durationSeconds: 3600, percentage: 21, focusCount: 8 },
+      { appName: 'Terminal', durationSeconds: 2700, percentage: 16, focusCount: 5 },
+      { appName: 'Slack', durationSeconds: 1500, percentage: 9, focusCount: 4 },
+      { appName: 'Chrome', durationSeconds: 900, percentage: 5, focusCount: 2 },
     ],
     shellCommands: 127,
     gitCommits: 5,
@@ -199,11 +199,11 @@ export const mockData = {
       totalActiveMinutes: 1680,
       dailyBreakdown: days.map(date => mockData.getDailyStats(date)),
       topApps: [
-        { appName: 'VS Code', durationSeconds: 50400, percentage: 50, sessionCount: 35 },
-        { appName: 'Firefox', durationSeconds: 20160, percentage: 20, sessionCount: 40 },
-        { appName: 'Terminal', durationSeconds: 15120, percentage: 15, sessionCount: 25 },
-        { appName: 'Slack', durationSeconds: 10080, percentage: 10, sessionCount: 20 },
-        { appName: 'Chrome', durationSeconds: 5040, percentage: 5, sessionCount: 10 },
+        { appName: 'VS Code', durationSeconds: 50400, percentage: 50, focusCount: 35 },
+        { appName: 'Firefox', durationSeconds: 20160, percentage: 20, focusCount: 40 },
+        { appName: 'Terminal', durationSeconds: 15120, percentage: 15, focusCount: 25 },
+        { appName: 'Slack', durationSeconds: 10080, percentage: 10, focusCount: 20 },
+        { appName: 'Chrome', durationSeconds: 5040, percentage: 5, focusCount: 10 },
       ],
     };
   },
@@ -228,11 +228,11 @@ export const mockData = {
   },
 
   getAppUsage: (_start: number, _end: number): AppUsage[] => [
-    { appName: 'VS Code', durationSeconds: 8400, percentage: 49, sessionCount: 6 },
-    { appName: 'Firefox', durationSeconds: 3600, percentage: 21, sessionCount: 8 },
-    { appName: 'Terminal', durationSeconds: 2700, percentage: 16, sessionCount: 5 },
-    { appName: 'Slack', durationSeconds: 1500, percentage: 9, sessionCount: 4 },
-    { appName: 'Chrome', durationSeconds: 900, percentage: 5, sessionCount: 2 },
+    { appName: 'VS Code', durationSeconds: 8400, percentage: 49, focusCount: 6 },
+    { appName: 'Firefox', durationSeconds: 3600, percentage: 21, focusCount: 8 },
+    { appName: 'Terminal', durationSeconds: 2700, percentage: 16, focusCount: 5 },
+    { appName: 'Slack', durationSeconds: 1500, percentage: 9, focusCount: 4 },
+    { appName: 'Chrome', durationSeconds: 900, percentage: 5, focusCount: 2 },
   ],
 
   getHourlyActivity: (_date: string): HourlyActivity[] =>
