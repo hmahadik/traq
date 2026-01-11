@@ -10,7 +10,6 @@ import (
 	"runtime"
 	"strings"
 	"sync"
-	"syscall"
 )
 
 // ModelInfo contains information about an available AI model
@@ -113,33 +112,9 @@ func GetModelPath(modelID string) (string, error) {
 // DownloadProgress is called during model download with progress updates
 type DownloadProgress func(bytesDownloaded, totalBytes int64)
 
-// checkDiskSpace checks if there's enough disk space available in the given directory
-func checkDiskSpace(dir string, requiredBytes int64) error {
-	// Ensure directory exists for checking
-	if err := os.MkdirAll(dir, 0755); err != nil {
-		return fmt.Errorf("failed to create directory: %w", err)
-	}
-
-	var stat syscall.Statfs_t
-	if err := syscall.Statfs(dir, &stat); err != nil {
-		// If statfs fails (e.g., on Windows), skip the check
-		if runtime.GOOS == "windows" {
-			return nil // Skip check on Windows
-		}
-		return fmt.Errorf("failed to check disk space: %w", err)
-	}
-
-	// Calculate available space in bytes
-	availableBytes := int64(stat.Bavail) * int64(stat.Bsize)
-	requiredGB := float64(requiredBytes) / (1024 * 1024 * 1024)
-	availableGB := float64(availableBytes) / (1024 * 1024 * 1024)
-
-	if availableBytes < requiredBytes {
-		return fmt.Errorf("insufficient disk space: %.1fGB available, %.1fGB required", availableGB, requiredGB)
-	}
-
-	return nil
-}
+// checkDiskSpace is implemented in platform-specific files:
+// - diskspace_unix.go (Linux, macOS)
+// - diskspace_windows.go (Windows)
 
 // ModelDownloader handles downloading AI models
 type ModelDownloader struct {
