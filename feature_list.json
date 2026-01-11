@@ -369,7 +369,7 @@
       "Click to preview",
       "Verify can navigate to or view session context"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "journey-screenshots",

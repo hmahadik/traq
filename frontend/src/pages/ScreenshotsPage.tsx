@@ -76,6 +76,7 @@ export function ScreenshotsPage() {
     filepath: string;
     appName?: unknown;
     windowTitle?: unknown;
+    sessionId?: number | null;
   } | null>(null);
 
   const dateStr = getDateString(selectedDate);
@@ -406,9 +407,16 @@ export function ScreenshotsPage() {
                     {/* Info */}
                     <div className="p-2 space-y-0.5">
                       <p className="text-xs font-medium truncate">{appName}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {formatTime(screenshot.timestamp)}
-                      </p>
+                      <div className="flex items-center justify-between gap-1">
+                        <p className="text-xs text-muted-foreground">
+                          {formatTime(screenshot.timestamp)}
+                        </p>
+                        {screenshot.sessionId && (
+                          <span className="text-xs text-muted-foreground font-mono" title={`Session #${screenshot.sessionId}`}>
+                            S{screenshot.sessionId}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
@@ -446,6 +454,25 @@ export function ScreenshotsPage() {
                 <p className="text-sm text-muted-foreground">
                   {extractString(previewScreenshot.windowTitle)}
                 </p>
+              )}
+              {previewScreenshot.sessionId && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground border-t pt-3">
+                  <span className="font-medium">Session:</span>
+                  <span className="px-2 py-1 bg-muted rounded-md font-mono text-xs">
+                    #{previewScreenshot.sessionId}
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="ml-auto"
+                    onClick={() => {
+                      // Navigate to Timeline page and open session details
+                      window.location.hash = `/timeline?session=${previewScreenshot.sessionId}`;
+                    }}
+                  >
+                    View Session
+                  </Button>
+                </div>
               )}
               <div className="flex justify-end gap-2">
                 <Button
