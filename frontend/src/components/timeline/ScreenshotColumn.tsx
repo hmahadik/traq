@@ -25,14 +25,37 @@ function GridThumbnail({
     return <Skeleton className="w-full h-full rounded" />;
   }
 
+  // Format timestamp for aria-label
+  const formatTime = (timestamp: number): string => {
+    const date = new Date(timestamp * 1000);
+    return date.toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    });
+  };
+
+  // Get app name for aria-label
+  const appName = screenshot.appName || 'Unknown app';
+  const timeStr = formatTime(screenshot.timestamp);
+
   return (
     <div
       className="w-full h-full rounded overflow-hidden cursor-pointer hover:ring-2 ring-primary transition-all group relative"
       onClick={onClick}
+      role="button"
+      aria-label={`Screenshot from ${appName} at ${timeStr}`}
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onClick();
+        }
+      }}
     >
       <img
         src={thumbnailUrl}
-        alt=""
+        alt={`Screenshot from ${appName} at ${timeStr}`}
         className="w-full h-full object-cover"
         loading="lazy"
       />
@@ -139,6 +162,15 @@ export const ScreenshotColumn: React.FC<ScreenshotColumnProps> = ({
                       <div
                         className="absolute bottom-2 right-2 bg-black/70 text-white text-[10px] px-1.5 py-0.5 rounded-full cursor-pointer hover:bg-black/90 transition-colors"
                         onClick={() => openGallery(hour, 0)}
+                        role="button"
+                        aria-label={`View all ${count} screenshots for this hour`}
+                        tabIndex={0}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            openGallery(hour, 0);
+                          }
+                        }}
                       >
                         +{count - 2}
                       </div>
