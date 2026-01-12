@@ -128,6 +128,16 @@ func (s *ReportsService) GenerateReport(timeRange, reportType string, includeScr
 func (s *ReportsService) generateSummaryReport(tr *TimeRange, includeScreenshots bool) (string, error) {
 	var sb strings.Builder
 
+	// Get sessions first (needed for batch loading summaries)
+	sessions, _ := s.store.GetSessionsByTimeRange(tr.Start, tr.End)
+
+	// Batch load all summaries for these sessions (optimization)
+	sessionIDs := make([]int64, len(sessions))
+	for i, sess := range sessions {
+		sessionIDs[i] = sess.ID
+	}
+	summariesMap, _ := s.store.GetSummariesForSessions(sessionIDs)
+
 	// Get app usage for time breakdown
 	appUsage, _ := s.analytics.GetAppUsage(tr.Start, tr.End)
 
@@ -178,8 +188,7 @@ func (s *ReportsService) generateSummaryReport(tr *TimeRange, includeScreenshots
 		topApp = GetFriendlyAppName(appUsage[0].AppName)
 	}
 
-	// Get sessions and commits for context
-	sessions, _ := s.store.GetSessionsByTimeRange(tr.Start, tr.End)
+	// Get commits for context
 	gitCommits, _ := s.store.GetGitCommitsByTimeRange(tr.Start, tr.End)
 
 	// Get hourly activity
@@ -334,7 +343,7 @@ func (s *ReportsService) generateSummaryReport(tr *TimeRange, includeScreenshots
 	}
 
 	// Key Accomplishments
-	accomplishments := s.extractAccomplishments(sessions)
+	accomplishments := s.extractAccomplishmentsOptimized(sessions, summariesMap)
 	if len(accomplishments) > 0 {
 		sb.WriteString(`<div style="margin-bottom: 24px;">
 			<div style="font-size: 0.85rem; font-weight: 600; color: #f1f5f9; margin-bottom: 12px;">Key Accomplishments</div>`)
@@ -450,6 +459,7 @@ func (s *ReportsService) buildHeadline(totalMinutes int64, topApp string, commit
 }
 
 // extractAccomplishments pulls key accomplishments from session summaries.
+// DEPRECATED: Use extractAccomplishmentsOptimized for better performance.
 func (s *ReportsService) extractAccomplishments(sessions []*storage.Session) []string {
 	var accomplishments []string
 	seen := make(map[string]bool)
@@ -459,6 +469,41 @@ func (s *ReportsService) extractAccomplishments(sessions []*storage.Session) []s
 			sum, err := s.store.GetSummary(sess.SummaryID.Int64)
 			if err == nil && sum != nil && sum.Summary != "" {
 				// Clean up the summary - remove generic phrases
+				summary := sum.Summary
+				if !seen[summary] && !isGenericSummary(summary) {
+					seen[summary] = true
+					accomplishments = append(accomplishments, summary)
+				}
+			}
+		}
+	}
+
+	// Limit to top 5
+	if len(accomplishments) > 5 {
+		accomplishments = accomplishments[:5]
+	}
+
+	return accomplishments
+}
+
+// extractAccomplishmentsOptimized pulls key accomplishments from session summaries
+// using a pre-loaded summaries map (eliminates N+1 queries).
+func (s *ReportsService) extractAccomplishmentsOptimized(sessions []*storage.Session, summariesMap map[int64]*storage.Summary) []string {
+	var accomplishments []string
+	seen := make(map[string]bool)
+
+	for _, sess := range sessions {
+		// First try the preloaded map (optimized path)
+		if sum, ok := summariesMap[sess.ID]; ok && sum != nil && sum.Summary != "" {
+			summary := sum.Summary
+			if !seen[summary] && !isGenericSummary(summary) {
+				seen[summary] = true
+				accomplishments = append(accomplishments, summary)
+			}
+		} else if sess.SummaryID.Valid {
+			// Fallback to direct lookup if not in map
+			sum, err := s.store.GetSummary(sess.SummaryID.Int64)
+			if err == nil && sum != nil && sum.Summary != "" {
 				summary := sum.Summary
 				if !seen[summary] && !isGenericSummary(summary) {
 					seen[summary] = true
@@ -746,6 +791,16 @@ func (s *ReportsService) generateDetailedReport(tr *TimeRange, includeScreenshot
 func (s *ReportsService) generateStandupReport(tr *TimeRange, includeScreenshots bool) (string, error) {
 	var sb strings.Builder
 
+	// Get sessions first (needed for batch loading summaries)
+	sessions, _ := s.store.GetSessionsByTimeRange(tr.Start, tr.End)
+
+	// Batch load all summaries for these sessions (optimization)
+	sessionIDs := make([]int64, len(sessions))
+	for i, sess := range sessions {
+		sessionIDs[i] = sess.ID
+	}
+	summariesMap, _ := s.store.GetSummariesForSessions(sessionIDs)
+
 	// Get app usage and calculate total time
 	appUsage, _ := s.analytics.GetAppUsage(tr.Start, tr.End)
 	var totalMinutes int64
@@ -753,8 +808,7 @@ func (s *ReportsService) generateStandupReport(tr *TimeRange, includeScreenshots
 		totalMinutes += int64(app.DurationSeconds / 60)
 	}
 
-	// Get sessions and commits
-	sessions, _ := s.store.GetSessionsByTimeRange(tr.Start, tr.End)
+	// Get commits
 	commits, _ := s.store.GetGitCommitsByTimeRange(tr.Start, tr.End)
 
 	// === START HTML ===
@@ -770,7 +824,7 @@ func (s *ReportsService) generateStandupReport(tr *TimeRange, includeScreenshots
 	sb.WriteString(`<div style="margin-bottom: 20px; padding: 16px; background: rgba(34, 197, 94, 0.1); border-radius: 8px; border-left: 3px solid #22c55e;">
 		<div style="font-size: 0.85rem; font-weight: 600; color: #22c55e; margin-bottom: 12px;">✓ What I accomplished</div>`)
 
-	accomplishments := s.extractAccomplishments(sessions)
+	accomplishments := s.extractAccomplishmentsOptimized(sessions, summariesMap)
 	if len(accomplishments) > 0 {
 		for _, acc := range accomplishments {
 			sb.WriteString(fmt.Sprintf(`<div style="font-size: 0.85rem; color: #cbd5e1; margin-bottom: 6px; padding-left: 8px;">• %s</div>`, acc))

@@ -148,6 +148,66 @@ func (s *Store) CountSummaries() (int64, error) {
 	return count, err
 }
 
+// GetSummariesForSessions retrieves summaries for multiple sessions in a single query.
+// Returns a map of sessionID -> Summary for efficient lookup.
+func (s *Store) GetSummariesForSessions(sessionIDs []int64) (map[int64]*Summary, error) {
+	if len(sessionIDs) == 0 {
+		return make(map[int64]*Summary), nil
+	}
+
+	// Build IN clause with placeholders
+	placeholders := make([]interface{}, len(sessionIDs))
+	for i, id := range sessionIDs {
+		placeholders[i] = id
+	}
+
+	query := fmt.Sprintf(`
+		SELECT id, session_id, summary, explanation, confidence, tags,
+		       model_used, inference_time_ms, screenshot_ids, context_json, created_at
+		FROM summaries
+		WHERE session_id IN (?%s)
+		ORDER BY session_id, created_at DESC`,
+		repeatPlaceholder(len(sessionIDs)-1))
+
+	rows, err := s.db.Query(query, placeholders...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query summaries for sessions: %w", err)
+	}
+	defer rows.Close()
+
+	summaries, err := scanSummaries(rows)
+	if err != nil {
+		return nil, err
+	}
+
+	// Build map, keeping only the most recent summary per session
+	summaryMap := make(map[int64]*Summary)
+	for _, sum := range summaries {
+		if sum.SessionID.Valid {
+			// Only store if not already present (already sorted by created_at DESC)
+			if _, exists := summaryMap[sum.SessionID.Int64]; !exists {
+				summaryMap[sum.SessionID.Int64] = sum
+			}
+		}
+	}
+
+	return summaryMap, nil
+}
+
+// repeatPlaceholder returns a string with N comma-separated "?" placeholders.
+func repeatPlaceholder(n int) string {
+	if n <= 0 {
+		return ""
+	}
+	result := make([]byte, n*3) // ", ?" is 3 chars
+	for i := 0; i < n; i++ {
+		result[i*3] = ','
+		result[i*3+1] = ' '
+		result[i*3+2] = '?'
+	}
+	return string(result)
+}
+
 func scanSummaries(rows *sql.Rows) ([]*Summary, error) {
 	var summaries []*Summary
 	for rows.Next() {

@@ -228,3 +228,67 @@ func TestGetSummariesByDateRange(t *testing.T) {
 		t.Errorf("got %d summaries, want 3", len(summaries))
 	}
 }
+
+func TestGetSummariesForSessions(t *testing.T) {
+	store, cleanup := testStore(t)
+	defer cleanup()
+
+	// Create sessions
+	sessionID1, _ := store.CreateSession(time.Now().Unix())
+	sessionID2, _ := store.CreateSession(time.Now().Unix())
+	sessionID3, _ := store.CreateSession(time.Now().Unix())
+
+	// Create summaries linked to sessions
+	sum1 := &Summary{
+		SessionID: sql.NullInt64{Int64: sessionID1, Valid: true},
+		Summary:   "Summary 1",
+		ModelUsed: "test-model",
+	}
+	store.SaveSummary(sum1)
+
+	sum2 := &Summary{
+		SessionID: sql.NullInt64{Int64: sessionID2, Valid: true},
+		Summary:   "Summary 2",
+		ModelUsed: "test-model",
+	}
+	store.SaveSummary(sum2)
+
+	// Session 3 has no summary
+
+	// Batch load summaries
+	sessionIDs := []int64{sessionID1, sessionID2, sessionID3}
+	summariesMap, err := store.GetSummariesForSessions(sessionIDs)
+	if err != nil {
+		t.Fatalf("failed to get summaries for sessions: %v", err)
+	}
+
+	// Should have 2 summaries (session 3 has none)
+	if len(summariesMap) != 2 {
+		t.Errorf("got %d summaries, want 2", len(summariesMap))
+	}
+
+	// Verify summaries
+	if sum, ok := summariesMap[sessionID1]; !ok || sum.Summary != "Summary 1" {
+		t.Errorf("session 1 summary incorrect")
+	}
+	if sum, ok := summariesMap[sessionID2]; !ok || sum.Summary != "Summary 2" {
+		t.Errorf("session 2 summary incorrect")
+	}
+	if _, ok := summariesMap[sessionID3]; ok {
+		t.Errorf("session 3 should not have a summary")
+	}
+}
+
+func TestGetSummariesForSessions_Empty(t *testing.T) {
+	store, cleanup := testStore(t)
+	defer cleanup()
+
+	// Empty list should return empty map
+	summariesMap, err := store.GetSummariesForSessions([]int64{})
+	if err != nil {
+		t.Fatalf("failed with empty list: %v", err)
+	}
+	if len(summariesMap) != 0 {
+		t.Errorf("expected empty map, got %d entries", len(summariesMap))
+	}
+}
