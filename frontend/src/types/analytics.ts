@@ -1,3 +1,20 @@
+export interface Comparison {
+  screenshotsDiff: number;
+  screenshotsPercent: number;
+  sessionsDiff: number;
+  sessionsPercent: number;
+  activeMinutesDiff: number;
+  activeMinutesPercent: number;
+  shellCommandsDiff: number;
+  shellCommandsPercent: number;
+  gitCommitsDiff: number;
+  gitCommitsPercent: number;
+  filesModifiedDiff: number;
+  filesModifiedPercent: number;
+  sitesVisitedDiff: number;
+  sitesVisitedPercent: number;
+}
+
 export interface DailyStats {
   date: string;
   totalScreenshots: number;
@@ -8,6 +25,7 @@ export interface DailyStats {
   gitCommits: number;
   filesModified: number;
   sitesVisited: number;
+  comparison?: Comparison;
 }
 
 export interface WeeklyStats {

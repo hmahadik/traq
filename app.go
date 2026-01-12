@@ -105,8 +105,8 @@ func (a *App) startup(ctx context.Context) {
 		}
 	}
 
-	// Initialize reports service (after timeline service)
-	a.Reports = service.NewReportsService(a.store, a.Timeline)
+	// Initialize reports service (after timeline and analytics services)
+	a.Reports = service.NewReportsService(a.store, a.Timeline, a.Analytics)
 
 	// Initialize inference service from config
 	config, _ := a.Config.GetConfig()
@@ -287,6 +287,20 @@ func (a *App) GetDailyStats(date string) (result *service.DailyStats, err error)
 		return nil, nil
 	}
 	return a.Analytics.GetDailyStats(date)
+}
+
+// GetDailyStatsWithComparison returns statistics for a specific date with comparison to previous day.
+func (a *App) GetDailyStatsWithComparison(date string) (result *service.DailyStats, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			result = nil
+			err = fmt.Errorf("internal error: %v", r)
+		}
+	}()
+	if a == nil || !a.ready || a.Analytics == nil {
+		return nil, nil
+	}
+	return a.Analytics.GetDailyStatsWithComparison(date, true)
 }
 
 // GetWeeklyStats returns statistics for a week.

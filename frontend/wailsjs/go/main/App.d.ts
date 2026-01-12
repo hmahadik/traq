@@ -72,6 +72,8 @@ export function GetDaemonStatus():Promise<service.DaemonStatus>;
 
 export function GetDailyStats(arg1:string):Promise<service.DailyStats>;
 
+export function GetDailyStatsWithComparison(arg1:string):Promise<service.DailyStats>;
+
 export function GetDailySummaries(arg1:number):Promise<Array<service.DailySummary>>;
 
 export function GetDataDir():Promise<string>;

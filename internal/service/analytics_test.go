@@ -175,3 +175,226 @@ func TestSortAppUsage_PercentageFormatting(t *testing.T) {
 		}
 	}
 }
+
+// TestCalculateComparison tests the comparison calculation logic.
+func TestCalculateComparison(t *testing.T) {
+	svc := &AnalyticsService{}
+
+	tests := []struct {
+		name     string
+		current  *DailyStats
+		previous *DailyStats
+		expect   *Comparison
+	}{
+		{
+			name: "all metrics increased",
+			current: &DailyStats{
+				TotalScreenshots: 100,
+				TotalSessions:    10,
+				ActiveMinutes:    300,
+				ShellCommands:    50,
+				GitCommits:       5,
+				FilesModified:    20,
+				SitesVisited:     15,
+			},
+			previous: &DailyStats{
+				TotalScreenshots: 80,
+				TotalSessions:    8,
+				ActiveMinutes:    240,
+				ShellCommands:    40,
+				GitCommits:       4,
+				FilesModified:    16,
+				SitesVisited:     12,
+			},
+			expect: &Comparison{
+				ScreenshotsDiff:      20,
+				ScreenshotsPercent:   25.0,
+				SessionsDiff:         2,
+				SessionsPercent:      25.0,
+				ActiveMinutesDiff:    60,
+				ActiveMinutesPercent: 25.0,
+				ShellCommandsDiff:    10,
+				ShellCommandsPercent: 25.0,
+				GitCommitsDiff:       1,
+				GitCommitsPercent:    25.0,
+				FilesModifiedDiff:    4,
+				FilesModifiedPercent: 25.0,
+				SitesVisitedDiff:     3,
+				SitesVisitedPercent:  25.0,
+			},
+		},
+		{
+			name: "all metrics decreased",
+			current: &DailyStats{
+				TotalScreenshots: 60,
+				TotalSessions:    6,
+				ActiveMinutes:    180,
+				ShellCommands:    30,
+				GitCommits:       3,
+				FilesModified:    12,
+				SitesVisited:     9,
+			},
+			previous: &DailyStats{
+				TotalScreenshots: 80,
+				TotalSessions:    8,
+				ActiveMinutes:    240,
+				ShellCommands:    40,
+				GitCommits:       4,
+				FilesModified:    16,
+				SitesVisited:     12,
+			},
+			expect: &Comparison{
+				ScreenshotsDiff:      -20,
+				ScreenshotsPercent:   -25.0,
+				SessionsDiff:         -2,
+				SessionsPercent:      -25.0,
+				ActiveMinutesDiff:    -60,
+				ActiveMinutesPercent: -25.0,
+				ShellCommandsDiff:    -10,
+				ShellCommandsPercent: -25.0,
+				GitCommitsDiff:       -1,
+				GitCommitsPercent:    -25.0,
+				FilesModifiedDiff:    -4,
+				FilesModifiedPercent: -25.0,
+				SitesVisitedDiff:     -3,
+				SitesVisitedPercent:  -25.0,
+			},
+		},
+		{
+			name: "no change",
+			current: &DailyStats{
+				TotalScreenshots: 80,
+				TotalSessions:    8,
+				ActiveMinutes:    240,
+				ShellCommands:    40,
+				GitCommits:       4,
+				FilesModified:    16,
+				SitesVisited:     12,
+			},
+			previous: &DailyStats{
+				TotalScreenshots: 80,
+				TotalSessions:    8,
+				ActiveMinutes:    240,
+				ShellCommands:    40,
+				GitCommits:       4,
+				FilesModified:    16,
+				SitesVisited:     12,
+			},
+			expect: &Comparison{
+				ScreenshotsDiff:      0,
+				ScreenshotsPercent:   0.0,
+				SessionsDiff:         0,
+				SessionsPercent:      0.0,
+				ActiveMinutesDiff:    0,
+				ActiveMinutesPercent: 0.0,
+				ShellCommandsDiff:    0,
+				ShellCommandsPercent: 0.0,
+				GitCommitsDiff:       0,
+				GitCommitsPercent:    0.0,
+				FilesModifiedDiff:    0,
+				FilesModifiedPercent: 0.0,
+				SitesVisitedDiff:     0,
+				SitesVisitedPercent:  0.0,
+			},
+		},
+		{
+			name: "previous has zeros",
+			current: &DailyStats{
+				TotalScreenshots: 100,
+				TotalSessions:    10,
+				ActiveMinutes:    300,
+				ShellCommands:    50,
+				GitCommits:       5,
+				FilesModified:    20,
+				SitesVisited:     15,
+			},
+			previous: &DailyStats{
+				TotalScreenshots: 0,
+				TotalSessions:    0,
+				ActiveMinutes:    0,
+				ShellCommands:    0,
+				GitCommits:       0,
+				FilesModified:    0,
+				SitesVisited:     0,
+			},
+			expect: &Comparison{
+				ScreenshotsDiff:      100,
+				ScreenshotsPercent:   0.0, // No previous value, so percentage is 0
+				SessionsDiff:         10,
+				SessionsPercent:      0.0,
+				ActiveMinutesDiff:    300,
+				ActiveMinutesPercent: 0.0,
+				ShellCommandsDiff:    50,
+				ShellCommandsPercent: 0.0,
+				GitCommitsDiff:       5,
+				GitCommitsPercent:    0.0,
+				FilesModifiedDiff:    20,
+				FilesModifiedPercent: 0.0,
+				SitesVisitedDiff:     15,
+				SitesVisitedPercent:  0.0,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := svc.calculateComparison(tt.current, tt.previous)
+
+			// Check screenshots
+			if result.ScreenshotsDiff != tt.expect.ScreenshotsDiff {
+				t.Errorf("ScreenshotsDiff = %d, want %d", result.ScreenshotsDiff, tt.expect.ScreenshotsDiff)
+			}
+			if math.Abs(result.ScreenshotsPercent-tt.expect.ScreenshotsPercent) > 0.01 {
+				t.Errorf("ScreenshotsPercent = %f, want %f", result.ScreenshotsPercent, tt.expect.ScreenshotsPercent)
+			}
+
+			// Check sessions
+			if result.SessionsDiff != tt.expect.SessionsDiff {
+				t.Errorf("SessionsDiff = %d, want %d", result.SessionsDiff, tt.expect.SessionsDiff)
+			}
+			if math.Abs(result.SessionsPercent-tt.expect.SessionsPercent) > 0.01 {
+				t.Errorf("SessionsPercent = %f, want %f", result.SessionsPercent, tt.expect.SessionsPercent)
+			}
+
+			// Check active minutes
+			if result.ActiveMinutesDiff != tt.expect.ActiveMinutesDiff {
+				t.Errorf("ActiveMinutesDiff = %d, want %d", result.ActiveMinutesDiff, tt.expect.ActiveMinutesDiff)
+			}
+			if math.Abs(result.ActiveMinutesPercent-tt.expect.ActiveMinutesPercent) > 0.01 {
+				t.Errorf("ActiveMinutesPercent = %f, want %f", result.ActiveMinutesPercent, tt.expect.ActiveMinutesPercent)
+			}
+
+			// Check shell commands
+			if result.ShellCommandsDiff != tt.expect.ShellCommandsDiff {
+				t.Errorf("ShellCommandsDiff = %d, want %d", result.ShellCommandsDiff, tt.expect.ShellCommandsDiff)
+			}
+			if math.Abs(result.ShellCommandsPercent-tt.expect.ShellCommandsPercent) > 0.01 {
+				t.Errorf("ShellCommandsPercent = %f, want %f", result.ShellCommandsPercent, tt.expect.ShellCommandsPercent)
+			}
+
+			// Check git commits
+			if result.GitCommitsDiff != tt.expect.GitCommitsDiff {
+				t.Errorf("GitCommitsDiff = %d, want %d", result.GitCommitsDiff, tt.expect.GitCommitsDiff)
+			}
+			if math.Abs(result.GitCommitsPercent-tt.expect.GitCommitsPercent) > 0.01 {
+				t.Errorf("GitCommitsPercent = %f, want %f", result.GitCommitsPercent, tt.expect.GitCommitsPercent)
+			}
+
+			// Check files modified
+			if result.FilesModifiedDiff != tt.expect.FilesModifiedDiff {
+				t.Errorf("FilesModifiedDiff = %d, want %d", result.FilesModifiedDiff, tt.expect.FilesModifiedDiff)
+			}
+			if math.Abs(result.FilesModifiedPercent-tt.expect.FilesModifiedPercent) > 0.01 {
+				t.Errorf("FilesModifiedPercent = %f, want %f", result.FilesModifiedPercent, tt.expect.FilesModifiedPercent)
+			}
+
+			// Check sites visited
+			if result.SitesVisitedDiff != tt.expect.SitesVisitedDiff {
+				t.Errorf("SitesVisitedDiff = %d, want %d", result.SitesVisitedDiff, tt.expect.SitesVisitedDiff)
+			}
+			if math.Abs(result.SitesVisitedPercent-tt.expect.SitesVisitedPercent) > 0.01 {
+				t.Errorf("SitesVisitedPercent = %f, want %f", result.SitesVisitedPercent, tt.expect.SitesVisitedPercent)
+			}
+		})
+	}
+}

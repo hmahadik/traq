@@ -30,6 +30,25 @@ type DailyStats struct {
 	GitCommits       int64        `json:"gitCommits"`
 	FilesModified    int64        `json:"filesModified"`
 	SitesVisited     int64        `json:"sitesVisited"`
+	Comparison       *Comparison  `json:"comparison,omitempty"`
+}
+
+// Comparison contains comparison data vs previous period.
+type Comparison struct {
+	ScreenshotsDiff     int64   `json:"screenshotsDiff"`
+	ScreenshotsPercent  float64 `json:"screenshotsPercent"`
+	SessionsDiff        int64   `json:"sessionsDiff"`
+	SessionsPercent     float64 `json:"sessionsPercent"`
+	ActiveMinutesDiff   int64   `json:"activeMinutesDiff"`
+	ActiveMinutesPercent float64 `json:"activeMinutesPercent"`
+	ShellCommandsDiff   int64   `json:"shellCommandsDiff"`
+	ShellCommandsPercent float64 `json:"shellCommandsPercent"`
+	GitCommitsDiff      int64   `json:"gitCommitsDiff"`
+	GitCommitsPercent   float64 `json:"gitCommitsPercent"`
+	FilesModifiedDiff   int64   `json:"filesModifiedDiff"`
+	FilesModifiedPercent float64 `json:"filesModifiedPercent"`
+	SitesVisitedDiff    int64   `json:"sitesVisitedDiff"`
+	SitesVisitedPercent float64 `json:"sitesVisitedPercent"`
 }
 
 // WeeklyStats contains statistics for a week.
@@ -223,6 +242,11 @@ type WindowUsage struct {
 
 // GetDailyStats returns statistics for a specific date.
 func (s *AnalyticsService) GetDailyStats(date string) (*DailyStats, error) {
+	return s.GetDailyStatsWithComparison(date, false)
+}
+
+// GetDailyStatsWithComparison returns statistics for a specific date with optional comparison.
+func (s *AnalyticsService) GetDailyStatsWithComparison(date string, withComparison bool) (*DailyStats, error) {
 	// Parse date to get start/end timestamps
 	t, err := time.ParseInLocation("2006-01-02", date, time.Local)
 	if err != nil {
@@ -286,7 +310,65 @@ func (s *AnalyticsService) GetDailyStats(date string) (*DailyStats, error) {
 	stats.FilesModified, _ = s.store.CountFileEventsByTimeRange(start, end)
 	stats.SitesVisited, _ = s.store.CountUniqueDomainsByTimeRange(start, end)
 
+	// Add comparison if requested
+	if withComparison {
+		prevDate := t.AddDate(0, 0, -1).Format("2006-01-02")
+		prevStats, err := s.GetDailyStats(prevDate)
+		if err == nil && prevStats != nil {
+			stats.Comparison = s.calculateComparison(stats, prevStats)
+		}
+	}
+
 	return stats, nil
+}
+
+// calculateComparison calculates the difference between current and previous stats.
+func (s *AnalyticsService) calculateComparison(current, previous *DailyStats) *Comparison {
+	comp := &Comparison{}
+
+	// Screenshots
+	comp.ScreenshotsDiff = current.TotalScreenshots - previous.TotalScreenshots
+	if previous.TotalScreenshots > 0 {
+		comp.ScreenshotsPercent = (float64(comp.ScreenshotsDiff) / float64(previous.TotalScreenshots)) * 100
+	}
+
+	// Sessions
+	comp.SessionsDiff = current.TotalSessions - previous.TotalSessions
+	if previous.TotalSessions > 0 {
+		comp.SessionsPercent = (float64(comp.SessionsDiff) / float64(previous.TotalSessions)) * 100
+	}
+
+	// Active Minutes
+	comp.ActiveMinutesDiff = current.ActiveMinutes - previous.ActiveMinutes
+	if previous.ActiveMinutes > 0 {
+		comp.ActiveMinutesPercent = (float64(comp.ActiveMinutesDiff) / float64(previous.ActiveMinutes)) * 100
+	}
+
+	// Shell Commands
+	comp.ShellCommandsDiff = current.ShellCommands - previous.ShellCommands
+	if previous.ShellCommands > 0 {
+		comp.ShellCommandsPercent = (float64(comp.ShellCommandsDiff) / float64(previous.ShellCommands)) * 100
+	}
+
+	// Git Commits
+	comp.GitCommitsDiff = current.GitCommits - previous.GitCommits
+	if previous.GitCommits > 0 {
+		comp.GitCommitsPercent = (float64(comp.GitCommitsDiff) / float64(previous.GitCommits)) * 100
+	}
+
+	// Files Modified
+	comp.FilesModifiedDiff = current.FilesModified - previous.FilesModified
+	if previous.FilesModified > 0 {
+		comp.FilesModifiedPercent = (float64(comp.FilesModifiedDiff) / float64(previous.FilesModified)) * 100
+	}
+
+	// Sites Visited
+	comp.SitesVisitedDiff = current.SitesVisited - previous.SitesVisited
+	if previous.SitesVisited > 0 {
+		comp.SitesVisitedPercent = (float64(comp.SitesVisitedDiff) / float64(previous.SitesVisited)) * 100
+	}
+
+	return comp
 }
 
 // GetWeeklyStats returns statistics for a week starting from the given date.
@@ -725,9 +807,9 @@ func (s *AnalyticsService) GetDataSourceStats(start, end int64) (*DataSourceStat
 	return stats, nil
 }
 
-// categorizeApp returns the productivity category for an app name.
+// CategorizeApp returns the productivity category for an app name.
 // First checks user-defined categories from database, then falls back to defaults.
-func (s *AnalyticsService) categorizeApp(appName string) AppCategory {
+func (s *AnalyticsService) CategorizeApp(appName string) AppCategory {
 	// Try to get user-defined category from database
 	appCategory, err := s.store.GetAppCategory(appName)
 	if err == nil && appCategory != nil {
@@ -806,7 +888,7 @@ func (s *AnalyticsService) GetProductivityScore(date string) (*ProductivityScore
 	for _, evt := range focusEvents {
 		minutes := int64(evt.DurationSeconds / 60)
 
-		category := s.categorizeApp(evt.AppName)
+		category := s.CategorizeApp(evt.AppName)
 		switch category {
 		case CategoryProductive:
 			score.ProductiveMinutes += minutes

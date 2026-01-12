@@ -1,6 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Badge } from '@/components/ui/badge';
 import { formatDuration } from '@/lib/utils';
 import {
   Camera,
@@ -11,8 +12,10 @@ import {
   FileText,
   Globe,
   Info,
+  TrendingUp,
+  TrendingDown,
 } from 'lucide-react';
-import type { DailyStats } from '@/types';
+import type { DailyStats, Comparison } from '@/types';
 
 interface StatsGridProps {
   stats: DailyStats | undefined;
@@ -25,9 +28,28 @@ interface StatCardProps {
   icon: React.ReactNode;
   description?: string;
   tooltip?: string;
+  comparisonPercent?: number;
+  comparisonDiff?: number;
 }
 
-function StatCard({ title, value, icon, description, tooltip }: StatCardProps) {
+function formatComparisonValue(value: number, isTime: boolean = false): string {
+  if (isTime) {
+    // Format time differences in human-readable format
+    const absValue = Math.abs(value);
+    if (absValue < 60) return `${Math.round(absValue)}m`;
+    const hours = Math.floor(absValue / 60);
+    const minutes = Math.round(absValue % 60);
+    return minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`;
+  }
+  return Math.abs(value).toString();
+}
+
+function StatCard({ title, value, icon, description, tooltip, comparisonPercent, comparisonDiff }: StatCardProps) {
+  const hasComparison = comparisonPercent !== undefined && comparisonDiff !== undefined;
+  const isPositive = comparisonDiff !== undefined && comparisonDiff > 0;
+  const isNegative = comparisonDiff !== undefined && comparisonDiff < 0;
+  const isActiveTime = title === 'Active Time';
+
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -48,7 +70,29 @@ function StatCard({ title, value, icon, description, tooltip }: StatCardProps) {
       </CardHeader>
       <CardContent>
         <div className="text-2xl font-bold">{value}</div>
-        {description && (
+        {hasComparison && comparisonDiff !== 0 && (
+          <div className="flex items-center gap-1 mt-1">
+            <Badge
+              variant="outline"
+              className={`text-xs ${
+                isPositive ? 'text-green-600 border-green-300 bg-green-50 dark:bg-green-950 dark:border-green-800' :
+                isNegative ? 'text-red-600 border-red-300 bg-red-50 dark:bg-red-950 dark:border-red-800' :
+                'text-muted-foreground'
+              }`}
+            >
+              {isPositive ? (
+                <TrendingUp className="h-3 w-3 mr-1" />
+              ) : (
+                <TrendingDown className="h-3 w-3 mr-1" />
+              )}
+              {isPositive ? '+' : ''}{comparisonPercent.toFixed(0)}%
+            </Badge>
+            <span className="text-xs text-muted-foreground">
+              {isPositive ? '+' : ''}{formatComparisonValue(comparisonDiff, isActiveTime)} vs yesterday
+            </span>
+          </div>
+        )}
+        {(!hasComparison || comparisonDiff === 0) && description && (
           <p className="text-xs text-muted-foreground mt-1">{description}</p>
         )}
       </CardContent>
@@ -86,6 +130,8 @@ export function StatsGrid({ stats, isLoading }: StatsGridProps) {
     return null;
   }
 
+  const comp = stats.comparison;
+
   return (
     <TooltipProvider>
       <div className="grid gap-3 sm:gap-4 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 2xl:grid-cols-8">
@@ -94,6 +140,8 @@ export function StatsGrid({ stats, isLoading }: StatsGridProps) {
           value={stats.totalScreenshots}
           icon={<Camera className="h-4 w-4" />}
           description="Captures today"
+          comparisonPercent={comp?.screenshotsPercent}
+          comparisonDiff={comp?.screenshotsDiff}
         />
         <StatCard
           title="Active Time"
@@ -101,36 +149,48 @@ export function StatsGrid({ stats, isLoading }: StatsGridProps) {
           icon={<Clock className="h-4 w-4" />}
           description="Total tracked time"
           tooltip="Time actively spent interacting with applications, calculated from window focus events. Excludes idle time (AFK)."
+          comparisonPercent={comp?.activeMinutesPercent}
+          comparisonDiff={comp?.activeMinutesDiff}
         />
       <StatCard
         title="Sessions"
         value={stats.totalSessions}
         icon={<Layers className="h-4 w-4" />}
         description="Work sessions"
+        comparisonPercent={comp?.sessionsPercent}
+        comparisonDiff={comp?.sessionsDiff}
       />
       <StatCard
         title="Shell Commands"
         value={stats.shellCommands}
         icon={<Terminal className="h-4 w-4" />}
         description="Terminal activity"
+        comparisonPercent={comp?.shellCommandsPercent}
+        comparisonDiff={comp?.shellCommandsDiff}
       />
       <StatCard
         title="Git Commits"
         value={stats.gitCommits}
         icon={<GitCommit className="h-4 w-4" />}
         description="Code commits"
+        comparisonPercent={comp?.gitCommitsPercent}
+        comparisonDiff={comp?.gitCommitsDiff}
       />
       <StatCard
         title="Files Modified"
         value={stats.filesModified}
         icon={<FileText className="h-4 w-4" />}
         description="File changes"
+        comparisonPercent={comp?.filesModifiedPercent}
+        comparisonDiff={comp?.filesModifiedDiff}
       />
       <StatCard
         title="Sites Visited"
         value={stats.sitesVisited}
         icon={<Globe className="h-4 w-4" />}
         description="Unique domains"
+        comparisonPercent={comp?.sitesVisitedPercent}
+        comparisonDiff={comp?.sitesVisitedDiff}
       />
       <StatCard
         title="Top App"

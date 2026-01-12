@@ -459,6 +459,44 @@ export namespace service {
 	        this.count = source["count"];
 	    }
 	}
+	export class Comparison {
+	    screenshotsDiff: number;
+	    screenshotsPercent: number;
+	    sessionsDiff: number;
+	    sessionsPercent: number;
+	    activeMinutesDiff: number;
+	    activeMinutesPercent: number;
+	    shellCommandsDiff: number;
+	    shellCommandsPercent: number;
+	    gitCommitsDiff: number;
+	    gitCommitsPercent: number;
+	    filesModifiedDiff: number;
+	    filesModifiedPercent: number;
+	    sitesVisitedDiff: number;
+	    sitesVisitedPercent: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new Comparison(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.screenshotsDiff = source["screenshotsDiff"];
+	        this.screenshotsPercent = source["screenshotsPercent"];
+	        this.sessionsDiff = source["sessionsDiff"];
+	        this.sessionsPercent = source["sessionsPercent"];
+	        this.activeMinutesDiff = source["activeMinutesDiff"];
+	        this.activeMinutesPercent = source["activeMinutesPercent"];
+	        this.shellCommandsDiff = source["shellCommandsDiff"];
+	        this.shellCommandsPercent = source["shellCommandsPercent"];
+	        this.gitCommitsDiff = source["gitCommitsDiff"];
+	        this.gitCommitsPercent = source["gitCommitsPercent"];
+	        this.filesModifiedDiff = source["filesModifiedDiff"];
+	        this.filesModifiedPercent = source["filesModifiedPercent"];
+	        this.sitesVisitedDiff = source["sitesVisitedDiff"];
+	        this.sitesVisitedPercent = source["sitesVisitedPercent"];
+	    }
+	}
 	export class IssuesConfig {
 	    webhookEnabled: boolean;
 	    webhookUrl: string;
@@ -765,6 +803,7 @@ export namespace service {
 	    gitCommits: number;
 	    filesModified: number;
 	    sitesVisited: number;
+	    comparison?: Comparison;
 	
 	    static createFrom(source: any = {}) {
 	        return new DailyStats(source);
@@ -781,6 +820,7 @@ export namespace service {
 	        this.gitCommits = source["gitCommits"];
 	        this.filesModified = source["filesModified"];
 	        this.sitesVisited = source["sitesVisited"];
+	        this.comparison = this.convertValues(source["comparison"], Comparison);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

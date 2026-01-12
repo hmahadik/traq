@@ -127,7 +127,7 @@ export function AnalyticsPage() {
   const customEndTs = Math.floor(customRange.end.setHours(23, 59, 59, 999) / 1000);
 
   // Day view data
-  const { data: stats, isLoading: statsLoading } = useDailyStats(dateStr);
+  const { data: stats, isLoading: statsLoading } = useDailyStats(dateStr, true); // Enable comparison
   const { data: hourlyActivity, isLoading: hourlyLoading } = useHourlyActivity(dateStr);
   const { data: appUsage, isLoading: appUsageLoading } = useAppUsage(dateStr);
 

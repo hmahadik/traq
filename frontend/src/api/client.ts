@@ -160,6 +160,12 @@ export const analytics = {
     return withRetry(() => App.GetDailyStats(date));
   },
 
+  getDailyStatsWithComparison: async (date: string) => {
+    if (isMockMode()) return mockData.getDailyStats(date);
+    await waitForReady();
+    return withRetry(() => App.GetDailyStatsWithComparison(date));
+  },
+
   getWeeklyStats: async (startDate: string) => {
     if (isMockMode()) return mockData.getWeeklyStats(startDate);
     await waitForReady();

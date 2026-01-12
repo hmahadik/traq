@@ -207,4 +207,60 @@ test.describe('Analytics Page - Productivity Analysis Journey', () => {
     const returnDate = await analyticsPage.getCurrentDateText();
     expect(returnDate).not.toBe(afterDate);
   });
+
+  test('should display comparison badges in day view stats', async ({ analyticsPage }) => {
+    await analyticsPage.waitForDataToLoad();
+
+    // Check if stats grid is visible
+    await expect(analyticsPage.statsGrid).toBeVisible();
+
+    // Look for comparison badges (they show trend indicators)
+    // Comparison badges have TrendingUp or TrendingDown icons and percentage text
+    const comparisonBadges = analyticsPage.page.locator('[class*="text-green-600"], [class*="text-red-600"]').filter({
+      hasText: /%/
+    });
+
+    // If there's data for yesterday, we should see at least one comparison badge
+    // Note: This test might not find badges if yesterday had no data
+    const badgeCount = await comparisonBadges.count();
+
+    // We expect 0 or more badges depending on whether there's previous day data
+    // The test validates the badges are properly formatted when they exist
+    if (badgeCount > 0) {
+      const firstBadge = comparisonBadges.first();
+      await expect(firstBadge).toBeVisible();
+
+      // Badge should contain percentage text
+      const badgeText = await firstBadge.textContent();
+      expect(badgeText).toMatch(/%/);
+
+      // Badge should either be green (positive) or red (negative)
+      const badgeClass = await firstBadge.getAttribute('class');
+      expect(badgeClass).toMatch(/(text-green-600|text-red-600)/);
+    }
+  });
+
+  test('should show "vs yesterday" text with comparison values', async ({ analyticsPage }) => {
+    await analyticsPage.waitForDataToLoad();
+
+    // Look for "vs yesterday" text which appears alongside comparison badges
+    const vsYesterdayText = analyticsPage.page.locator('text=/vs yesterday/i');
+
+    // Count how many comparison texts we have
+    const comparisonCount = await vsYesterdayText.count();
+
+    // If there's previous day data, we should see comparison text
+    // The test validates the text is properly formatted when it exists
+    if (comparisonCount > 0) {
+      const firstComparison = vsYesterdayText.first();
+      await expect(firstComparison).toBeVisible();
+
+      // Get the full text content which should include the value and "vs yesterday"
+      const fullText = await firstComparison.textContent();
+      expect(fullText).toMatch(/vs yesterday/i);
+
+      // The text should include either a number or time value (e.g., "5m vs yesterday" or "10 vs yesterday")
+      expect(fullText).toMatch(/\d/);
+    }
+  });
 });

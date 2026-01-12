@@ -134,6 +134,10 @@ export function GetDailyStats(arg1) {
   return window['go']['main']['App']['GetDailyStats'](arg1);
 }
 
+export function GetDailyStatsWithComparison(arg1) {
+  return window['go']['main']['App']['GetDailyStatsWithComparison'](arg1);
+}
+
 export function GetDailySummaries(arg1) {
   return window['go']['main']['App']['GetDailySummaries'](arg1);
 }

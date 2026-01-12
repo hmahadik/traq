@@ -87,10 +87,12 @@ export const queryKeys = {
 // Analytics Hooks
 // ============================================================================
 
-export function useDailyStats(date: string) {
+export function useDailyStats(date: string, withComparison: boolean = false) {
   return useQuery({
-    queryKey: queryKeys.analytics.daily(date),
-    queryFn: () => api.analytics.getDailyStats(date),
+    queryKey: [...queryKeys.analytics.daily(date), withComparison],
+    queryFn: () => withComparison
+      ? api.analytics.getDailyStatsWithComparison(date)
+      : api.analytics.getDailyStats(date),
     staleTime: 60_000, // 1 minute
   });
 }
