@@ -9,6 +9,6 @@
 [x] Allow changing time range on analytics page (including prev/next navigation)
 [x] Analytics page metrics should show comparisons
 [x] Fix Settings modal: sources page content being rendered beyond container
-[ ] Improve settings page modal: clean it up, make it look minimal
+[x] Improve settings page modal: clean it up, make it look minimal
 [ ] Fix detailed report generation to render reports correctly like the other types
 [ ] Review and refactor AI summary generation logic to optimize for report generation 

@@ -81,7 +81,7 @@ export function SettingsDrawer({ open, onOpenChange }: SettingsDrawerProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-5xl max-h-[85vh] overflow-y-auto">
-        <DialogHeader>
+        <DialogHeader className="pb-4 border-b">
           <DialogTitle>Settings</DialogTitle>
           <DialogDescription>
             Configure Traq to match your workflow.
@@ -93,8 +93,8 @@ export function SettingsDrawer({ open, onOpenChange }: SettingsDrawerProps) {
             <p className="text-muted-foreground">Loading settings...</p>
           </div>
         ) : (
-        <Tabs defaultValue="capture" className="mt-6 flex flex-col max-h-[calc(85vh-180px)] min-w-0">
-          <TabsList className="flex flex-wrap h-auto gap-1 p-1 flex-shrink-0">
+        <Tabs defaultValue="capture" className="mt-4 flex flex-col max-h-[calc(85vh-180px)] min-w-0">
+          <TabsList className="flex flex-wrap h-auto gap-1.5 p-1.5 flex-shrink-0">
             <TabsTrigger value="capture" className="flex-shrink-0">Capture</TabsTrigger>
             <TabsTrigger value="ai" className="flex-shrink-0">AI</TabsTrigger>
             <TabsTrigger value="categories" className="flex-shrink-0">Categories</TabsTrigger>
@@ -103,7 +103,7 @@ export function SettingsDrawer({ open, onOpenChange }: SettingsDrawerProps) {
             <TabsTrigger value="system" className="flex-shrink-0">System</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="capture" className="space-y-6 mt-4 overflow-y-auto flex-1 min-w-0">
+          <TabsContent value="capture" className="space-y-4 mt-4 overflow-y-auto flex-1 min-w-0">
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">
                 <label className="text-sm font-medium">Enable Capture</label>
@@ -119,7 +119,7 @@ export function SettingsDrawer({ open, onOpenChange }: SettingsDrawerProps) {
               />
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               <div className="flex items-center justify-between">
                 <label className="text-sm font-medium">Capture Interval</label>
                 <span className="text-sm text-muted-foreground">
@@ -139,14 +139,17 @@ export function SettingsDrawer({ open, onOpenChange }: SettingsDrawerProps) {
               />
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               <div className="flex items-center justify-between">
                 <label className="text-sm font-medium">Image Quality</label>
                 <span className="text-sm text-muted-foreground">
                   {config.capture.quality}%
                 </span>
               </div>
-              <div className="flex gap-2 mb-2">
+              <p className="text-xs text-muted-foreground">
+                Low (~30KB), Medium (~60KB), High (~100KB per screenshot)
+              </p>
+              <div className="flex gap-2">
                 <Button
                   variant={config.capture.quality <= 70 ? "default" : "outline"}
                   size="sm"
@@ -195,12 +198,9 @@ export function SettingsDrawer({ open, onOpenChange }: SettingsDrawerProps) {
                   })
                 }
               />
-              <p className="text-xs text-muted-foreground">
-                Low (~30KB), Medium (~60KB), High (~100KB per screenshot)
-              </p>
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               <div className="flex items-center justify-between">
                 <label className="text-sm font-medium">AFK Timeout</label>
                 <span className="text-sm text-muted-foreground">
@@ -220,7 +220,7 @@ export function SettingsDrawer({ open, onOpenChange }: SettingsDrawerProps) {
               />
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               <div className="flex items-center justify-between">
                 <label className="text-sm font-medium">Duplicate Threshold</label>
                 <span className="text-sm text-muted-foreground">
@@ -243,7 +243,7 @@ export function SettingsDrawer({ open, onOpenChange }: SettingsDrawerProps) {
               />
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               <div className="flex items-center justify-between">
                 <label className="text-sm font-medium">Min Session Duration</label>
                 <span className="text-sm text-muted-foreground">
@@ -267,7 +267,7 @@ export function SettingsDrawer({ open, onOpenChange }: SettingsDrawerProps) {
             </div>
 
             {/* Monitor Selection */}
-            <div className="space-y-3 pt-4 border-t">
+            <div className="space-y-3 p-3 rounded-lg bg-muted/30">
               <div className="flex items-center gap-2">
                 <Monitor className="h-4 w-4" />
                 <label className="text-sm font-medium">Monitor Selection</label>
@@ -295,7 +295,7 @@ export function SettingsDrawer({ open, onOpenChange }: SettingsDrawerProps) {
 
               {/* Show monitor picker when "specific" is selected */}
               {config.capture.monitorMode === 'specific' && monitors && monitors.length > 0 && (
-                <div className="space-y-2 pl-4 border-l-2 border-muted">
+                <div className="space-y-2 pl-3 border-l-2 border-border">
                   <label className="text-sm font-medium">Select Monitor</label>
                   <Select
                     value={String(config.capture.monitorIndex || 0)}
@@ -329,8 +329,8 @@ export function SettingsDrawer({ open, onOpenChange }: SettingsDrawerProps) {
             </div>
           </TabsContent>
 
-          <TabsContent value="ai" className="space-y-6 mt-4 overflow-y-auto flex-1 min-w-0">
-            <div className="space-y-2">
+          <TabsContent value="ai" className="space-y-4 mt-4 overflow-y-auto flex-1 min-w-0">
+            <div className="space-y-1.5">
               <label className="text-sm font-medium">Inference Engine</label>
               <Select
                 value={config.inference.engine}
@@ -390,7 +390,7 @@ export function SettingsDrawer({ open, onOpenChange }: SettingsDrawerProps) {
                   )}
                 </div>
 
-                <div className="space-y-2">
+                <div className="space-y-1.5">
                   <label className="text-sm font-medium">Model</label>
                   <Select
                     value={config.inference.bundled.model}
@@ -432,7 +432,7 @@ export function SettingsDrawer({ open, onOpenChange }: SettingsDrawerProps) {
                 )}
 
                 {/* Available Models for Download */}
-                <div className="space-y-2">
+                <div className="space-y-3">
                   <label className="text-sm font-medium">Available Models</label>
                   <div className="space-y-2">
                     {models?.map((model) => (
@@ -487,7 +487,7 @@ export function SettingsDrawer({ open, onOpenChange }: SettingsDrawerProps) {
 
             {config.inference.engine === 'ollama' && (
               <div className="space-y-4">
-                <div className="space-y-2">
+                <div className="space-y-1.5">
                   <label className="text-sm font-medium">Ollama Host</label>
                   <Input
                     value={config.inference.ollama.host}
@@ -502,7 +502,7 @@ export function SettingsDrawer({ open, onOpenChange }: SettingsDrawerProps) {
                     placeholder="http://localhost:11434"
                   />
                 </div>
-                <div className="space-y-2">
+                <div className="space-y-1.5">
                   <label className="text-sm font-medium">Model</label>
                   <Input
                     value={config.inference.ollama.model}
@@ -525,7 +525,7 @@ export function SettingsDrawer({ open, onOpenChange }: SettingsDrawerProps) {
 
             {config.inference.engine === 'cloud' && (
               <div className="space-y-4">
-                <div className="space-y-2">
+                <div className="space-y-1.5">
                   <label className="text-sm font-medium">Provider</label>
                   <Select
                     value={config.inference.cloud.provider}
@@ -547,7 +547,7 @@ export function SettingsDrawer({ open, onOpenChange }: SettingsDrawerProps) {
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="space-y-2">
+                <div className="space-y-1.5">
                   <label className="text-sm font-medium">API Key</label>
                   <Input
                     type="password"
@@ -563,7 +563,7 @@ export function SettingsDrawer({ open, onOpenChange }: SettingsDrawerProps) {
                     placeholder="sk-..."
                   />
                 </div>
-                <div className="space-y-2">
+                <div className="space-y-1.5">
                   <label className="text-sm font-medium">Custom API Endpoint</label>
                   <p className="text-xs text-muted-foreground">
                     Leave empty to use default endpoint
@@ -585,7 +585,7 @@ export function SettingsDrawer({ open, onOpenChange }: SettingsDrawerProps) {
             )}
           </TabsContent>
 
-          <TabsContent value="sources" className="space-y-6 mt-4 overflow-y-auto flex-1 min-w-0">
+          <TabsContent value="sources" className="space-y-4 mt-4 overflow-y-auto flex-1 min-w-0">
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">
                 <label className="text-sm font-medium">Shell History</label>
@@ -608,7 +608,7 @@ export function SettingsDrawer({ open, onOpenChange }: SettingsDrawerProps) {
 
             {/* Shell Type Selection */}
             {config.dataSources.shell.enabled && (
-              <div className="pl-4 border-l-2 border-muted space-y-3">
+              <div className="p-3 rounded-lg bg-muted/30 space-y-3">
                 <div className="space-y-1.5">
                   <label className="text-sm font-medium">Shell Type</label>
                   <select
@@ -699,7 +699,7 @@ export function SettingsDrawer({ open, onOpenChange }: SettingsDrawerProps) {
 
             {/* Git Repository Management */}
             {config.dataSources.git.enabled && (
-              <div className="pl-4 border-l-2 border-muted">
+              <div className="p-3 rounded-lg bg-muted/30">
                 <GitRepositoriesSection />
               </div>
             )}
@@ -726,7 +726,7 @@ export function SettingsDrawer({ open, onOpenChange }: SettingsDrawerProps) {
 
             {/* File Watch Directories Management */}
             {config.dataSources.files.enabled && (
-              <div className="pl-4 border-l-2 border-muted space-y-3">
+              <div className="p-3 rounded-lg bg-muted/30 space-y-3">
                 <FileWatchDirectoriesSection />
 
                 {/* File Extension Filter */}
@@ -784,7 +784,7 @@ export function SettingsDrawer({ open, onOpenChange }: SettingsDrawerProps) {
 
             {/* Browser Selection */}
             {config.dataSources.browser.enabled && (
-              <div className="pl-4 border-l-2 border-muted space-y-3">
+              <div className="p-3 rounded-lg bg-muted/30 space-y-3">
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Browsers to Track</label>
                   <p className="text-xs text-muted-foreground">
@@ -826,7 +826,7 @@ export function SettingsDrawer({ open, onOpenChange }: SettingsDrawerProps) {
                 </div>
 
                 {/* History Limit */}
-                <div className="space-y-2 pt-2 border-t">
+                <div className="space-y-2">
                   <label className="text-sm font-medium">History Limit</label>
                   <p className="text-xs text-muted-foreground">
                     How far back to read browser history (in days). Set to 0 for unlimited.
@@ -854,7 +854,7 @@ export function SettingsDrawer({ open, onOpenChange }: SettingsDrawerProps) {
                 </div>
 
                 {/* Excluded Domains */}
-                <div className="space-y-2 pt-2 border-t">
+                <div className="space-y-2">
                   <label className="text-sm font-medium">Excluded Domains</label>
                   <p className="text-xs text-muted-foreground">
                     Domains to exclude from tracking (one per line)
@@ -884,15 +884,15 @@ export function SettingsDrawer({ open, onOpenChange }: SettingsDrawerProps) {
             )}
           </TabsContent>
 
-          <TabsContent value="categories" className="space-y-6 mt-4 overflow-y-auto flex-1 min-w-0">
+          <TabsContent value="categories" className="space-y-4 mt-4 overflow-y-auto flex-1 min-w-0">
             <CategoriesTab />
           </TabsContent>
 
-          <TabsContent value="timeline-categories" className="space-y-6 mt-4 overflow-y-auto flex-1 min-w-0">
+          <TabsContent value="timeline-categories" className="space-y-4 mt-4 overflow-y-auto flex-1 min-w-0">
             <TimelineCategoriesTab />
           </TabsContent>
 
-          <TabsContent value="system" className="space-y-6 mt-4 overflow-y-auto flex-1 min-w-0">
+          <TabsContent value="system" className="space-y-4 mt-4 overflow-y-auto flex-1 min-w-0">
             {/* Storage Statistics */}
             <div className="space-y-3">
               <label className="text-sm font-medium flex items-center gap-2">
@@ -960,7 +960,7 @@ export function SettingsDrawer({ open, onOpenChange }: SettingsDrawerProps) {
               </div>
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               <label className="text-sm font-medium">Theme</label>
               <Select
                 value={config.ui.theme}
@@ -1016,7 +1016,7 @@ export function SettingsDrawer({ open, onOpenChange }: SettingsDrawerProps) {
             </div>
 
             {/* Crash Report Webhook */}
-            <div className="space-y-3 pt-4 border-t">
+            <div className="space-y-3 p-3 rounded-lg bg-muted/30">
               <div className="flex items-center gap-2">
                 <Bell className="h-4 w-4" />
                 <label className="text-sm font-medium">Crash Report Notifications</label>
@@ -1066,7 +1066,7 @@ export function SettingsDrawer({ open, onOpenChange }: SettingsDrawerProps) {
               )}
             </div>
 
-            <div className="pt-4 space-y-2">
+            <div className="space-y-2">
               <Button variant="outline" className="w-full">
                 Export Data
               </Button>
