@@ -32,6 +32,9 @@ export class ScreenshotsPage extends BasePage {
   readonly previewImage: Locator;
   readonly previewCloseButton: Locator;
   readonly previewDeleteButton: Locator;
+  readonly previewPrevButton: Locator;
+  readonly previewNextButton: Locator;
+  readonly previewCounter: Locator;
 
   // Loading
   readonly loadingSpinner: Locator;
@@ -70,6 +73,9 @@ export class ScreenshotsPage extends BasePage {
       this.previewDialog.locator('button').filter({ has: page.locator('svg.lucide-x') })
     );
     this.previewDeleteButton = this.previewDialog.getByRole('button', { name: /Delete/i });
+    this.previewPrevButton = this.previewDialog.getByTestId('gallery-prev');
+    this.previewNextButton = this.previewDialog.getByTestId('gallery-next');
+    this.previewCounter = this.previewDialog.locator('text=/\\d+ \\/ \\d+/');
 
     // Loading
     this.loadingSpinner = page.locator('[class*="animate-spin"]');
@@ -165,5 +171,24 @@ export class ScreenshotsPage extends BasePage {
   async getSelectedCount(): Promise<number> {
     // Count cards with ring-primary class (selected state)
     return this.page.locator('[class*="ring-primary"]').count();
+  }
+
+  async clickPrevInGallery() {
+    await this.previewPrevButton.click();
+    await this.page.waitForTimeout(300);
+  }
+
+  async clickNextInGallery() {
+    await this.previewNextButton.click();
+    await this.page.waitForTimeout(300);
+  }
+
+  async getGalleryCounter(): Promise<string | null> {
+    return this.previewCounter.textContent();
+  }
+
+  async navigateGalleryWithKeyboard(direction: 'left' | 'right') {
+    await this.page.keyboard.press(direction === 'left' ? 'ArrowLeft' : 'ArrowRight');
+    await this.page.waitForTimeout(300);
   }
 }

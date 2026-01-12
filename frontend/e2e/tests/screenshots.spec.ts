@@ -132,4 +132,67 @@ test.describe('Screenshots Page - Screenshot Browser Journey', () => {
 
     await expect(screenshotsPage.heading).toBeVisible();
   });
+
+  test('should navigate prev/next in screenshot gallery', async ({ screenshotsPage }) => {
+    await screenshotsPage.waitForScreenshotsToLoad();
+    const screenshotCount = await screenshotsPage.getScreenshotCount();
+
+    test.skip(screenshotCount < 2, 'Need at least 2 screenshots to test navigation');
+
+    // Open first screenshot
+    await screenshotsPage.clickScreenshot(0);
+    await expect(screenshotsPage.previewDialog).toBeVisible();
+
+    // Check initial counter (should be "1 / X")
+    const initialCounter = await screenshotsPage.getGalleryCounter();
+    expect(initialCounter).toContain('1 /');
+
+    // Click next button
+    await screenshotsPage.clickNextInGallery();
+
+    // Counter should change to "2 / X"
+    const nextCounter = await screenshotsPage.getGalleryCounter();
+    expect(nextCounter).toContain('2 /');
+
+    // Click prev button to go back
+    await screenshotsPage.clickPrevInGallery();
+
+    // Should be back at "1 / X"
+    const backCounter = await screenshotsPage.getGalleryCounter();
+    expect(backCounter).toContain('1 /');
+
+    await screenshotsPage.closePreview();
+  });
+
+  test('should navigate with keyboard arrows in gallery', async ({ screenshotsPage }) => {
+    await screenshotsPage.waitForScreenshotsToLoad();
+    const screenshotCount = await screenshotsPage.getScreenshotCount();
+
+    test.skip(screenshotCount < 2, 'Need at least 2 screenshots to test keyboard navigation');
+
+    // Open first screenshot
+    await screenshotsPage.clickScreenshot(0);
+    await expect(screenshotsPage.previewDialog).toBeVisible();
+
+    // Check initial counter
+    const initialCounter = await screenshotsPage.getGalleryCounter();
+    expect(initialCounter).toContain('1 /');
+
+    // Use arrow right key
+    await screenshotsPage.navigateGalleryWithKeyboard('right');
+
+    // Should move to next
+    const nextCounter = await screenshotsPage.getGalleryCounter();
+    expect(nextCounter).toContain('2 /');
+
+    // Use arrow left key
+    await screenshotsPage.navigateGalleryWithKeyboard('left');
+
+    // Should move back
+    const backCounter = await screenshotsPage.getGalleryCounter();
+    expect(backCounter).toContain('1 /');
+
+    // Close with Escape
+    await screenshotsPage.closePreview();
+  });
 });
