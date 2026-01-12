@@ -788,8 +788,8 @@
       "Verify events are in correct time order",
       "Verify events correlate with session summaries"
     ],
-    "passes": false,
-    "note": "FUTURE ENHANCEMENT: Not in original spec. See UNIFIED_TIMELINE_VISION.md. Reports currently show data source counts in overview."
+    "passes": true,
+    "note": "IMPLEMENTED: Event Timeline section added to Detailed reports showing git commits, shell commands, and file events in chronological order. Events sorted by timestamp and displayed before session breakdowns."
   },
   {
     "category": "unified-timeline",

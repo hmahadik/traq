@@ -199,12 +199,87 @@ func (s *ReportsService) generateSummaryReport(tr *TimeRange, includeScreenshots
 	return sb.String(), nil
 }
 
+// TimelineEvent represents a unified event for chronological display.
+type TimelineEvent struct {
+	Timestamp int64
+	Type      string // "git", "shell", "file", "browser"
+	Summary   string
+}
+
 // generateDetailedReport creates a detailed report with all data.
 func (s *ReportsService) generateDetailedReport(tr *TimeRange, includeScreenshots bool) (string, error) {
 	var sb strings.Builder
 
 	sb.WriteString(fmt.Sprintf("# Detailed Activity Report: %s\n\n", tr.Label))
 	sb.WriteString(fmt.Sprintf("*Generated: %s*\n\n", time.Now().Format("2006-01-02 15:04")))
+
+	// Add Chronological Event Timeline section
+	sb.WriteString("## Event Timeline\n\n")
+	sb.WriteString("*All events in chronological order*\n\n")
+
+	// Collect all events
+	var timelineEvents []TimelineEvent
+
+	// Get git commits
+	gitCommits, _ := s.store.GetGitCommitsByTimeRange(tr.Start, tr.End)
+	for _, commit := range gitCommits {
+		timelineEvents = append(timelineEvents, TimelineEvent{
+			Timestamp: commit.Timestamp,
+			Type:      "git",
+			Summary:   fmt.Sprintf("**[Git]** `%s` %s", commit.ShortHash, commit.Message),
+		})
+	}
+
+	// Get shell commands
+	shellCommands, _ := s.store.GetShellCommandsByTimeRange(tr.Start, tr.End)
+	for _, cmd := range shellCommands {
+		// Truncate long commands
+		cmdText := cmd.Command
+		if len(cmdText) > 80 {
+			cmdText = cmdText[:77] + "..."
+		}
+		timelineEvents = append(timelineEvents, TimelineEvent{
+			Timestamp: cmd.Timestamp,
+			Type:      "shell",
+			Summary:   fmt.Sprintf("**[Shell]** `%s`", cmdText),
+		})
+	}
+
+	// Get file events
+	fileEvents, _ := s.store.GetFileEventsByTimeRange(tr.Start, tr.End)
+	for _, fileEvt := range fileEvents {
+		fileName := fileEvt.FileName
+		if fileEvt.FileExtension.Valid && fileEvt.FileExtension.String != "" {
+			fileName += fileEvt.FileExtension.String
+		}
+		timelineEvents = append(timelineEvents, TimelineEvent{
+			Timestamp: fileEvt.Timestamp,
+			Type:      "file",
+			Summary:   fmt.Sprintf("**[File]** %s: `%s`", fileEvt.EventType, fileName),
+		})
+	}
+
+	// Sort by timestamp
+	for i := 0; i < len(timelineEvents)-1; i++ {
+		for j := i + 1; j < len(timelineEvents); j++ {
+			if timelineEvents[i].Timestamp > timelineEvents[j].Timestamp {
+				timelineEvents[i], timelineEvents[j] = timelineEvents[j], timelineEvents[i]
+			}
+		}
+	}
+
+	// Render timeline
+	if len(timelineEvents) > 0 {
+		for _, evt := range timelineEvents {
+			evtTime := time.Unix(evt.Timestamp, 0)
+			sb.WriteString(fmt.Sprintf("- **%s** - %s\n", evtTime.Format("15:04:05"), evt.Summary))
+		}
+		sb.WriteString("\n")
+	} else {
+		sb.WriteString("*No events recorded for this period*\n\n")
+	}
+
+	sb.WriteString("---\n\n")
 
 	// Get all sessions with context
 	sessions, _ := s.store.GetSessionsByTimeRange(tr.Start, tr.End)
