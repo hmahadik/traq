@@ -254,13 +254,15 @@ func (s *Store) GetTotalActiveTime() (int64, error) {
 	return total.Int64, nil
 }
 
-// GetSessionsByTimeRange retrieves sessions within a time range.
+// GetSessionsByTimeRange retrieves sessions that overlap with a time range.
+// A session overlaps if it starts at or before the range ends AND (ends after the range starts OR is ongoing).
+// This correctly handles sessions that span midnight boundaries.
 func (s *Store) GetSessionsByTimeRange(start, end int64) ([]*Session, error) {
 	rows, err := s.db.Query(`
 		SELECT id, start_time, end_time, duration_seconds, screenshot_count, summary_id, created_at
 		FROM sessions
-		WHERE (start_time >= ? AND start_time <= ?) OR (end_time >= ? AND end_time <= ?)
-		ORDER BY start_time ASC`, start, end, start, end)
+		WHERE start_time <= ? AND (end_time IS NULL OR end_time > ?)
+		ORDER BY start_time ASC`, end, start)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query sessions by time range: %w", err)
 	}

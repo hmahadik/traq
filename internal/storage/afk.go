@@ -56,13 +56,15 @@ func (s *Store) GetAFKEvent(id int64) (*AFKEvent, error) {
 	return event, nil
 }
 
-// GetAFKEventsByTimeRange retrieves AFK events within a time range.
+// GetAFKEventsByTimeRange retrieves AFK events that overlap with a time range.
+// An AFK event overlaps if it starts at or before the range ends AND (ends after the range starts OR is ongoing).
+// This correctly handles AFK events that span midnight boundaries.
 func (s *Store) GetAFKEventsByTimeRange(start, end int64) ([]*AFKEvent, error) {
 	rows, err := s.db.Query(`
 		SELECT id, start_time, end_time, session_id, trigger_type, created_at
 		FROM afk_events
-		WHERE start_time >= ? AND start_time <= ?
-		ORDER BY start_time ASC`, start, end)
+		WHERE start_time <= ? AND (end_time IS NULL OR end_time > ?)
+		ORDER BY start_time ASC`, end, start)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query AFK events: %w", err)
 	}

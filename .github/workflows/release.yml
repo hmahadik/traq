@@ -9,7 +9,22 @@ permissions:
   contents: write
 
 jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+
+      - name: Run Go tests
+        run: go test ./...
+
   build:
+    needs: test
     strategy:
       matrix:
         include:
@@ -106,6 +121,9 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
@@ -114,10 +132,14 @@ jobs:
       - name: Display artifacts
         run: ls -R artifacts
 
-      - name: Upload to Release
+      - name: Create/Update Release
         uses: softprops/action-gh-release@v2
         with:
           files: |
             artifacts/traq-linux-amd64/traq-linux-amd64
             artifacts/traq-windows-amd64.exe/traq-windows-amd64.exe
             artifacts/traq-macos-universal/traq-macos-universal.zip
+          # Mark as latest release (not pre-release) when CI passes
+          prerelease: false
+          make_latest: true
+          generate_release_notes: true

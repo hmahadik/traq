@@ -100,6 +100,75 @@ func TestGetFocusEventsByTimeRange(t *testing.T) {
 	}
 }
 
+func TestGetFocusEventsByTimeRange_MidnightBoundary(t *testing.T) {
+	store, cleanup := testStore(t)
+	defer cleanup()
+
+	// Simulate midnight at Unix timestamp 0 for simplicity
+	midnight := int64(86400) // One day in seconds
+
+	// Event 1: Spans midnight (starts 11pm, ends 1am next day)
+	// This should appear on BOTH days
+	store.SaveFocusEvent(&WindowFocusEvent{
+		WindowTitle: "Late night work", AppName: "Code",
+		StartTime:       midnight - 3600,  // 11pm
+		EndTime:         midnight + 3600,  // 1am next day
+		DurationSeconds: 7200,             // 2 hours
+	})
+
+	// Event 2: Ends exactly at midnight (should NOT appear on next day)
+	store.SaveFocusEvent(&WindowFocusEvent{
+		WindowTitle: "Before midnight", AppName: "Browser",
+		StartTime:       midnight - 1800,  // 11:30pm
+		EndTime:         midnight,         // exactly midnight
+		DurationSeconds: 1800,             // 30 minutes
+	})
+
+	// Event 3: Starts exactly at midnight (should appear on next day only)
+	store.SaveFocusEvent(&WindowFocusEvent{
+		WindowTitle: "After midnight", AppName: "Terminal",
+		StartTime:       midnight,         // exactly midnight
+		EndTime:         midnight + 1800,  // 12:30am
+		DurationSeconds: 1800,             // 30 minutes
+	})
+
+	// Query for "Day 1" (before midnight)
+	day1Start := midnight - 86400  // Start of day 1
+	day1End := midnight - 1        // End of day 1 (23:59:59)
+
+	eventsDay1, err := store.GetFocusEventsByTimeRange(day1Start, day1End)
+	if err != nil {
+		t.Fatalf("failed to get day 1 events: %v", err)
+	}
+
+	// Day 1 should have: Event 1 (spans), Event 2 (ends at midnight)
+	if len(eventsDay1) != 2 {
+		t.Errorf("day 1: got %d events, want 2", len(eventsDay1))
+	}
+
+	// Query for "Day 2" (after midnight)
+	day2Start := midnight          // Start of day 2 (00:00:00)
+	day2End := midnight + 86400 - 1 // End of day 2
+
+	eventsDay2, err := store.GetFocusEventsByTimeRange(day2Start, day2End)
+	if err != nil {
+		t.Fatalf("failed to get day 2 events: %v", err)
+	}
+
+	// Day 2 should have: Event 1 (spans), Event 3 (starts at midnight)
+	// Event 2 should NOT appear (it ended exactly at midnight, not after)
+	if len(eventsDay2) != 2 {
+		t.Errorf("day 2: got %d events, want 2", len(eventsDay2))
+	}
+
+	// Verify event 2 (ends at midnight) is not in day 2
+	for _, e := range eventsDay2 {
+		if e.WindowTitle == "Before midnight" {
+			t.Error("event ending at midnight should not appear on next day")
+		}
+	}
+}
+
 func TestGetAppUsageByTimeRange(t *testing.T) {
 	store, cleanup := testStore(t)
 	defer cleanup()
