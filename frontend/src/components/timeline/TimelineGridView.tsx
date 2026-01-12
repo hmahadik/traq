@@ -10,8 +10,9 @@ import { ShellColumn } from './ShellColumn';
 import { FilesColumn } from './FilesColumn';
 import { BrowserColumn } from './BrowserColumn';
 import { ClusterColumn } from './ClusterColumn';
+import { AFKColumn } from './AFKColumn';
 import { TimelineFilters } from './FilterControls';
-import { ScrollArea } from '@/components/ui/scroll-area';
+import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { ImageGallery } from '@/components/common/ImageGallery';
 import { useScreenshotsForDate } from '@/api/hooks';
 import type { Screenshot } from '@/types';
@@ -19,13 +20,17 @@ import type { Screenshot } from '@/types';
 interface TimelineGridViewProps {
   data: TimelineGridData;
   filters?: TimelineFilters;
+  hourHeight?: number; // Dynamic hour height for zoom (default: GRID_CONSTANTS.HOUR_HEIGHT_PX)
 }
 
 // Header height for column headers (matches the header in HourColumn/AppColumn)
 const HEADER_HEIGHT_PX = 44;
 
-export const TimelineGridView: React.FC<TimelineGridViewProps> = ({ data, filters }) => {
+export const TimelineGridView: React.FC<TimelineGridViewProps> = ({ data, filters, hourHeight }) => {
   const { hourlyGrid, sessionSummaries, topApps } = data;
+
+  // Use provided hourHeight or fall back to default
+  const effectiveHourHeight = hourHeight || GRID_CONSTANTS.HOUR_HEIGHT_PX;
 
   // Default to showing all if no filters provided
   const activeFilters: TimelineFilters = filters || {
@@ -63,8 +68,8 @@ export const TimelineGridView: React.FC<TimelineGridViewProps> = ({ data, filter
       const currentHour = now.getHours();
       const currentMinute = now.getMinutes();
       // Position = header + (hour * hourHeight) + (minute fraction of hour)
-      const position = HEADER_HEIGHT_PX + (currentHour * GRID_CONSTANTS.HOUR_HEIGHT_PX) +
-        (currentMinute / 60 * GRID_CONSTANTS.HOUR_HEIGHT_PX);
+      const position = HEADER_HEIGHT_PX + (currentHour * effectiveHourHeight) +
+        (currentMinute / 60 * effectiveHourHeight);
       setNowPosition(position);
     };
 
@@ -72,16 +77,16 @@ export const TimelineGridView: React.FC<TimelineGridViewProps> = ({ data, filter
     const interval = setInterval(updateNowPosition, 60000); // Update every minute
 
     return () => clearInterval(interval);
-  }, [isToday]);
+  }, [isToday, effectiveHourHeight]);
 
   // Always show full 24-hour day (12 AM to 11 PM)
   const activeHours = useMemo(() => {
     return Array.from({ length: 24 }, (_, i) => i); // 0-23 (12 AM to 11 PM)
   }, []);
 
-  // Prepare app columns data
+  // Prepare app columns data - limit to MAX_APP_COLUMNS to reduce scrolling
   const appColumns = useMemo(() => {
-    return topApps.map((app) => {
+    return topApps.slice(0, GRID_CONSTANTS.MAX_APP_COLUMNS).map((app) => {
       // Collect all activity blocks for this app across all hours
       const activityBlocks: any[] = [];
       Object.entries(hourlyGrid).forEach(([, appActivities]) => {
@@ -154,58 +159,63 @@ export const TimelineGridView: React.FC<TimelineGridViewProps> = ({ data, filter
     );
   }
 
-  // Total height: header (44px) + 24 hours * 80px = 1964px
-  const gridHeight = HEADER_HEIGHT_PX + (24 * GRID_CONSTANTS.HOUR_HEIGHT_PX);
+  // Total height: header (44px) + 24 hours * hourHeight
+  const gridHeight = HEADER_HEIGHT_PX + (24 * effectiveHourHeight);
 
   return (
     <div className="relative bg-card border border-border flex-1 min-h-0 overflow-hidden">
       {/* Full-screen scrollable container - spans entire available space */}
-      <ScrollArea className="h-full w-full" style={{ height: 'calc(100vh - 12rem)' }}>
+      <ScrollArea className="h-full w-full" style={{ height: 'calc(100vh - 12rem)' }} type="always">
         <div className="flex min-w-full relative" style={{ height: `${gridHeight}px`, minWidth: 'max-content' }}>
           {/* Hour Column (Sticky) */}
-          <HourColumn hours={activeHours} />
+          <HourColumn hours={activeHours} hourHeight={effectiveHourHeight} />
 
           {/* AI Summary Column (Sticky) */}
           <AISummaryColumn
             sessionSummaries={sessionSummaries}
             hours={activeHours}
             onSessionClick={handleSessionClick}
+            hourHeight={effectiveHourHeight}
           />
+
+          {/* AFK Column - Shows away-from-keyboard periods */}
+          {data.afkBlocks && Object.keys(data.afkBlocks).length > 0 && (
+            <AFKColumn
+              afkBlocks={data.afkBlocks}
+              hours={activeHours}
+              hourHeight={effectiveHourHeight}
+            />
+          )}
 
           {/* Activity Clusters Column - Shows related events grouped by temporal proximity */}
           {data.activityClusters && Object.keys(data.activityClusters).length > 0 && (
             <div
-              className="relative border-r border-gray-200 dark:border-gray-700"
-              style={{ minWidth: '140px' }}
+              className="relative border-r border-border"
+              style={{ minWidth: '100px' }}
             >
-              {/* Column header */}
-              <div
-                className="sticky top-0 z-20 flex items-center gap-2 px-3 py-2.5 bg-amber-50/80 dark:bg-amber-900/20 backdrop-blur-sm border-b border-amber-200 dark:border-amber-800"
-                style={{ height: `${HEADER_HEIGHT_PX}px` }}
-              >
-                <div className="flex items-center gap-1.5 flex-1 min-w-0">
-                  <Network className="w-4 h-4 text-amber-600 flex-shrink-0" />
-                  <span className="text-sm font-semibold text-amber-900 dark:text-amber-100 truncate">
-                    Clusters
-                  </span>
+              {/* Column header - Fixed height */}
+              <div className="sticky top-0 z-10 bg-card border-b border-border px-2 h-11 flex items-center">
+                <div className="flex items-center gap-1.5 w-full min-w-0">
+                  <div className="w-5 h-5 rounded bg-amber-500 flex items-center justify-center flex-shrink-0">
+                    <Network className="w-3 h-3 text-white" />
+                  </div>
+                  <span className="text-xs font-medium text-foreground truncate">Clusters</span>
                 </div>
-                {/* Cluster count */}
-                <span className="text-xs text-amber-700 dark:text-amber-300 flex-shrink-0">
-                  {Object.values(data.activityClusters).reduce((sum, clusters) => sum + clusters.length, 0)}
-                </span>
               </div>
 
               {/* Hour blocks */}
-              {activeHours.map((hour) => {
+              {activeHours.map((hour, index) => {
                 const clusters = data.activityClusters?.[hour] || [];
                 return (
                   <div
                     key={hour}
-                    className="relative border-b border-gray-100 dark:border-gray-800"
-                    style={{ height: `${GRID_CONSTANTS.HOUR_HEIGHT_PX}px` }}
+                    className={`relative border-b border-gray-100 dark:border-gray-800 ${
+                      index % 2 === 0 ? 'bg-card' : 'bg-muted/30'
+                    }`}
+                    style={{ height: `${effectiveHourHeight}px` }}
                   >
                     {clusters.length > 0 && (
-                      <ClusterColumn clusters={clusters} hourHeight={GRID_CONSTANTS.HOUR_HEIGHT_PX} />
+                      <ClusterColumn clusters={clusters} hourHeight={effectiveHourHeight} />
                     )}
                   </div>
                 );
@@ -215,27 +225,27 @@ export const TimelineGridView: React.FC<TimelineGridViewProps> = ({ data, filter
 
           {/* Screenshot Column */}
           {activeFilters.showScreenshots && (
-            <ScreenshotColumn date={data.date} hours={activeHours} />
+            <ScreenshotColumn date={data.date} hours={activeHours} hourHeight={effectiveHourHeight} />
           )}
 
           {/* Git Column */}
           {activeFilters.showGit && (
-            <GitColumn gitEvents={data.gitEvents || {}} hours={activeHours} />
+            <GitColumn gitEvents={data.gitEvents || {}} hours={activeHours} hourHeight={effectiveHourHeight} />
           )}
 
           {/* Shell Column */}
           {activeFilters.showShell && (
-            <ShellColumn shellEvents={data.shellEvents || {}} hours={activeHours} />
+            <ShellColumn shellEvents={data.shellEvents || {}} hours={activeHours} hourHeight={effectiveHourHeight} />
           )}
 
           {/* Files Column */}
           {activeFilters.showFiles && (
-            <FilesColumn fileEvents={data.fileEvents || {}} hours={activeHours} />
+            <FilesColumn fileEvents={data.fileEvents || {}} hours={activeHours} hourHeight={effectiveHourHeight} />
           )}
 
           {/* Browser Column */}
           {activeFilters.showBrowser && (
-            <BrowserColumn browserEvents={data.browserEvents || {}} hours={activeHours} />
+            <BrowserColumn browserEvents={data.browserEvents || {}} hours={activeHours} hourHeight={effectiveHourHeight} />
           )}
 
           {/* App Columns (Scrollable) */}
@@ -248,6 +258,7 @@ export const TimelineGridView: React.FC<TimelineGridViewProps> = ({ data, filter
               activityBlocks={column.activityBlocks}
               hours={activeHours}
               onBlockClick={handleActivityBlockClick}
+              hourHeight={effectiveHourHeight}
             />
           ))}
 
@@ -264,6 +275,7 @@ export const TimelineGridView: React.FC<TimelineGridViewProps> = ({ data, filter
             </div>
           )}
         </div>
+        <ScrollBar orientation="horizontal" />
       </ScrollArea>
 
       {/* ImageGallery modal for activity block and session clicks */}

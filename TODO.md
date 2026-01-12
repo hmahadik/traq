@@ -3,7 +3,7 @@
 [ ] Sessions that start before and extend beyond midnight not rendered correctly
 [x] Allow for prev/next browsing of screenshots in screenshots page
 [x] Pre-fetch screenshot images to make navigating prev/next faster 
-[ ] Active/AFK time not shown / easily identifiable on the timeline grid
+[x] Active/AFK time not shown / easily identifiable on the timeline grid
 [ ] Timeline week view (See Timely app UI for reference)
 [ ] Timeline month view (See Timely app UI for reference)
 [x] Allow changing time range on analytics page (including prev/next navigation)

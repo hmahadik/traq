@@ -134,6 +134,34 @@ export namespace main {
 
 export namespace service {
 	
+	export class AFKBlock {
+	    id: number;
+	    startTime: number;
+	    endTime: number;
+	    durationSeconds: number;
+	    triggerType: string;
+	    hourOffset: number;
+	    minuteOffset: number;
+	    pixelPosition: number;
+	    pixelHeight: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new AFKBlock(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.startTime = source["startTime"];
+	        this.endTime = source["endTime"];
+	        this.durationSeconds = source["durationSeconds"];
+	        this.triggerType = source["triggerType"];
+	        this.hourOffset = source["hourOffset"];
+	        this.minuteOffset = source["minuteOffset"];
+	        this.pixelPosition = source["pixelPosition"];
+	        this.pixelHeight = source["pixelHeight"];
+	    }
+	}
 	export class AFKConfig {
 	    timeoutSeconds: number;
 	    minSessionMinutes: number;
@@ -1806,6 +1834,7 @@ export namespace service {
 	    fileEvents: Record<number, Array<FileEventDisplay>>;
 	    browserEvents: Record<number, Array<BrowserEventDisplay>>;
 	    activityClusters: Record<number, Array<ActivityCluster>>;
+	    afkBlocks: Record<number, Array<AFKBlock>>;
 	
 	    static createFrom(source: any = {}) {
 	        return new TimelineGridData(source);
@@ -1824,6 +1853,7 @@ export namespace service {
 	        this.fileEvents = this.convertValues(source["fileEvents"], Array<FileEventDisplay>, true);
 	        this.browserEvents = this.convertValues(source["browserEvents"], Array<BrowserEventDisplay>, true);
 	        this.activityClusters = this.convertValues(source["activityClusters"], Array<ActivityCluster>, true);
+	        this.afkBlocks = this.convertValues(source["afkBlocks"], Array<AFKBlock>, true);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -1847,7 +1877,132 @@ export namespace service {
 	
 	
 	
+	export class WeekTimeBlock {
+	    blockIndex: number;
+	    startHour: number;
+	    startMinute: number;
+	    hasActivity: boolean;
+	    dominantCategory: string;
+	    activeSeconds: number;
+	    intensity: number;
 	
+	    static createFrom(source: any = {}) {
+	        return new WeekTimeBlock(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.blockIndex = source["blockIndex"];
+	        this.startHour = source["startHour"];
+	        this.startMinute = source["startMinute"];
+	        this.hasActivity = source["hasActivity"];
+	        this.dominantCategory = source["dominantCategory"];
+	        this.activeSeconds = source["activeSeconds"];
+	        this.intensity = source["intensity"];
+	    }
+	}
+	export class WeekDayData {
+	    date: string;
+	    dayOfWeek: number;
+	    dayName: string;
+	    isToday: boolean;
+	    totalHours: number;
+	    timeBlocks: WeekTimeBlock[];
+	    hasAiSummary: boolean;
+	    screenshotCount: number;
+	    categoryBreakdown: Record<string, number>;
+	
+	    static createFrom(source: any = {}) {
+	        return new WeekDayData(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.date = source["date"];
+	        this.dayOfWeek = source["dayOfWeek"];
+	        this.dayName = source["dayName"];
+	        this.isToday = source["isToday"];
+	        this.totalHours = source["totalHours"];
+	        this.timeBlocks = this.convertValues(source["timeBlocks"], WeekTimeBlock);
+	        this.hasAiSummary = source["hasAiSummary"];
+	        this.screenshotCount = source["screenshotCount"];
+	        this.categoryBreakdown = source["categoryBreakdown"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
+	export class WeekSummaryStats {
+	    totalHours: number;
+	    averageDaily: number;
+	    mostActiveDay: string;
+	    categoryBreakdown: Record<string, number>;
+	
+	    static createFrom(source: any = {}) {
+	        return new WeekSummaryStats(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.totalHours = source["totalHours"];
+	        this.averageDaily = source["averageDaily"];
+	        this.mostActiveDay = source["mostActiveDay"];
+	        this.categoryBreakdown = source["categoryBreakdown"];
+	    }
+	}
+	
+	export class WeekTimelineData {
+	    startDate: string;
+	    endDate: string;
+	    days: WeekDayData[];
+	    weekStats?: WeekSummaryStats;
+	
+	    static createFrom(source: any = {}) {
+	        return new WeekTimelineData(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.startDate = source["startDate"];
+	        this.endDate = source["endDate"];
+	        this.days = this.convertValues(source["days"], WeekDayData);
+	        this.weekStats = this.convertValues(source["weekStats"], WeekSummaryStats);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class WeeklyStats {
 	    startDate: string;
 	    endDate: string;

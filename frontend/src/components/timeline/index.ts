@@ -7,3 +7,7 @@ export { TimelineStats } from './TimelineStats';
 export { TimelineBands } from './TimelineBands';
 export { TimelineTags } from './TimelineTags';
 export { TimelineFilters, type TimePeriod, getTimePeriodRange } from './TimelineFilters';
+export { ViewModeSelector, type ViewMode } from './ViewModeSelector';
+export { TimelineWeekView, TimelineWeekViewSkeleton } from './TimelineWeekView';
+export { WeekSummaryCard } from './WeekSummaryCard';
+export { AFKColumn } from './AFKColumn';

@@ -21,6 +21,7 @@ type TimelineGridData struct {
 	FileEvents       map[int][]FileEventDisplay                `json:"fileEvents"` // hour -> file events
 	BrowserEvents    map[int][]BrowserEventDisplay             `json:"browserEvents"` // hour -> browser visits
 	ActivityClusters map[int][]ActivityCluster                 `json:"activityClusters"` // hour -> clusters
+	AFKBlocks        map[int][]AFKBlock                        `json:"afkBlocks"` // hour -> AFK blocks
 }
 
 // DayStats contains aggregated statistics for a day.
@@ -151,6 +152,63 @@ type ActivityCluster struct {
 	FileEventIDs    []int64  `json:"fileEventIds"`    // IDs of file events in this cluster
 	BrowserEventIDs []int64  `json:"browserEventIds"` // IDs of browser visits in this cluster
 	Summary         string   `json:"summary"`         // Brief description of the cluster
+}
+
+// AFKBlock represents an AFK (away-from-keyboard) period in the timeline grid.
+type AFKBlock struct {
+	ID              int64   `json:"id"`
+	StartTime       int64   `json:"startTime"`
+	EndTime         int64   `json:"endTime"`
+	DurationSeconds float64 `json:"durationSeconds"`
+	TriggerType     string  `json:"triggerType"`  // idle_timeout, system_sleep, manual
+	HourOffset      int     `json:"hourOffset"`   // Hour of day (0-23)
+	MinuteOffset    int     `json:"minuteOffset"` // Minute within hour (0-59)
+	PixelPosition   float64 `json:"pixelPosition"`// Vertical position in pixels (0-60)
+	PixelHeight     float64 `json:"pixelHeight"`  // Height in pixels
+}
+
+// ============================================================================
+// Week View Types
+// ============================================================================
+
+// WeekTimelineData represents the data structure for the week view.
+type WeekTimelineData struct {
+	StartDate string            `json:"startDate"` // Monday of the week (YYYY-MM-DD)
+	EndDate   string            `json:"endDate"`   // Sunday of the week (YYYY-MM-DD)
+	Days      []*WeekDayData    `json:"days"`      // 7 days (Mon-Sun)
+	WeekStats *WeekSummaryStats `json:"weekStats"` // Aggregated weekly stats
+}
+
+// WeekDayData represents a single day in the week view.
+type WeekDayData struct {
+	Date              string             `json:"date"`              // YYYY-MM-DD
+	DayOfWeek         int                `json:"dayOfWeek"`         // 0=Sunday, 6=Saturday
+	DayName           string             `json:"dayName"`           // "Mon", "Tue", etc.
+	IsToday           bool               `json:"isToday"`
+	TotalHours        float64            `json:"totalHours"`
+	TimeBlocks        []*WeekTimeBlock   `json:"timeBlocks"`        // 48 blocks (30-min each)
+	HasAISummary      bool               `json:"hasAiSummary"`
+	ScreenshotCount   int64              `json:"screenshotCount"`
+	CategoryBreakdown map[string]float64 `json:"categoryBreakdown"` // category -> hours
+}
+
+// WeekTimeBlock represents a 30-minute block in the week view.
+type WeekTimeBlock struct {
+	BlockIndex       int     `json:"blockIndex"`       // 0-47 (0 = 00:00-00:30, 47 = 23:30-00:00)
+	StartHour        int     `json:"startHour"`        // 0-23
+	StartMinute      int     `json:"startMinute"`      // 0 or 30
+	HasActivity      bool    `json:"hasActivity"`
+	DominantCategory string  `json:"dominantCategory"` // "focus", "meetings", "comms", "other"
+	ActiveSeconds    float64 `json:"activeSeconds"`    // Actual activity in this 30-min block
+	Intensity        int     `json:"intensity"`        // 0-4 for visual intensity
+}
+
+// WeekSummaryStats contains aggregated statistics for the week.
+type WeekSummaryStats struct {
+	TotalHours        float64            `json:"totalHours"`
+	AverageDaily      float64            `json:"averageDaily"`
+	MostActiveDay     string             `json:"mostActiveDay"`     // "Monday", "Tuesday", etc.
+	CategoryBreakdown map[string]float64 `json:"categoryBreakdown"` // category -> hours
 }
 
 // GetTimelineGridData retrieves all data needed for the v3 timeline grid view.
@@ -559,6 +617,67 @@ func (s *TimelineService) GetTimelineGridData(date string) (*TimelineGridData, e
 	// Generate activity clusters by identifying temporally related events
 	activityClusters := s.generateActivityClusters(gitEvents, shellEvents, fileEvents, browserEvents, dayStart)
 
+	// Fetch AFK events for the day
+	afkEvents, err := s.store.GetAFKEventsByTimeRange(dayStart.Unix(), dayEnd.Unix())
+	if err != nil {
+		// Non-fatal: log and continue with empty AFK blocks
+		afkEvents = []*storage.AFKEvent{}
+	}
+
+	// Build AFK blocks map: hour -> blocks
+	afkBlocks := make(map[int][]AFKBlock)
+
+	for _, afk := range afkEvents {
+		// Skip if AFK event doesn't have an end time yet (ongoing)
+		if !afk.EndTime.Valid {
+			continue
+		}
+
+		// Clip AFK times to day boundaries
+		effectiveStart := afk.StartTime
+		if effectiveStart < dayStart.Unix() {
+			effectiveStart = dayStart.Unix()
+		}
+
+		effectiveEnd := afk.EndTime.Int64
+		if effectiveEnd > dayEnd.Unix() {
+			effectiveEnd = dayEnd.Unix()
+		}
+
+		// Skip if AFK doesn't overlap with this day after clipping
+		if effectiveStart >= effectiveEnd {
+			continue
+		}
+
+		startTime := time.Unix(effectiveStart, 0).In(time.Local)
+		hour := startTime.Hour()
+		minute := startTime.Minute()
+		pixelPosition := (float64(minute) / 60.0) * 60.0
+
+		// Use clipped duration for display
+		durationSeconds := float64(effectiveEnd - effectiveStart)
+		pixelHeight := (durationSeconds / 3600.0) * 60.0
+
+		// Ensure minimum visibility (4px)
+		if pixelHeight < 4 {
+			pixelHeight = 4
+		}
+
+		block := AFKBlock{
+			ID:              afk.ID,
+			StartTime:       effectiveStart,
+			EndTime:         effectiveEnd,
+			DurationSeconds: durationSeconds,
+			TriggerType:     afk.TriggerType,
+			HourOffset:      hour,
+			MinuteOffset:    minute,
+			PixelPosition:   pixelPosition,
+			PixelHeight:     pixelHeight,
+		}
+
+		afkBlocks[hour] = append(afkBlocks[hour], block)
+	}
+
 	return &TimelineGridData{
 		Date:             date,
 		DayStats:         dayStats,
@@ -571,6 +690,7 @@ func (s *TimelineService) GetTimelineGridData(date string) (*TimelineGridData, e
 		FileEvents:       fileEvents,
 		BrowserEvents:    browserEvents,
 		ActivityClusters: activityClusters,
+		AFKBlocks:        afkBlocks,
 	}, nil
 }
 
@@ -898,4 +1018,275 @@ func (s *TimelineService) calculateDayStats(focusEvents []*storage.WindowFocusEv
 		Breakdown:        breakdown,
 		BreakdownPercent: breakdownPercent,
 	}
+}
+
+// ============================================================================
+// Week View Methods
+// ============================================================================
+
+// GetWeekTimelineData retrieves aggregated data for the week view.
+// startDate can be any date in the desired week; it will be normalized to Monday.
+func (s *TimelineService) GetWeekTimelineData(startDate string) (*WeekTimelineData, error) {
+	// Parse the input date
+	t, err := time.ParseInLocation("2006-01-02", startDate, time.Local)
+	if err != nil {
+		return nil, fmt.Errorf("invalid date format: %w", err)
+	}
+
+	// Normalize to Monday of the week
+	weekday := int(t.Weekday())
+	if weekday == 0 {
+		weekday = 7 // Sunday becomes 7
+	}
+	monday := t.AddDate(0, 0, -(weekday - 1))
+	sunday := monday.AddDate(0, 0, 6)
+
+	// Get week boundaries
+	weekStart := time.Date(monday.Year(), monday.Month(), monday.Day(), 0, 0, 0, 0, time.Local)
+	weekEnd := time.Date(sunday.Year(), sunday.Month(), sunday.Day(), 23, 59, 59, 0, time.Local)
+
+	// Fetch all focus events for the entire week in one query
+	focusEvents, err := s.store.GetFocusEventsByTimeRange(weekStart.Unix(), weekEnd.Unix())
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch focus events: %w", err)
+	}
+
+	// Get all unique app names for categorization
+	appNames := make(map[string]bool)
+	for _, event := range focusEvents {
+		appNames[event.AppName] = true
+	}
+	var appNamesList []string
+	for name := range appNames {
+		appNamesList = append(appNamesList, name)
+	}
+
+	// Fetch categories for all apps
+	categories, err := s.store.GetAppTimelineCategories(appNamesList)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch app categories: %w", err)
+	}
+
+	// Get today's date for comparison
+	today := time.Now().In(time.Local)
+	todayStr := today.Format("2006-01-02")
+
+	// Build data for each day
+	days := make([]*WeekDayData, 7)
+	dayNames := []string{"Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"}
+	fullDayNames := []string{"Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"}
+
+	var totalWeekHours float64
+	var mostActiveDay string
+	var mostActiveHours float64
+	weekCategoryBreakdown := map[string]float64{
+		"focus":    0,
+		"meetings": 0,
+		"comms":    0,
+		"other":    0,
+	}
+
+	for i := 0; i < 7; i++ {
+		dayDate := monday.AddDate(0, 0, i)
+		dayStr := dayDate.Format("2006-01-02")
+
+		// Calculate day boundaries
+		dayStart := time.Date(dayDate.Year(), dayDate.Month(), dayDate.Day(), 0, 0, 0, 0, time.Local)
+		dayEnd := dayStart.AddDate(0, 0, 1).Add(-time.Second)
+
+		// Filter focus events for this day
+		dayEvents := filterEventsByDay(focusEvents, dayStart.Unix(), dayEnd.Unix())
+
+		// Build 48 time blocks (30-min each)
+		timeBlocks := make([]*WeekTimeBlock, 48)
+		for blockIdx := 0; blockIdx < 48; blockIdx++ {
+			hour := blockIdx / 2
+			minute := (blockIdx % 2) * 30
+			timeBlocks[blockIdx] = &WeekTimeBlock{
+				BlockIndex:       blockIdx,
+				StartHour:        hour,
+				StartMinute:      minute,
+				HasActivity:      false,
+				DominantCategory: "",
+				ActiveSeconds:    0,
+				Intensity:        0,
+			}
+		}
+
+		// Aggregate events into time blocks
+		dayCategoryBreakdown := map[string]float64{
+			"focus":    0,
+			"meetings": 0,
+			"comms":    0,
+			"other":    0,
+		}
+
+		for _, event := range dayEvents {
+			// Clip event to day boundaries
+			effectiveStart := event.StartTime
+			if effectiveStart < dayStart.Unix() {
+				effectiveStart = dayStart.Unix()
+			}
+			effectiveEnd := event.EndTime
+			if effectiveEnd > dayEnd.Unix() {
+				effectiveEnd = dayEnd.Unix()
+			}
+			if effectiveStart >= effectiveEnd {
+				continue
+			}
+
+			category := categories[event.AppName]
+			if category == "" {
+				category = "other"
+			}
+
+			// Distribute event duration across 30-min blocks
+			eventStart := time.Unix(effectiveStart, 0).In(time.Local)
+			eventEnd := time.Unix(effectiveEnd, 0).In(time.Local)
+
+			// Calculate which blocks this event spans
+			startBlockIdx := eventStart.Hour()*2 + eventStart.Minute()/30
+			endBlockIdx := eventEnd.Hour()*2 + eventEnd.Minute()/30
+			if endBlockIdx >= 48 {
+				endBlockIdx = 47
+			}
+
+			for blockIdx := startBlockIdx; blockIdx <= endBlockIdx; blockIdx++ {
+				block := timeBlocks[blockIdx]
+
+				// Calculate overlap with this block
+				blockStartTime := dayStart.Add(time.Duration(blockIdx*30) * time.Minute)
+				blockEndTime := blockStartTime.Add(30 * time.Minute)
+
+				overlapStart := effectiveStart
+				if overlapStart < blockStartTime.Unix() {
+					overlapStart = blockStartTime.Unix()
+				}
+				overlapEnd := effectiveEnd
+				if overlapEnd > blockEndTime.Unix() {
+					overlapEnd = blockEndTime.Unix()
+				}
+
+				overlapSeconds := float64(overlapEnd - overlapStart)
+				if overlapSeconds > 0 {
+					block.HasActivity = true
+					block.ActiveSeconds += overlapSeconds
+
+					// Track category time for this block
+					// For dominant category, we'll use a simple approach: last category wins
+					// but could be enhanced to track per-category time
+					block.DominantCategory = category
+				}
+			}
+
+			// Track category breakdown for the day
+			duration := float64(effectiveEnd - effectiveStart)
+			dayCategoryBreakdown[category] += duration
+		}
+
+		// Calculate intensity for each block (0-4 based on active time)
+		for _, block := range timeBlocks {
+			if block.ActiveSeconds > 0 {
+				// Intensity based on % of 30 minutes (1800 seconds)
+				percentage := (block.ActiveSeconds / 1800.0) * 100
+				switch {
+				case percentage >= 80:
+					block.Intensity = 4
+				case percentage >= 60:
+					block.Intensity = 3
+				case percentage >= 40:
+					block.Intensity = 2
+				case percentage >= 20:
+					block.Intensity = 1
+				default:
+					block.Intensity = 1 // At least 1 if there's any activity
+				}
+			}
+		}
+
+		// Calculate total hours for the day
+		var dayTotalSeconds float64
+		for _, secs := range dayCategoryBreakdown {
+			dayTotalSeconds += secs
+		}
+		dayTotalHours := dayTotalSeconds / 3600.0
+
+		// Convert category breakdown to hours
+		dayCategoryHours := make(map[string]float64)
+		for cat, secs := range dayCategoryBreakdown {
+			dayCategoryHours[cat] = secs / 3600.0
+			weekCategoryBreakdown[cat] += secs / 3600.0
+		}
+
+		// Track most active day
+		if dayTotalHours > mostActiveHours {
+			mostActiveHours = dayTotalHours
+			mostActiveDay = fullDayNames[i]
+		}
+		totalWeekHours += dayTotalHours
+
+		// Get screenshot count for the day
+		screenshotCount, _ := s.store.CountScreenshotsByTimeRange(dayStart.Unix(), dayEnd.Unix())
+
+		// Check if day has any AI summaries
+		sessions, _ := s.GetSessionsForDate(dayStr)
+		hasAISummary := false
+		for _, sess := range sessions {
+			if sess.Summary != "" {
+				hasAISummary = true
+				break
+			}
+		}
+
+		days[i] = &WeekDayData{
+			Date:              dayStr,
+			DayOfWeek:         int(dayDate.Weekday()),
+			DayName:           dayNames[i],
+			IsToday:           dayStr == todayStr,
+			TotalHours:        dayTotalHours,
+			TimeBlocks:        timeBlocks,
+			HasAISummary:      hasAISummary,
+			ScreenshotCount:   screenshotCount,
+			CategoryBreakdown: dayCategoryHours,
+		}
+	}
+
+	// Calculate week stats
+	activeDays := 0
+	for _, day := range days {
+		if day.TotalHours > 0 {
+			activeDays++
+		}
+	}
+
+	averageDaily := 0.0
+	if activeDays > 0 {
+		averageDaily = totalWeekHours / float64(activeDays)
+	}
+
+	weekStats := &WeekSummaryStats{
+		TotalHours:        totalWeekHours,
+		AverageDaily:      averageDaily,
+		MostActiveDay:     mostActiveDay,
+		CategoryBreakdown: weekCategoryBreakdown,
+	}
+
+	return &WeekTimelineData{
+		StartDate: monday.Format("2006-01-02"),
+		EndDate:   sunday.Format("2006-01-02"),
+		Days:      days,
+		WeekStats: weekStats,
+	}, nil
+}
+
+// filterEventsByDay returns focus events that overlap with the given day.
+func filterEventsByDay(events []*storage.WindowFocusEvent, dayStart, dayEnd int64) []*storage.WindowFocusEvent {
+	var result []*storage.WindowFocusEvent
+	for _, e := range events {
+		// Check if event overlaps with the day
+		if e.StartTime <= dayEnd && e.EndTime >= dayStart {
+			result = append(result, e)
+		}
+	}
+	return result
 }

@@ -13,6 +13,7 @@ export interface TimelineGridData {
   fileEvents: Record<number, FileEventDisplay[]>; // hour -> file events
   browserEvents: Record<number, BrowserEventDisplay[]>; // hour -> browser visits
   activityClusters: Record<number, ActivityCluster[]>; // hour -> activity clusters
+  afkBlocks: Record<number, AFKBlock[]>; // hour -> AFK blocks
 }
 
 export interface DayStats {
@@ -152,6 +153,18 @@ export interface ActivityCluster {
   summary: string; // Brief description of the cluster
 }
 
+export interface AFKBlock {
+  id: number;
+  startTime: number; // Unix timestamp
+  endTime: number; // Unix timestamp
+  durationSeconds: number;
+  triggerType: string; // idle_timeout, system_sleep, manual
+  hourOffset: number; // Hour of day (0-23)
+  minuteOffset: number; // Minute within hour (0-59)
+  pixelPosition: number; // Vertical position in pixels (0-60)
+  pixelHeight: number; // Height in pixels
+}
+
 export interface CategorizationRule {
   id: number;
   appName: string;
@@ -181,6 +194,46 @@ export interface AppColumnData {
 
 export interface SessionBlock extends SessionSummaryWithPosition {
   // Additional UI-specific fields if needed
+}
+
+// ============================================================================
+// Week View Types
+// ============================================================================
+
+export interface WeekTimelineData {
+  startDate: string; // Monday (YYYY-MM-DD)
+  endDate: string; // Sunday (YYYY-MM-DD)
+  days: WeekDayData[];
+  weekStats: WeekSummaryStats;
+}
+
+export interface WeekDayData {
+  date: string; // YYYY-MM-DD
+  dayOfWeek: number; // 0=Sunday, 6=Saturday
+  dayName: string; // "Mon", "Tue", etc.
+  isToday: boolean;
+  totalHours: number;
+  timeBlocks: WeekTimeBlock[];
+  hasAiSummary: boolean;
+  screenshotCount: number;
+  categoryBreakdown: Record<string, number>; // category -> hours
+}
+
+export interface WeekTimeBlock {
+  blockIndex: number; // 0-47
+  startHour: number; // 0-23
+  startMinute: number; // 0 or 30
+  hasActivity: boolean;
+  dominantCategory: string; // "focus", "meetings", "comms", "other", or ""
+  activeSeconds: number;
+  intensity: number; // 0-4
+}
+
+export interface WeekSummaryStats {
+  totalHours: number;
+  averageDaily: number;
+  mostActiveDay: string; // "Monday", "Tuesday", etc.
+  categoryBreakdown: Record<string, number>; // category -> hours
 }
 
 // Category colors and configuration
@@ -218,12 +271,13 @@ export const CATEGORY_LABELS: Record<CategoryType, string> = {
 // Grid layout constants (Timely-style)
 
 export const GRID_CONSTANTS = {
-  HOUR_HEIGHT_PX: 80, // Increased for more spacious Timely look
-  HOUR_COLUMN_WIDTH_PX: 60,
-  AI_SUMMARY_COLUMN_WIDTH_PX: 200, // Wider for "Memories" column
-  APP_COLUMN_WIDTH_PX: 160, // Slightly wider for better readability
-  MIN_BLOCK_HEIGHT_PX: 6,
-  MIN_SESSION_HEIGHT_PX: 14,
+  HOUR_HEIGHT_PX: 80, // Spacious Timely look
+  HOUR_COLUMN_WIDTH_PX: 56, // Compact time labels
+  AI_SUMMARY_COLUMN_WIDTH_PX: 180, // Summary readability
+  APP_COLUMN_WIDTH_PX: 120, // Compact app columns
+  MIN_BLOCK_HEIGHT_PX: 8, // Increased for better visibility
+  MIN_SESSION_HEIGHT_PX: 16, // Increased minimum
+  MAX_APP_COLUMNS: 5, // Limit app columns to reduce scrolling
 } as const;
 
 // Timely-style pastel colors for activity blocks
