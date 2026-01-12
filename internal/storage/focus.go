@@ -43,14 +43,16 @@ func (s *Store) GetFocusEventsBySession(sessionID int64) ([]*WindowFocusEvent, e
 	return scanFocusEvents(rows)
 }
 
-// GetFocusEventsByTimeRange retrieves focus events within a time range.
+// GetFocusEventsByTimeRange retrieves focus events that overlap with a time range.
+// An event overlaps if it starts at or before the range ends AND ends after the range starts.
+// This correctly handles events that span midnight boundaries.
 func (s *Store) GetFocusEventsByTimeRange(start, end int64) ([]*WindowFocusEvent, error) {
 	rows, err := s.db.Query(`
 		SELECT id, window_title, app_name, window_class,
 		       start_time, end_time, duration_seconds, session_id, created_at
 		FROM window_focus_events
-		WHERE start_time >= ? AND start_time <= ?
-		ORDER BY start_time ASC`, start, end)
+		WHERE start_time <= ? AND end_time > ?
+		ORDER BY start_time ASC`, end, start)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query focus events by time: %w", err)
 	}
@@ -60,13 +62,14 @@ func (s *Store) GetFocusEventsByTimeRange(start, end int64) ([]*WindowFocusEvent
 }
 
 // GetAppUsageByTimeRange returns aggregated app usage statistics.
+// Uses overlap detection to correctly handle events spanning midnight boundaries.
 func (s *Store) GetAppUsageByTimeRange(start, end int64) (map[string]float64, error) {
 	rows, err := s.db.Query(`
 		SELECT app_name, SUM(duration_seconds) as total_duration
 		FROM window_focus_events
-		WHERE start_time >= ? AND start_time <= ?
+		WHERE start_time <= ? AND end_time > ?
 		GROUP BY app_name
-		ORDER BY total_duration DESC`, start, end)
+		ORDER BY total_duration DESC`, end, start)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query app usage: %w", err)
 	}
@@ -85,6 +88,7 @@ func (s *Store) GetAppUsageByTimeRange(start, end int64) (map[string]float64, er
 }
 
 // GetTopApps returns the top N apps by usage duration.
+// Uses overlap detection to correctly handle events spanning midnight boundaries.
 func (s *Store) GetTopApps(start, end int64, limit int) ([]struct {
 	AppName  string
 	Duration float64
@@ -92,10 +96,10 @@ func (s *Store) GetTopApps(start, end int64, limit int) ([]struct {
 	rows, err := s.db.Query(`
 		SELECT app_name, SUM(duration_seconds) as total_duration
 		FROM window_focus_events
-		WHERE start_time >= ? AND start_time <= ?
+		WHERE start_time <= ? AND end_time > ?
 		GROUP BY app_name
 		ORDER BY total_duration DESC
-		LIMIT ?`, start, end, limit)
+		LIMIT ?`, end, start, limit)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query top apps: %w", err)
 	}
