@@ -93,8 +93,8 @@ export function SettingsDrawer({ open, onOpenChange }: SettingsDrawerProps) {
             <p className="text-muted-foreground">Loading settings...</p>
           </div>
         ) : (
-        <Tabs defaultValue="capture" className="mt-6">
-          <TabsList className="flex flex-wrap h-auto gap-1 p-1">
+        <Tabs defaultValue="capture" className="mt-6 flex flex-col max-h-[calc(85vh-180px)] min-w-0">
+          <TabsList className="flex flex-wrap h-auto gap-1 p-1 flex-shrink-0">
             <TabsTrigger value="capture" className="flex-shrink-0">Capture</TabsTrigger>
             <TabsTrigger value="ai" className="flex-shrink-0">AI</TabsTrigger>
             <TabsTrigger value="categories" className="flex-shrink-0">Categories</TabsTrigger>
@@ -103,7 +103,7 @@ export function SettingsDrawer({ open, onOpenChange }: SettingsDrawerProps) {
             <TabsTrigger value="system" className="flex-shrink-0">System</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="capture" className="space-y-6 mt-4">
+          <TabsContent value="capture" className="space-y-6 mt-4 overflow-y-auto flex-1 min-w-0">
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">
                 <label className="text-sm font-medium">Enable Capture</label>
@@ -329,7 +329,7 @@ export function SettingsDrawer({ open, onOpenChange }: SettingsDrawerProps) {
             </div>
           </TabsContent>
 
-          <TabsContent value="ai" className="space-y-6 mt-4">
+          <TabsContent value="ai" className="space-y-6 mt-4 overflow-y-auto flex-1 min-w-0">
             <div className="space-y-2">
               <label className="text-sm font-medium">Inference Engine</label>
               <Select
@@ -585,7 +585,7 @@ export function SettingsDrawer({ open, onOpenChange }: SettingsDrawerProps) {
             )}
           </TabsContent>
 
-          <TabsContent value="sources" className="space-y-6 mt-4">
+          <TabsContent value="sources" className="space-y-6 mt-4 overflow-y-auto flex-1 min-w-0">
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">
                 <label className="text-sm font-medium">Shell History</label>
@@ -884,15 +884,15 @@ export function SettingsDrawer({ open, onOpenChange }: SettingsDrawerProps) {
             )}
           </TabsContent>
 
-          <TabsContent value="categories" className="space-y-6 mt-4">
+          <TabsContent value="categories" className="space-y-6 mt-4 overflow-y-auto flex-1 min-w-0">
             <CategoriesTab />
           </TabsContent>
 
-          <TabsContent value="timeline-categories" className="space-y-6 mt-4">
+          <TabsContent value="timeline-categories" className="space-y-6 mt-4 overflow-y-auto flex-1 min-w-0">
             <TimelineCategoriesTab />
           </TabsContent>
 
-          <TabsContent value="system" className="space-y-6 mt-4">
+          <TabsContent value="system" className="space-y-6 mt-4 overflow-y-auto flex-1 min-w-0">
             {/* Storage Statistics */}
             <div className="space-y-3">
               <label className="text-sm font-medium flex items-center gap-2">
