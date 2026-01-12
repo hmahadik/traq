@@ -20,12 +20,29 @@ export interface DateContextValue {
   dateRange: DateRange | null;
   setDateRange: (range: DateRange | null) => void;
 
-  // Helpers
+  // Helpers - Day navigation
   goToPreviousDay: () => void;
   goToNextDay: () => void;
   goToToday: () => void;
   goToYesterday: () => void;
   isToday: boolean;
+
+  // Helpers - Week navigation
+  goToPreviousWeek: () => void;
+  goToNextWeek: () => void;
+
+  // Helpers - Month navigation
+  goToPreviousMonth: () => void;
+  goToNextMonth: () => void;
+
+  // Helpers - Year navigation
+  goToPreviousYear: () => void;
+  goToNextYear: () => void;
+
+  // Smart navigation based on current timeframeType
+  goToPrevious: () => void;
+  goToNext: () => void;
+  canGoNext: boolean; // False if at current period
 
   // Get the appropriate representative date for Timeline
   // For multi-day ranges, returns end date (capped at today)
@@ -56,6 +73,7 @@ export function DateProvider({ children }: { children: ReactNode }) {
   const today = new Date();
   const isToday = getDateString(selectedDate) === getDateString(today);
 
+  // Day navigation
   const goToPreviousDay = useCallback(() => {
     setSelectedDate((d) => addDays(d, -1));
   }, []);
@@ -68,6 +86,149 @@ export function DateProvider({ children }: { children: ReactNode }) {
       setSelectedDate(nextDay);
     }
   }, [selectedDate]);
+
+  // Week navigation
+  const goToPreviousWeek = useCallback(() => {
+    setSelectedDate((d) => addDays(d, -7));
+  }, []);
+
+  const goToNextWeek = useCallback(() => {
+    const nextWeek = addDays(selectedDate, 7);
+    const today = new Date();
+    // Don't allow going past today
+    if (getDateString(nextWeek) <= getDateString(today)) {
+      setSelectedDate(nextWeek);
+    }
+  }, [selectedDate]);
+
+  // Month navigation
+  const goToPreviousMonth = useCallback(() => {
+    setSelectedDate((d) => {
+      const newDate = new Date(d);
+      newDate.setMonth(d.getMonth() - 1);
+      return newDate;
+    });
+  }, []);
+
+  const goToNextMonth = useCallback(() => {
+    setSelectedDate((d) => {
+      const nextMonth = new Date(d);
+      nextMonth.setMonth(d.getMonth() + 1);
+      const today = new Date();
+      // Don't allow going past current month
+      if (getDateString(nextMonth) <= getDateString(today)) {
+        return nextMonth;
+      }
+      return d;
+    });
+  }, []);
+
+  // Year navigation
+  const goToPreviousYear = useCallback(() => {
+    setSelectedDate((d) => {
+      const newDate = new Date(d);
+      newDate.setFullYear(d.getFullYear() - 1);
+      return newDate;
+    });
+  }, []);
+
+  const goToNextYear = useCallback(() => {
+    setSelectedDate((d) => {
+      const nextYear = new Date(d);
+      nextYear.setFullYear(d.getFullYear() + 1);
+      const today = new Date();
+      // Don't allow going past current year
+      if (nextYear.getFullYear() <= today.getFullYear()) {
+        return nextYear;
+      }
+      return d;
+    });
+  }, []);
+
+  // Smart navigation based on timeframeType
+  const goToPrevious = useCallback(() => {
+    switch (timeframeType) {
+      case 'day':
+        goToPreviousDay();
+        break;
+      case 'week':
+        goToPreviousWeek();
+        break;
+      case 'month':
+        goToPreviousMonth();
+        break;
+      case 'year':
+        goToPreviousYear();
+        break;
+      case 'custom':
+        // For custom, move by the range duration
+        if (dateRange) {
+          const duration = dateRange.end.getTime() - dateRange.start.getTime();
+          const newStart = new Date(dateRange.start.getTime() - duration);
+          const newEnd = new Date(dateRange.end.getTime() - duration);
+          setDateRange({ start: newStart, end: newEnd });
+        }
+        break;
+    }
+  }, [timeframeType, goToPreviousDay, goToPreviousWeek, goToPreviousMonth, goToPreviousYear, dateRange]);
+
+  const goToNext = useCallback(() => {
+    switch (timeframeType) {
+      case 'day':
+        goToNextDay();
+        break;
+      case 'week':
+        goToNextWeek();
+        break;
+      case 'month':
+        goToNextMonth();
+        break;
+      case 'year':
+        goToNextYear();
+        break;
+      case 'custom':
+        // For custom, move by the range duration
+        if (dateRange) {
+          const duration = dateRange.end.getTime() - dateRange.start.getTime();
+          const newStart = new Date(dateRange.start.getTime() + duration);
+          const newEnd = new Date(dateRange.end.getTime() + duration);
+          const today = new Date();
+          // Don't go past today
+          if (getDateString(newEnd) <= getDateString(today)) {
+            setDateRange({ start: newStart, end: newEnd });
+          }
+        }
+        break;
+    }
+  }, [timeframeType, goToNextDay, goToNextWeek, goToNextMonth, goToNextYear, dateRange]);
+
+  // Calculate if we can go to next period
+  const canGoNext = useCallback(() => {
+    const today = new Date();
+    switch (timeframeType) {
+      case 'day':
+        return getDateString(selectedDate) < getDateString(today);
+      case 'week': {
+        const nextWeek = addDays(selectedDate, 7);
+        return getDateString(nextWeek) <= getDateString(today);
+      }
+      case 'month': {
+        const nextMonth = new Date(selectedDate);
+        nextMonth.setMonth(selectedDate.getMonth() + 1);
+        return getDateString(nextMonth) <= getDateString(today);
+      }
+      case 'year': {
+        return selectedDate.getFullYear() < today.getFullYear();
+      }
+      case 'custom': {
+        if (!dateRange) return false;
+        const duration = dateRange.end.getTime() - dateRange.start.getTime();
+        const newEnd = new Date(dateRange.end.getTime() + duration);
+        return getDateString(newEnd) <= getDateString(today);
+      }
+    }
+    return false;
+  }, [timeframeType, selectedDate, dateRange])();
 
   const goToToday = useCallback(() => {
     setSelectedDate(new Date());
@@ -107,6 +268,15 @@ export function DateProvider({ children }: { children: ReactNode }) {
     goToToday,
     goToYesterday,
     isToday,
+    goToPreviousWeek,
+    goToNextWeek,
+    goToPreviousMonth,
+    goToNextMonth,
+    goToPreviousYear,
+    goToNextYear,
+    goToPrevious,
+    goToNext,
+    canGoNext,
     getRepresentativeDate,
   };
 

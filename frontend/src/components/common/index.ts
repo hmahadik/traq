@@ -8,6 +8,7 @@ export { ImageGallery } from './ImageGallery';
 export { DatePicker } from './DatePicker';
 export { DateRangePicker } from './DateRangePicker';
 export type { DateRange } from './DateRangePicker';
+export { DateNavigation } from './DateNavigation';
 export {
   ScreenshotSkeleton,
   SessionCardSkeleton,

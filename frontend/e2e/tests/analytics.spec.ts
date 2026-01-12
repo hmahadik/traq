@@ -96,4 +96,115 @@ test.describe('Analytics Page - Productivity Analysis Journey', () => {
 
     await expect(analyticsPage.heading).toBeVisible();
   });
+
+  test('should have date navigation buttons', async ({ analyticsPage }) => {
+    await expect(analyticsPage.prevButton).toBeVisible();
+    await expect(analyticsPage.nextButton).toBeVisible();
+  });
+
+  test('should navigate to previous day in day view', async ({ analyticsPage }) => {
+    await analyticsPage.waitForDataToLoad();
+
+    // Get current date
+    const beforeDate = await analyticsPage.getCurrentDateText();
+
+    // Click previous
+    await analyticsPage.clickPrevious();
+
+    // Date should change
+    const afterDate = await analyticsPage.getCurrentDateText();
+    expect(afterDate).not.toBe(beforeDate);
+  });
+
+  test('should navigate to next day in day view when not at today', async ({ analyticsPage }) => {
+    await analyticsPage.waitForDataToLoad();
+
+    // Go to previous day first
+    await analyticsPage.clickPrevious();
+
+    // Get current date
+    const beforeDate = await analyticsPage.getCurrentDateText();
+
+    // Next button should be enabled
+    const isDisabled = await analyticsPage.isNextButtonDisabled();
+    expect(isDisabled).toBe(false);
+
+    // Click next
+    await analyticsPage.clickNext();
+
+    // Date should change
+    const afterDate = await analyticsPage.getCurrentDateText();
+    expect(afterDate).not.toBe(beforeDate);
+  });
+
+  test('should disable next button when at current period', async ({ analyticsPage }) => {
+    await analyticsPage.waitForDataToLoad();
+
+    // At today in day view, next should be disabled
+    const isDisabled = await analyticsPage.isNextButtonDisabled();
+    expect(isDisabled).toBe(true);
+  });
+
+  test('should navigate weeks in week view', async ({ analyticsPage }) => {
+    await analyticsPage.switchToView('week');
+
+    // Get current date
+    const beforeDate = await analyticsPage.getCurrentDateText();
+
+    // Click previous week
+    await analyticsPage.clickPrevious();
+
+    // Date should change
+    const afterDate = await analyticsPage.getCurrentDateText();
+    expect(afterDate).not.toBe(beforeDate);
+
+    // Click next week
+    await analyticsPage.clickNext();
+
+    // Should return to original or close to it
+    const returnDate = await analyticsPage.getCurrentDateText();
+    expect(returnDate).not.toBe(afterDate);
+  });
+
+  test('should navigate months in month view', async ({ analyticsPage }) => {
+    await analyticsPage.switchToView('month');
+
+    // Get current date
+    const beforeDate = await analyticsPage.getCurrentDateText();
+
+    // Click previous month
+    await analyticsPage.clickPrevious();
+
+    // Date should change
+    const afterDate = await analyticsPage.getCurrentDateText();
+    expect(afterDate).not.toBe(beforeDate);
+
+    // Click next month
+    await analyticsPage.clickNext();
+
+    // Should return to original or close to it
+    const returnDate = await analyticsPage.getCurrentDateText();
+    expect(returnDate).not.toBe(afterDate);
+  });
+
+  test('should navigate years in year view', async ({ analyticsPage }) => {
+    await analyticsPage.switchToView('year');
+
+    // Get current date (should show year)
+    const beforeDate = await analyticsPage.getCurrentDateText();
+
+    // Click previous year
+    await analyticsPage.clickPrevious();
+
+    // Date should change
+    const afterDate = await analyticsPage.getCurrentDateText();
+    expect(afterDate).not.toBe(beforeDate);
+
+    // Click next year
+    await analyticsPage.clickNext();
+
+    // Should return to original year
+    const returnDate = await analyticsPage.getCurrentDateText();
+    expect(returnDate).not.toBe(afterDate);
+  });
 });

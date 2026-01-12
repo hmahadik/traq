@@ -15,6 +15,8 @@ export class AnalyticsPage extends BasePage {
   // Buttons
   readonly regenerateButton: Locator;
   readonly exportButton: Locator;
+  readonly prevButton: Locator;
+  readonly nextButton: Locator;
 
   // Stats and charts
   readonly statsGrid: Locator;
@@ -52,6 +54,8 @@ export class AnalyticsPage extends BasePage {
     // Buttons
     this.regenerateButton = page.getByRole('button', { name: /Regenerate/i });
     this.exportButton = page.getByRole('button', { name: /Export/i });
+    this.prevButton = page.getByTestId('date-nav-prev');
+    this.nextButton = page.getByTestId('date-nav-next');
 
     // Stats grid (contains stat cards)
     this.statsGrid = page.locator('[class*="grid"]').first();
@@ -138,5 +142,19 @@ export class AnalyticsPage extends BasePage {
     await this.regenerateButton.click();
     // Wait for regeneration to complete
     await this.page.waitForTimeout(1000);
+  }
+
+  async clickPrevious() {
+    await this.prevButton.click();
+    await this.waitForDataToLoad();
+  }
+
+  async clickNext() {
+    await this.nextButton.click();
+    await this.waitForDataToLoad();
+  }
+
+  async isNextButtonDisabled(): Promise<boolean> {
+    return (await this.nextButton.getAttribute('disabled')) !== null;
   }
 }
