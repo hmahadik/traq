@@ -2,7 +2,7 @@
 [ ] Export all data for backup/migration
 [ ] Sessions that start before and extend beyond midnight not rendered correctly
 [x] Allow for prev/next browsing of screenshots in screenshots page
-[ ] Pre-fetch screenshot images to make navigating prev/next faster
+[x] Pre-fetch screenshot images to make navigating prev/next faster
 [ ] Hovering over an activity in timeline should show screenshot 
 [ ] Active/AFK time not shown on timeline
 [ ] Timeline week view (See Timely app UI for reference)

@@ -6,6 +6,7 @@ import { useScreenshotImage, useThumbnail } from '@/api/hooks';
 import { formatTimestamp, formatDate, isNullableValid, getNullableInt, getNullableString } from '@/lib/utils';
 import { useKeyboardNav } from '@/hooks/useKeyboardNav';
 import { Skeleton } from '@/components/ui/skeleton';
+import { api } from '@/api/client';
 import type { Screenshot } from '@/types';
 
 // Small thumbnail for the strip
@@ -67,6 +68,48 @@ export function ImageGallery({
   useEffect(() => {
     setCurrentIndex(initialIndex);
   }, [initialIndex]);
+
+  // Pre-fetch adjacent images for faster navigation
+  useEffect(() => {
+    if (!open || !currentScreenshot) return;
+
+    // Pre-fetch next 3 images and previous 2 images
+    const prefetchCount = 3;
+    const imagesToPrefetch: number[] = [];
+
+    // Add next images
+    for (let i = 1; i <= prefetchCount; i++) {
+      const nextIndex = currentIndex + i;
+      if (nextIndex < screenshots.length) {
+        imagesToPrefetch.push(nextIndex);
+      }
+    }
+
+    // Add previous images
+    for (let i = 1; i <= Math.min(2, prefetchCount); i++) {
+      const prevIndex = currentIndex - i;
+      if (prevIndex >= 0) {
+        imagesToPrefetch.push(prevIndex);
+      }
+    }
+
+    // Prefetch images by fetching their paths and loading them into browser cache
+    imagesToPrefetch.forEach(async (index) => {
+      const screenshot = screenshots[index];
+      if (screenshot?.id) {
+        try {
+          // Get the file path for the screenshot
+          const imagePath = await api.screenshots.getScreenshotImage(screenshot.id);
+          // Create an Image object to load it into browser cache
+          const img = new Image();
+          img.src = imagePath;
+        } catch (error) {
+          // Silently fail - pre-fetching is a performance optimization
+          console.debug('Failed to prefetch screenshot:', screenshot.id, error);
+        }
+      }
+    });
+  }, [currentIndex, open, currentScreenshot, screenshots]);
 
   // Keyboard navigation
   useKeyboardNav({

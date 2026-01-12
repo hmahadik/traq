@@ -195,4 +195,51 @@ test.describe('Screenshots Page - Screenshot Browser Journey', () => {
     // Close with Escape
     await screenshotsPage.closePreview();
   });
+
+  test('should pre-fetch adjacent images for faster navigation', async ({ page }) => {
+    // Navigate to screenshots page
+    await page.goto('http://localhost:34115/#/screenshots');
+    await page.waitForTimeout(2000);
+
+    // Look for hour groups with screenshots
+    const hourGroup = page.locator('.space-y-3 > div').first();
+
+    // Check if we have screenshots to test with
+    const hasScreenshots = await hourGroup.isVisible().catch(() => false);
+    test.skip(!hasScreenshots, 'No screenshots available to test pre-fetching');
+
+    // Click on first screenshot in the hour group
+    const firstScreenshot = hourGroup.locator('img').first();
+    await firstScreenshot.click();
+
+    // Wait for gallery modal to open
+    const galleryDialog = page.locator('[data-testid="image-gallery"]');
+    await expect(galleryDialog).toBeVisible({ timeout: 5000 });
+
+    // Check that we have multiple screenshots to navigate through
+    const counterText = await page.locator('text=/\\d+ \\/ \\d+/').textContent();
+    const match = counterText?.match(/(\d+) \/ (\d+)/);
+    const currentIndex = match ? parseInt(match[1]) : 0;
+    const totalCount = match ? parseInt(match[2]) : 0;
+
+    test.skip(totalCount < 4, 'Need at least 4 screenshots to test pre-fetching');
+
+    // Wait a moment for pre-fetching to occur
+    await page.waitForTimeout(500);
+
+    // Navigate to next screenshot - should be fast due to pre-fetching
+    const nextButton = page.getByTestId('gallery-next');
+    await nextButton.click();
+
+    // Image should load quickly (pre-fetched)
+    const mainImage = galleryDialog.locator('img').filter({ hasNot: page.locator('.w-16') });
+    await expect(mainImage).toBeVisible({ timeout: 1000 });
+
+    // Navigate once more to test continued pre-fetching
+    await nextButton.click();
+    await expect(mainImage).toBeVisible({ timeout: 1000 });
+
+    // Close dialog
+    await page.keyboard.press('Escape');
+  });
 });
