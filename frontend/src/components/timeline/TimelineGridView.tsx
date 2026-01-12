@@ -165,7 +165,7 @@ export const TimelineGridView: React.FC<TimelineGridViewProps> = ({ data, filter
   return (
     <div className="relative bg-card border border-border flex-1 min-h-0 overflow-hidden">
       {/* Full-screen scrollable container - spans entire available space */}
-      <ScrollArea className="h-full w-full" style={{ height: 'calc(100vh - 12rem)' }} type="always">
+      <ScrollArea className="h-full w-full" type="always">
         <div className="flex min-w-full relative" style={{ height: `${gridHeight}px`, minWidth: 'max-content' }}>
           {/* Hour Column (Sticky) */}
           <HourColumn hours={activeHours} hourHeight={effectiveHourHeight} />

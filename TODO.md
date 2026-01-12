@@ -1,5 +1,5 @@
 [ ] Time breakdown should only include active (non-afk), breaks (see logic in v1), and meetings
-[ ] Timeline grid has unnecessary extra padding at the bottom
+[x] Timeline grid has unnecessary extra padding at the bottom
 [ ] Sessions that start before and extend beyond midnight not rendered correctly
 [x] Allow for prev/next browsing of screenshots in screenshots page
 [x] Pre-fetch screenshot images to make navigating prev/next faster 
