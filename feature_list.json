@@ -745,8 +745,8 @@
       "Toggle off 'Screenshots' - verify only events remain",
       "Toggle all back on - verify full timeline restored"
     ],
-    "passes": false,
-    "note": "FUTURE ENHANCEMENT: Not in original spec. See UNIFIED_TIMELINE_VISION.md. Requires unified timeline implementation first."
+    "passes": true,
+    "note": "IMPLEMENTED: Event filtering UI complete with toggle buttons for each event type (Git, Shell, Files, Browser, Screenshots). Filter controls appear in Timeline header with color-coded buttons matching column themes. Toggle buttons show/hide respective columns. Reset button appears when any filter is off. Filter state persists in localStorage across page reloads. Verified all filters work correctly through browser automation testing."
   },
   {
     "category": "unified-timeline",

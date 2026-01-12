@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { ChevronLeft, ChevronRight, Calendar, Sparkles, Loader2 } from 'lucide-react';
 import { CalendarWidget } from '@/components/timeline';
@@ -8,6 +8,7 @@ import { DailySummaryCard } from '@/components/timeline/DailySummaryCard';
 import { BreakdownBar } from '@/components/timeline/BreakdownBar';
 import { TopAppsSection } from '@/components/timeline/TopAppsSection';
 import { TimelinePageSkeleton } from '@/components/timeline/TimelineGridSkeleton';
+import { FilterControls, TimelineFilters } from '@/components/timeline/FilterControls';
 import { toast } from 'sonner';
 
 function getDateString(date: Date): string {
@@ -24,10 +25,40 @@ function addDays(date: Date, days: number): Date {
   return result;
 }
 
+const FILTER_STORAGE_KEY = 'timeline-filters';
+
 export function TimelinePage() {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [showCalendar, setShowCalendar] = useState(false);
   const [isBatchGenerating, setIsBatchGenerating] = useState(false);
+
+  // Load filters from localStorage or use defaults
+  const [filters, setFilters] = useState<TimelineFilters>(() => {
+    try {
+      const stored = localStorage.getItem(FILTER_STORAGE_KEY);
+      if (stored) {
+        return JSON.parse(stored);
+      }
+    } catch (e) {
+      console.error('Failed to load filters from localStorage:', e);
+    }
+    return {
+      showGit: true,
+      showShell: true,
+      showFiles: true,
+      showBrowser: true,
+      showScreenshots: true,
+    };
+  });
+
+  // Persist filters to localStorage whenever they change
+  useEffect(() => {
+    try {
+      localStorage.setItem(FILTER_STORAGE_KEY, JSON.stringify(filters));
+    } catch (e) {
+      console.error('Failed to save filters to localStorage:', e);
+    }
+  }, [filters]);
 
   const dateStr = getDateString(selectedDate);
   const isToday = dateStr === getDateString(new Date());
@@ -101,7 +132,7 @@ export function TimelinePage() {
     <div className="flex flex-col xl:flex-row gap-6 h-[calc(100vh-5rem)] lg:h-[calc(100vh-3rem)]">
       {/* Header - Always visible */}
       <div className="xl:hidden">
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center justify-between mb-4">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Timeline</h1>
             <p className="text-muted-foreground">{formattedDate}</p>
@@ -173,6 +204,11 @@ export function TimelinePage() {
             )}
           </div>
         </div>
+
+        {/* Filter Controls - Mobile */}
+        <div className="mb-6">
+          <FilterControls filters={filters} onFiltersChange={setFilters} />
+        </div>
       </div>
 
       {/* Loading State */}
@@ -192,7 +228,7 @@ export function TimelinePage() {
           {/* Main Content - Timeline Grid */}
           <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
             {/* Header - Desktop */}
-            <div className="hidden xl:flex items-center justify-between mb-6">
+            <div className="hidden xl:flex items-center justify-between mb-4">
               <div>
                 <h1 className="text-3xl font-bold tracking-tight">Timeline</h1>
                 <p className="text-muted-foreground">{formattedDate}</p>
@@ -265,8 +301,13 @@ export function TimelinePage() {
               </div>
             </div>
 
+            {/* Filter Controls - Desktop */}
+            <div className="hidden xl:block mb-6">
+              <FilterControls filters={filters} onFiltersChange={setFilters} />
+            </div>
+
             {/* Grid View */}
-            <TimelineGridView data={gridData} />
+            <TimelineGridView data={gridData} filters={filters} />
           </div>
         </>
       ) : (

@@ -8,6 +8,7 @@ import { GitColumn } from './GitColumn';
 import { ShellColumn } from './ShellColumn';
 import { FilesColumn } from './FilesColumn';
 import { BrowserColumn } from './BrowserColumn';
+import { TimelineFilters } from './FilterControls';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { ImageGallery } from '@/components/common/ImageGallery';
 import { useScreenshotsForDate } from '@/api/hooks';
@@ -15,13 +16,23 @@ import type { Screenshot } from '@/types';
 
 interface TimelineGridViewProps {
   data: TimelineGridData;
+  filters?: TimelineFilters;
 }
 
 // Header height for column headers (matches the header in HourColumn/AppColumn)
 const HEADER_HEIGHT_PX = 44;
 
-export const TimelineGridView: React.FC<TimelineGridViewProps> = ({ data }) => {
+export const TimelineGridView: React.FC<TimelineGridViewProps> = ({ data, filters }) => {
   const { hourlyGrid, sessionSummaries, topApps } = data;
+
+  // Default to showing all if no filters provided
+  const activeFilters: TimelineFilters = filters || {
+    showGit: true,
+    showShell: true,
+    showFiles: true,
+    showBrowser: true,
+    showScreenshots: true,
+  };
 
   // Fetch all screenshots for this date
   const { data: allScreenshots } = useScreenshotsForDate(data.date);
@@ -160,19 +171,29 @@ export const TimelineGridView: React.FC<TimelineGridViewProps> = ({ data }) => {
           />
 
           {/* Screenshot Column */}
-          <ScreenshotColumn date={data.date} hours={activeHours} />
+          {activeFilters.showScreenshots && (
+            <ScreenshotColumn date={data.date} hours={activeHours} />
+          )}
 
           {/* Git Column */}
-          <GitColumn gitEvents={data.gitEvents || {}} hours={activeHours} />
+          {activeFilters.showGit && (
+            <GitColumn gitEvents={data.gitEvents || {}} hours={activeHours} />
+          )}
 
           {/* Shell Column */}
-          <ShellColumn shellEvents={data.shellEvents || {}} hours={activeHours} />
+          {activeFilters.showShell && (
+            <ShellColumn shellEvents={data.shellEvents || {}} hours={activeHours} />
+          )}
 
           {/* Files Column */}
-          <FilesColumn fileEvents={data.fileEvents || {}} hours={activeHours} />
+          {activeFilters.showFiles && (
+            <FilesColumn fileEvents={data.fileEvents || {}} hours={activeHours} />
+          )}
 
           {/* Browser Column */}
-          <BrowserColumn browserEvents={data.browserEvents || {}} hours={activeHours} />
+          {activeFilters.showBrowser && (
+            <BrowserColumn browserEvents={data.browserEvents || {}} hours={activeHours} />
+          )}
 
           {/* App Columns (Scrollable) */}
           {appColumns.map((column) => (
