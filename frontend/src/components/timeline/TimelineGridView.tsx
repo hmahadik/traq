@@ -1,4 +1,5 @@
 import React, { useMemo, useState, useEffect, useCallback } from 'react';
+import { Network } from 'lucide-react';
 import { TimelineGridData, GRID_CONSTANTS, ActivityBlock as ActivityBlockType, SessionSummaryWithPosition } from '@/types/timeline';
 import { HourColumn } from './HourColumn';
 import { AISummaryColumn } from './AISummaryColumn';
@@ -8,6 +9,7 @@ import { GitColumn } from './GitColumn';
 import { ShellColumn } from './ShellColumn';
 import { FilesColumn } from './FilesColumn';
 import { BrowserColumn } from './BrowserColumn';
+import { ClusterColumn } from './ClusterColumn';
 import { TimelineFilters } from './FilterControls';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { ImageGallery } from '@/components/common/ImageGallery';
@@ -169,6 +171,47 @@ export const TimelineGridView: React.FC<TimelineGridViewProps> = ({ data, filter
             hours={activeHours}
             onSessionClick={handleSessionClick}
           />
+
+          {/* Activity Clusters Column - Shows related events grouped by temporal proximity */}
+          {data.activityClusters && Object.keys(data.activityClusters).length > 0 && (
+            <div
+              className="relative border-r border-gray-200 dark:border-gray-700"
+              style={{ minWidth: '140px' }}
+            >
+              {/* Column header */}
+              <div
+                className="sticky top-0 z-20 flex items-center gap-2 px-3 py-2.5 bg-amber-50/80 dark:bg-amber-900/20 backdrop-blur-sm border-b border-amber-200 dark:border-amber-800"
+                style={{ height: `${HEADER_HEIGHT_PX}px` }}
+              >
+                <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                  <Network className="w-4 h-4 text-amber-600 flex-shrink-0" />
+                  <span className="text-sm font-semibold text-amber-900 dark:text-amber-100 truncate">
+                    Clusters
+                  </span>
+                </div>
+                {/* Cluster count */}
+                <span className="text-xs text-amber-700 dark:text-amber-300 flex-shrink-0">
+                  {Object.values(data.activityClusters).reduce((sum, clusters) => sum + clusters.length, 0)}
+                </span>
+              </div>
+
+              {/* Hour blocks */}
+              {activeHours.map((hour) => {
+                const clusters = data.activityClusters?.[hour] || [];
+                return (
+                  <div
+                    key={hour}
+                    className="relative border-b border-gray-100 dark:border-gray-800"
+                    style={{ height: `${GRID_CONSTANTS.HOUR_HEIGHT_PX}px` }}
+                  >
+                    {clusters.length > 0 && (
+                      <ClusterColumn clusters={clusters} hourHeight={GRID_CONSTANTS.HOUR_HEIGHT_PX} />
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
 
           {/* Screenshot Column */}
           {activeFilters.showScreenshots && (

@@ -12,6 +12,7 @@ export interface TimelineGridData {
   shellEvents: Record<number, ShellEventDisplay[]>; // hour -> shell commands
   fileEvents: Record<number, FileEventDisplay[]>; // hour -> file events
   browserEvents: Record<number, BrowserEventDisplay[]>; // hour -> browser visits
+  activityClusters: Record<number, ActivityCluster[]>; // hour -> activity clusters
 }
 
 export interface DayStats {
@@ -133,6 +134,22 @@ export interface BrowserEventDisplay {
   hourOffset: number; // Hour of day (0-23)
   minuteOffset: number; // Minute within hour (0-59)
   pixelPosition: number; // Vertical position in pixels (0-60)
+}
+
+export interface ActivityCluster {
+  id: string; // Unique cluster ID
+  startTime: number; // Timestamp of earliest event
+  endTime: number; // Timestamp of latest event
+  hourOffset: number; // Hour of day (0-23)
+  minuteOffset: number; // Minute within hour (0-59)
+  pixelPosition: number; // Vertical position in pixels
+  pixelHeight: number; // Height in pixels (spans duration)
+  eventCount: number; // Total number of events in cluster
+  gitEventIds: number[]; // IDs of git commits in this cluster
+  shellEventIds: number[]; // IDs of shell commands in this cluster
+  fileEventIds: number[]; // IDs of file events in this cluster
+  browserEventIds: number[]; // IDs of browser visits in this cluster
+  summary: string; // Brief description of the cluster
 }
 
 export interface CategorizationRule {

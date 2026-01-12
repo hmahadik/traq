@@ -759,8 +759,8 @@
       "Click cluster to expand and see all events",
       "Verify temporal proximity is visually clear"
     ],
-    "passes": false,
-    "note": "FUTURE ENHANCEMENT: Not in original spec. See UNIFIED_TIMELINE_VISION.md. Requires AI/ML correlation logic and unified timeline implementation."
+    "passes": true,
+    "note": "IMPLEMENTED: Cluster column displays activity clusters with temporal proximity algorithm (5-minute window). Clusters show event counts and summary, with expand/collapse functionality. Backend: generateActivityClusters() in timeline_grid.go. Frontend: ClusterColumn component with amber theme."
   },
   {
     "category": "unified-timeline",

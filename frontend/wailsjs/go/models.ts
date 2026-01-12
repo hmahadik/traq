@@ -180,6 +180,42 @@ export namespace service {
 	        this.pixelHeight = source["pixelHeight"];
 	    }
 	}
+	export class ActivityCluster {
+	    id: string;
+	    startTime: number;
+	    endTime: number;
+	    hourOffset: number;
+	    minuteOffset: number;
+	    pixelPosition: number;
+	    pixelHeight: number;
+	    eventCount: number;
+	    gitEventIds: number[];
+	    shellEventIds: number[];
+	    fileEventIds: number[];
+	    browserEventIds: number[];
+	    summary: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ActivityCluster(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.startTime = source["startTime"];
+	        this.endTime = source["endTime"];
+	        this.hourOffset = source["hourOffset"];
+	        this.minuteOffset = source["minuteOffset"];
+	        this.pixelPosition = source["pixelPosition"];
+	        this.pixelHeight = source["pixelHeight"];
+	        this.eventCount = source["eventCount"];
+	        this.gitEventIds = source["gitEventIds"];
+	        this.shellEventIds = source["shellEventIds"];
+	        this.fileEventIds = source["fileEventIds"];
+	        this.browserEventIds = source["browserEventIds"];
+	        this.summary = source["summary"];
+	    }
+	}
 	export class AppUsage {
 	    appName: string;
 	    durationSeconds: number;
@@ -1729,6 +1765,7 @@ export namespace service {
 	    shellEvents: Record<number, Array<ShellEventDisplay>>;
 	    fileEvents: Record<number, Array<FileEventDisplay>>;
 	    browserEvents: Record<number, Array<BrowserEventDisplay>>;
+	    activityClusters: Record<number, Array<ActivityCluster>>;
 	
 	    static createFrom(source: any = {}) {
 	        return new TimelineGridData(source);
@@ -1746,6 +1783,7 @@ export namespace service {
 	        this.shellEvents = this.convertValues(source["shellEvents"], Array<ShellEventDisplay>, true);
 	        this.fileEvents = this.convertValues(source["fileEvents"], Array<FileEventDisplay>, true);
 	        this.browserEvents = this.convertValues(source["browserEvents"], Array<BrowserEventDisplay>, true);
+	        this.activityClusters = this.convertValues(source["activityClusters"], Array<ActivityCluster>, true);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

@@ -20,6 +20,7 @@ type TimelineGridData struct {
 	ShellEvents      map[int][]ShellEventDisplay               `json:"shellEvents"` // hour -> shell commands
 	FileEvents       map[int][]FileEventDisplay                `json:"fileEvents"` // hour -> file events
 	BrowserEvents    map[int][]BrowserEventDisplay             `json:"browserEvents"` // hour -> browser visits
+	ActivityClusters map[int][]ActivityCluster                 `json:"activityClusters"` // hour -> clusters
 }
 
 // DayStats contains aggregated statistics for a day.
@@ -133,6 +134,23 @@ type BrowserEventDisplay struct {
 	HourOffset           int     `json:"hourOffset"`      // Hour of day (0-23)
 	MinuteOffset         int     `json:"minuteOffset"`    // Minute within hour (0-59)
 	PixelPosition        float64 `json:"pixelPosition"`   // Vertical position in pixels (0-60)
+}
+
+// ActivityCluster represents a group of related events that occurred in temporal proximity.
+type ActivityCluster struct {
+	ID              string   `json:"id"`              // Unique cluster ID
+	StartTime       int64    `json:"startTime"`       // Timestamp of earliest event
+	EndTime         int64    `json:"endTime"`         // Timestamp of latest event
+	HourOffset      int      `json:"hourOffset"`      // Hour of day (0-23)
+	MinuteOffset    int      `json:"minuteOffset"`    // Minute within hour (0-59)
+	PixelPosition   float64  `json:"pixelPosition"`   // Vertical position in pixels
+	PixelHeight     float64  `json:"pixelHeight"`     // Height in pixels (spans duration)
+	EventCount      int      `json:"eventCount"`      // Total number of events in cluster
+	GitEventIDs     []int64  `json:"gitEventIds"`     // IDs of git commits in this cluster
+	ShellEventIDs   []int64  `json:"shellEventIds"`   // IDs of shell commands in this cluster
+	FileEventIDs    []int64  `json:"fileEventIds"`    // IDs of file events in this cluster
+	BrowserEventIDs []int64  `json:"browserEventIds"` // IDs of browser visits in this cluster
+	Summary         string   `json:"summary"`         // Brief description of the cluster
 }
 
 // GetTimelineGridData retrieves all data needed for the v3 timeline grid view.
@@ -538,6 +556,9 @@ func (s *TimelineService) GetTimelineGridData(date string) (*TimelineGridData, e
 		browserEvents[hour] = append(browserEvents[hour], browserEvent)
 	}
 
+	// Generate activity clusters by identifying temporally related events
+	activityClusters := s.generateActivityClusters(gitEvents, shellEvents, fileEvents, browserEvents, dayStart)
+
 	return &TimelineGridData{
 		Date:             date,
 		DayStats:         dayStats,
@@ -549,6 +570,7 @@ func (s *TimelineService) GetTimelineGridData(date string) (*TimelineGridData, e
 		ShellEvents:      shellEvents,
 		FileEvents:       fileEvents,
 		BrowserEvents:    browserEvents,
+		ActivityClusters: activityClusters,
 	}, nil
 }
 
@@ -579,6 +601,195 @@ func (s *TimelineService) getSessionDominantCategory(sessionID int64, categories
 		return "other"
 	}
 	return dominantCategory
+}
+
+// generateActivityClusters identifies and groups temporally related events.
+// Events within 5 minutes of each other are considered potentially related.
+func (s *TimelineService) generateActivityClusters(
+	gitEvents map[int][]GitEventDisplay,
+	shellEvents map[int][]ShellEventDisplay,
+	fileEvents map[int][]FileEventDisplay,
+	browserEvents map[int][]BrowserEventDisplay,
+	dayStart time.Time,
+) map[int][]ActivityCluster {
+
+	// Collect all events with timestamps
+	type eventWithTime struct {
+		timestamp   int64
+		eventType   string // "git", "shell", "file", "browser"
+		eventID     int64
+		hour        int
+		minute      int
+		pixelPos    float64
+	}
+
+	var allEvents []eventWithTime
+
+	// Collect git events
+	for _, events := range gitEvents {
+		for _, e := range events {
+			allEvents = append(allEvents, eventWithTime{
+				timestamp: e.Timestamp,
+				eventType: "git",
+				eventID:   e.ID,
+				hour:      e.HourOffset,
+				minute:    e.MinuteOffset,
+				pixelPos:  e.PixelPosition,
+			})
+		}
+	}
+
+	// Collect shell events
+	for _, events := range shellEvents {
+		for _, e := range events {
+			allEvents = append(allEvents, eventWithTime{
+				timestamp: e.Timestamp,
+				eventType: "shell",
+				eventID:   e.ID,
+				hour:      e.HourOffset,
+				minute:    e.MinuteOffset,
+				pixelPos:  e.PixelPosition,
+			})
+		}
+	}
+
+	// Collect file events
+	for _, events := range fileEvents {
+		for _, e := range events {
+			allEvents = append(allEvents, eventWithTime{
+				timestamp: e.Timestamp,
+				eventType: "file",
+				eventID:   e.ID,
+				hour:      e.HourOffset,
+				minute:    e.MinuteOffset,
+				pixelPos:  e.PixelPosition,
+			})
+		}
+	}
+
+	// Collect browser events
+	for _, events := range browserEvents {
+		for _, e := range events {
+			allEvents = append(allEvents, eventWithTime{
+				timestamp: e.Timestamp,
+				eventType: "browser",
+				eventID:   e.ID,
+				hour:      e.HourOffset,
+				minute:    e.MinuteOffset,
+				pixelPos:  e.PixelPosition,
+			})
+		}
+	}
+
+	// Sort events by timestamp
+	sort.Slice(allEvents, func(i, j int) bool {
+		return allEvents[i].timestamp < allEvents[j].timestamp
+	})
+
+	// Build clusters: events within 5 minutes of each other are grouped
+	clusters := make(map[int][]ActivityCluster)
+	const clusterWindow = 5 * 60 // 5 minutes in seconds
+
+	var currentCluster *ActivityCluster
+	clusterID := 0
+
+	for _, event := range allEvents {
+		// If no current cluster or event is too far from cluster, start new cluster
+		if currentCluster == nil || event.timestamp-currentCluster.EndTime > clusterWindow {
+			// Save previous cluster if it had multiple events
+			if currentCluster != nil && currentCluster.EventCount >= 2 {
+				hour := currentCluster.HourOffset
+				clusters[hour] = append(clusters[hour], *currentCluster)
+			}
+
+			// Start new cluster
+			clusterID++
+			currentCluster = &ActivityCluster{
+				ID:              fmt.Sprintf("cluster-%d", clusterID),
+				StartTime:       event.timestamp,
+				EndTime:         event.timestamp,
+				HourOffset:      event.hour,
+				MinuteOffset:    event.minute,
+				PixelPosition:   event.pixelPos,
+				PixelHeight:     4, // Will be updated
+				EventCount:      0,
+				GitEventIDs:     []int64{},
+				ShellEventIDs:   []int64{},
+				FileEventIDs:    []int64{},
+				BrowserEventIDs: []int64{},
+				Summary:         "",
+			}
+		}
+
+		// Add event to current cluster
+		currentCluster.EventCount++
+		currentCluster.EndTime = event.timestamp
+
+		switch event.eventType {
+		case "git":
+			currentCluster.GitEventIDs = append(currentCluster.GitEventIDs, event.eventID)
+		case "shell":
+			currentCluster.ShellEventIDs = append(currentCluster.ShellEventIDs, event.eventID)
+		case "file":
+			currentCluster.FileEventIDs = append(currentCluster.FileEventIDs, event.eventID)
+		case "browser":
+			currentCluster.BrowserEventIDs = append(currentCluster.BrowserEventIDs, event.eventID)
+		}
+
+		// Update pixel height to span from first to last event
+		durationMinutes := float64(currentCluster.EndTime-currentCluster.StartTime) / 60.0
+		currentCluster.PixelHeight = (durationMinutes / 60.0) * 80.0 // 80px per hour
+		if currentCluster.PixelHeight < 4 {
+			currentCluster.PixelHeight = 4
+		}
+
+		// Generate summary
+		parts := []string{}
+		if len(currentCluster.GitEventIDs) > 0 {
+			parts = append(parts, fmt.Sprintf("%d commit%s", len(currentCluster.GitEventIDs), pluralize(len(currentCluster.GitEventIDs))))
+		}
+		if len(currentCluster.ShellEventIDs) > 0 {
+			parts = append(parts, fmt.Sprintf("%d command%s", len(currentCluster.ShellEventIDs), pluralize(len(currentCluster.ShellEventIDs))))
+		}
+		if len(currentCluster.FileEventIDs) > 0 {
+			parts = append(parts, fmt.Sprintf("%d file%s", len(currentCluster.FileEventIDs), pluralize(len(currentCluster.FileEventIDs))))
+		}
+		if len(currentCluster.BrowserEventIDs) > 0 {
+			parts = append(parts, fmt.Sprintf("%d visit%s", len(currentCluster.BrowserEventIDs), pluralize(len(currentCluster.BrowserEventIDs))))
+		}
+
+		if len(parts) > 0 {
+			currentCluster.Summary = "Related: " + parts[0]
+			if len(parts) > 1 {
+				currentCluster.Summary += ", " + parts[1]
+			}
+			if len(parts) > 2 {
+				currentCluster.Summary += ", +"
+				for i := 2; i < len(parts); i++ {
+					if i > 2 {
+						currentCluster.Summary += ", "
+					}
+					currentCluster.Summary += parts[i]
+				}
+			}
+		}
+	}
+
+	// Save last cluster if it had multiple events
+	if currentCluster != nil && currentCluster.EventCount >= 2 {
+		hour := currentCluster.HourOffset
+		clusters[hour] = append(clusters[hour], *currentCluster)
+	}
+
+	return clusters
+}
+
+// pluralize returns "s" if count is not 1, otherwise empty string.
+func pluralize(count int) string {
+	if count == 1 {
+		return ""
+	}
+	return "s"
 }
 
 // calculateDayStats computes aggregated statistics for the day.
