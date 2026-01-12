@@ -354,6 +354,10 @@ export function SaveAppCategory(arg1, arg2) {
   return window['go']['main']['App']['SaveAppCategory'](arg1, arg2);
 }
 
+export function SearchAllDataSources(arg1, arg2) {
+  return window['go']['main']['App']['SearchAllDataSources'](arg1, arg2);
+}
+
 export function SetAppTimelineCategory(arg1, arg2) {
   return window['go']['main']['App']['SetAppTimelineCategory'](arg1, arg2);
 }

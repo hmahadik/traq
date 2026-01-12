@@ -491,6 +491,14 @@ func (a *App) GetScreenshotsForHour(date string, hour int) ([]*service.Screensho
 	return a.Timeline.GetScreenshotsForHour(date, hour)
 }
 
+// SearchAllDataSources searches across all event types (git, shell, files, browser, screenshots).
+func (a *App) SearchAllDataSources(query string, maxResults int) ([]*service.SearchResult, error) {
+	if a.Timeline == nil {
+		return nil, nil
+	}
+	return a.Timeline.SearchAllDataSources(query, maxResults)
+}
+
 // GetScreenshotsForDate returns all screenshots for a specific date.
 func (a *App) GetScreenshotsForDate(date string) ([]*service.ScreenshotDisplay, error) {
 	if a.Timeline == nil {

@@ -123,6 +123,21 @@ func (s *Store) CountFileEvents() (int64, error) {
 	return count, err
 }
 
+// GetAllFileEvents retrieves all file events (for search).
+func (s *Store) GetAllFileEvents() ([]*FileEvent, error) {
+	rows, err := s.db.Query(`
+		SELECT id, timestamp, event_type, file_path, file_name, directory,
+		       file_extension, file_size_bytes, watch_category, old_path, session_id, created_at
+		FROM file_events
+		ORDER BY timestamp DESC`)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query all file events: %w", err)
+	}
+	defer rows.Close()
+
+	return scanFileEvents(rows)
+}
+
 // CountFileEventsByTimeRange returns the count of file events in a time range.
 func (s *Store) CountFileEventsByTimeRange(start, end int64) (int64, error) {
 	var count int64

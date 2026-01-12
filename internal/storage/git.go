@@ -232,6 +232,22 @@ func (s *Store) CountGitCommitsByTimeRange(start, end int64) (int64, error) {
 	return count, err
 }
 
+// GetAllGitCommits retrieves all git commits (for search).
+func (s *Store) GetAllGitCommits() ([]*GitCommit, error) {
+	rows, err := s.db.Query(`
+		SELECT id, timestamp, commit_hash, short_hash, repository_id, branch,
+		       message, message_subject, files_changed, insertions, deletions,
+		       author_name, author_email, is_merge, session_id, created_at
+		FROM git_commits
+		ORDER BY timestamp DESC`)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query all git commits: %w", err)
+	}
+	defer rows.Close()
+
+	return scanGitCommits(rows)
+}
+
 func scanGitCommits(rows *sql.Rows) ([]*GitCommit, error) {
 	var commits []*GitCommit
 	for rows.Next() {

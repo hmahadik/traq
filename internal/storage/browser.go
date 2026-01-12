@@ -157,6 +157,21 @@ func (s *Store) CountBrowserVisitsByTimeRange(start, end int64) (int64, error) {
 	return count, err
 }
 
+// GetAllBrowserVisits retrieves all browser visits (for search).
+func (s *Store) GetAllBrowserVisits() ([]*BrowserVisit, error) {
+	rows, err := s.db.Query(`
+		SELECT id, timestamp, url, title, domain, browser, visit_duration_seconds,
+		       transition_type, session_id, created_at
+		FROM browser_history
+		ORDER BY timestamp DESC`)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query all browser visits: %w", err)
+	}
+	defer rows.Close()
+
+	return scanBrowserVisits(rows)
+}
+
 // CountUniqueDomainsByTimeRange returns the count of unique domains in a time range.
 func (s *Store) CountUniqueDomainsByTimeRange(start, end int64) (int64, error) {
 	var count int64

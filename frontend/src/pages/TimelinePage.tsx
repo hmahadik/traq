@@ -9,6 +9,7 @@ import { BreakdownBar } from '@/components/timeline/BreakdownBar';
 import { TopAppsSection } from '@/components/timeline/TopAppsSection';
 import { TimelinePageSkeleton } from '@/components/timeline/TimelineGridSkeleton';
 import { FilterControls, TimelineFilters } from '@/components/timeline/FilterControls';
+import { GlobalSearch } from '@/components/timeline/GlobalSearch';
 import { toast } from 'sonner';
 
 function getDateString(date: Date): string {
@@ -121,6 +122,14 @@ export function TimelinePage() {
     setSelectedDate(date);
   }, []);
 
+  const handleSearchNavigateToDate = useCallback((dateString: string) => {
+    // Parse YYYY-MM-DD and create date object
+    const [year, month, day] = dateString.split('-').map(Number);
+    const date = new Date(year, month - 1, day);
+    setSelectedDate(date);
+    setShowCalendar(false);
+  }, []);
+
   const formattedDate = selectedDate.toLocaleDateString('en-US', {
     weekday: 'long',
     year: 'numeric',
@@ -203,6 +212,11 @@ export function TimelinePage() {
               </Button>
             )}
           </div>
+        </div>
+
+        {/* Search Bar - Mobile */}
+        <div className="mb-4">
+          <GlobalSearch onNavigateToDate={handleSearchNavigateToDate} />
         </div>
 
         {/* Filter Controls - Mobile */}
@@ -299,6 +313,11 @@ export function TimelinePage() {
                   </Button>
                 )}
               </div>
+            </div>
+
+            {/* Search Bar - Desktop */}
+            <div className="hidden xl:block mb-4">
+              <GlobalSearch onNavigateToDate={handleSearchNavigateToDate} />
             </div>
 
             {/* Filter Controls - Desktop */}

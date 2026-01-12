@@ -1443,6 +1443,32 @@ export namespace service {
 		    return a;
 		}
 	}
+	export class SearchResult {
+	    type: string;
+	    id: number;
+	    timestamp: number;
+	    date: string;
+	    time: string;
+	    summary: string;
+	    details: string;
+	    appName: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new SearchResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.type = source["type"];
+	        this.id = source["id"];
+	        this.timestamp = source["timestamp"];
+	        this.date = source["date"];
+	        this.time = source["time"];
+	        this.summary = source["summary"];
+	        this.details = source["details"];
+	        this.appName = source["appName"];
+	    }
+	}
 	export class SessionContext {
 	    session?: storage.Session;
 	    summary?: storage.Summary;

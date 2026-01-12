@@ -100,6 +100,21 @@ func (s *Store) CountShellCommandsByTimeRange(start, end int64) (int64, error) {
 	return count, err
 }
 
+// GetAllShellCommands retrieves all shell commands (for search).
+func (s *Store) GetAllShellCommands() ([]*ShellCommand, error) {
+	rows, err := s.db.Query(`
+		SELECT id, timestamp, command, shell_type, working_directory,
+		       exit_code, duration_seconds, hostname, session_id, created_at
+		FROM shell_commands
+		ORDER BY timestamp DESC`)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query all shell commands: %w", err)
+	}
+	defer rows.Close()
+
+	return scanShellCommands(rows)
+}
+
 func scanShellCommands(rows *sql.Rows) ([]*ShellCommand, error) {
 	var commands []*ShellCommand
 	for rows.Next() {
