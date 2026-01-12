@@ -15,15 +15,17 @@ import (
 
 // ReportsService provides report generation.
 type ReportsService struct {
-	store    *storage.Store
-	timeline *TimelineService
+	store     *storage.Store
+	timeline  *TimelineService
+	analytics *AnalyticsService
 }
 
 // NewReportsService creates a new ReportsService.
-func NewReportsService(store *storage.Store, timeline *TimelineService) *ReportsService {
+func NewReportsService(store *storage.Store, timeline *TimelineService, analytics *AnalyticsService) *ReportsService {
 	return &ReportsService{
-		store:    store,
-		timeline: timeline,
+		store:     store,
+		timeline:  timeline,
+		analytics: analytics,
 	}
 }
 
@@ -107,7 +109,7 @@ func (s *ReportsService) GenerateReport(timeRange, reportType string, includeScr
 		Title:      fmt.Sprintf("%s Report: %s", strings.Title(reportType), tr.Label),
 		TimeRange:  timeRange,
 		ReportType: reportType,
-		Format:     "markdown",
+		Format:     "html",
 		Content:    storage.NullString(content),
 		StartTime:  storage.NullInt64(tr.Start),
 		EndTime:    storage.NullInt64(tr.End),
@@ -122,81 +124,428 @@ func (s *ReportsService) GenerateReport(timeRange, reportType string, includeScr
 	return toServiceReport(storageReport), nil
 }
 
-// generateSummaryReport creates a brief summary report.
+// generateSummaryReport creates a visual HTML summary report.
 func (s *ReportsService) generateSummaryReport(tr *TimeRange, includeScreenshots bool) (string, error) {
 	var sb strings.Builder
 
-	sb.WriteString(fmt.Sprintf("# Activity Summary: %s\n\n", tr.Label))
+	// Get app usage for time breakdown
+	appUsage, _ := s.analytics.GetAppUsage(tr.Start, tr.End)
 
-	// Get sessions
-	sessions, _ := s.store.GetSessionsByTimeRange(tr.Start, tr.End)
-
-	// Calculate totals
-	var totalScreenshots int64
-	var totalMinutes int64
-	for _, sess := range sessions {
-		if sess.ScreenshotCount > 0 {
-			totalScreenshots += int64(sess.ScreenshotCount)
+	// Calculate category breakdown
+	var productiveMinutes, neutralMinutes, distractingMinutes int64
+	for _, app := range appUsage {
+		minutes := int64(app.DurationSeconds / 60)
+		category := s.analytics.CategorizeApp(app.AppName)
+		switch category {
+		case CategoryProductive:
+			productiveMinutes += minutes
+		case CategoryDistracting:
+			distractingMinutes += minutes
+		default:
+			neutralMinutes += minutes
 		}
-		if sess.DurationSeconds.Valid {
-			totalMinutes += sess.DurationSeconds.Int64 / 60
+	}
+	totalMinutes := productiveMinutes + neutralMinutes + distractingMinutes
+
+	// Calculate productivity score (0-100)
+	var productivityScore int
+	var productivityLabel string
+	var scoreColor string
+	if totalMinutes > 0 {
+		productivityScore = int((float64(productiveMinutes) / float64(totalMinutes)) * 100)
+	}
+	switch {
+	case productivityScore >= 80:
+		productivityLabel = "Excellent"
+		scoreColor = "#22c55e"
+	case productivityScore >= 60:
+		productivityLabel = "Good"
+		scoreColor = "#84cc16"
+	case productivityScore >= 40:
+		productivityLabel = "Fair"
+		scoreColor = "#eab308"
+	case productivityScore >= 20:
+		productivityLabel = "Needs Improvement"
+		scoreColor = "#f97316"
+	default:
+		productivityLabel = "Low"
+		scoreColor = "#ef4444"
+	}
+
+	// Get top app for headline
+	topApp := "various apps"
+	if len(appUsage) > 0 {
+		topApp = GetFriendlyAppName(appUsage[0].AppName)
+	}
+
+	// Get sessions and commits for context
+	sessions, _ := s.store.GetSessionsByTimeRange(tr.Start, tr.End)
+	gitCommits, _ := s.store.GetGitCommitsByTimeRange(tr.Start, tr.End)
+
+	// Get hourly activity
+	hourlyData := s.getHourlyActivity(tr.Start, tr.End)
+
+	// Build headline
+	headline := s.buildHeadline(totalMinutes, topApp, len(gitCommits), productivityLabel)
+
+	// === START BUILDING HTML REPORT ===
+	sb.WriteString(`<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 100%; color: #e2e8f0;">`)
+
+	// Header
+	sb.WriteString(fmt.Sprintf(`<div style="margin-bottom: 24px;">
+		<h1 style="font-size: 1.5rem; font-weight: 700; margin: 0 0 8px 0; color: #f1f5f9;">Activity Summary: %s</h1>
+		<p style="color: #94a3b8; margin: 0; font-size: 0.9rem;">%s</p>
+	</div>`, tr.Label, headline))
+
+	// Stats Grid
+	sb.WriteString(`<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 24px;">`)
+
+	// Productivity Score Card
+	sb.WriteString(fmt.Sprintf(`
+		<div style="background: linear-gradient(135deg, rgba(30, 41, 59, 0.8), rgba(30, 41, 59, 0.4)); border-radius: 12px; padding: 16px; border: 1px solid rgba(148, 163, 184, 0.1);">
+			<div style="font-size: 0.75rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px;">Productivity</div>
+			<div style="font-size: 2rem; font-weight: 700; color: %s; line-height: 1;">%d%%</div>
+			<div style="font-size: 0.8rem; color: %s; margin-top: 4px;">%s</div>
+			<div style="margin-top: 8px; height: 4px; background: rgba(148, 163, 184, 0.2); border-radius: 2px; overflow: hidden;">
+				<div style="height: 100%%; width: %d%%; background: %s; border-radius: 2px;"></div>
+			</div>
+		</div>`, scoreColor, productivityScore, scoreColor, productivityLabel, productivityScore, scoreColor))
+
+	// Total Time Card
+	sb.WriteString(fmt.Sprintf(`
+		<div style="background: linear-gradient(135deg, rgba(30, 41, 59, 0.8), rgba(30, 41, 59, 0.4)); border-radius: 12px; padding: 16px; border: 1px solid rgba(148, 163, 184, 0.1);">
+			<div style="font-size: 0.75rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px;">Active Time</div>
+			<div style="font-size: 2rem; font-weight: 700; color: #f1f5f9; line-height: 1;">%s</div>
+			<div style="font-size: 0.8rem; color: #64748b; margin-top: 4px;">%d sessions</div>
+		</div>`, formatMinutes(totalMinutes), len(sessions)))
+
+	// Productive Time Card
+	sb.WriteString(fmt.Sprintf(`
+		<div style="background: linear-gradient(135deg, rgba(30, 41, 59, 0.8), rgba(30, 41, 59, 0.4)); border-radius: 12px; padding: 16px; border: 1px solid rgba(148, 163, 184, 0.1);">
+			<div style="font-size: 0.75rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px;">Productive</div>
+			<div style="font-size: 2rem; font-weight: 700; color: #22c55e; line-height: 1;">%s</div>
+			<div style="font-size: 0.8rem; color: #64748b; margin-top: 4px;">focused work</div>
+		</div>`, formatMinutes(productiveMinutes)))
+
+	// Distracted Time Card
+	sb.WriteString(fmt.Sprintf(`
+		<div style="background: linear-gradient(135deg, rgba(30, 41, 59, 0.8), rgba(30, 41, 59, 0.4)); border-radius: 12px; padding: 16px; border: 1px solid rgba(148, 163, 184, 0.1);">
+			<div style="font-size: 0.75rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px;">Distracted</div>
+			<div style="font-size: 2rem; font-weight: 700; color: %s; line-height: 1;">%s</div>
+			<div style="font-size: 0.8rem; color: #64748b; margin-top: 4px;">off-task</div>
+		</div>`, func() string {
+		if distractingMinutes > 30 {
+			return "#ef4444"
+		}
+		return "#64748b"
+	}(), formatMinutes(distractingMinutes)))
+
+	sb.WriteString(`</div>`) // End stats grid
+
+	// Time Breakdown Bar
+	if totalMinutes > 0 {
+		productivePct := float64(productiveMinutes) / float64(totalMinutes) * 100
+		neutralPct := float64(neutralMinutes) / float64(totalMinutes) * 100
+		distractingPct := float64(distractingMinutes) / float64(totalMinutes) * 100
+
+		sb.WriteString(fmt.Sprintf(`
+		<div style="margin-bottom: 24px;">
+			<div style="font-size: 0.85rem; font-weight: 600; color: #f1f5f9; margin-bottom: 8px;">Time Distribution</div>
+			<div style="display: flex; height: 24px; border-radius: 6px; overflow: hidden; background: rgba(30, 41, 59, 0.5);">
+				<div style="width: %.1f%%; background: #22c55e; display: flex; align-items: center; justify-content: center; font-size: 0.7rem; font-weight: 600; color: white;" title="Productive: %s">%s</div>
+				<div style="width: %.1f%%; background: #64748b; display: flex; align-items: center; justify-content: center; font-size: 0.7rem; font-weight: 600; color: white;" title="Neutral: %s">%s</div>
+				<div style="width: %.1f%%; background: #ef4444; display: flex; align-items: center; justify-content: center; font-size: 0.7rem; font-weight: 600; color: white;" title="Distracting: %s">%s</div>
+			</div>
+			<div style="display: flex; justify-content: space-between; margin-top: 6px; font-size: 0.75rem; color: #94a3b8;">
+				<span><span style="display: inline-block; width: 8px; height: 8px; border-radius: 2px; background: #22c55e; margin-right: 4px;"></span>Productive</span>
+				<span><span style="display: inline-block; width: 8px; height: 8px; border-radius: 2px; background: #64748b; margin-right: 4px;"></span>Neutral</span>
+				<span><span style="display: inline-block; width: 8px; height: 8px; border-radius: 2px; background: #ef4444; margin-right: 4px;"></span>Distracting</span>
+			</div>
+		</div>`,
+			productivePct, formatMinutes(productiveMinutes), formatMinutes(productiveMinutes),
+			neutralPct, formatMinutes(neutralMinutes), formatMinutes(neutralMinutes),
+			distractingPct, formatMinutes(distractingMinutes), formatMinutes(distractingMinutes)))
+	}
+
+	// Hourly Activity
+	if len(hourlyData) > 0 {
+		sb.WriteString(`<div style="margin-bottom: 24px;">
+			<div style="font-size: 0.85rem; font-weight: 600; color: #f1f5f9; margin-bottom: 8px;">Activity by Hour</div>
+			<div style="display: flex; gap: 2px; align-items: flex-end; height: 60px; padding: 4px; background: rgba(30, 41, 59, 0.3); border-radius: 8px;">`)
+
+		maxActivity := int64(1)
+		for _, h := range hourlyData {
+			if h.Minutes > maxActivity {
+				maxActivity = h.Minutes
+			}
+		}
+
+		for _, h := range hourlyData {
+			height := 0
+			if maxActivity > 0 {
+				height = int(float64(h.Minutes) / float64(maxActivity) * 100)
+			}
+			color := "#334155"
+			if h.Minutes > 0 {
+				color = "#3b82f6"
+			}
+			sb.WriteString(fmt.Sprintf(`<div style="flex: 1; height: %d%%; min-height: 4px; background: %s; border-radius: 2px;" title="%d:00 - %dm"></div>`, height, color, h.Hour, h.Minutes))
+		}
+
+		sb.WriteString(`</div>
+			<div style="display: flex; justify-content: space-between; font-size: 0.65rem; color: #64748b; margin-top: 4px;">
+				<span>12am</span><span>6am</span><span>12pm</span><span>6pm</span><span>11pm</span>
+			</div>
+		</div>`)
+	}
+
+	// Top Applications
+	if len(appUsage) > 0 {
+		sb.WriteString(`<div style="margin-bottom: 24px;">
+			<div style="font-size: 0.85rem; font-weight: 600; color: #f1f5f9; margin-bottom: 12px;">Top Applications</div>`)
+
+		maxDuration := appUsage[0].DurationSeconds
+		count := 0
+		for _, app := range appUsage {
+			if count >= 6 {
+				break
+			}
+			appName := GetFriendlyAppName(app.AppName)
+			category := s.analytics.CategorizeApp(app.AppName)
+			barWidth := int(app.DurationSeconds / maxDuration * 100)
+			barColor := "#64748b"
+			if category == CategoryProductive {
+				barColor = "#22c55e"
+			} else if category == CategoryDistracting {
+				barColor = "#ef4444"
+			}
+
+			sb.WriteString(fmt.Sprintf(`
+			<div style="display: flex; align-items: center; margin-bottom: 8px;">
+				<div style="width: 100px; font-size: 0.8rem; color: #e2e8f0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">%s</div>
+				<div style="flex: 1; height: 20px; background: rgba(30, 41, 59, 0.5); border-radius: 4px; margin: 0 12px; overflow: hidden;">
+					<div style="height: 100%%; width: %d%%; background: %s; border-radius: 4px;"></div>
+				</div>
+				<div style="width: 50px; text-align: right; font-size: 0.8rem; color: #94a3b8;">%s</div>
+			</div>`, appName, barWidth, barColor, formatMinutes(int64(app.DurationSeconds/60))))
+			count++
+		}
+		sb.WriteString(`</div>`)
+	}
+
+	// Key Accomplishments
+	accomplishments := s.extractAccomplishments(sessions)
+	if len(accomplishments) > 0 {
+		sb.WriteString(`<div style="margin-bottom: 24px;">
+			<div style="font-size: 0.85rem; font-weight: 600; color: #f1f5f9; margin-bottom: 12px;">Key Accomplishments</div>`)
+		for _, acc := range accomplishments {
+			sb.WriteString(fmt.Sprintf(`<div style="display: flex; gap: 8px; margin-bottom: 8px;">
+				<div style="color: #22c55e; font-size: 0.9rem;">✓</div>
+				<div style="font-size: 0.85rem; color: #cbd5e1;">%s</div>
+			</div>`, acc))
+		}
+		sb.WriteString(`</div>`)
+	}
+
+	// Git Commits
+	if len(gitCommits) > 0 {
+		sb.WriteString(`<div style="margin-bottom: 24px;">
+			<div style="font-size: 0.85rem; font-weight: 600; color: #f1f5f9; margin-bottom: 12px;">Commits</div>`)
+		seen := make(map[string]bool)
+		for _, commit := range gitCommits {
+			if !seen[commit.Message] {
+				seen[commit.Message] = true
+				sb.WriteString(fmt.Sprintf(`<div style="display: flex; gap: 8px; margin-bottom: 6px; align-items: baseline;">
+					<code style="font-size: 0.75rem; color: #f97316; background: rgba(249, 115, 22, 0.1); padding: 2px 6px; border-radius: 4px;">%s</code>
+					<span style="font-size: 0.85rem; color: #cbd5e1;">%s</span>
+				</div>`, commit.ShortHash, commit.Message))
+			}
+		}
+		sb.WriteString(`</div>`)
+	}
+
+	// Insights
+	insights := s.generateInsights(appUsage, productiveMinutes, distractingMinutes, len(gitCommits))
+	if len(insights) > 0 {
+		sb.WriteString(`<div style="margin-bottom: 24px; padding: 16px; background: rgba(59, 130, 246, 0.1); border-radius: 8px; border-left: 3px solid #3b82f6;">
+			<div style="font-size: 0.85rem; font-weight: 600; color: #3b82f6; margin-bottom: 8px;">💡 Insights</div>`)
+		for _, insight := range insights {
+			sb.WriteString(fmt.Sprintf(`<div style="font-size: 0.85rem; color: #cbd5e1; margin-bottom: 4px;">• %s</div>`, insight))
+		}
+		sb.WriteString(`</div>`)
+	}
+
+	sb.WriteString(`</div>`) // End main container
+
+	return sb.String(), nil
+}
+
+// HourlyActivityData represents activity for a single hour.
+type HourlyActivityData struct {
+	Hour    int
+	Minutes int64
+}
+
+// getHourlyActivity returns activity breakdown by hour.
+func (s *ReportsService) getHourlyActivity(start, end int64) []HourlyActivityData {
+	startTime := time.Unix(start, 0)
+	endTime := time.Unix(end, 0)
+
+	// Only generate hourly data for single-day reports
+	if startTime.Day() != endTime.Day() || startTime.Month() != endTime.Month() {
+		return nil
+	}
+
+	hourly := make([]HourlyActivityData, 24)
+	for i := 0; i < 24; i++ {
+		hourly[i] = HourlyActivityData{Hour: i, Minutes: 0}
+	}
+
+	// Get screenshots by time range and count by hour
+	screenshots, _ := s.store.GetScreenshotsByTimeRange(start, end)
+	for _, ss := range screenshots {
+		hour := time.Unix(ss.Timestamp, 0).Hour()
+		if hour >= 0 && hour < 24 {
+			hourly[hour].Minutes++ // Each screenshot ≈ 0.5 min, but count as 1 for simplicity
 		}
 	}
 
-	sb.WriteString("## Overview\n\n")
-	sb.WriteString(fmt.Sprintf("- **Total Sessions:** %d\n", len(sessions)))
-	sb.WriteString(fmt.Sprintf("- **Total Screenshots:** %d\n", totalScreenshots))
-	sb.WriteString(fmt.Sprintf("- **Active Time:** %dh %dm\n", totalMinutes/60, totalMinutes%60))
+	return hourly
+}
 
-	// Get data source counts
-	shellCount, _ := s.store.CountShellCommandsByTimeRange(tr.Start, tr.End)
-	gitCount, _ := s.store.CountGitCommitsByTimeRange(tr.Start, tr.End)
-	fileCount, _ := s.store.CountFileEventsByTimeRange(tr.Start, tr.End)
-	browserCount, _ := s.store.CountBrowserVisitsByTimeRange(tr.Start, tr.End)
+// buildHeadline creates a natural language headline for the report.
+func (s *ReportsService) buildHeadline(totalMinutes int64, topApp string, commitCount int, productivityLabel string) string {
+	if totalMinutes == 0 {
+		return "No activity recorded for this period"
+	}
 
-	sb.WriteString(fmt.Sprintf("- **Shell Commands:** %d\n", shellCount))
-	sb.WriteString(fmt.Sprintf("- **Git Commits:** %d\n", gitCount))
-	sb.WriteString(fmt.Sprintf("- **File Events:** %d\n", fileCount))
-	sb.WriteString(fmt.Sprintf("- **Browser Visits:** %d\n", browserCount))
+	var parts []string
 
-	// Get existing summaries
-	sb.WriteString("\n## Session Summaries\n\n")
+	// Time description
+	if totalMinutes >= 60 {
+		hours := totalMinutes / 60
+		if hours == 1 {
+			parts = append(parts, "1 hour")
+		} else {
+			parts = append(parts, fmt.Sprintf("%d hours", hours))
+		}
+	} else {
+		parts = append(parts, fmt.Sprintf("%d minutes", totalMinutes))
+	}
+
+	// Top app
+	parts = append(parts, fmt.Sprintf("mostly in %s", topApp))
+
+	// Commits
+	if commitCount > 0 {
+		if commitCount == 1 {
+			parts = append(parts, "with 1 commit")
+		} else {
+			parts = append(parts, fmt.Sprintf("with %d commits", commitCount))
+		}
+	}
+
+	headline := strings.Join(parts, ", ")
+	return fmt.Sprintf("%s productivity day: %s", productivityLabel, headline)
+}
+
+// extractAccomplishments pulls key accomplishments from session summaries.
+func (s *ReportsService) extractAccomplishments(sessions []*storage.Session) []string {
+	var accomplishments []string
+	seen := make(map[string]bool)
+
 	for _, sess := range sessions {
 		if sess.SummaryID.Valid {
 			sum, err := s.store.GetSummary(sess.SummaryID.Int64)
-			if err == nil && sum != nil {
-				startTime := time.Unix(sess.StartTime, 0)
-				sb.WriteString(fmt.Sprintf("### %s\n\n", startTime.Format("3:04 PM")))
-				sb.WriteString(sum.Summary + "\n\n")
+			if err == nil && sum != nil && sum.Summary != "" {
+				// Clean up the summary - remove generic phrases
+				summary := sum.Summary
+				if !seen[summary] && !isGenericSummary(summary) {
+					seen[summary] = true
+					accomplishments = append(accomplishments, summary)
+				}
 			}
 		}
 	}
 
-	// Include representative screenshots if requested
-	if includeScreenshots {
-		sb.WriteString("\n## Key Screenshots\n\n")
-		// Get representative screenshots for the time range
-		screenshots, err := s.store.GetScreenshotsByTimeRange(tr.Start, tr.End)
-		if err == nil && len(screenshots) > 0 {
-			// Select up to 5 representative screenshots evenly distributed
-			step := len(screenshots) / 5
-			if step < 1 {
-				step = 1
-			}
-			count := 0
-			for i := 0; i < len(screenshots) && count < 5; i += step {
-				ss := screenshots[i]
-				timestamp := time.Unix(ss.Timestamp, 0).Format("3:04 PM")
-				sb.WriteString(fmt.Sprintf("- **%s** - %s\n", timestamp, GetFriendlyAppName(ss.AppName.String)))
-				sb.WriteString(fmt.Sprintf("  ![Screenshot](%s)\n\n", ss.Filepath))
-				count++
-			}
-		} else {
-			sb.WriteString("*No screenshots available for this period*\n\n")
+	// Limit to top 5
+	if len(accomplishments) > 5 {
+		accomplishments = accomplishments[:5]
+	}
+
+	return accomplishments
+}
+
+// isGenericSummary returns true if the summary is too generic to be useful.
+func isGenericSummary(summary string) bool {
+	genericPhrases := []string{
+		"no significant activity",
+		"idle period",
+		"minimal activity",
+	}
+	lower := strings.ToLower(summary)
+	for _, phrase := range genericPhrases {
+		if strings.Contains(lower, phrase) {
+			return true
+		}
+	}
+	return false
+}
+
+// generateInsights creates actionable insights from the data.
+func (s *ReportsService) generateInsights(appUsage []*AppUsage, productiveMin, distractingMin int64, commitCount int) []string {
+	var insights []string
+
+	// Distraction insight
+	if distractingMin > 30 && productiveMin > 0 {
+		ratio := float64(distractingMin) / float64(productiveMin)
+		if ratio > 0.5 {
+			insights = append(insights, fmt.Sprintf("Spent %s on distracting apps - consider blocking during focus time", formatMinutes(distractingMin)))
 		}
 	}
 
-	return sb.String(), nil
+	// Top app dominance
+	if len(appUsage) >= 2 {
+		topDuration := appUsage[0].DurationSeconds
+		secondDuration := appUsage[1].DurationSeconds
+		if secondDuration > 0 && topDuration/secondDuration > 3 {
+			insights = append(insights, fmt.Sprintf("%s dominated your time at %.0f%% of total", GetFriendlyAppName(appUsage[0].AppName), appUsage[0].Percentage))
+		}
+	}
+
+	// Commit productivity
+	if commitCount > 5 {
+		insights = append(insights, fmt.Sprintf("Productive coding session with %d commits", commitCount))
+	} else if commitCount == 0 && productiveMin > 60 {
+		insights = append(insights, "Significant productive time but no commits - consider breaking work into smaller commits")
+	}
+
+	// Browser usage
+	for _, app := range appUsage {
+		if strings.Contains(strings.ToLower(app.AppName), "chrome") ||
+			strings.Contains(strings.ToLower(app.AppName), "firefox") ||
+			strings.Contains(strings.ToLower(app.AppName), "safari") {
+			if app.DurationSeconds > 3600 {
+				insights = append(insights, fmt.Sprintf("Spent %s in browser - review if this was productive research", formatMinutes(int64(app.DurationSeconds/60))))
+			}
+			break
+		}
+	}
+
+	return insights
+}
+
+// formatMinutes formats minutes as "Xh Ym" or "Xm".
+func formatMinutes(minutes int64) string {
+	if minutes >= 60 {
+		hours := minutes / 60
+		mins := minutes % 60
+		if mins > 0 {
+			return fmt.Sprintf("%dh %dm", hours, mins)
+		}
+		return fmt.Sprintf("%dh", hours)
+	}
+	return fmt.Sprintf("%dm", minutes)
 }
 
 // TimelineEvent represents a unified event for chronological display.
@@ -206,18 +555,20 @@ type TimelineEvent struct {
 	Summary   string
 }
 
-// generateDetailedReport creates a detailed report with all data.
+// generateDetailedReport creates a detailed HTML report with all data.
 func (s *ReportsService) generateDetailedReport(tr *TimeRange, includeScreenshots bool) (string, error) {
 	var sb strings.Builder
 
-	sb.WriteString(fmt.Sprintf("# Detailed Activity Report: %s\n\n", tr.Label))
-	sb.WriteString(fmt.Sprintf("*Generated: %s*\n\n", time.Now().Format("2006-01-02 15:04")))
+	// === START BUILDING HTML REPORT ===
+	sb.WriteString(`<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 100%; color: #e2e8f0;">`)
 
-	// Add Chronological Event Timeline section
-	sb.WriteString("## Event Timeline\n\n")
-	sb.WriteString("*All events in chronological order*\n\n")
+	// Header
+	sb.WriteString(fmt.Sprintf(`<div style="margin-bottom: 24px;">
+		<h1 style="font-size: 1.5rem; font-weight: 700; margin: 0 0 8px 0; color: #f1f5f9;">Detailed Activity Report: %s</h1>
+		<p style="color: #94a3b8; margin: 0; font-size: 0.9rem;">Generated: %s</p>
+	</div>`, tr.Label, time.Now().Format("2006-01-02 15:04")))
 
-	// Collect all events
+	// Collect all timeline events
 	var timelineEvents []TimelineEvent
 
 	// Get git commits
@@ -226,14 +577,13 @@ func (s *ReportsService) generateDetailedReport(tr *TimeRange, includeScreenshot
 		timelineEvents = append(timelineEvents, TimelineEvent{
 			Timestamp: commit.Timestamp,
 			Type:      "git",
-			Summary:   fmt.Sprintf("**[Git]** `%s` %s", commit.ShortHash, commit.Message),
+			Summary:   fmt.Sprintf(`<span style="font-weight: 600; color: #f97316;">[Git]</span> <code style="font-size: 0.85em; background: rgba(249, 115, 22, 0.1); padding: 2px 6px; border-radius: 4px; color: #f97316;">%s</code> %s`, commit.ShortHash, commit.Message),
 		})
 	}
 
 	// Get shell commands
 	shellCommands, _ := s.store.GetShellCommandsByTimeRange(tr.Start, tr.End)
 	for _, cmd := range shellCommands {
-		// Truncate long commands
 		cmdText := cmd.Command
 		if len(cmdText) > 80 {
 			cmdText = cmdText[:77] + "..."
@@ -241,7 +591,7 @@ func (s *ReportsService) generateDetailedReport(tr *TimeRange, includeScreenshot
 		timelineEvents = append(timelineEvents, TimelineEvent{
 			Timestamp: cmd.Timestamp,
 			Type:      "shell",
-			Summary:   fmt.Sprintf("**[Shell]** `%s`", cmdText),
+			Summary:   fmt.Sprintf(`<span style="font-weight: 600; color: #3b82f6;">[Shell]</span> <code style="font-size: 0.85em; background: rgba(59, 130, 246, 0.1); padding: 2px 6px; border-radius: 4px; color: #60a5fa;">%s</code>`, cmdText),
 		})
 	}
 
@@ -255,7 +605,7 @@ func (s *ReportsService) generateDetailedReport(tr *TimeRange, includeScreenshot
 		timelineEvents = append(timelineEvents, TimelineEvent{
 			Timestamp: fileEvt.Timestamp,
 			Type:      "file",
-			Summary:   fmt.Sprintf("**[File]** %s: `%s`", fileEvt.EventType, fileName),
+			Summary:   fmt.Sprintf(`<span style="font-weight: 600; color: #22c55e;">[File]</span> %s: <code style="font-size: 0.85em; background: rgba(34, 197, 94, 0.1); padding: 2px 6px; border-radius: 4px; color: #4ade80;">%s</code>`, fileEvt.EventType, fileName),
 		})
 	}
 
@@ -268,134 +618,254 @@ func (s *ReportsService) generateDetailedReport(tr *TimeRange, includeScreenshot
 		}
 	}
 
-	// Render timeline
+	// Event Timeline Section
+	sb.WriteString(`<div style="margin-bottom: 32px;">
+		<div style="font-size: 1.1rem; font-weight: 600; color: #f1f5f9; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 2px solid rgba(148, 163, 184, 0.2);">📅 Event Timeline</div>
+		<p style="color: #94a3b8; margin-bottom: 16px; font-size: 0.85rem;">All events in chronological order</p>`)
+
 	if len(timelineEvents) > 0 {
+		sb.WriteString(`<div style="background: rgba(30, 41, 59, 0.3); border-radius: 8px; padding: 16px;">`)
 		for _, evt := range timelineEvents {
 			evtTime := time.Unix(evt.Timestamp, 0)
-			sb.WriteString(fmt.Sprintf("- **%s** - %s\n", evtTime.Format("15:04:05"), evt.Summary))
+			sb.WriteString(fmt.Sprintf(`<div style="display: flex; gap: 12px; margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid rgba(148, 163, 184, 0.1);">
+				<div style="font-family: monospace; color: #94a3b8; font-size: 0.85rem; min-width: 70px;">%s</div>
+				<div style="font-size: 0.9rem; color: #cbd5e1; flex: 1;">%s</div>
+			</div>`, evtTime.Format("15:04:05"), evt.Summary))
 		}
-		sb.WriteString("\n")
+		sb.WriteString(`</div>`)
 	} else {
-		sb.WriteString("*No events recorded for this period*\n\n")
+		sb.WriteString(`<p style="color: #64748b; font-style: italic; font-size: 0.9rem;">No events recorded for this period</p>`)
 	}
+	sb.WriteString(`</div>`)
 
-	sb.WriteString("---\n\n")
-
-	// Get all sessions with context
+	// Sessions Section
 	sessions, _ := s.store.GetSessionsByTimeRange(tr.Start, tr.End)
 
-	for _, sess := range sessions {
-		ctx, _ := s.timeline.GetSessionContext(sess.ID)
-		if ctx == nil {
-			continue
+	if len(sessions) > 0 {
+		sb.WriteString(`<div style="margin-bottom: 32px;">
+			<div style="font-size: 1.1rem; font-weight: 600; color: #f1f5f9; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 2px solid rgba(148, 163, 184, 0.2);">🎯 Sessions</div>`)
+
+		for _, sess := range sessions {
+			ctx, _ := s.timeline.GetSessionContext(sess.ID)
+			if ctx == nil {
+				continue
+			}
+
+			startTime := time.Unix(sess.StartTime, 0)
+			sb.WriteString(fmt.Sprintf(`<div style="background: rgba(30, 41, 59, 0.4); border-radius: 8px; padding: 16px; margin-bottom: 16px; border-left: 3px solid #3b82f6;">
+				<div style="font-size: 1rem; font-weight: 600; color: #f1f5f9; margin-bottom: 8px;">Session: %s</div>`, startTime.Format("2006-01-02 15:04")))
+
+			if sess.DurationSeconds.Valid {
+				minutes := sess.DurationSeconds.Int64 / 60
+				sb.WriteString(fmt.Sprintf(`<div style="color: #94a3b8; font-size: 0.85rem; margin-bottom: 12px;">Duration: %dh %dm</div>`, minutes/60, minutes%60))
+			}
+
+			// Summary
+			if ctx.Summary != nil {
+				sb.WriteString(`<div style="margin-bottom: 16px; padding: 12px; background: rgba(59, 130, 246, 0.1); border-radius: 6px;">
+					<div style="font-size: 0.85rem; font-weight: 600; color: #3b82f6; margin-bottom: 6px;">Summary</div>`)
+				sb.WriteString(fmt.Sprintf(`<p style="color: #cbd5e1; font-size: 0.9rem; margin: 0;">%s</p>`, ctx.Summary.Summary))
+				if ctx.Summary.Explanation.Valid && ctx.Summary.Explanation.String != "" {
+					sb.WriteString(fmt.Sprintf(`<p style="color: #94a3b8; font-size: 0.85rem; margin-top: 8px; margin-bottom: 0;"><strong>Explanation:</strong> %s</p>`, ctx.Summary.Explanation.String))
+				}
+				if len(ctx.Summary.Tags) > 0 {
+					sb.WriteString(`<div style="margin-top: 8px; display: flex; gap: 6px; flex-wrap: wrap;">`)
+					for _, tag := range ctx.Summary.Tags {
+						sb.WriteString(fmt.Sprintf(`<span style="background: rgba(59, 130, 246, 0.2); color: #60a5fa; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem;">%s</span>`, tag))
+					}
+					sb.WriteString(`</div>`)
+				}
+				sb.WriteString(`</div>`)
+			}
+
+			// Application Focus
+			if len(ctx.FocusEvents) > 0 {
+				sb.WriteString(`<div style="margin-bottom: 16px;">
+					<div style="font-size: 0.85rem; font-weight: 600; color: #f1f5f9; margin-bottom: 8px;">Application Focus</div>
+					<div style="background: rgba(30, 41, 59, 0.5); border-radius: 6px; overflow: hidden;">
+						<table style="width: 100%; border-collapse: collapse;">
+							<thead>
+								<tr style="background: rgba(148, 163, 184, 0.1);">
+									<th style="text-align: left; padding: 8px 12px; font-size: 0.8rem; color: #94a3b8; font-weight: 600;">Application</th>
+									<th style="text-align: right; padding: 8px 12px; font-size: 0.8rem; color: #94a3b8; font-weight: 600;">Duration</th>
+								</tr>
+							</thead>
+							<tbody>`)
+
+				appDurations := make(map[string]float64)
+				for _, evt := range ctx.FocusEvents {
+					appDurations[evt.AppName] += evt.DurationSeconds
+				}
+				for app, dur := range appDurations {
+					minutes := int(dur / 60)
+					sb.WriteString(fmt.Sprintf(`<tr style="border-bottom: 1px solid rgba(148, 163, 184, 0.05);">
+						<td style="padding: 8px 12px; font-size: 0.85rem; color: #e2e8f0;">%s</td>
+						<td style="padding: 8px 12px; font-size: 0.85rem; color: #94a3b8; text-align: right;">%dm</td>
+					</tr>`, GetFriendlyAppName(app), minutes))
+				}
+
+				sb.WriteString(`</tbody></table></div></div>`)
+			}
+
+			// Shell Commands
+			if len(ctx.ShellCommands) > 0 {
+				sb.WriteString(`<div style="margin-bottom: 16px;">
+					<div style="font-size: 0.85rem; font-weight: 600; color: #f1f5f9; margin-bottom: 8px;">Shell Commands</div>
+					<div style="background: rgba(0, 0, 0, 0.3); border-radius: 6px; padding: 12px; font-family: monospace; font-size: 0.8rem; color: #94a3b8; overflow-x: auto;">`)
+				for _, cmd := range ctx.ShellCommands {
+					sb.WriteString(fmt.Sprintf(`<div style="margin-bottom: 4px;">%s</div>`, cmd.Command))
+				}
+				sb.WriteString(`</div></div>`)
+			}
+
+			// Git Commits
+			if len(ctx.GitCommits) > 0 {
+				sb.WriteString(`<div style="margin-bottom: 16px;">
+					<div style="font-size: 0.85rem; font-weight: 600; color: #f1f5f9; margin-bottom: 8px;">Git Commits</div>`)
+				for _, commit := range ctx.GitCommits {
+					sb.WriteString(fmt.Sprintf(`<div style="display: flex; gap: 8px; margin-bottom: 6px; align-items: baseline;">
+						<code style="font-size: 0.75rem; color: #f97316; background: rgba(249, 115, 22, 0.15); padding: 2px 6px; border-radius: 4px; flex-shrink: 0;">%s</code>
+						<span style="font-size: 0.85rem; color: #cbd5e1;">%s</span>
+					</div>`, commit.ShortHash, commit.Message))
+				}
+				sb.WriteString(`</div>`)
+			}
+
+			sb.WriteString(`</div>`) // End session card
 		}
 
-		startTime := time.Unix(sess.StartTime, 0)
-		sb.WriteString(fmt.Sprintf("## Session: %s\n\n", startTime.Format("2006-01-02 15:04")))
-
-		if sess.DurationSeconds.Valid {
-			minutes := sess.DurationSeconds.Int64 / 60
-			sb.WriteString(fmt.Sprintf("**Duration:** %dh %dm\n\n", minutes/60, minutes%60))
-		}
-
-		// Summary
-		if ctx.Summary != nil {
-			sb.WriteString("### Summary\n\n")
-			sb.WriteString(ctx.Summary.Summary + "\n\n")
-			if ctx.Summary.Explanation.Valid {
-				sb.WriteString("**Explanation:** " + ctx.Summary.Explanation.String + "\n\n")
-			}
-			if len(ctx.Summary.Tags) > 0 {
-				sb.WriteString("**Tags:** " + strings.Join(ctx.Summary.Tags, ", ") + "\n\n")
-			}
-		}
-
-		// Focus events
-		if len(ctx.FocusEvents) > 0 {
-			sb.WriteString("### Application Focus\n\n")
-			sb.WriteString("| Application | Duration |\n")
-			sb.WriteString("|-------------|----------|\n")
-			appDurations := make(map[string]float64)
-			for _, evt := range ctx.FocusEvents {
-				appDurations[evt.AppName] += evt.DurationSeconds
-			}
-			for app, dur := range appDurations {
-				minutes := int(dur / 60)
-				sb.WriteString(fmt.Sprintf("| %s | %dm |\n", GetFriendlyAppName(app), minutes))
-			}
-			sb.WriteString("\n")
-		}
-
-		// Shell commands
-		if len(ctx.ShellCommands) > 0 {
-			sb.WriteString("### Shell Commands\n\n")
-			sb.WriteString("```\n")
-			for _, cmd := range ctx.ShellCommands {
-				sb.WriteString(cmd.Command + "\n")
-			}
-			sb.WriteString("```\n\n")
-		}
-
-		// Git commits
-		if len(ctx.GitCommits) > 0 {
-			sb.WriteString("### Git Commits\n\n")
-			for _, commit := range ctx.GitCommits {
-				sb.WriteString(fmt.Sprintf("- `%s` %s\n", commit.ShortHash, commit.Message))
-			}
-			sb.WriteString("\n")
-		}
-
-		sb.WriteString("---\n\n")
+		sb.WriteString(`</div>`) // End sessions section
 	}
+
+	sb.WriteString(`</div>`) // End main container
 
 	return sb.String(), nil
 }
 
-// generateStandupReport creates a standup-style report.
+// generateStandupReport creates an HTML standup-style report following the standard 3-question format.
 func (s *ReportsService) generateStandupReport(tr *TimeRange, includeScreenshots bool) (string, error) {
 	var sb strings.Builder
 
-	sb.WriteString(fmt.Sprintf("# Standup Report: %s\n\n", tr.Label))
+	// Get app usage and calculate total time
+	appUsage, _ := s.analytics.GetAppUsage(tr.Start, tr.End)
+	var totalMinutes int64
+	for _, app := range appUsage {
+		totalMinutes += int64(app.DurationSeconds / 60)
+	}
 
-	// What I worked on
-	sb.WriteString("## What I worked on\n\n")
-
+	// Get sessions and commits
 	sessions, _ := s.store.GetSessionsByTimeRange(tr.Start, tr.End)
-	for _, sess := range sessions {
-		if sess.SummaryID.Valid {
-			sum, err := s.store.GetSummary(sess.SummaryID.Int64)
-			if err == nil && sum != nil {
-				sb.WriteString("- " + sum.Summary + "\n")
+	commits, _ := s.store.GetGitCommitsByTimeRange(tr.Start, tr.End)
+
+	// === START HTML ===
+	sb.WriteString(`<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 100%; color: #e2e8f0;">`)
+
+	// Header with summary
+	sb.WriteString(fmt.Sprintf(`<div style="margin-bottom: 20px;">
+		<h1 style="font-size: 1.5rem; font-weight: 700; margin: 0 0 8px 0; color: #f1f5f9;">Standup Report: %s</h1>
+		<p style="color: #94a3b8; margin: 0; font-size: 0.9rem;">%s tracked across %d sessions</p>
+	</div>`, tr.Label, formatMinutes(totalMinutes), len(sessions)))
+
+	// === WHAT I ACCOMPLISHED ===
+	sb.WriteString(`<div style="margin-bottom: 20px; padding: 16px; background: rgba(34, 197, 94, 0.1); border-radius: 8px; border-left: 3px solid #22c55e;">
+		<div style="font-size: 0.85rem; font-weight: 600; color: #22c55e; margin-bottom: 12px;">✓ What I accomplished</div>`)
+
+	accomplishments := s.extractAccomplishments(sessions)
+	if len(accomplishments) > 0 {
+		for _, acc := range accomplishments {
+			sb.WriteString(fmt.Sprintf(`<div style="font-size: 0.85rem; color: #cbd5e1; margin-bottom: 6px; padding-left: 8px;">• %s</div>`, acc))
+		}
+	} else if len(commits) > 0 {
+		sb.WriteString(`<div style="font-size: 0.75rem; color: #64748b; margin-bottom: 6px;">Based on commits:</div>`)
+		seen := make(map[string]bool)
+		count := 0
+		for _, commit := range commits {
+			if !seen[commit.Message] && count < 5 {
+				seen[commit.Message] = true
+				sb.WriteString(fmt.Sprintf(`<div style="font-size: 0.85rem; color: #cbd5e1; margin-bottom: 6px; padding-left: 8px;">• %s</div>`, commit.Message))
+				count++
 			}
 		}
+	} else {
+		sb.WriteString(`<div style="font-size: 0.85rem; color: #64748b; font-style: italic;">No specific accomplishments recorded</div>`)
 	}
+	sb.WriteString(`</div>`)
 
-	// Git commits
-	commits, _ := s.store.GetGitCommitsByTimeRange(tr.Start, tr.End)
+	// === COMMITS ===
 	if len(commits) > 0 {
-		sb.WriteString("\n## Commits\n\n")
+		sb.WriteString(`<div style="margin-bottom: 20px; padding: 16px; background: rgba(249, 115, 22, 0.1); border-radius: 8px; border-left: 3px solid #f97316;">
+			<div style="font-size: 0.85rem; font-weight: 600; color: #f97316; margin-bottom: 12px;">📝 Commits</div>`)
+		seen := make(map[string]bool)
 		for _, commit := range commits {
-			sb.WriteString(fmt.Sprintf("- %s\n", commit.Message))
+			if !seen[commit.Message] {
+				seen[commit.Message] = true
+				sb.WriteString(fmt.Sprintf(`<div style="display: flex; gap: 8px; margin-bottom: 6px; align-items: baseline;">
+					<code style="font-size: 0.7rem; color: #f97316; background: rgba(249, 115, 22, 0.15); padding: 2px 6px; border-radius: 4px; flex-shrink: 0;">%s</code>
+					<span style="font-size: 0.85rem; color: #cbd5e1;">%s</span>
+				</div>`, commit.ShortHash, commit.Message))
+			}
 		}
+		sb.WriteString(`</div>`)
 	}
 
-	// Time breakdown
-	sb.WriteString("\n## Time Breakdown\n\n")
-	focusEvents, _ := s.store.GetWindowFocusEventsByTimeRange(tr.Start, tr.End)
-	appDurations := make(map[string]float64)
-	for _, evt := range focusEvents {
-		appDurations[evt.AppName] += evt.DurationSeconds
-	}
-	for app, dur := range appDurations {
-		hours := int(dur / 3600)
-		minutes := int((dur - float64(hours*3600)) / 60)
-		friendlyApp := GetFriendlyAppName(app)
-		if hours > 0 {
-			sb.WriteString(fmt.Sprintf("- **%s:** %dh %dm\n", friendlyApp, hours, minutes))
+	// === WHAT'S NEXT ===
+	sb.WriteString(`<div style="margin-bottom: 20px; padding: 16px; background: rgba(59, 130, 246, 0.1); border-radius: 8px; border-left: 3px solid #3b82f6;">
+		<div style="font-size: 0.85rem; font-weight: 600; color: #3b82f6; margin-bottom: 12px;">🎯 What's next</div>`)
+
+	if len(commits) > 0 {
+		lastCommit := commits[len(commits)-1]
+		if strings.Contains(strings.ToLower(lastCommit.Message), "wip") ||
+			strings.Contains(strings.ToLower(lastCommit.Message), "in progress") {
+			sb.WriteString(fmt.Sprintf(`<div style="font-size: 0.85rem; color: #cbd5e1; padding-left: 8px;">• Continue work on: %s</div>`, lastCommit.Message))
 		} else {
-			sb.WriteString(fmt.Sprintf("- **%s:** %dm\n", friendlyApp, minutes))
+			sb.WriteString(`<div style="font-size: 0.85rem; color: #64748b; font-style: italic; padding-left: 8px;">Add your planned tasks here</div>`)
 		}
+	} else {
+		sb.WriteString(`<div style="font-size: 0.85rem; color: #64748b; font-style: italic; padding-left: 8px;">Add your planned tasks here</div>`)
 	}
+	sb.WriteString(`</div>`)
+
+	// === BLOCKERS ===
+	sb.WriteString(`<div style="margin-bottom: 20px; padding: 16px; background: rgba(100, 116, 139, 0.1); border-radius: 8px; border-left: 3px solid #64748b;">
+		<div style="font-size: 0.85rem; font-weight: 600; color: #94a3b8; margin-bottom: 12px;">🚧 Blockers</div>
+		<div style="font-size: 0.85rem; color: #64748b; padding-left: 8px;">• None identified</div>
+	</div>`)
+
+	// === TIME SUMMARY ===
+	if len(appUsage) > 0 {
+		sb.WriteString(`<div style="margin-bottom: 20px;">
+			<div style="font-size: 0.85rem; font-weight: 600; color: #f1f5f9; margin-bottom: 12px;">⏱️ Time Summary</div>`)
+
+		maxDuration := appUsage[0].DurationSeconds
+		count := 0
+		for _, app := range appUsage {
+			if count >= 5 {
+				break
+			}
+			appName := GetFriendlyAppName(app.AppName)
+			category := s.analytics.CategorizeApp(app.AppName)
+			barWidth := int(app.DurationSeconds / maxDuration * 100)
+			barColor := "#64748b"
+			if category == CategoryProductive {
+				barColor = "#22c55e"
+			} else if category == CategoryDistracting {
+				barColor = "#ef4444"
+			}
+
+			sb.WriteString(fmt.Sprintf(`
+			<div style="display: flex; align-items: center; margin-bottom: 6px;">
+				<div style="width: 80px; font-size: 0.8rem; color: #e2e8f0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">%s</div>
+				<div style="flex: 1; height: 16px; background: rgba(30, 41, 59, 0.5); border-radius: 4px; margin: 0 12px; overflow: hidden;">
+					<div style="height: 100%%; width: %d%%; background: %s; border-radius: 4px;"></div>
+				</div>
+				<div style="width: 45px; text-align: right; font-size: 0.8rem; color: #94a3b8;">%s</div>
+			</div>`, appName, barWidth, barColor, formatMinutes(int64(app.DurationSeconds/60))))
+			count++
+		}
+		sb.WriteString(`</div>`)
+	}
+
+	sb.WriteString(`</div>`) // End main container
 
 	return sb.String(), nil
 }
@@ -690,6 +1160,97 @@ func extractPreview(content string) string {
 	return preview
 }
 
+// parseDateRange attempts to parse a date range string like "jan 5, 2026 - jan 12, 2026"
+// Returns start date, end date, label, and success bool
+func parseDateRange(input string) (time.Time, time.Time, string, bool) {
+	// Split on common separators
+	parts := strings.Split(input, " - ")
+	if len(parts) != 2 {
+		parts = strings.Split(input, " to ")
+	}
+	if len(parts) != 2 {
+		return time.Time{}, time.Time{}, "", false
+	}
+
+	startStr := strings.TrimSpace(parts[0])
+	endStr := strings.TrimSpace(parts[1])
+
+	startDate, startOk := parseFlexibleDate(startStr)
+	endDate, endOk := parseFlexibleDate(endStr)
+
+	if !startOk || !endOk {
+		return time.Time{}, time.Time{}, "", false
+	}
+
+	// Normalize to start of day
+	startDate = time.Date(startDate.Year(), startDate.Month(), startDate.Day(), 0, 0, 0, 0, time.Local)
+	endDate = time.Date(endDate.Year(), endDate.Month(), endDate.Day(), 0, 0, 0, 0, time.Local)
+
+	// Generate label
+	label := fmt.Sprintf("%s - %s", startDate.Format("Jan 2, 2006"), endDate.Format("Jan 2, 2006"))
+
+	return startDate, endDate, label, true
+}
+
+// parseFlexibleDate parses a date string in various common formats
+// Input is expected to be lowercase (already lowercased by caller)
+func parseFlexibleDate(input string) (time.Time, bool) {
+	input = strings.TrimSpace(input)
+
+	// Map of lowercase month abbreviations/names to Go format month
+	monthMap := map[string]time.Month{
+		"jan": time.January, "january": time.January,
+		"feb": time.February, "february": time.February,
+		"mar": time.March, "march": time.March,
+		"apr": time.April, "april": time.April,
+		"may": time.May,
+		"jun": time.June, "june": time.June,
+		"jul": time.July, "july": time.July,
+		"aug": time.August, "august": time.August,
+		"sep": time.September, "september": time.September,
+		"oct": time.October, "october": time.October,
+		"nov": time.November, "november": time.November,
+		"dec": time.December, "december": time.December,
+	}
+
+	// Try "month day, year" format (e.g., "jan 5, 2026")
+	monthDayYearRe := regexp.MustCompile(`^([a-z]+)\s+(\d{1,2}),?\s*(\d{4})$`)
+	if matches := monthDayYearRe.FindStringSubmatch(input); len(matches) == 4 {
+		month, ok := monthMap[matches[1]]
+		if ok {
+			day, _ := strconv.Atoi(matches[2])
+			year, _ := strconv.Atoi(matches[3])
+			return time.Date(year, month, day, 0, 0, 0, 0, time.Local), true
+		}
+	}
+
+	// Try "day month year" format (e.g., "5 jan 2026")
+	dayMonthYearRe := regexp.MustCompile(`^(\d{1,2})\s+([a-z]+)\s+(\d{4})$`)
+	if matches := dayMonthYearRe.FindStringSubmatch(input); len(matches) == 4 {
+		month, ok := monthMap[matches[2]]
+		if ok {
+			day, _ := strconv.Atoi(matches[1])
+			year, _ := strconv.Atoi(matches[3])
+			return time.Date(year, month, day, 0, 0, 0, 0, time.Local), true
+		}
+	}
+
+	// Try standard formats
+	formats := []string{
+		"2006-01-02", // 2026-01-05
+		"01/02/2006", // 01/05/2026
+		"1/2/2006",   // 1/5/2026
+	}
+
+	for _, format := range formats {
+		if parsed, err := time.ParseInLocation(format, input, time.Local); err == nil {
+			return parsed, true
+		}
+	}
+
+	return time.Time{}, false
+}
+
 // ParseTimeRange parses natural language time input.
 func (s *ReportsService) ParseTimeRange(input string) (*TimeRange, error) {
 	now := time.Now()
@@ -745,6 +1306,11 @@ func (s *ReportsService) ParseTimeRange(input string) (*TimeRange, error) {
 			start = time.Date(now.Year(), now.Month(), now.Day()-days+1, 0, 0, 0, 0, time.Local)
 			end = time.Date(now.Year(), now.Month(), now.Day()+1, 0, 0, 0, 0, time.Local)
 			label = fmt.Sprintf("Past %d Days", days)
+		} else if parsedStart, parsedEnd, rangeLabel, ok := parseDateRange(input); ok {
+			// Try parsing as date range (e.g., "jan 5, 2026 - jan 12, 2026")
+			start = parsedStart
+			end = parsedEnd.Add(24 * time.Hour) // Include the end date
+			label = rangeLabel
 		} else {
 			// Try parsing as date
 			parsed, err := time.ParseInLocation("2006-01-02", input, time.Local)

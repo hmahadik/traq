@@ -10,5 +10,5 @@
 [x] Analytics page metrics should show comparisons
 [x] Fix Settings modal: sources page content being rendered beyond container
 [x] Improve settings page modal: clean it up, make it look minimal
-[ ] Fix detailed report generation to render reports correctly like the other types
+[x] Fix detailed report generation to render reports correctly like the other types
 [ ] Review and refactor AI summary generation logic to optimize for report generation 
