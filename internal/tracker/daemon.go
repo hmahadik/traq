@@ -58,6 +58,11 @@ type Daemon struct {
 	mu              sync.RWMutex
 	lastDHash       string
 	currentAFKID    int64 // Track ongoing AFK event ID
+
+	// Auto-update support
+	onUpdateReady     func() bool    // Returns true if update is pending
+	onUpdateApply     func()         // Called to apply update and restart
+	afkRestartMinutes int            // AFK duration threshold for auto-restart (default: 10)
 }
 
 // NewDaemon creates a new tracking daemon.
@@ -78,18 +83,19 @@ func NewDaemon(config *DaemonConfig, store *storage.Store, plat platform.Platfor
 	browser := NewBrowserTracker(plat, store, config.DataDir)
 
 	d := &Daemon{
-		config:  config,
-		store:   store,
-		plat:    plat,
-		capture: capture,
-		window:  window,
-		afk:     afk,
-		session: session,
-		shell:   shell,
-		git:     git,
-		files:   files,
-		browser: browser,
-		stopCh:  make(chan struct{}),
+		config:            config,
+		store:             store,
+		plat:              plat,
+		capture:           capture,
+		window:            window,
+		afk:               afk,
+		session:           session,
+		shell:             shell,
+		git:               git,
+		files:             files,
+		browser:           browser,
+		stopCh:            make(chan struct{}),
+		afkRestartMinutes: 10, // Default: restart after 10 min AFK with pending update
 	}
 
 	// Set up AFK callbacks
@@ -242,6 +248,8 @@ func (d *Daemon) tick() {
 
 	// Don't capture if AFK
 	if d.afk.IsAFK() {
+		// Check if we should auto-restart for pending update
+		d.checkAutoUpdate()
 		return
 	}
 
@@ -322,6 +330,36 @@ func (d *Daemon) tick() {
 
 	// Poll browser history for new visits
 	d.browser.Poll(session.ID)
+}
+
+// checkAutoUpdate checks if we should auto-restart to apply a pending update.
+// This is called during AFK periods to apply updates when user is away.
+func (d *Daemon) checkAutoUpdate() {
+	d.mu.RLock()
+	onReady := d.onUpdateReady
+	onApply := d.onUpdateApply
+	threshold := d.afkRestartMinutes
+	d.mu.RUnlock()
+
+	// Skip if callbacks not set
+	if onReady == nil || onApply == nil {
+		return
+	}
+
+	// Check if update is pending
+	if !onReady() {
+		return
+	}
+
+	// Check if we've been AFK long enough
+	idleDuration := d.afk.GetIdleDuration()
+	if idleDuration < time.Duration(threshold)*time.Minute {
+		return
+	}
+
+	// Trigger update and restart
+	fmt.Printf("Auto-update: AFK for %v with pending update, restarting...\n", idleDuration)
+	onApply()
 }
 
 func (d *Daemon) onAFK() {
@@ -420,6 +458,23 @@ func (d *Daemon) UpdateConfig(config *DaemonConfig) {
 	if config.ResumeWindow > 0 {
 		d.session.SetResumeWindow(config.ResumeWindow)
 	}
+}
+
+// SetUpdateCallbacks sets the callbacks for auto-update support.
+// onReady is called to check if an update is pending (returns true if ready to apply).
+// onApply is called to apply the update and restart the app.
+func (d *Daemon) SetUpdateCallbacks(onReady func() bool, onApply func()) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.onUpdateReady = onReady
+	d.onUpdateApply = onApply
+}
+
+// SetAFKRestartMinutes sets the AFK duration threshold for auto-restart with pending update.
+func (d *Daemon) SetAFKRestartMinutes(minutes int) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.afkRestartMinutes = minutes
 }
 
 // SetMonitorMode sets the monitor selection mode.

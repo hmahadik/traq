@@ -77,11 +77,44 @@ export const DailySummaryCard: React.FC<DailySummaryCardProps> = ({ stats }) => 
         </div>
       )}
 
-      {/* Longest Focus */}
-      <div>
-        <div className="text-xs text-muted-foreground uppercase tracking-wide mb-0.5">Longest Focus</div>
-        <div className="text-lg font-semibold">{formatDuration(stats.longestFocus)}</div>
+      {/* Focus Metrics Row */}
+      <div className="grid grid-cols-2 gap-4">
+        {/* Longest Focus */}
+        <div>
+          <div className="text-xs text-muted-foreground uppercase tracking-wide mb-0.5">Longest Focus</div>
+          <div className="text-lg font-semibold">{formatDuration(stats.longestFocus)}</div>
+        </div>
+
+        {/* Time Since Last Break */}
+        <div>
+          <div className="text-xs text-muted-foreground uppercase tracking-wide mb-0.5">Since Last Break</div>
+          {stats.timeSinceLastBreak < 0 ? (
+            <div className="text-lg font-semibold text-muted-foreground">No breaks</div>
+          ) : (
+            <div className={`text-lg font-semibold ${getBreakStatusColor(stats.timeSinceLastBreak)}`}>
+              {formatDuration(stats.timeSinceLastBreak)}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
+};
+
+// Get color class based on time since last break
+// Green: < 30 min (just had a break)
+// Yellow: 30-60 min (break coming up)
+// Orange: 60-90 min (should break soon)
+// Red: > 90 min (overdue for a break)
+const getBreakStatusColor = (seconds: number): string => {
+  const minutes = seconds / 60;
+  if (minutes < 30) {
+    return 'text-emerald-500'; // Just had a break - good
+  } else if (minutes < 60) {
+    return 'text-yellow-500'; // Break coming up
+  } else if (minutes < 90) {
+    return 'text-orange-500'; // Should break soon
+  } else {
+    return 'text-red-500'; // Overdue for a break
+  }
 };

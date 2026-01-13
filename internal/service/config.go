@@ -43,6 +43,14 @@ type Config struct {
 	UI          *UIConfig          `json:"ui"`
 	System      *SystemConfig      `json:"system"`
 	Issues      *IssuesConfig      `json:"issues"`
+	Update      *UpdateConfig      `json:"update"`
+}
+
+// UpdateConfig contains auto-update settings.
+type UpdateConfig struct {
+	AutoUpdate        bool `json:"autoUpdate"`        // Default: true
+	CheckIntervalHours int  `json:"checkIntervalHours"` // Default: 5
+	AFKRestartMinutes int  `json:"afkRestartMinutes"` // Default: 10
 }
 
 // IssuesConfig contains issue reporting settings.
@@ -173,6 +181,7 @@ func (s *ConfigService) GetConfig() (*Config, error) {
 		DataSources: s.getDefaultDataSourcesConfig(),
 		UI:          s.getDefaultUIConfig(),
 		System:      s.getDefaultSystemConfig(),
+		Update:      s.getDefaultUpdateConfig(),
 	}
 
 	// Load from database
@@ -298,6 +307,21 @@ func (s *ConfigService) GetConfig() (*Config, error) {
 	}
 	if val, err := s.store.GetConfig("inference.cloud.endpoint"); err == nil && val != "" {
 		config.Inference.Cloud.Endpoint = val
+	}
+
+	// Update settings
+	if val, err := s.store.GetConfig("update.autoUpdate"); err == nil {
+		config.Update.AutoUpdate = val == "true"
+	}
+	if val, err := s.store.GetConfig("update.checkIntervalHours"); err == nil {
+		if v, e := strconv.Atoi(val); e == nil {
+			config.Update.CheckIntervalHours = v
+		}
+	}
+	if val, err := s.store.GetConfig("update.afkRestartMinutes"); err == nil {
+		if v, e := strconv.Atoi(val); e == nil {
+			config.Update.AFKRestartMinutes = v
+		}
 	}
 
 	return config, nil
@@ -435,6 +459,11 @@ func mapToStorageKey(frontendKey string) string {
 		// Issues settings
 		"issues.webhookEnabled": "issues.webhookEnabled",
 		"issues.webhookUrl":     "issues.webhookUrl",
+
+		// Update settings
+		"update.autoUpdate":         "update.autoUpdate",
+		"update.checkIntervalHours": "update.checkIntervalHours",
+		"update.afkRestartMinutes":  "update.afkRestartMinutes",
 	}
 
 	if storageKey, ok := keyMap[frontendKey]; ok {
@@ -698,5 +727,13 @@ func (s *ConfigService) getDefaultInferenceConfig() *InferenceConfig {
 			Model:    "claude-sonnet-4-20250514",
 			Endpoint: "", // Empty = use default provider endpoint
 		},
+	}
+}
+
+func (s *ConfigService) getDefaultUpdateConfig() *UpdateConfig {
+	return &UpdateConfig{
+		AutoUpdate:         true,
+		CheckIntervalHours: 5,
+		AFKRestartMinutes:  10,
 	}
 }

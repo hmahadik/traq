@@ -704,6 +704,7 @@ export const mockData = {
       breakCount: 3,
       breakDuration: 42 * 60, // 42m
       longestFocus: 1 * 3600 + 48 * 60, // 1h 48m
+      timeSinceLastBreak: 52 * 60, // 52 minutes - shows yellow color
       daySpan: {
         startTime,
         endTime,
@@ -837,6 +838,122 @@ export const mockData = {
       },
     ];
 
+    // Git events for the day
+    const gitEvents: Record<number, any[]> = {
+      8: [{
+        id: 1,
+        timestamp: dayStart + 8 * hour + 45 * 60,
+        message: 'feat: Add timeline grid component with activity blocks',
+        messageSubject: 'feat: Add timeline grid component',
+        shortHash: 'a1b2c3d',
+        repository: 'traq',
+        branch: 'feature/timeline-v3',
+        insertions: 245,
+        deletions: 32,
+        hourOffset: 8,
+        minuteOffset: 45,
+        pixelPosition: 45,
+      }],
+      11: [{
+        id: 2,
+        timestamp: dayStart + 11 * hour + 55 * 60,
+        message: 'fix: Resolve activity block overlap issue',
+        messageSubject: 'fix: Resolve activity block overlap',
+        shortHash: 'e4f5g6h',
+        repository: 'traq',
+        branch: 'feature/timeline-v3',
+        insertions: 18,
+        deletions: 5,
+        hourOffset: 11,
+        minuteOffset: 55,
+        pixelPosition: 55,
+      }],
+      15: [{
+        id: 3,
+        timestamp: dayStart + 15 * hour + 28 * 60,
+        message: 'chore: Update tests and documentation',
+        messageSubject: 'chore: Update tests and docs',
+        shortHash: 'i7j8k9l',
+        repository: 'traq',
+        branch: 'feature/timeline-v3',
+        insertions: 89,
+        deletions: 12,
+        hourOffset: 15,
+        minuteOffset: 28,
+        pixelPosition: 28,
+      }],
+    };
+
+    // Shell events for the day
+    const shellEvents: Record<number, any[]> = {
+      8: [
+        { id: 1, timestamp: dayStart + 8 * hour + 6 * 60, command: 'npm run dev', shellType: 'zsh', workingDirectory: '~/projects/traq/frontend', exitCode: 0, durationSeconds: 0.5, hourOffset: 8, minuteOffset: 6, pixelPosition: 6 },
+        { id: 2, timestamp: dayStart + 8 * hour + 42 * 60, command: 'git status', shellType: 'zsh', workingDirectory: '~/projects/traq', exitCode: 0, durationSeconds: 0.2, hourOffset: 8, minuteOffset: 42, pixelPosition: 42 },
+      ],
+      11: [
+        { id: 3, timestamp: dayStart + 11 * hour + 36 * 60, command: 'npm test', shellType: 'zsh', workingDirectory: '~/projects/traq/frontend', exitCode: 0, durationSeconds: 12.5, hourOffset: 11, minuteOffset: 36, pixelPosition: 36 },
+        { id: 4, timestamp: dayStart + 11 * hour + 52 * 60, command: 'git add -A && git commit', shellType: 'zsh', workingDirectory: '~/projects/traq', exitCode: 0, durationSeconds: 1.2, hourOffset: 11, minuteOffset: 52, pixelPosition: 52 },
+      ],
+      15: [
+        { id: 5, timestamp: dayStart + 15 * hour + 25 * 60, command: 'git push origin feature/timeline-v3', shellType: 'zsh', workingDirectory: '~/projects/traq', exitCode: 0, durationSeconds: 3.5, hourOffset: 15, minuteOffset: 25, pixelPosition: 25 },
+      ],
+    };
+
+    // File events for the day
+    const fileEvents: Record<number, any[]> = {
+      8: [
+        { id: 1, timestamp: dayStart + 8 * hour + 12 * 60, eventType: 'modify', filePath: '~/projects/traq/frontend/src/pages/TimelinePage.tsx', fileName: 'TimelinePage.tsx', directory: '~/projects/traq/frontend/src/pages', fileExtension: '.tsx', fileSizeBytes: 8542, watchCategory: 'projects', oldPath: '', hourOffset: 8, minuteOffset: 12, pixelPosition: 12 },
+      ],
+      11: [
+        { id: 2, timestamp: dayStart + 11 * hour + 15 * 60, eventType: 'create', filePath: '~/projects/traq/frontend/src/components/timeline/ActivityBlock.tsx', fileName: 'ActivityBlock.tsx', directory: '~/projects/traq/frontend/src/components/timeline', fileExtension: '.tsx', fileSizeBytes: 3250, watchCategory: 'projects', oldPath: '', hourOffset: 11, minuteOffset: 15, pixelPosition: 15 },
+      ],
+      12: [
+        { id: 3, timestamp: dayStart + 12 * hour + 8 * 60, eventType: 'create', filePath: '~/Downloads/design-spec.pdf', fileName: 'design-spec.pdf', directory: '~/Downloads', fileExtension: '.pdf', fileSizeBytes: 2458624, watchCategory: 'downloads', oldPath: '', hourOffset: 12, minuteOffset: 8, pixelPosition: 8 },
+      ],
+    };
+
+    // Browser events for the day
+    const browserEvents: Record<number, any[]> = {
+      8: [
+        { id: 1, timestamp: dayStart + 8 * hour + 18 * 60, url: 'https://stackoverflow.com/questions/react-hooks', title: 'React Hooks best practices - Stack Overflow', domain: 'stackoverflow.com', browser: 'chrome', visitDurationSeconds: 180, transitionType: 'link', hourOffset: 8, minuteOffset: 18, pixelPosition: 18 },
+      ],
+      10: [
+        { id: 2, timestamp: dayStart + 10 * hour + 22 * 60, url: 'https://tanstack.com/query/latest/docs', title: 'React Query Documentation', domain: 'tanstack.com', browser: 'chrome', visitDurationSeconds: 540, transitionType: 'typed', hourOffset: 10, minuteOffset: 22, pixelPosition: 22 },
+      ],
+      12: [
+        { id: 3, timestamp: dayStart + 12 * hour + 15 * 60, url: 'https://news.ycombinator.com', title: 'Hacker News', domain: 'news.ycombinator.com', browser: 'chrome', visitDurationSeconds: 420, transitionType: 'typed', hourOffset: 12, minuteOffset: 15, pixelPosition: 15 },
+      ],
+    };
+
+    // AFK blocks for the day (break periods)
+    const afkBlocks: Record<number, any[]> = {
+      12: [{
+        id: 1,
+        startTime: dayStart + 12 * hour + 45 * 60,
+        endTime: dayStart + 13 * hour,
+        durationSeconds: 15 * 60,
+        triggerType: 'idle_timeout',
+        hourOffset: 12,
+        minuteOffset: 45,
+        pixelPosition: 45,
+        pixelHeight: 15,
+      }],
+      14: [{
+        id: 2,
+        startTime: dayStart + 14 * hour + 55 * 60,
+        endTime: dayStart + 15 * hour,
+        durationSeconds: 5 * 60,
+        triggerType: 'idle_timeout',
+        hourOffset: 14,
+        minuteOffset: 55,
+        pixelPosition: 55,
+        pixelHeight: 5,
+      }],
+    };
+
+    // Activity clusters
+    const activityClusters: Record<number, any[]> = {};
+
     return {
       date,
       dayStats,
@@ -854,6 +971,12 @@ export const mockData = {
         'browser': 'focus',
         'comms': 'comms',
       },
+      gitEvents,
+      shellEvents,
+      fileEvents,
+      browserEvents,
+      afkBlocks,
+      activityClusters,
     };
   },
 };

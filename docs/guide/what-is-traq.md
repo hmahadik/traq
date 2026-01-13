@@ -8,8 +8,10 @@ Traq runs in the background and:
 
 1. **Captures screenshots** at regular intervals (default: every 30 seconds)
 2. **Records window context** - which application is active and its window title
-3. **Detects sessions** - groups your activity and recognizes when you're away (AFK)
-4. **Provides insights** - visualizes your activity patterns and app usage
+3. **Tracks development activity** - git commits, shell commands, file changes, browser visits
+4. **Detects sessions** - groups your activity and recognizes when you're away (AFK)
+5. **Generates AI summaries** - natural language descriptions of what you worked on (optional)
+6. **Provides insights** - visualizes your activity patterns and app usage
 
 ## Key Features
 
@@ -21,12 +23,27 @@ Traq uses perceptual hashing (dHash) to detect near-identical screenshots and sk
 
 Activity is grouped into sessions. When you step away from your computer for more than 3 minutes (configurable), Traq detects this as AFK time and starts a new session when you return.
 
+### Developer Activity Tracking
+
+Beyond screenshots, Traq captures:
+- **Git commits** - repository, branch, message, insertions/deletions
+- **Shell commands** - terminal activity with exit codes and duration
+- **File events** - downloads, project file changes, document edits
+- **Browser visits** - pages visited with time spent
+
+### AI-Powered Summaries
+
+Optionally connect to an AI provider (OpenAI, Anthropic, or local Ollama) to automatically generate:
+- Session summaries describing what you worked on
+- Tags and categories for quick filtering
+- Confidence scores for summary accuracy
+
 ### Privacy-First
 
 All data stays on your machine:
 - Screenshots are stored locally in `~/.local/share/traq/screenshots/`
 - Activity data is stored in a local SQLite database
-- Nothing is sent to external servers
+- Nothing is sent to external servers (AI summaries use your own API keys)
 
 ## Use Cases
 
@@ -34,3 +51,5 @@ All data stays on your machine:
 - **Productivity analysis** - Identify patterns in your work habits
 - **Activity review** - Scroll through your day's screenshots as a visual timeline
 - **Report generation** - Create summaries for timesheets or personal records
+- **Standup prep** - Quickly review what you accomplished yesterday
+- **Break reminders** - Color-coded indicators show when you need a break

@@ -525,6 +525,22 @@ export namespace service {
 	        this.sitesVisitedPercent = source["sitesVisitedPercent"];
 	    }
 	}
+	export class UpdateConfig {
+	    autoUpdate: boolean;
+	    checkIntervalHours: number;
+	    afkRestartMinutes: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new UpdateConfig(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.autoUpdate = source["autoUpdate"];
+	        this.checkIntervalHours = source["checkIntervalHours"];
+	        this.afkRestartMinutes = source["afkRestartMinutes"];
+	    }
+	}
 	export class IssuesConfig {
 	    webhookEnabled: boolean;
 	    webhookUrl: string;
@@ -751,6 +767,7 @@ export namespace service {
 	    ui?: UIConfig;
 	    system?: SystemConfig;
 	    issues?: IssuesConfig;
+	    update?: UpdateConfig;
 	
 	    static createFrom(source: any = {}) {
 	        return new Config(source);
@@ -765,6 +782,7 @@ export namespace service {
 	        this.ui = this.convertValues(source["ui"], UIConfig);
 	        this.system = this.convertValues(source["system"], SystemConfig);
 	        this.issues = this.convertValues(source["issues"], IssuesConfig);
+	        this.update = this.convertValues(source["update"], UpdateConfig);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -1123,6 +1141,7 @@ export namespace service {
 	    breakCount: number;
 	    breakDuration: number;
 	    longestFocus: number;
+	    timeSinceLastBreak: number;
 	    daySpan?: DaySpan;
 	    breakdown: Record<string, number>;
 	    breakdownPercent: Record<string, number>;
@@ -1138,6 +1157,7 @@ export namespace service {
 	        this.breakCount = source["breakCount"];
 	        this.breakDuration = source["breakDuration"];
 	        this.longestFocus = source["longestFocus"];
+	        this.timeSinceLastBreak = source["timeSinceLastBreak"];
 	        this.daySpan = this.convertValues(source["daySpan"], DaySpan);
 	        this.breakdown = source["breakdown"];
 	        this.breakdownPercent = source["breakdownPercent"];
@@ -1876,6 +1896,63 @@ export namespace service {
 	}
 	
 	
+	
+	export class UpdateInfo {
+	    version: string;
+	    releaseNotes: string;
+	    downloadUrl: string;
+	    publishedAt: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new UpdateInfo(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.version = source["version"];
+	        this.releaseNotes = source["releaseNotes"];
+	        this.downloadUrl = source["downloadUrl"];
+	        this.publishedAt = source["publishedAt"];
+	    }
+	}
+	export class UpdateStatus {
+	    currentVersion: string;
+	    updatePending: boolean;
+	    pendingInfo?: UpdateInfo;
+	    lastCheck: string;
+	    enabled: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new UpdateStatus(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.currentVersion = source["currentVersion"];
+	        this.updatePending = source["updatePending"];
+	        this.pendingInfo = this.convertValues(source["pendingInfo"], UpdateInfo);
+	        this.lastCheck = source["lastCheck"];
+	        this.enabled = source["enabled"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	
 	export class WeekTimeBlock {
 	    blockIndex: number;

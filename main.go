@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	"traq/internal/platform"
+	"traq/internal/service"
 	"traq/internal/tray"
 
 	"github.com/wailsapp/wails/v2"
@@ -61,6 +63,19 @@ func (h *screenshotHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
+	// Check for pending updates BEFORE starting the app
+	// This applies any staged update from a previous session
+	plat := platform.New()
+	dataDir := plat.DataDir()
+	if applied, err := service.ApplyPendingUpdate(dataDir); err != nil {
+		log.Printf("Warning: failed to apply pending update: %v", err)
+	} else if applied {
+		// Update was applied, restart ourselves
+		log.Println("Update applied, restarting...")
+		service.RestartSelf()
+		return // Should not reach here
+	}
+
 	// Create an instance of the app structure
 	app := NewApp()
 

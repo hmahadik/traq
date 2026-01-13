@@ -6,6 +6,10 @@ export function AddTagToSession(arg1, arg2) {
   return window['go']['main']['App']['AddTagToSession'](arg1, arg2);
 }
 
+export function CheckForUpdate() {
+  return window['go']['main']['App']['CheckForUpdate']();
+}
+
 export function DeleteAppCategory(arg1) {
   return window['go']['main']['App']['DeleteAppCategory'](arg1);
 }
@@ -286,6 +290,10 @@ export function GetTrackedRepositories() {
   return window['go']['main']['App']['GetTrackedRepositories']();
 }
 
+export function GetUpdateStatus() {
+  return window['go']['main']['App']['GetUpdateStatus']();
+}
+
 export function GetVersion() {
   return window['go']['main']['App']['GetVersion']();
 }
@@ -392,6 +400,10 @@ export function StopTracking() {
 
 export function TestIssueWebhook() {
   return window['go']['main']['App']['TestIssueWebhook']();
+}
+
+export function TriggerUpdate() {
+  return window['go']['main']['App']['TriggerUpdate']();
 }
 
 export function UnregisterGitRepository(arg1) {

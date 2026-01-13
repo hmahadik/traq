@@ -22,6 +22,7 @@ export interface DayStats {
   breakCount: number;
   breakDuration: number; // Total AFK seconds
   longestFocus: number; // Longest continuous focus seconds
+  timeSinceLastBreak: number; // Seconds since last break ended (-1 if no breaks)
   daySpan: DaySpan | null;
   breakdown: Record<string, number>; // category -> seconds
   breakdownPercent: Record<string, number>; // category -> percentage

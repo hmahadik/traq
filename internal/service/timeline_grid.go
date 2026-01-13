@@ -26,14 +26,15 @@ type TimelineGridData struct {
 
 // DayStats contains aggregated statistics for a day.
 type DayStats struct {
-	TotalSeconds    float64                   `json:"totalSeconds"`
-	TotalHours      float64                   `json:"totalHours"`
-	BreakCount      int                       `json:"breakCount"`
-	BreakDuration   float64                   `json:"breakDuration"`    // Total AFK seconds
-	LongestFocus    float64                   `json:"longestFocus"`     // Longest continuous focus seconds
-	DaySpan         *DaySpan                  `json:"daySpan"`          // First to last activity time
-	Breakdown       map[string]float64        `json:"breakdown"`        // category -> seconds
-	BreakdownPercent map[string]float64       `json:"breakdownPercent"` // category -> percentage
+	TotalSeconds       float64                   `json:"totalSeconds"`
+	TotalHours         float64                   `json:"totalHours"`
+	BreakCount         int                       `json:"breakCount"`
+	BreakDuration      float64                   `json:"breakDuration"`      // Total AFK seconds
+	LongestFocus       float64                   `json:"longestFocus"`       // Longest continuous focus seconds
+	TimeSinceLastBreak float64                   `json:"timeSinceLastBreak"` // Seconds since last break ended (-1 if no breaks)
+	DaySpan            *DaySpan                  `json:"daySpan"`            // First to last activity time
+	Breakdown          map[string]float64        `json:"breakdown"`          // category -> seconds
+	BreakdownPercent   map[string]float64        `json:"breakdownPercent"`   // category -> percentage
 }
 
 // DaySpan represents the time range of activity in a day.
@@ -916,13 +917,14 @@ func pluralize(count int) string {
 func (s *TimelineService) calculateDayStats(focusEvents []*storage.WindowFocusEvent, categories map[string]string, dayStart, dayEnd time.Time) *DayStats {
 	if len(focusEvents) == 0 {
 		return &DayStats{
-			TotalSeconds:     0,
-			TotalHours:       0,
-			BreakCount:       0,
-			BreakDuration:    0,
-			LongestFocus:     0,
-			Breakdown:        make(map[string]float64),
-			BreakdownPercent: make(map[string]float64),
+			TotalSeconds:       0,
+			TotalHours:         0,
+			BreakCount:         0,
+			BreakDuration:      0,
+			LongestFocus:       0,
+			TimeSinceLastBreak: -1, // No breaks taken
+			Breakdown:          make(map[string]float64),
+			BreakdownPercent:   make(map[string]float64),
 		}
 	}
 
@@ -1053,15 +1055,42 @@ func (s *TimelineService) calculateDayStats(focusEvents []*storage.WindowFocusEv
 		}
 	}
 
+	// Calculate time since last break
+	// Find the most recent AFK end time and calculate time elapsed
+	timeSinceLastBreak := float64(-1) // -1 means no breaks taken
+	if len(afkEvents) > 0 {
+		// Find the latest AFK event that has ended
+		var latestBreakEnd int64 = 0
+		for _, afk := range afkEvents {
+			if afk.EndTime.Valid && afk.EndTime.Int64 > latestBreakEnd {
+				latestBreakEnd = afk.EndTime.Int64
+			}
+		}
+		if latestBreakEnd > 0 {
+			// Use current time for today, or day end for historical days
+			now := time.Now().Unix()
+			referenceTime := now
+			if now > dayEnd.Unix() {
+				// Historical day - use day end
+				referenceTime = dayEnd.Unix()
+			}
+			timeSinceLastBreak = float64(referenceTime - latestBreakEnd)
+			if timeSinceLastBreak < 0 {
+				timeSinceLastBreak = 0
+			}
+		}
+	}
+
 	return &DayStats{
-		TotalSeconds:     totalSeconds,
-		TotalHours:       totalSeconds / 3600.0,
-		BreakCount:       breakCount,
-		BreakDuration:    breakDuration,
-		LongestFocus:     longestFocus,
-		DaySpan:          daySpan,
-		Breakdown:        breakdown,
-		BreakdownPercent: breakdownPercent,
+		TotalSeconds:       totalSeconds,
+		TotalHours:         totalSeconds / 3600.0,
+		BreakCount:         breakCount,
+		BreakDuration:      breakDuration,
+		LongestFocus:       longestFocus,
+		TimeSinceLastBreak: timeSinceLastBreak,
+		DaySpan:            daySpan,
+		Breakdown:          breakdown,
+		BreakdownPercent:   breakdownPercent,
 	}
 }
 

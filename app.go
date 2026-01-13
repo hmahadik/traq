@@ -19,6 +19,9 @@ import (
 	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
+// Version is set at build time via -ldflags "-X main.Version=x.y.z"
+var Version = "dev"
+
 // App struct holds the application state and services
 type App struct {
 	ctx   context.Context
@@ -37,6 +40,7 @@ type App struct {
 	Screenshots *service.ScreenshotService
 	Summary     *service.SummaryService
 	Issues      *service.IssueService
+	Update      *service.UpdateService
 
 	// Inference engine
 	inference *inference.Service
@@ -117,7 +121,30 @@ func (a *App) startup(ctx context.Context) {
 	a.Summary = service.NewSummaryService(a.store, a.inference)
 
 	// Initialize issues service (for crash/manual reporting)
-	a.Issues = service.NewIssueService(a.store, "dev") // TODO: pass actual version
+	a.Issues = service.NewIssueService(a.store, Version)
+
+	// Initialize update service for auto-updates
+	a.Update = service.NewUpdateService(Version, dataDir)
+
+	// Configure update service from settings
+	if config != nil && config.Update != nil {
+		a.Update.SetEnabled(config.Update.AutoUpdate)
+		a.Update.SetCheckInterval(config.Update.CheckIntervalHours)
+		if a.daemon != nil {
+			a.daemon.SetAFKRestartMinutes(config.Update.AFKRestartMinutes)
+		}
+	}
+
+	// Wire up update callbacks to daemon for AFK-triggered auto-restart
+	if a.daemon != nil {
+		a.daemon.SetUpdateCallbacks(
+			a.Update.HasPendingUpdate,
+			func() { a.Update.ApplyAndRestart() },
+		)
+	}
+
+	// Start update service (background update checker)
+	a.Update.Start()
 
 	// Start screenshot server for dev mode (Vite proxies to this)
 	go startScreenshotServer(dataDir)
@@ -169,6 +196,11 @@ func startScreenshotServer(dataDir string) {
 
 // shutdown is called when the app is closing
 func (a *App) shutdown(ctx context.Context) {
+	// Stop update service
+	if a.Update != nil {
+		a.Update.Stop()
+	}
+
 	// Stop daemon gracefully
 	if a.daemon != nil {
 		if err := a.daemon.Stop(); err != nil {
@@ -806,7 +838,7 @@ func (a *App) GetDataDir() string {
 
 // GetVersion returns the application version.
 func (a *App) GetVersion() string {
-	return "2.0.0"
+	return Version
 }
 
 // GetSystemInfo returns basic system information.
@@ -817,7 +849,7 @@ func (a *App) GetSystemInfo() map[string]string {
 	}
 	return map[string]string{
 		"dataDir": dataDir,
-		"version": "2.0.0",
+		"version": Version,
 	}
 }
 
@@ -840,6 +872,37 @@ func (a *App) OpenDataDir() error {
 // GetCurrentTime returns the current Unix timestamp.
 func (a *App) GetCurrentTime() int64 {
 	return time.Now().Unix()
+}
+
+// ============================================================================
+// Update Methods (exposed to frontend)
+// ============================================================================
+
+// GetUpdateStatus returns the current auto-update status.
+func (a *App) GetUpdateStatus() *service.UpdateStatus {
+	if a.Update == nil {
+		return &service.UpdateStatus{
+			CurrentVersion: Version,
+			Enabled:        false,
+		}
+	}
+	return a.Update.GetStatus()
+}
+
+// CheckForUpdate manually triggers an update check.
+func (a *App) CheckForUpdate() (*service.UpdateInfo, error) {
+	if a.Update == nil {
+		return nil, nil
+	}
+	return a.Update.CheckForUpdate()
+}
+
+// TriggerUpdate manually applies a pending update and restarts.
+func (a *App) TriggerUpdate() error {
+	if a.Update == nil {
+		return nil
+	}
+	return a.Update.ApplyAndRestart()
 }
 
 // ============================================================================
