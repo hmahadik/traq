@@ -102,7 +102,18 @@ test.describe('Responsive Layout Screenshots', () => {
             return !generatingBtn;
           }, { timeout: 15000 });
 
-          // Extra wait for report content to render
+          // Wait for report content to fully render - look for bullet points or list content
+          try {
+            await page.waitForFunction(() => {
+              // Check if there's actual list content (ul/ol with li elements) in the report
+              const lists = document.querySelectorAll('ul li, ol li');
+              return lists.length > 0;
+            }, { timeout: 10000 });
+          } catch {
+            console.log(`  Warning: Report content may not be fully loaded`);
+          }
+
+          // Extra buffer for any final rendering
           await page.waitForTimeout(1000);
         } catch (error) {
           console.log(`  Warning: Could not generate report, continuing with form view...`);

@@ -120,6 +120,9 @@ test.describe('Documentation Screenshots', () => {
           // Navigate to the page
           await page.goto(shot.path);
 
+          // Set theme BEFORE any actions to avoid re-render issues
+          await setTheme(page, theme);
+
           // Handle special actions
           if (shot.action === 'openSettings') {
             await basePage.openSettings();
@@ -136,12 +139,20 @@ test.describe('Documentation Screenshots', () => {
               return !generatingBtn;
             }, { timeout: 15000 });
 
-            // Extra wait for report content to render
+            // Wait for report content to fully render - look for bullet points or list content
+            try {
+              await page.waitForFunction(() => {
+                // Check if there's actual list content (ul/ol with li elements) in the report
+                const lists = document.querySelectorAll('ul li, ol li');
+                return lists.length > 0;
+              }, { timeout: 10000 });
+            } catch {
+              console.log(`  Warning: Report content may not be fully loaded`);
+            }
+
+            // Extra buffer for any final rendering
             await page.waitForTimeout(1000);
           }
-
-          // Re-apply theme after navigation (navigation may reset it)
-          await setTheme(page, theme);
 
           // Wait for content to load
           try {

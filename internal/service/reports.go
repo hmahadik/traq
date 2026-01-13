@@ -2717,8 +2717,66 @@ func (s *ReportsService) formatWeeklySummaryHTML(data *WeeklySummaryData) string
 	startDate, _ := time.Parse("2006-01-02", data.StartDate)
 	endDate, _ := time.Parse("2006-01-02", data.EndDate)
 
+	// Add theme-aware CSS
+	sb.WriteString(`<style>
+		.report-container { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 100%; }
+		.report-title { font-size: 1.5rem; font-weight: 700; margin: 0 0 16px 0; }
+		.report-card { margin-bottom: 24px; padding: 16px; border-radius: 12px; border: 1px solid; }
+		.report-card-title { font-size: 0.85rem; font-weight: 600; margin-bottom: 8px; }
+		.report-text { font-size: 0.9rem; line-height: 1.5; }
+		.report-stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 24px; }
+		.report-stat-card { border-radius: 12px; padding: 16px; border: 1px solid; }
+		.report-stat-label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; }
+		.report-stat-value { font-size: 2rem; font-weight: 700; line-height: 1; }
+		.report-stat-meta { font-size: 0.8rem; margin-top: 4px; }
+		.report-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+		.report-table th { text-align: left; padding: 8px 4px; }
+		.report-table td { padding: 8px 4px; }
+		.report-table tr { border-bottom: 1px solid; }
+		.report-project-card { margin-bottom: 16px; padding: 12px; border-radius: 8px; border-left: 3px solid; }
+		.report-project-title { font-size: 0.95rem; font-weight: 600; }
+		.report-project-stats { font-size: 0.8rem; }
+		.report-accomplishment { padding-left: 12px; margin-bottom: 2px; }
+
+		/* Light mode colors */
+		.report-container { color: #1e293b; }
+		.report-title { color: #0f172a; }
+		.report-card { background: linear-gradient(135deg, rgba(241, 245, 249, 0.8), rgba(241, 245, 249, 0.4)); border-color: rgba(148, 163, 184, 0.2); }
+		.report-card-title { color: #0f172a; }
+		.report-text { color: #475569; }
+		.report-stat-card { background: linear-gradient(135deg, rgba(241, 245, 249, 0.8), rgba(241, 245, 249, 0.4)); border-color: rgba(148, 163, 184, 0.2); }
+		.report-stat-label { color: #64748b; }
+		.report-stat-value { color: #0f172a; }
+		.report-stat-meta { color: #94a3b8; }
+		.report-table th { color: #64748b; }
+		.report-table td { color: #1e293b; }
+		.report-table tr { border-color: rgba(148, 163, 184, 0.2); }
+		.report-project-card { background: rgba(241, 245, 249, 0.5); border-left-color: #3b82f6; }
+		.report-project-title { color: #0f172a; }
+		.report-project-stats { color: #64748b; }
+		.report-accomplishment { color: #64748b; }
+
+		/* Dark mode colors */
+		.dark .report-container { color: #e2e8f0; }
+		.dark .report-title { color: #f1f5f9; }
+		.dark .report-card { background: linear-gradient(135deg, rgba(30, 41, 59, 0.8), rgba(30, 41, 59, 0.4)); border-color: rgba(148, 163, 184, 0.1); }
+		.dark .report-card-title { color: #f1f5f9; }
+		.dark .report-text { color: #cbd5e1; }
+		.dark .report-stat-card { background: linear-gradient(135deg, rgba(30, 41, 59, 0.8), rgba(30, 41, 59, 0.4)); border-color: rgba(148, 163, 184, 0.1); }
+		.dark .report-stat-label { color: #94a3b8; }
+		.dark .report-stat-value { color: #f1f5f9; }
+		.dark .report-stat-meta { color: #64748b; }
+		.dark .report-table th { color: #94a3b8; }
+		.dark .report-table td { color: #e2e8f0; }
+		.dark .report-table tr { border-color: rgba(148, 163, 184, 0.1); }
+		.dark .report-project-card { background: rgba(30, 41, 59, 0.5); border-left-color: #3b82f6; }
+		.dark .report-project-title { color: #f1f5f9; }
+		.dark .report-project-stats { color: #94a3b8; }
+		.dark .report-accomplishment { color: #94a3b8; }
+	</style>`)
+
 	// Main container
-	sb.WriteString(`<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 100%; color: #e2e8f0;">`)
+	sb.WriteString(`<div class="report-container">`)
 
 	// Title
 	isSingleDay := data.StartDate == data.EndDate
@@ -2731,11 +2789,11 @@ func (s *ReportsService) formatWeeklySummaryHTML(data *WeeklySummaryData) string
 			endDate.Format("2"),
 			startDate.Year())
 	}
-	sb.WriteString(fmt.Sprintf(`<h1 style="font-size: 1.5rem; font-weight: 700; margin: 0 0 16px 0; color: #f1f5f9;">%s</h1>`, title))
+	sb.WriteString(fmt.Sprintf(`<h1 class="report-title">%s</h1>`, title))
 
 	// Executive Summary
-	sb.WriteString(`<div style="margin-bottom: 24px; padding: 16px; background: linear-gradient(135deg, rgba(30, 41, 59, 0.8), rgba(30, 41, 59, 0.4)); border-radius: 12px; border: 1px solid rgba(148, 163, 184, 0.1);">`)
-	sb.WriteString(`<div style="font-size: 0.85rem; font-weight: 600; color: #f1f5f9; margin-bottom: 8px;">Executive Summary</div>`)
+	sb.WriteString(`<div class="report-card">`)
+	sb.WriteString(`<div class="report-card-title">Executive Summary</div>`)
 
 	// Build executive summary
 	primaryProject := "development work"
@@ -2743,11 +2801,11 @@ func (s *ReportsService) formatWeeklySummaryHTML(data *WeeklySummaryData) string
 		primaryProject = fmt.Sprintf("<strong>%s</strong>", data.Projects[0].Name)
 	}
 	execSummary := fmt.Sprintf("This period was focused on %s.", primaryProject)
-	sb.WriteString(fmt.Sprintf(`<p style="color: #cbd5e1; margin: 0 0 12px 0; font-size: 0.9rem; line-height: 1.5;">%s</p>`, execSummary))
+	sb.WriteString(fmt.Sprintf(`<p class="report-text" style="margin: 0 0 12px 0;">%s</p>`, execSummary))
 
 	// Stats line
-	sb.WriteString(fmt.Sprintf(`<div style="font-size: 0.85rem; color: #94a3b8;">
-		<strong style="color: #f1f5f9;">%.1f hours</strong> active time across <strong style="color: #f1f5f9;">%d sessions</strong>`,
+	sb.WriteString(fmt.Sprintf(`<div class="report-stat-meta">
+		<strong class="report-stat-value" style="font-size: 0.85rem; font-weight: 600;">%.1f hours</strong> active time across <strong class="report-stat-value" style="font-size: 0.85rem; font-weight: 600;">%d sessions</strong>`,
 		data.TotalHours, data.SessionCount))
 	if data.GitCommitCount > 0 {
 		sb.WriteString(fmt.Sprintf(` • <strong style="color: #f97316;">%d commits</strong>`, data.GitCommitCount))
@@ -2755,33 +2813,33 @@ func (s *ReportsService) formatWeeklySummaryHTML(data *WeeklySummaryData) string
 	sb.WriteString(`</div></div>`)
 
 	// Stats Grid
-	sb.WriteString(`<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 24px;">`)
+	sb.WriteString(`<div class="report-stats-grid">`)
 
 	// Total Time Card
 	sb.WriteString(fmt.Sprintf(`
-		<div style="background: linear-gradient(135deg, rgba(30, 41, 59, 0.8), rgba(30, 41, 59, 0.4)); border-radius: 12px; padding: 16px; border: 1px solid rgba(148, 163, 184, 0.1);">
-			<div style="font-size: 0.75rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px;">Active Time</div>
-			<div style="font-size: 2rem; font-weight: 700; color: #f1f5f9; line-height: 1;">%.1fh</div>
-			<div style="font-size: 0.8rem; color: #64748b; margin-top: 4px;">%d sessions</div>
+		<div class="report-stat-card">
+			<div class="report-stat-label">Active Time</div>
+			<div class="report-stat-value">%.1fh</div>
+			<div class="report-stat-meta">%d sessions</div>
 		</div>`, data.TotalHours, data.SessionCount))
 
 	// Commits Card
 	if data.GitCommitCount > 0 {
 		sb.WriteString(fmt.Sprintf(`
-			<div style="background: linear-gradient(135deg, rgba(30, 41, 59, 0.8), rgba(30, 41, 59, 0.4)); border-radius: 12px; padding: 16px; border: 1px solid rgba(148, 163, 184, 0.1);">
-				<div style="font-size: 0.75rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px;">Commits</div>
-				<div style="font-size: 2rem; font-weight: 700; color: #f97316; line-height: 1;">%d</div>
-				<div style="font-size: 0.8rem; color: #64748b; margin-top: 4px;">+%s -%s lines</div>
+			<div class="report-stat-card">
+				<div class="report-stat-label">Commits</div>
+				<div class="report-stat-value" style="color: #f97316;">%d</div>
+				<div class="report-stat-meta">+%s -%s lines</div>
 			</div>`, data.GitCommitCount, formatNumber(data.TotalInsertions), formatNumber(data.TotalDeletions)))
 	}
 
 	// Screenshots Card
 	if data.ScreenshotCount > 0 {
 		sb.WriteString(fmt.Sprintf(`
-			<div style="background: linear-gradient(135deg, rgba(30, 41, 59, 0.8), rgba(30, 41, 59, 0.4)); border-radius: 12px; padding: 16px; border: 1px solid rgba(148, 163, 184, 0.1);">
-				<div style="font-size: 0.75rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px;">Screenshots</div>
-				<div style="font-size: 2rem; font-weight: 700; color: #3b82f6; line-height: 1;">%d</div>
-				<div style="font-size: 0.8rem; color: #64748b; margin-top: 4px;">captured</div>
+			<div class="report-stat-card">
+				<div class="report-stat-label">Screenshots</div>
+				<div class="report-stat-value" style="color: #3b82f6;">%d</div>
+				<div class="report-stat-meta">captured</div>
 			</div>`, data.ScreenshotCount))
 	}
 
@@ -2790,15 +2848,15 @@ func (s *ReportsService) formatWeeklySummaryHTML(data *WeeklySummaryData) string
 	// Time Distribution by Day (for multi-day reports)
 	if len(data.DailyStats) > 1 {
 		sb.WriteString(`<div style="margin-bottom: 24px;">
-			<div style="font-size: 0.85rem; font-weight: 600; color: #f1f5f9; margin-bottom: 12px;">Time Distribution by Day</div>
+			<div class="report-card-title">Time Distribution by Day</div>
 			<div style="overflow-x: auto;">
-			<table style="width: 100%; border-collapse: collapse; font-size: 0.8rem;">
+			<table class="report-table">
 				<thead>
-					<tr style="border-bottom: 1px solid rgba(148, 163, 184, 0.2);">
-						<th style="text-align: left; padding: 8px 4px; color: #94a3b8;">Day</th>
-						<th style="text-align: right; padding: 8px 4px; color: #94a3b8;">Hours</th>
-						<th style="text-align: right; padding: 8px 4px; color: #94a3b8;">Sessions</th>
-						<th style="text-align: left; padding: 8px 4px; color: #94a3b8;">Primary Focus</th>
+					<tr>
+						<th style="text-align: left;">Day</th>
+						<th style="text-align: right;">Hours</th>
+						<th style="text-align: right;">Sessions</th>
+						<th style="text-align: left;">Primary Focus</th>
 					</tr>
 				</thead>
 				<tbody>`)
@@ -2810,11 +2868,11 @@ func (s *ReportsService) formatWeeklySummaryHTML(data *WeeklySummaryData) string
 					focus = "-"
 				}
 				sb.WriteString(fmt.Sprintf(`
-					<tr style="border-bottom: 1px solid rgba(148, 163, 184, 0.1);">
-						<td style="padding: 8px 4px; color: #e2e8f0;">%s</td>
-						<td style="text-align: right; padding: 8px 4px; color: #e2e8f0;">%.1fh</td>
-						<td style="text-align: right; padding: 8px 4px; color: #94a3b8;">%d</td>
-						<td style="padding: 8px 4px; color: #94a3b8;">%s</td>
+					<tr>
+						<td style="text-align: left;">%s</td>
+						<td style="text-align: right;">%.1fh</td>
+						<td style="text-align: right;" class="report-stat-meta">%d</td>
+						<td style="text-align: left;" class="report-stat-meta">%s</td>
 					</tr>`, day.DayName, day.Hours, day.SessionCount, focus))
 			}
 		}
@@ -2824,7 +2882,7 @@ func (s *ReportsService) formatWeeklySummaryHTML(data *WeeklySummaryData) string
 	// Projects & Themes
 	if len(data.Projects) > 0 {
 		sb.WriteString(`<div style="margin-bottom: 24px;">
-			<div style="font-size: 0.85rem; font-weight: 600; color: #f1f5f9; margin-bottom: 12px;">Projects & Themes</div>`)
+			<div class="report-card-title">Projects & Themes</div>`)
 
 		for i, project := range data.Projects {
 			if project.Hours < 0.5 && project.CommitCount == 0 {
@@ -2833,10 +2891,10 @@ func (s *ReportsService) formatWeeklySummaryHTML(data *WeeklySummaryData) string
 
 			// Project card
 			sb.WriteString(fmt.Sprintf(`
-				<div style="margin-bottom: 16px; padding: 12px; background: rgba(30, 41, 59, 0.5); border-radius: 8px; border-left: 3px solid #3b82f6;">
+				<div class="report-project-card">
 					<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-						<span style="font-size: 0.95rem; font-weight: 600; color: #f1f5f9;">%d. %s</span>
-						<span style="font-size: 0.8rem; color: #94a3b8;">~%.0fh (%.0f%%)</span>
+						<span class="report-project-title">%d. %s</span>
+						<span class="report-project-stats">~%.0fh (%.0f%%)</span>
 					</div>`, i+1, project.Name, project.Hours, project.Percentage))
 
 			// Commit count
@@ -2849,7 +2907,7 @@ func (s *ReportsService) formatWeeklySummaryHTML(data *WeeklySummaryData) string
 
 			// Daily accomplishments
 			if len(project.DailyAccomplishments) > 0 {
-				sb.WriteString(`<div style="font-size: 0.8rem; color: #94a3b8;">`)
+				sb.WriteString(`<div class="report-project-stats">`)
 				var days []string
 				for d := range project.DailyAccomplishments {
 					days = append(days, d)
@@ -2862,13 +2920,13 @@ func (s *ReportsService) formatWeeklySummaryHTML(data *WeeklySummaryData) string
 						continue
 					}
 					dayTime, _ := time.Parse("2006-01-02", day)
-					sb.WriteString(fmt.Sprintf(`<div style="margin-bottom: 6px;"><strong style="color: #cbd5e1;">%s:</strong></div>`, dayTime.Format("Mon Jan 2")))
+					sb.WriteString(fmt.Sprintf(`<div style="margin-bottom: 6px;"><strong class="report-project-title" style="font-size: 0.8rem;">%s:</strong></div>`, dayTime.Format("Mon Jan 2")))
 					cleanedAccs := consolidateAccomplishments(accs)
 					for _, acc := range cleanedAccs {
 						if len(acc) > 100 {
 							acc = acc[:97] + "..."
 						}
-						sb.WriteString(fmt.Sprintf(`<div style="padding-left: 12px; margin-bottom: 2px;">• %s</div>`, acc))
+						sb.WriteString(fmt.Sprintf(`<div class="report-accomplishment">• %s</div>`, acc))
 					}
 				}
 				sb.WriteString(`</div>`)
