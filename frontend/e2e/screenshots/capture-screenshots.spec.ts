@@ -4,6 +4,10 @@
  * Captures screenshots of all main views in both light and dark modes.
  * Output goes to docs/public/screenshots/
  *
+ * IMPORTANT: This script captures REAL app data, not mock data.
+ * The timeline defaults to "today" and other pages show actual data.
+ * Ensure the app has been running and collecting data for compelling screenshots.
+ *
  * Usage:
  *   npm run screenshots        # Capture all screenshots
  *   npm run screenshots:light  # Light mode only
@@ -22,20 +26,44 @@ const SCREENSHOT_DIR = path.join(__dirname, '../../../docs/public/screenshots');
 
 // Screenshot configurations
 // Note: App uses hash-based routing, so paths need /#/ prefix
-// Add ?mock=true to enable mock data mode for realistic screenshots
-const MOCK_PARAM = '?mock=true';
-
+// Using real app data with today's date for compelling screenshots
 const screenshots = [
-  { name: 'timeline', path: `/${MOCK_PARAM}#/`, waitFor: '[data-testid="session-card"]' },
-  { name: 'analytics', path: `/${MOCK_PARAM}#/analytics`, waitFor: '[data-testid="productivity-score"], .recharts-wrapper' },
-  { name: 'reports', path: `/${MOCK_PARAM}#/reports`, waitFor: 'main' },
-  { name: 'settings', path: `/${MOCK_PARAM}#/`, action: 'openSettings', waitFor: '[role="dialog"]' },
+  {
+    name: 'timeline',
+    path: '/#/timeline',
+    waitFor: '.timeline-grid, [data-testid="daily-summary"], main',
+    waitForTimeout: 3000,
+  },
+  {
+    name: 'analytics',
+    path: '/#/analytics',
+    waitFor: '.recharts-wrapper, [data-testid="stats-grid"], main',
+    waitForTimeout: 3000,
+  },
+  {
+    name: 'reports',
+    path: '/#/reports',
+    action: 'generateReport',
+    waitFor: '[data-testid="report-form"], main',
+    waitForTimeout: 5000, // Extra time for report generation
+  },
+  {
+    name: 'settings',
+    path: '/#/timeline',
+    action: 'openSettings',
+    waitFor: '[role="dialog"]',
+    waitForTimeout: 1000,
+  },
 ] as const;
 
 // Additional detail screenshots
 const detailScreenshots = [
-  { name: 'session-details', path: `/${MOCK_PARAM}#/session/1`, waitFor: 'main' },
-  { name: 'activity-heatmap', path: `/${MOCK_PARAM}#/analytics`, waitFor: 'main', scroll: '[data-testid="activity-heatmap"]' },
+  {
+    name: 'session-details',
+    path: '/#/session/1',
+    waitFor: 'main',
+    waitForTimeout: 2000,
+  },
 ] as const;
 
 type Theme = 'light' | 'dark';
@@ -89,16 +117,27 @@ test.describe('Documentation Screenshots', () => {
         for (const shot of screenshots) {
           console.log(`\nCapturing ${shot.name} (${theme})...`);
 
-          if (shot.path !== '/') {
-            await page.goto(shot.path);
-          } else if (shot.action !== 'openSettings') {
-            await basePage.goto('/');
-          }
+          // Navigate to the page
+          await page.goto(shot.path);
 
           // Handle special actions
           if (shot.action === 'openSettings') {
-            await basePage.goto('/');
             await basePage.openSettings();
+          } else if (shot.action === 'generateReport') {
+            // Click the "Generate Report" button
+            const generateButton = page.getByRole('button', { name: /Generate Report/i });
+            await generateButton.waitFor({ state: 'visible', timeout: 5000 });
+            await generateButton.click();
+
+            // Wait for the report to be generated (button text changes from "Generating..." back to "Generate Report")
+            await page.waitForFunction(() => {
+              const buttons = Array.from(document.querySelectorAll('button'));
+              const generatingBtn = buttons.find(btn => btn.textContent?.includes('Generating...'));
+              return !generatingBtn;
+            }, { timeout: 15000 });
+
+            // Extra wait for report content to render
+            await page.waitForTimeout(1000);
           }
 
           // Re-apply theme after navigation (navigation may reset it)
@@ -108,21 +147,22 @@ test.describe('Documentation Screenshots', () => {
           try {
             const selectors = shot.waitFor.split(', ');
             await Promise.race(
-              selectors.map(s => page.waitForSelector(s, { timeout: 5000 }))
+              selectors.map(s => page.waitForSelector(s, { timeout: 8000 }))
             );
           } catch {
             console.log(`  Warning: waitFor selector not found, continuing...`);
           }
 
-          // Extra wait for animations/data loading
-          await page.waitForTimeout(1500);
+          // Extra wait for animations/data loading (use config timeout or default)
+          const timeout = 'waitForTimeout' in shot ? shot.waitForTimeout : 1500;
+          await page.waitForTimeout(timeout);
+
+          // Capture screenshot
+          await captureScreenshot(page, shot.name, theme);
 
           // Close settings drawer if open before next screenshot
           if (shot.action === 'openSettings') {
-            await captureScreenshot(page, shot.name, theme);
             await settingsDrawer.close();
-          } else {
-            await captureScreenshot(page, shot.name, theme);
           }
         }
       });
@@ -137,25 +177,35 @@ test.describe('Documentation Screenshots', () => {
           await setTheme(page, theme);
 
           try {
-            await page.waitForSelector(shot.waitFor, { timeout: 5000 });
+            const selectors = shot.waitFor.split(', ');
+            await Promise.race(
+              selectors.map(s => page.waitForSelector(s, { timeout: 8000 }))
+            );
           } catch {
             console.log(`  Warning: waitFor selector not found, continuing...`);
           }
 
           // Scroll to element if specified
           if ('scroll' in shot && shot.scroll) {
-            try {
-              const element = await page.$(shot.scroll);
-              if (element) {
-                await element.scrollIntoViewIfNeeded();
-                await page.waitForTimeout(300);
+            const scrollSelectors = shot.scroll.split(', ');
+            for (const selector of scrollSelectors) {
+              try {
+                const element = await page.$(selector);
+                if (element) {
+                  await element.scrollIntoViewIfNeeded();
+                  await page.waitForTimeout(300);
+                  break;
+                }
+              } catch {
+                // Try next selector
               }
-            } catch {
-              console.log(`  Warning: scroll target not found`);
             }
           }
 
-          await page.waitForTimeout(1500);
+          // Extra wait for animations/data loading (use config timeout or default)
+          const timeout = 'waitForTimeout' in shot ? shot.waitForTimeout : 1500;
+          await page.waitForTimeout(timeout);
+
           await captureScreenshot(page, shot.name, theme);
         }
       });

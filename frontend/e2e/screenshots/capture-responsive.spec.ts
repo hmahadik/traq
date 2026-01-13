@@ -4,6 +4,10 @@
  * Captures screenshots of main views at various screen sizes to verify
  * responsive layout behavior.
  *
+ * IMPORTANT: This script captures REAL app data, not mock data.
+ * The timeline defaults to "today" and other pages show actual data.
+ * Ensure the app has been running and collecting data for compelling screenshots.
+ *
  * Usage:
  *   npx playwright test --config=playwright.screenshots.config.ts capture-responsive
  */
@@ -27,12 +31,12 @@ const VIEWPORTS = [
   { name: 'desktop-large', width: 1920, height: 1080 },  // Full HD
 ] as const;
 
-// Pages to capture (using mock data for realistic content)
-const MOCK_PARAM = '?mock=true';
+// Pages to capture (using real app data)
+// Note: App uses hash-based routing, so paths need /#/ prefix
 const PAGES = [
-  { name: 'timeline', path: `/${MOCK_PARAM}#/`, waitFor: '[data-testid="session-card"]' },
-  { name: 'analytics', path: `/${MOCK_PARAM}#/analytics`, waitFor: '.recharts-wrapper' },
-  { name: 'reports', path: `/${MOCK_PARAM}#/reports`, waitFor: 'main' },
+  { name: 'timeline', path: '/#/timeline', waitFor: '.timeline-grid, [data-testid="daily-summary"], main' },
+  { name: 'analytics', path: '/#/analytics', waitFor: '.recharts-wrapper, [data-testid="stats-grid"], main' },
+  { name: 'reports', path: '/#/reports', waitFor: '[data-testid="report-form"], main' },
 ] as const;
 
 // Ensure screenshot directory exists
@@ -73,15 +77,40 @@ test.describe('Responsive Layout Screenshots', () => {
       // Navigate to the page
       await page.goto(pageConfig.path);
 
-      // Wait for content to load
+      // Wait for content to load - try multiple selectors
       try {
-        await page.waitForSelector(pageConfig.waitFor, { timeout: 10000 });
+        const selectors = pageConfig.waitFor.split(', ');
+        await Promise.race(
+          selectors.map(s => page.waitForSelector(s, { timeout: 10000 }))
+        );
       } catch {
         console.log(`  Warning: waitFor selector "${pageConfig.waitFor}" not found, continuing...`);
       }
 
+      // Special handling for reports page - generate a report
+      if (pageConfig.name === 'reports') {
+        try {
+          // Click the "Generate Report" button
+          const generateButton = page.getByRole('button', { name: /Generate Report/i });
+          await generateButton.waitFor({ state: 'visible', timeout: 5000 });
+          await generateButton.click();
+
+          // Wait for the report to be generated
+          await page.waitForFunction(() => {
+            const buttons = Array.from(document.querySelectorAll('button'));
+            const generatingBtn = buttons.find(btn => btn.textContent?.includes('Generating...'));
+            return !generatingBtn;
+          }, { timeout: 15000 });
+
+          // Extra wait for report content to render
+          await page.waitForTimeout(1000);
+        } catch (error) {
+          console.log(`  Warning: Could not generate report, continuing with form view...`);
+        }
+      }
+
       // Extra wait for data/animations
-      await page.waitForTimeout(1500);
+      await page.waitForTimeout(2000);
 
       // Capture at each viewport size
       for (const viewport of VIEWPORTS) {
