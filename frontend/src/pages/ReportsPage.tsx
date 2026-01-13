@@ -1,26 +1,31 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import {
-  QuickPresets,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
   TimeRangeSelector,
   ReportTypeSelector,
   ReportPreview,
-  ReportHistory,
-  DailySummariesList,
 } from '@/components/reports';
 import {
   useReportHistory,
-  useDailySummaries,
   useGenerateReport,
   useExportReport,
   useDeleteReport,
   useParseTimeRange,
 } from '@/api/hooks';
 import { api } from '@/api/client';
-import { Loader2, Sparkles, ImageIcon } from 'lucide-react';
-import type { Report } from '@/types';
+import { Loader2, Sparkles, ImageIcon, History, Trash2 } from 'lucide-react';
+import { formatDate } from '@/lib/utils';
+import type { Report, ReportMeta } from '@/types';
 import { useDateContext } from '@/contexts';
 
 function formatDateForTimeRange(date: Date): string {
@@ -31,7 +36,6 @@ function formatDateForTimeRange(date: Date): string {
 export function ReportsPage() {
   const { selectedDate, timeframeType, dateRange, setSelectedDate, setTimeframeType, setDateRange } = useDateContext();
 
-  // Initialize time range from global date context
   const getInitialTimeRange = () => {
     if (timeframeType === 'day') {
       const today = new Date();
@@ -55,16 +59,15 @@ export function ReportsPage() {
 
   const [timeRange, setTimeRange] = useState(getInitialTimeRange());
 
-  // Update time range when global date context changes
   useEffect(() => {
     setTimeRange(getInitialTimeRange());
   }, [selectedDate, timeframeType, dateRange]);
-  const [reportType, setReportType] = useState('summary');
+
+  const [reportType, setReportType] = useState<'summary' | 'detailed' | 'standup'>('summary');
   const [includeScreenshots, setIncludeScreenshots] = useState(false);
   const [generatedReport, setGeneratedReport] = useState<Report | undefined>();
 
-  const { data: history, isLoading: historyLoading } = useReportHistory();
-  const { data: dailySummaries, isLoading: summariesLoading } = useDailySummaries(30);
+  const { data: history } = useReportHistory();
   const { data: parsedRange } = useParseTimeRange(timeRange);
   const generateReport = useGenerateReport();
   const exportReport = useExportReport();
@@ -75,23 +78,7 @@ export function ReportsPage() {
     setGeneratedReport(result);
   };
 
-  const handleQuickGenerate = async (
-    quickTimeRange: string,
-    quickReportType: 'summary' | 'detailed' | 'standup'
-  ) => {
-    // Update the form state to reflect what's being generated
-    setTimeRange(quickTimeRange);
-    setReportType(quickReportType);
-    // Generate the report
-    const result = await generateReport.mutateAsync({
-      timeRange: quickTimeRange,
-      reportType: quickReportType,
-      includeScreenshots,
-    });
-    setGeneratedReport(result);
-  };
-
-  const handleExport = async (format: 'md' | 'html' | 'pdf' | 'json') => {
+  const handleExport = async (format: 'html' | 'markdown') => {
     if (!generatedReport) return;
     await exportReport.mutateAsync({ reportId: generatedReport.id, format });
   };
@@ -113,24 +100,19 @@ export function ReportsPage() {
           endTime: report.endTime?.Int64 || null,
         });
 
-        // Update global date context based on report's timeframe
         if (report.startTime?.Int64 && report.endTime?.Int64) {
           const startDate = new Date(report.startTime.Int64 * 1000);
           const endDate = new Date(report.endTime.Int64 * 1000);
-
-          // Check if it's a single day
           const isSameDay = startDate.toDateString() === endDate.toDateString();
 
           if (isSameDay) {
-            // Single day - use day timeframe
             setSelectedDate(startDate);
             setTimeframeType('day');
             setDateRange(null);
           } else {
-            // Multi-day range - use custom timeframe
             setDateRange({ start: startDate, end: endDate });
             setTimeframeType('custom');
-            setSelectedDate(endDate); // Set to end date for consistency
+            setSelectedDate(endDate);
           }
         }
       }
@@ -139,14 +121,9 @@ export function ReportsPage() {
     }
   };
 
-  const handleExportFromHistory = async (reportId: number, format: string) => {
-    await exportReport.mutateAsync({ reportId, format });
-  };
-
   const handleDeleteReport = async (reportId: number) => {
     try {
       await deleteReport.mutateAsync(reportId);
-      // If the deleted report is currently displayed, clear it
       if (generatedReport?.id === reportId) {
         setGeneratedReport(undefined);
       }
@@ -156,24 +133,66 @@ export function ReportsPage() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Reports</h1>
-          <p className="text-muted-foreground">
-            Generate and export activity reports
-          </p>
-        </div>
+    <div className="h-full flex flex-col">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-4">
+        <h1 className="text-2xl font-semibold">Reports</h1>
+
+        {/* History dropdown */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="sm">
+              <History className="h-4 w-4 mr-2" />
+              History
+              {history && history.length > 0 && (
+                <Badge variant="secondary" className="ml-2 text-xs">
+                  {history.length}
+                </Badge>
+              )}
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-72">
+            <DropdownMenuLabel>Previous Reports</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            {!history || history.length === 0 ? (
+              <div className="p-3 text-center text-sm text-muted-foreground">
+                No reports yet
+              </div>
+            ) : (
+              history.slice(0, 10).map((report: ReportMeta) => (
+                <DropdownMenuItem
+                  key={report.id}
+                  className="flex items-center justify-between cursor-pointer"
+                  onClick={() => handleViewReport(report.id)}
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium truncate">{report.title}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {report.timeRange} · {formatDate(report.createdAt)}
+                    </p>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 w-6 p-0 ml-2 text-muted-foreground hover:text-destructive shrink-0"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDeleteReport(report.id);
+                    }}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </DropdownMenuItem>
+              ))
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
-      <div className="grid gap-6 grid-cols-1 lg:grid-cols-[400px_1fr] xl:grid-cols-[450px_1fr] 2xl:grid-cols-[500px_1fr]">
-        {/* Left Column - Report Configuration */}
-        <div className="space-y-4">
-          <QuickPresets
-            onGenerate={handleQuickGenerate}
-            isGenerating={generateReport.isPending}
-          />
-
+      {/* Main content - fills remaining height */}
+      <div className="flex-1 grid gap-6 lg:grid-cols-[340px_1fr] min-h-0">
+        {/* Left Column - Configuration */}
+        <div className="space-y-4 lg:overflow-y-auto">
           <TimeRangeSelector
             value={timeRange}
             onChange={setTimeRange}
@@ -182,76 +201,49 @@ export function ReportsPage() {
 
           <ReportTypeSelector value={reportType} onChange={setReportType} />
 
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium flex items-center gap-2">
-                <ImageIcon className="h-4 w-4" />
-                Options
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <div className="text-sm font-medium">
-                    Include key screenshots
-                  </div>
-                  <div className="text-xs text-muted-foreground">
-                    Adds representative screenshots to the report
-                  </div>
-                </div>
-                <Switch
-                  id="includeScreenshots"
-                  checked={includeScreenshots}
-                  onCheckedChange={setIncludeScreenshots}
-                />
-              </div>
-            </CardContent>
-          </Card>
+          {/* Generate section */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-3">
+              <Switch
+                id="includeScreenshots"
+                checked={includeScreenshots}
+                onCheckedChange={setIncludeScreenshots}
+              />
+              <label htmlFor="includeScreenshots" className="text-sm flex items-center gap-1.5 cursor-pointer">
+                <ImageIcon className="h-3.5 w-3.5 text-muted-foreground" />
+                Include screenshots
+              </label>
+            </div>
 
-          <Button
-            onClick={handleGenerate}
-            disabled={generateReport.isPending}
-            className="w-full"
-            size="lg"
-          >
-            {generateReport.isPending ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Generating...
-              </>
-            ) : (
-              <>
-                <Sparkles className="mr-2 h-4 w-4" />
-                Generate Report
-              </>
-            )}
-          </Button>
+            <Button
+              onClick={handleGenerate}
+              disabled={generateReport.isPending}
+              className="w-full"
+            >
+              {generateReport.isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Generating...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="mr-2 h-4 w-4" />
+                  Generate Report
+                </>
+              )}
+            </Button>
+          </div>
         </div>
 
-        {/* Right Column - Preview */}
+        {/* Right Column - Preview (fills height) */}
         <ReportPreview
           report={generatedReport}
           isLoading={generateReport.isPending}
           onExport={handleExport}
           isExporting={exportReport.isPending}
+          fullHeight
         />
       </div>
-
-      {/* Daily Summaries */}
-      <DailySummariesList
-        summaries={dailySummaries}
-        isLoading={summariesLoading}
-        onView={handleViewReport}
-      />
-
-      {/* Report History */}
-      <ReportHistory
-        reports={history}
-        isLoading={historyLoading}
-        onView={handleViewReport}
-        onExport={handleExportFromHistory}
-        onDelete={handleDeleteReport}
-      />
     </div>
   );
 }

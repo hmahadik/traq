@@ -28,40 +28,6 @@ func (s *ScreenshotService) GetScreenshot(id int64) (*storage.Screenshot, error)
 	return s.store.GetScreenshot(id)
 }
 
-// GetScreenshotImage returns the full screenshot image bytes.
-func (s *ScreenshotService) GetScreenshotImage(id int64) ([]byte, error) {
-	screenshot, err := s.store.GetScreenshot(id)
-	if err != nil {
-		return nil, fmt.Errorf("screenshot not found: %w", err)
-	}
-
-	data, err := os.ReadFile(screenshot.Filepath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read image: %w", err)
-	}
-
-	return data, nil
-}
-
-// GetThumbnail returns the thumbnail image bytes.
-func (s *ScreenshotService) GetThumbnail(id int64) ([]byte, error) {
-	screenshot, err := s.store.GetScreenshot(id)
-	if err != nil {
-		return nil, fmt.Errorf("screenshot not found: %w", err)
-	}
-
-	// Derive thumbnail path from screenshot path
-	thumbPath := s.thumbnailPath(screenshot.Filepath)
-
-	data, err := os.ReadFile(thumbPath)
-	if err != nil {
-		// Fallback to full image if thumbnail doesn't exist
-		return s.GetScreenshotImage(id)
-	}
-
-	return data, nil
-}
-
 // GetScreenshotPath returns the URL path to a screenshot.
 // Returns a path like "/screenshots/2026/01/05/123456.webp" that can be loaded via the asset handler.
 func (s *ScreenshotService) GetScreenshotPath(id int64) (string, error) {
@@ -129,35 +95,6 @@ func (s *ScreenshotService) DeleteScreenshot(id int64) error {
 
 	// Delete from database
 	return s.store.DeleteScreenshot(id)
-}
-
-// DeleteScreenshotsForSession deletes all screenshots for a session.
-func (s *ScreenshotService) DeleteScreenshotsForSession(sessionID int64) error {
-	screenshots, err := s.store.GetScreenshotsBySession(sessionID)
-	if err != nil {
-		return err
-	}
-
-	for _, sc := range screenshots {
-		s.DeleteScreenshot(sc.ID)
-	}
-
-	return nil
-}
-
-// GetScreenshotsByDate returns screenshots for a specific date.
-func (s *ScreenshotService) GetScreenshotsByDate(date string) ([]*storage.Screenshot, error) {
-	// Parse date and get time range
-	// Implementation depends on date format
-	return nil, nil
-}
-
-// CleanupOldScreenshots removes screenshots older than the given number of days.
-func (s *ScreenshotService) CleanupOldScreenshots(olderThanDays int) (int, error) {
-	// Get old screenshots
-	// Delete them
-	// Return count
-	return 0, nil
 }
 
 // thumbnailPath derives the thumbnail path from the screenshot path.

@@ -62,9 +62,8 @@ export const queryKeys = {
     context: (sessionId: number) => ['timeline', 'context', sessionId] as const,
     events: (startTime: number, endTime: number, eventTypes?: string[]) =>
       ['timeline', 'events', startTime, endTime, eventTypes] as const,
-    eventsForDate: (date: string, eventTypes?: string[]) =>
-      ['timeline', 'eventsForDate', date, eventTypes] as const,
     gridData: (date: string) => ['timeline', 'gridData', date] as const,
+    weekGridData: (startDate: string) => ['timeline', 'weekGridData', startDate] as const,
   },
   reports: {
     history: () => ['reports', 'history'] as const,
@@ -162,22 +161,6 @@ export function useHourlyActivity(date: string) {
   });
 }
 
-export function useHourlyActivityHeatmap() {
-  return useQuery({
-    queryKey: queryKeys.analytics.heatmap(),
-    queryFn: () => api.analytics.getHourlyActivityHeatmap(),
-    staleTime: 5 * 60_000, // 5 minutes - this data changes slowly
-  });
-}
-
-export function useDataSourceStatsRange(start: number, end: number) {
-  return useQuery({
-    queryKey: queryKeys.analytics.dataSources(start, end),
-    queryFn: () => api.analytics.getDataSourceStats(start, end),
-    staleTime: 60_000,
-  });
-}
-
 export function useDataSourceStats(date: string) {
   const { start, end } = getDateRange(date);
   return useQuery({
@@ -269,6 +252,15 @@ export function useTimelineGridData(date: string) {
   });
 }
 
+export function useWeekTimelineData(startDate: string, enabled = true) {
+  return useQuery({
+    queryKey: queryKeys.timeline.weekGridData(startDate),
+    queryFn: () => api.timeline.getWeekTimelineData(startDate),
+    staleTime: 30_000, // 30 seconds
+    enabled,
+  });
+}
+
 export function useSessionContext(sessionId: number) {
   return useQuery({
     queryKey: queryKeys.timeline.context(sessionId),
@@ -288,14 +280,6 @@ export function useTimelineEvents(query: {
   return useQuery({
     queryKey: queryKeys.timeline.events(query.startTime, query.endTime, query.eventTypes),
     queryFn: () => api.timeline.getTimelineEvents(query),
-    staleTime: 30_000,
-  });
-}
-
-export function useTimelineEventsForDate(date: string, eventTypes?: string[]) {
-  return useQuery({
-    queryKey: queryKeys.timeline.eventsForDate(date, eventTypes),
-    queryFn: () => api.timeline.getTimelineEventsForDate(date, eventTypes),
     staleTime: 30_000,
   });
 }
@@ -750,59 +734,6 @@ export function useRemoveTagFromSession() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tags'] });
       queryClient.invalidateQueries({ queryKey: ['timeline'] });
-    },
-  });
-}
-
-// ============================================================================
-// Hierarchical Summary Hooks
-// ============================================================================
-
-export function useHierarchicalSummary(periodType: string, periodDate: string) {
-  return useQuery({
-    queryKey: ['hierarchicalSummaries', periodType, periodDate],
-    queryFn: () => api.hierarchicalSummaries.get(periodType, periodDate),
-    enabled: !!periodType && !!periodDate,
-    staleTime: 60_000,
-  });
-}
-
-export function useHierarchicalSummariesList(periodType: string, limit: number = 50) {
-  return useQuery({
-    queryKey: ['hierarchicalSummaries', 'list', periodType, limit],
-    queryFn: () => api.hierarchicalSummaries.list(periodType, limit),
-    enabled: !!periodType,
-    staleTime: 60_000,
-  });
-}
-
-export function useLatestHierarchicalSummaries() {
-  return useQuery({
-    queryKey: ['hierarchicalSummaries', 'latest'],
-    queryFn: () => api.hierarchicalSummaries.getLatest(),
-    staleTime: 60_000,
-  });
-}
-
-export function useUpdateHierarchicalSummary() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: ({ id, summary }: { id: number; summary: string }) =>
-      api.hierarchicalSummaries.update(id, summary),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['hierarchicalSummaries'] });
-    },
-  });
-}
-
-export function useDeleteHierarchicalSummary() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: (id: number) => api.hierarchicalSummaries.delete(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['hierarchicalSummaries'] });
     },
   });
 }

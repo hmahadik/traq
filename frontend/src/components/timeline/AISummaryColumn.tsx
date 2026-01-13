@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import { Sparkles } from 'lucide-react';
 import { SessionSummaryWithPosition, GRID_CONSTANTS, getAppColors } from '@/types/timeline';
 import { snapTo15Minutes } from '@/utils/timelineHelpers';
 import {
@@ -12,6 +13,7 @@ interface AISummaryColumnProps {
   sessionSummaries: SessionSummaryWithPosition[];
   hours: number[]; // Array of hours for grid alignment
   onSessionClick?: (session: SessionSummaryWithPosition) => void;
+  hourHeight?: number; // Override for effectiveHourHeight
 }
 
 // Category to border color mapping (Timely-style)
@@ -26,7 +28,9 @@ export const AISummaryColumn: React.FC<AISummaryColumnProps> = ({
   sessionSummaries,
   hours,
   onSessionClick,
+  hourHeight,
 }) => {
+  const effectiveHourHeight = hourHeight || GRID_CONSTANTS.HOUR_HEIGHT_PX;
   // Process sessions to snap to 15-minute boundaries for cleaner display
   const snappedSessions = useMemo(() => {
     return sessionSummaries.map(session => {
@@ -91,31 +95,32 @@ export const AISummaryColumn: React.FC<AISummaryColumnProps> = ({
 
   return (
     <div
-      className="sticky left-[60px] z-10 bg-muted border-r border-border"
-      style={{ width: `${GRID_CONSTANTS.AI_SUMMARY_COLUMN_WIDTH_PX}px` }}
+      className="sticky z-10 bg-muted border-r border-border"
+      style={{
+        width: `${GRID_CONSTANTS.AI_SUMMARY_COLUMN_WIDTH_PX}px`,
+        left: `${GRID_CONSTANTS.HOUR_COLUMN_WIDTH_PX}px`
+      }}
     >
-      {/* Column Header - Timely style */}
-      <div className="sticky top-0 z-10 bg-card border-b border-border px-3 py-2.5">
-        <div className="flex items-center gap-2">
-          <div className="w-5 h-5 rounded bg-amber-500 dark:bg-amber-600 flex items-center justify-center">
-            <span className="text-[10px]">✨</span>
+      {/* Column Header - Fixed height */}
+      <div className="sticky top-0 z-10 bg-card border-b border-border px-2 h-11 flex items-center">
+        <div className="flex items-center gap-1.5 w-full min-w-0">
+          <div className="w-5 h-5 rounded bg-amber-500 dark:bg-amber-600 flex items-center justify-center flex-shrink-0">
+            <Sparkles className="w-3 h-3 text-white" />
           </div>
-          <div className="flex-1 min-w-0">
-            <div className="text-xs font-medium text-foreground">AI Summary</div>
-          </div>
-          <div className="text-[11px] text-muted-foreground font-medium">
-            {snappedSessions.length} session{snappedSessions.length !== 1 ? 's' : ''}
-          </div>
+          <div className="flex-1 min-w-0 truncate text-xs font-medium text-foreground">Summary</div>
+          <div className="text-[10px] text-muted-foreground flex-shrink-0">{snappedSessions.length}</div>
         </div>
       </div>
 
       {/* Hour Blocks */}
       <div className="relative">
-        {hours.map((hour) => (
+        {hours.map((hour, index) => (
           <div
             key={hour}
-            className="relative border-b border-border"
-            style={{ height: `${GRID_CONSTANTS.HOUR_HEIGHT_PX}px` }}
+            className={`relative border-b border-border ${
+              index % 2 === 0 ? 'bg-muted' : 'bg-muted/50'
+            }`}
+            style={{ height: `${effectiveHourHeight}px` }}
           />
         ))}
 
@@ -123,24 +128,24 @@ export const AISummaryColumn: React.FC<AISummaryColumnProps> = ({
         <div className="absolute inset-0">
           {snappedSessions.map((session) => {
             // Scale to new hour height
-            const scaledPixelPosition = (session.pixelPosition / 60) * GRID_CONSTANTS.HOUR_HEIGHT_PX;
-            const scaledPixelHeight = (session.pixelHeight / 60) * GRID_CONSTANTS.HOUR_HEIGHT_PX;
+            const scaledPixelPosition = (session.pixelPosition / 60) * effectiveHourHeight;
+            const scaledPixelHeight = (session.pixelHeight / 60) * effectiveHourHeight;
             const actualHeight = Math.max(scaledPixelHeight, GRID_CONSTANTS.MIN_SESSION_HEIGHT_PX);
 
             // Calculate absolute position
             const hourIndex = hours.indexOf(session.hourOffset);
             const absoluteTop = hourIndex >= 0
-              ? (hourIndex * GRID_CONSTANTS.HOUR_HEIGHT_PX) + scaledPixelPosition
+              ? (hourIndex * effectiveHourHeight) + scaledPixelPosition
               : scaledPixelPosition;
 
             const borderClass = CATEGORY_BORDERS[session.category] || CATEGORY_BORDERS.other;
 
             // Determine what to show based on height
-            const showSummary = actualHeight >= 28;
-            const showTime = actualHeight >= 20;
+            const showSummary = actualHeight >= 32;
+            const showTime = actualHeight >= 22;
 
             return (
-              <TooltipProvider key={session.id} delayDuration={200}>
+              <TooltipProvider key={session.id} delayDuration={100}>
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <div
@@ -153,14 +158,14 @@ export const AISummaryColumn: React.FC<AISummaryColumnProps> = ({
                       role="button"
                       aria-label={`Session from ${formatTime(session.startTime)} - ${session.summary || 'No summary'}`}
                     >
-                      <div className="p-2 h-full flex flex-col">
+                      <div className="p-2.5 h-full flex flex-col">
                         {showTime && (
-                          <div className="text-[10px] text-muted-foreground mb-0.5">
+                          <div className="text-[11px] text-muted-foreground font-medium mb-1">
                             {formatTime(session.startTime)}
                           </div>
                         )}
                         {showSummary && (
-                          <div className="text-[11px] text-foreground leading-tight line-clamp-2 flex-1">
+                          <div className="text-xs text-foreground leading-snug line-clamp-2 flex-1">
                             {session.summary || '(Processing...)'}
                           </div>
                         )}

@@ -1,18 +1,40 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Globe, ExternalLink, Chrome, Link as LinkIcon } from 'lucide-react';
 import { GRID_CONSTANTS, BrowserEventDisplay } from '@/types/timeline';
+import { groupBrowserEventsByDomain, GroupedBrowserEvent } from '@/utils/timelineHelpers';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 
 interface BrowserColumnProps {
   browserEvents: { [hour: number]: BrowserEventDisplay[] };
   hours: number[]; // Array of hours for grid alignment
   onVisitClick?: (event: BrowserEventDisplay) => void;
+  hourHeight?: number;
 }
 
 export const BrowserColumn: React.FC<BrowserColumnProps> = ({
   browserEvents,
   hours,
   onVisitClick,
+  hourHeight,
 }) => {
+  const effectiveHourHeight = hourHeight || GRID_CONSTANTS.HOUR_HEIGHT_PX;
+
+  // Flatten and group all browser events by domain
+  const groupedEvents = useMemo(() => {
+    const allEvents: BrowserEventDisplay[] = [];
+    Object.values(browserEvents).forEach(events => {
+      allEvents.push(...events);
+    });
+    const grouped = groupBrowserEventsByDomain(allEvents, 900); // 15 min gap threshold
+    console.log(`[BrowserColumn] ${allEvents.length} events -> ${grouped.length} grouped`);
+    return grouped;
+  }, [browserEvents]);
+
   // Calculate total browser visits for the day
   const totalVisits = Object.values(browserEvents).reduce((sum, events) => sum + events.length, 0);
 
@@ -102,98 +124,162 @@ export const BrowserColumn: React.FC<BrowserColumnProps> = ({
       className="flex-shrink-0 border-r border-border"
       style={{ width: `${GRID_CONSTANTS.APP_COLUMN_WIDTH_PX}px` }}
     >
-      {/* Column Header */}
-      <div className="sticky top-0 z-10 bg-card border-b border-border px-3 py-2.5">
-        <div className="flex items-center gap-2">
-          {/* Browser icon */}
+      {/* Column Header - Fixed height */}
+      <div className="sticky top-0 z-10 bg-card border-b border-border px-2 h-11 flex items-center">
+        <div className="flex items-center gap-1.5 w-full min-w-0">
           <div className="w-5 h-5 rounded bg-cyan-500 flex items-center justify-center flex-shrink-0">
             <Globe className="w-3 h-3 text-white" />
           </div>
-          {/* Column name */}
-          <div className="flex-1 min-w-0">
-            <div className="text-xs font-medium text-foreground truncate">Browser</div>
-          </div>
-          {/* Total visits badge */}
-          <div className="text-[11px] text-muted-foreground font-medium">
-            {totalVisits} {totalVisits === 1 ? 'visit' : 'visits'}
-          </div>
+          <div className="flex-1 min-w-0 truncate text-xs font-medium text-foreground">Browser</div>
+          <div className="text-[10px] text-muted-foreground flex-shrink-0">{totalVisits}</div>
         </div>
       </div>
 
       {/* Hour Blocks with Browser Visits */}
       <div className="relative bg-card">
-        {hours.map((hour) => (
+        {hours.map((hour, index) => (
           <div
             key={hour}
-            className="relative border-b border-border"
-            style={{ height: `${GRID_CONSTANTS.HOUR_HEIGHT_PX}px` }}
-          >
-            {/* Subtle grid pattern for empty state */}
-            <div
-              className="absolute inset-0 opacity-[0.03] dark:opacity-[0.05]"
-              style={{
-                backgroundImage:
-                  'repeating-linear-gradient(45deg, currentColor 0, currentColor 1px, transparent 0, transparent 50%)',
-                backgroundSize: '8px 8px',
-              }}
-            />
-          </div>
+            className={`relative border-b border-border ${
+              index % 2 === 0 ? 'bg-card' : 'bg-muted/30'
+            }`}
+            style={{ height: `${effectiveHourHeight}px` }}
+          />
         ))}
 
-        {/* Browser Visit Blocks (absolutely positioned) */}
+        {/* Grouped Browser Visit Blocks (absolutely positioned) */}
         <div className="absolute inset-0">
-          {Object.entries(browserEvents).map(([hour, events]) =>
-            events.map((event) => {
-              // Calculate position relative to the first hour in the display
-              const firstHour = hours[0];
-              const hourIndex = parseInt(hour) - firstHour;
-              const top = hourIndex * GRID_CONSTANTS.HOUR_HEIGHT_PX + event.pixelPosition;
+          {groupedEvents.map((event) => {
+            // Calculate position based on startTimestamp
+            const startDate = new Date(event.startTimestamp * 1000);
+            const eventHour = startDate.getHours();
+            const eventMinute = startDate.getMinutes();
+            const firstHour = hours[0];
+            const hourIndex = eventHour - firstHour;
+            const minuteFraction = eventMinute / 60;
+            const top = (hourIndex * effectiveHourHeight) + (minuteFraction * effectiveHourHeight);
 
-              const BrowserIcon = getBrowserIcon(event.browser);
-              const colors = getBrowserColor(event.browser);
+            // Calculate height based on total duration
+            const durationHours = event.totalDurationSeconds / 3600;
+            const height = Math.max(32, durationHours * effectiveHourHeight);
 
-              return (
-                <div
-                  key={event.id}
-                  className="absolute left-0 right-0 mx-2 cursor-pointer hover:shadow-md transition-shadow"
-                  style={{
-                    top: `${top}px`,
-                    minHeight: '32px',
-                  }}
-                  onClick={() => onVisitClick?.(event)}
-                >
-                  <div className={`${colors.bg} border ${colors.border} rounded-md px-2 py-1.5`}>
-                    {/* Browser visit header */}
-                    <div className="flex items-center gap-1.5 mb-1">
-                      <BrowserIcon className={`w-3 h-3 ${colors.icon} flex-shrink-0`} />
-                      <span className={`text-[10px] font-medium ${colors.icon} uppercase tracking-wide`}>
-                        {event.browser}
-                      </span>
-                      <ExternalLink className="w-2.5 h-2.5 text-muted-foreground ml-auto" />
+            const BrowserIcon = getBrowserIcon(event.browser);
+            const colors = getBrowserColor(event.browser);
+
+            return (
+              <TooltipProvider key={event.id} delayDuration={100}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div
+                      className="absolute left-0 right-0 mx-1 cursor-pointer hover:shadow-md transition-shadow"
+                      style={{
+                        top: `${top}px`,
+                        height: `${height}px`,
+                      }}
+                      onClick={() => onVisitClick?.(event as unknown as BrowserEventDisplay)}
+                    >
+                      <div className={`${colors.bg} border ${colors.border} rounded-md px-2 py-1 h-full overflow-hidden`}>
+                        {/* Header with domain/sites count */}
+                        <div className="flex items-center gap-1">
+                          <BrowserIcon className={`w-3 h-3 ${colors.icon} flex-shrink-0`} />
+                          <span className="text-[10px] font-medium text-foreground truncate flex-1">
+                            {event.mergedDomains && event.mergedDomains.length > 1
+                              ? `${event.mergedDomains.length} sites`
+                              : truncateDomain(event.domain, 15)}
+                          </span>
+                          <span className="text-[9px] text-muted-foreground flex-shrink-0">
+                            {event.mergedCount}
+                          </span>
+                        </div>
+                        {/* Duration - only show if tall enough */}
+                        {height >= 40 && (
+                          <div className="text-[9px] text-muted-foreground mt-0.5">
+                            {formatDuration(event.totalDurationSeconds)}
+                          </div>
+                        )}
+                      </div>
                     </div>
-
-                    {/* Page title */}
-                    <div className="text-[11px] text-foreground line-clamp-2 leading-tight mb-1 font-medium">
-                      {truncateTitle(event.title)}
-                    </div>
-
-                    {/* Domain and duration */}
-                    <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
-                      <LinkIcon className="w-2.5 h-2.5 flex-shrink-0" />
-                      <span className="truncate flex-1">
-                        {truncateDomain(event.domain)}
-                      </span>
-                      {event.visitDurationSeconds > 0 && (
-                        <span className="flex-shrink-0 font-mono">
-                          {formatDuration(event.visitDurationSeconds)}
+                  </TooltipTrigger>
+                  <TooltipContent side="right" className="max-w-sm p-3">
+                    <div className="space-y-3">
+                      {/* Header */}
+                      <div className="flex items-center gap-2">
+                        <BrowserIcon className={`w-4 h-4 ${colors.icon}`} />
+                        <span className="font-semibold text-sm">
+                          {event.mergedDomains && event.mergedDomains.length > 1
+                            ? `${event.mergedDomains.length} Sites`
+                            : event.domain}
                         </span>
+                      </div>
+
+                      {/* Stats row */}
+                      <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                        <span>{event.mergedCount} page{event.mergedCount > 1 ? 's' : ''}</span>
+                        <span>•</span>
+                        <span>{formatDuration(event.totalDurationSeconds)}</span>
+                        <span>•</span>
+                        <span>{new Date(event.startTimestamp * 1000).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}</span>
+                      </div>
+
+                      {/* Domains list (if multiple) */}
+                      {event.mergedDomains && event.mergedDomains.length > 1 && (
+                        <div className="space-y-1 pt-1 border-t border-border">
+                          <div className="text-[10px] uppercase tracking-wide text-muted-foreground font-medium">
+                            Sites visited
+                          </div>
+                          <div className="flex flex-wrap gap-1">
+                            {event.mergedDomains.slice(0, 8).map((domain, idx) => (
+                              <span key={idx} className="text-[10px] px-1.5 py-0.5 bg-muted rounded">
+                                {domain}
+                              </span>
+                            ))}
+                            {event.mergedDomains.length > 8 && (
+                              <span className="text-[10px] text-muted-foreground">
+                                +{event.mergedDomains.length - 8} more
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Current/most recent URL - clickable */}
+                      <a
+                        href={event.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-1.5 text-xs text-primary hover:underline"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <ExternalLink className="w-3 h-3" />
+                        <span className="truncate">{event.url}</span>
+                      </a>
+
+                      {/* Page titles */}
+                      {event.mergedTitles.length > 0 && (
+                        <div className="space-y-1.5 pt-1 border-t border-border">
+                          <div className="text-[10px] uppercase tracking-wide text-muted-foreground font-medium">
+                            Pages ({event.mergedTitles.length})
+                          </div>
+                          <div className="space-y-1 max-h-24 overflow-y-auto">
+                            {event.mergedTitles.slice(0, 5).map((title, idx) => (
+                              <div key={idx} className="text-[11px] text-foreground/80 leading-tight truncate">
+                                {title || '(Untitled)'}
+                              </div>
+                            ))}
+                            {event.mergedTitles.length > 5 && (
+                              <div className="text-[10px] text-muted-foreground/70 italic">
+                                +{event.mergedTitles.length - 5} more...
+                              </div>
+                            )}
+                          </div>
+                        </div>
                       )}
                     </div>
-                  </div>
-                </div>
-              );
-            })
-          )}
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            );
+          })}
         </div>
       </div>
     </div>

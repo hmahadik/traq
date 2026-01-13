@@ -63,7 +63,6 @@ export const TopAppsSection: React.FC<TopAppsSectionProps> = ({ topApps }) => {
                   {formatDuration(app.duration)}
                 </div>
               </div>
-              <div className="text-xs text-muted-foreground flex-shrink-0">#{index + 1}</div>
             </div>
           );
         })}

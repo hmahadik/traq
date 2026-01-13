@@ -237,14 +237,14 @@ export function Sidebar({ onSettingsClick }: SidebarProps) {
       )}
 
       {/* Desktop sidebar - always visible */}
-      <aside className="hidden lg:flex lg:flex-col lg:w-20 lg:fixed lg:inset-y-0 lg:left-0 lg:z-30 bg-background border-r border-border">
+      <aside className="hidden lg:flex lg:flex-col lg:w-[88px] lg:fixed lg:inset-y-0 lg:left-0 lg:z-30 bg-background border-r border-border">
         {sidebarContent}
       </aside>
 
       {/* Mobile sidebar - slide in */}
       <aside
         className={cn(
-          'fixed inset-y-0 left-0 z-50 w-20 bg-background border-r border-border flex flex-col transform transition-transform duration-200 ease-in-out lg:hidden',
+          'fixed inset-y-0 left-0 z-50 w-[88px] bg-background border-r border-border flex flex-col transform transition-transform duration-200 ease-in-out lg:hidden',
           mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
         )}
       >

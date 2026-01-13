@@ -330,6 +330,14 @@ export const timeline = {
     return withRetry(() => App.GetTimelineGridData(date));
   },
 
+  getWeekTimelineData: async (startDate: string) => {
+    if (isMockMode()) return null; // No mock data for week view
+    await waitForReady();
+    const result = await withRetry(() => App.GetWeekTimelineData(startDate));
+    // Cast from Wails class to our interface (structurally compatible)
+    return result as unknown as import('@/types/timeline').WeekTimelineData | null;
+  },
+
   getRecentSessions: async (limit: number) => {
     if (isMockMode()) {
       const today = new Date().toISOString().split('T')[0];
@@ -343,45 +351,6 @@ export const timeline = {
     if (isMockMode()) return;
     await waitForReady();
     return App.DeleteSession(sessionId);
-  },
-
-  getTimelineEventsForDate: async (date: string, eventTypes?: string[]) => {
-    if (isMockMode()) {
-      // Return mock timeline events
-      return {
-        events: [
-          {
-            id: 1,
-            type: 'screenshot',
-            timestamp: Math.floor(new Date(date).getTime() / 1000) + 3600,
-            endTime: Math.floor(new Date(date).getTime() / 1000) + 5400,
-            appName: 'VS Code',
-            sessionId: 1,
-            screenshot: {
-              filepath: '/path/to/screenshot.png',
-              windowTitle: 'main.go - VS Code',
-            },
-          },
-          {
-            id: 2,
-            type: 'focus_change',
-            timestamp: Math.floor(new Date(date).getTime() / 1000) + 7200,
-            endTime: Math.floor(new Date(date).getTime() / 1000) + 9000,
-            appName: 'Firefox',
-            sessionId: 1,
-            focusChange: {
-              windowTitle: 'GitHub - Pull Request',
-              durationSeconds: 1800,
-            },
-          },
-        ],
-        total: 2,
-        hasMore: false,
-        eventTypes: ['screenshot', 'git_commit', 'file_event', 'shell_command', 'browser_visit', 'focus_change', 'afk'],
-      };
-    }
-    await waitForReady();
-    return withRetry(() => App.GetTimelineEventsForDate(date, eventTypes || []));
   },
 };
 

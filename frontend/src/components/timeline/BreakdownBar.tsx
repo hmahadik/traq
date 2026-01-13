@@ -1,6 +1,5 @@
 import React from 'react';
-import { DayStats, CATEGORY_LABELS } from '@/types/timeline';
-import { Card } from '@/components/ui/card';
+import { DayStats } from '@/types/timeline';
 
 interface BreakdownBarProps {
   stats: DayStats | null;
@@ -8,23 +7,8 @@ interface BreakdownBarProps {
 
 export const BreakdownBar: React.FC<BreakdownBarProps> = ({ stats }) => {
   if (!stats || stats.totalSeconds === 0) {
-    return (
-      <Card className="p-4">
-        <div className="text-sm font-semibold mb-3">Time Breakdown</div>
-        <div className="text-sm text-muted-foreground">No activity to display</div>
-      </Card>
-    );
+    return null;
   }
-
-  const { breakdown, breakdownPercent } = stats;
-
-  // Category colors
-  const categoryColors = {
-    focus: 'bg-green-500',
-    meetings: 'bg-red-500',
-    comms: 'bg-purple-500',
-    other: 'bg-gray-500',
-  };
 
   // Format duration
   const formatDuration = (seconds: number): string => {
@@ -36,66 +20,56 @@ export const BreakdownBar: React.FC<BreakdownBarProps> = ({ stats }) => {
     return `${minutes}m`;
   };
 
-  // Get categories with data
-  const categories = ['focus', 'meetings', 'comms', 'other'].filter(
-    (cat) => breakdown[cat] && breakdown[cat] > 0
-  );
+  // Calculate values
+  const meetingSeconds = stats.breakdown?.meetings || 0;
+  const activeSeconds = stats.totalSeconds - meetingSeconds; // Active = total minus meetings
+  const breakSeconds = stats.breakDuration || 0;
 
-  if (categories.length === 0) {
-    return (
-      <Card className="p-4">
-        <div className="text-sm font-semibold mb-3">Time Breakdown</div>
-        <div className="text-sm text-muted-foreground">No categorized activity</div>
-      </Card>
-    );
-  }
+  // Total for percentage calculation (active + breaks + meetings)
+  const totalSeconds = stats.totalSeconds + breakSeconds;
+
+  if (totalSeconds === 0) return null;
+
+  // Calculate percentages
+  const activePercent = (activeSeconds / totalSeconds) * 100;
+  const meetingsPercent = (meetingSeconds / totalSeconds) * 100;
+  const breaksPercent = (breakSeconds / totalSeconds) * 100;
+
+  // Categories with their values
+  const categories = [
+    { key: 'active', label: 'Active', seconds: activeSeconds, percent: activePercent, color: 'bg-emerald-500' },
+    { key: 'meetings', label: 'Meetings', seconds: meetingSeconds, percent: meetingsPercent, color: 'bg-blue-500' },
+    { key: 'breaks', label: 'Breaks', seconds: breakSeconds, percent: breaksPercent, color: 'bg-orange-500' },
+  ].filter(cat => cat.seconds > 0);
+
+  if (categories.length === 0) return null;
 
   return (
-    <Card className="p-4">
-      <div className="text-sm font-semibold mb-3">Time Breakdown</div>
+    <div className="space-y-2">
+      <div className="text-xs text-muted-foreground uppercase tracking-wide">Time Breakdown</div>
 
-      {/* Stacked Bar */}
-      <div className="h-8 w-full flex rounded-lg overflow-hidden mb-4 shadow-sm">
-        {categories.map((category) => {
-          const percentage = breakdownPercent[category] || 0;
-          const colorClass =
-            categoryColors[category as keyof typeof categoryColors] || categoryColors.other;
-
-          return (
-            <div
-              key={category}
-              className={`${colorClass} transition-all hover:brightness-110`}
-              style={{ width: `${percentage}%` }}
-              title={`${CATEGORY_LABELS[category as keyof typeof CATEGORY_LABELS]}: ${percentage.toFixed(1)}%`}
-            />
-          );
-        })}
+      {/* Slim stacked bar */}
+      <div className="flex h-2 bg-muted rounded-full overflow-hidden">
+        {categories.map((cat) => (
+          <div
+            key={cat.key}
+            className={`${cat.color} transition-all duration-300`}
+            style={{ width: `${cat.percent}%` }}
+            title={`${cat.label}: ${formatDuration(cat.seconds)} (${cat.percent.toFixed(0)}%)`}
+          />
+        ))}
       </div>
 
-      {/* Legend */}
-      <div className="space-y-2">
-        {categories.map((category) => {
-          const seconds = breakdown[category] || 0;
-          const percentage = breakdownPercent[category] || 0;
-          const colorClass =
-            categoryColors[category as keyof typeof categoryColors] || categoryColors.other;
-
-          return (
-            <div key={category} className="flex items-center justify-between text-sm">
-              <div className="flex items-center gap-2">
-                <div className={`w-3 h-3 rounded ${colorClass}`} />
-                <span className="text-muted-foreground">
-                  {CATEGORY_LABELS[category as keyof typeof CATEGORY_LABELS]}
-                </span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="font-medium">{formatDuration(seconds)}</span>
-                <span className="text-xs text-muted-foreground">({percentage.toFixed(0)}%)</span>
-              </div>
-            </div>
-          );
-        })}
+      {/* Legend - inline */}
+      <div className="flex flex-wrap gap-x-4 gap-y-1">
+        {categories.map((cat) => (
+          <div key={cat.key} className="flex items-center gap-1.5 text-xs">
+            <div className={`w-2 h-2 rounded-full ${cat.color}`} />
+            <span className="text-muted-foreground">{cat.label}</span>
+            <span className="font-medium">{formatDuration(cat.seconds)}</span>
+          </div>
+        ))}
       </div>
-    </Card>
+    </div>
   );
 };

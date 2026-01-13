@@ -14,11 +14,11 @@ export function AppLayout() {
   return (
     <DateProvider>
       <GlobalErrorHandler>
-        <div className="relative min-h-screen bg-background">
+        <div className="relative h-screen bg-background overflow-hidden">
           <Sidebar onSettingsClick={() => setSettingsOpen(true)} />
           {/* Main content - offset by sidebar width on desktop */}
-          <main className="lg:pl-20 min-h-screen">
-            <div className="px-4 sm:px-6 py-6">
+          <main className="lg:pl-[88px] h-screen flex flex-col">
+            <div className="flex-1 px-4 sm:px-6 py-6 min-h-0 overflow-hidden">
               <Outlet />
             </div>
           </main>

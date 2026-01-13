@@ -1,19 +1,21 @@
 import { useState, useCallback, useMemo, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { ChevronLeft, ChevronRight, Calendar, Sparkles, Loader2 } from 'lucide-react';
-import { CalendarWidget } from '@/components/timeline';
-import { useTimelineGridData, useCalendarHeatmap, useGenerateSummary } from '@/api/hooks';
+import { CalendarWidget, ViewModeSelector, ViewMode } from '@/components/timeline';
+import { useTimelineGridData, useCalendarHeatmap, useGenerateSummary, useWeekTimelineData } from '@/api/hooks';
 import { TimelineGridView } from '@/components/timeline/TimelineGridView';
+import { TimelineWeekView, TimelineWeekViewSkeleton } from '@/components/timeline/TimelineWeekView';
 import { DailySummaryCard } from '@/components/timeline/DailySummaryCard';
+import { WeekSummaryCard } from '@/components/timeline/WeekSummaryCard';
 import { BreakdownBar } from '@/components/timeline/BreakdownBar';
 import { TopAppsSection } from '@/components/timeline/TopAppsSection';
 import { TimelinePageSkeleton } from '@/components/timeline/TimelineGridSkeleton';
 import { FilterControls, TimelineFilters } from '@/components/timeline/FilterControls';
 import { GlobalSearch } from '@/components/timeline/GlobalSearch';
+import { ZoomControls, ZoomLevel, DEFAULT_ZOOM, ZOOM_LEVELS } from '@/components/timeline/ZoomControls';
 import { toast } from 'sonner';
 
 function getDateString(date: Date): string {
-  // Use local date components to avoid timezone issues
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const day = String(date.getDate()).padStart(2, '0');
@@ -26,20 +28,52 @@ function addDays(date: Date, days: number): Date {
   return result;
 }
 
+// Get the Monday of the week for a given date
+function getWeekStartDate(date: Date): string {
+  const d = new Date(date);
+  const day = d.getDay();
+  const diff = day === 0 ? -6 : 1 - day; // Monday is day 1, Sunday is day 0
+  d.setDate(d.getDate() + diff);
+  return getDateString(d);
+}
+
+// Format date range for week view header
+function formatWeekRange(startDate: string, endDate: string): string {
+  const start = new Date(startDate + 'T00:00:00');
+  const end = new Date(endDate + 'T00:00:00');
+  const startMonth = start.toLocaleDateString('en-US', { month: 'short' });
+  const endMonth = end.toLocaleDateString('en-US', { month: 'short' });
+
+  if (startMonth === endMonth) {
+    return `${startMonth} ${start.getDate()} - ${end.getDate()}`;
+  }
+  return `${startMonth} ${start.getDate()} - ${endMonth} ${end.getDate()}`;
+}
+
 const FILTER_STORAGE_KEY = 'timeline-filters';
+const ZOOM_STORAGE_KEY = 'timeline-zoom';
+const VIEW_MODE_STORAGE_KEY = 'timeline-view-mode';
 
 export function TimelinePage() {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [showCalendar, setShowCalendar] = useState(false);
   const [isBatchGenerating, setIsBatchGenerating] = useState(false);
 
-  // Load filters from localStorage or use defaults
+  // View mode state with localStorage persistence
+  const [viewMode, setViewMode] = useState<ViewMode>(() => {
+    try {
+      const stored = localStorage.getItem(VIEW_MODE_STORAGE_KEY);
+      if (stored === 'day' || stored === 'week') return stored;
+    } catch (e) {
+      console.error('Failed to load view mode from localStorage:', e);
+    }
+    return 'day';
+  });
+
   const [filters, setFilters] = useState<TimelineFilters>(() => {
     try {
       const stored = localStorage.getItem(FILTER_STORAGE_KEY);
-      if (stored) {
-        return JSON.parse(stored);
-      }
+      if (stored) return JSON.parse(stored);
     } catch (e) {
       console.error('Failed to load filters from localStorage:', e);
     }
@@ -52,7 +86,28 @@ export function TimelinePage() {
     };
   });
 
-  // Persist filters to localStorage whenever they change
+  const [zoom, setZoom] = useState<ZoomLevel>(() => {
+    try {
+      const stored = localStorage.getItem(ZOOM_STORAGE_KEY);
+      if (stored) {
+        const parsed = parseInt(stored, 10);
+        if (ZOOM_LEVELS.includes(parsed as ZoomLevel)) return parsed as ZoomLevel;
+      }
+    } catch (e) {
+      console.error('Failed to load zoom from localStorage:', e);
+    }
+    return DEFAULT_ZOOM;
+  });
+
+  // Persist view mode
+  useEffect(() => {
+    try {
+      localStorage.setItem(VIEW_MODE_STORAGE_KEY, viewMode);
+    } catch (e) {
+      console.error('Failed to save view mode to localStorage:', e);
+    }
+  }, [viewMode]);
+
   useEffect(() => {
     try {
       localStorage.setItem(FILTER_STORAGE_KEY, JSON.stringify(filters));
@@ -61,24 +116,41 @@ export function TimelinePage() {
     }
   }, [filters]);
 
+  useEffect(() => {
+    try {
+      localStorage.setItem(ZOOM_STORAGE_KEY, zoom.toString());
+    } catch (e) {
+      console.error('Failed to save zoom to localStorage:', e);
+    }
+  }, [zoom]);
+
   const dateStr = getDateString(selectedDate);
   const isToday = dateStr === getDateString(new Date());
+  const weekStartDate = useMemo(() => getWeekStartDate(selectedDate), [selectedDate]);
 
-  // Fetch grid data
+  // Check if we're in the current week
+  const isCurrentWeek = useMemo(() => {
+    const todayWeekStart = getWeekStartDate(new Date());
+    return weekStartDate === todayWeekStart;
+  }, [weekStartDate]);
+
+  // Fetch data based on view mode
   const { data: gridData, isLoading: gridLoading } = useTimelineGridData(dateStr);
+  const { data: weekData, isLoading: weekLoading } = useWeekTimelineData(
+    weekStartDate,
+    viewMode === 'week'
+  );
   const { data: calendarData, isLoading: calendarLoading } = useCalendarHeatmap(
     selectedDate.getFullYear(),
     selectedDate.getMonth() + 1
   );
   const generateSummary = useGenerateSummary();
 
-  // Sessions without summaries
   const sessionsWithoutSummaries = useMemo(() => {
     if (!gridData?.sessionSummaries) return [];
     return gridData.sessionSummaries.filter(s => !s.summary);
   }, [gridData?.sessionSummaries]);
 
-  // Batch generate summaries
   const handleBatchGenerateSummaries = useCallback(async () => {
     if (!sessionsWithoutSummaries.length || isBatchGenerating) return;
 
@@ -99,7 +171,6 @@ export function TimelinePage() {
     }
 
     setIsBatchGenerating(false);
-
     if (errorCount === 0) {
       toast.success(`Successfully generated ${successCount} summaries`);
     } else {
@@ -107,163 +178,132 @@ export function TimelinePage() {
     }
   }, [sessionsWithoutSummaries, isBatchGenerating, generateSummary]);
 
-  // Navigation handlers
-  const goToPreviousDay = useCallback(() => {
-    setSelectedDate((d) => addDays(d, -1));
-  }, []);
-
-  const goToNextDay = useCallback(() => {
-    if (!isToday) {
-      setSelectedDate((d) => addDays(d, 1));
+  // Navigation handlers - adjust based on view mode
+  const goToPrevious = useCallback(() => {
+    if (viewMode === 'day') {
+      setSelectedDate((d) => addDays(d, -1));
+    } else {
+      setSelectedDate((d) => addDays(d, -7));
     }
-  }, [isToday]);
+  }, [viewMode]);
+
+  const goToNext = useCallback(() => {
+    if (viewMode === 'day') {
+      if (!isToday) setSelectedDate((d) => addDays(d, 1));
+    } else {
+      // In week mode, check if next week is in the future
+      if (!isCurrentWeek) setSelectedDate((d) => addDays(d, 7));
+    }
+  }, [viewMode, isToday, isCurrentWeek]);
 
   const handleDateSelect = useCallback((date: Date) => {
     setSelectedDate(date);
   }, []);
 
+  // Handle clicking a day in week view - switch to day view for that date
+  const handleWeekDayClick = useCallback((date: string) => {
+    const [year, month, day] = date.split('-').map(Number);
+    setSelectedDate(new Date(year, month - 1, day));
+    setViewMode('day');
+  }, []);
+
   const handleSearchNavigateToDate = useCallback((dateString: string) => {
-    // Parse YYYY-MM-DD and create date object
     const [year, month, day] = dateString.split('-').map(Number);
     const date = new Date(year, month - 1, day);
     setSelectedDate(date);
     setShowCalendar(false);
   }, []);
 
-  const formattedDate = selectedDate.toLocaleDateString('en-US', {
-    weekday: 'long',
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  });
+  // Format header based on view mode
+  const formattedDate = viewMode === 'day'
+    ? selectedDate.toLocaleDateString('en-US', {
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric',
+      })
+    : weekData
+      ? formatWeekRange(weekData.startDate, weekData.endDate)
+      : 'Loading...';
 
-  return (
-    <div className="flex flex-col xl:flex-row gap-6 h-[calc(100vh-5rem)] lg:h-[calc(100vh-3rem)]">
-      {/* Header - Always visible */}
-      <div className="xl:hidden">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Timeline</h1>
-            <p className="text-muted-foreground">{formattedDate}</p>
+  // Determine loading state based on view mode
+  const isLoading = viewMode === 'day' ? gridLoading : weekLoading;
+
+  // Determine if next button should be disabled
+  const isNextDisabled = viewMode === 'day' ? isToday : isCurrentWeek;
+
+  // Keyboard shortcuts for view switching
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Only trigger if not in an input/textarea
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+        return;
+      }
+
+      switch (e.key.toLowerCase()) {
+        case 'd':
+          setViewMode('day');
+          break;
+        case 'w':
+          setViewMode('week');
+          break;
+        case 'arrowleft':
+          goToPrevious();
+          break;
+        case 'arrowright':
+          if (!isNextDisabled) goToNext();
+          break;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [goToPrevious, goToNext, isNextDisabled]);
+
+  // Render content based on view mode
+  const renderContent = () => {
+    if (isLoading) {
+      return viewMode === 'day' ? <TimelinePageSkeleton /> : <TimelineWeekViewSkeleton />;
+    }
+
+    if (viewMode === 'day') {
+      if (!gridData) {
+        return (
+          <div className="flex items-center justify-center h-64 text-muted-foreground">
+            No data available
           </div>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="icon" onClick={goToPreviousDay}>
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={goToNextDay}
-              disabled={isToday}
-            >
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-            {/* Quick Date Jump Buttons */}
-            <div className="hidden sm:flex items-center gap-1 ml-2">
-              <Button
-                variant={isToday ? 'secondary' : 'ghost'}
-                size="sm"
-                onClick={() => handleDateSelect(new Date())}
-              >
-                Today
-              </Button>
-              <Button
-                variant={dateStr === getDateString(addDays(new Date(), -1)) ? 'secondary' : 'ghost'}
-                size="sm"
-                onClick={() => handleDateSelect(addDays(new Date(), -1))}
-              >
-                Yesterday
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  const today = new Date();
-                  const dayOfWeek = today.getDay();
-                  const startOfWeek = addDays(today, -dayOfWeek);
-                  handleDateSelect(startOfWeek);
-                }}
-              >
-                This Week
-              </Button>
-            </div>
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => setShowCalendar(!showCalendar)}
-              title={showCalendar ? 'Hide calendar' : 'Show calendar'}
-            >
-              <Calendar className="h-4 w-4" />
-            </Button>
-            {sessionsWithoutSummaries.length > 0 && (
-              <Button
-                variant="default"
-                size="sm"
-                onClick={handleBatchGenerateSummaries}
-                disabled={isBatchGenerating}
-                title={`Generate ${sessionsWithoutSummaries.length} missing summaries`}
-              >
-                {isBatchGenerating ? (
-                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                ) : (
-                  <Sparkles className="h-4 w-4 mr-1" />
-                )}
-                {sessionsWithoutSummaries.length}
-              </Button>
-            )}
-          </div>
-        </div>
+        );
+      }
 
-        {/* Search Bar - Mobile */}
-        <div className="mb-4">
-          <GlobalSearch onNavigateToDate={handleSearchNavigateToDate} />
-        </div>
-
-        {/* Filter Controls - Mobile */}
-        <div className="mb-6">
-          <FilterControls filters={filters} onFiltersChange={setFilters} />
-        </div>
-      </div>
-
-      {/* Loading State */}
-      {gridLoading ? (
-        <TimelinePageSkeleton />
-      ) : gridData ? (
+      return (
         <>
-          {/* Left Sidebar - Stats and Summary */}
-          <div className="xl:w-80 xl:flex-shrink-0">
-            <div className="xl:sticky xl:top-0 space-y-4">
+          {/* Left Sidebar */}
+          <div className="xl:w-72 xl:flex-shrink-0">
+            <div className="xl:sticky xl:top-0 space-y-3">
               <DailySummaryCard stats={gridData.dayStats || null} />
               <BreakdownBar stats={gridData.dayStats || null} />
               <TopAppsSection topApps={gridData.topApps || []} />
             </div>
           </div>
 
-          {/* Main Content - Timeline Grid */}
+          {/* Main Content */}
           <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-            {/* Header - Desktop */}
-            <div className="hidden xl:flex items-center justify-between mb-4">
-              <div>
-                <h1 className="text-3xl font-bold tracking-tight">Timeline</h1>
-                <p className="text-muted-foreground">{formattedDate}</p>
-              </div>
+            {/* Desktop Header */}
+            <div className="hidden xl:flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
-                <Button variant="outline" size="icon" onClick={goToPreviousDay}>
+                <ViewModeSelector viewMode={viewMode} onViewModeChange={setViewMode} />
+                <div className="w-px h-6 bg-border mx-1" />
+                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={goToPrevious}>
                   <ChevronLeft className="h-4 w-4" />
                 </Button>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={goToNextDay}
-                  disabled={isToday}
-                >
+                <span className="text-sm font-medium">{formattedDate}</span>
+                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={goToNext} disabled={isNextDisabled}>
                   <ChevronRight className="h-4 w-4" />
                 </Button>
-                {/* Quick Date Jump Buttons */}
                 <div className="flex items-center gap-1 ml-2">
                   <Button
                     variant={isToday ? 'secondary' : 'ghost'}
                     size="sm"
+                    className="h-7 text-xs"
                     onClick={() => handleDateSelect(new Date())}
                   >
                     Today
@@ -271,71 +311,155 @@ export function TimelinePage() {
                   <Button
                     variant={dateStr === getDateString(addDays(new Date(), -1)) ? 'secondary' : 'ghost'}
                     size="sm"
+                    className="h-7 text-xs"
                     onClick={() => handleDateSelect(addDays(new Date(), -1))}
                   >
                     Yesterday
                   </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      const today = new Date();
-                      const dayOfWeek = today.getDay();
-                      const startOfWeek = addDays(today, -dayOfWeek);
-                      handleDateSelect(startOfWeek);
-                    }}
-                  >
-                    This Week
-                  </Button>
                 </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <FilterControls filters={filters} onFiltersChange={setFilters} />
+                <ZoomControls zoom={zoom} onZoomChange={setZoom} />
+                <GlobalSearch onNavigateToDate={handleSearchNavigateToDate} />
                 <Button
-                  variant="outline"
+                  variant="ghost"
                   size="icon"
+                  className="h-8 w-8"
                   onClick={() => setShowCalendar(!showCalendar)}
-                  title={showCalendar ? 'Hide calendar' : 'Show calendar'}
                 >
                   <Calendar className="h-4 w-4" />
                 </Button>
                 {sessionsWithoutSummaries.length > 0 && (
                   <Button
-                    variant="default"
-                    size="sm"
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
                     onClick={handleBatchGenerateSummaries}
                     disabled={isBatchGenerating}
-                    title={`Generate ${sessionsWithoutSummaries.length} missing summaries`}
+                    title={`Generate ${sessionsWithoutSummaries.length} summaries`}
                   >
                     {isBatchGenerating ? (
-                      <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                      <Loader2 className="h-4 w-4 animate-spin" />
                     ) : (
-                      <Sparkles className="h-4 w-4 mr-1" />
+                      <Sparkles className="h-4 w-4" />
                     )}
-                    {sessionsWithoutSummaries.length}
                   </Button>
                 )}
               </div>
             </div>
 
-            {/* Search Bar - Desktop */}
-            <div className="hidden xl:block mb-4">
-              <GlobalSearch onNavigateToDate={handleSearchNavigateToDate} />
-            </div>
-
-            {/* Filter Controls - Desktop */}
-            <div className="hidden xl:block mb-6">
-              <FilterControls filters={filters} onFiltersChange={setFilters} />
-            </div>
-
-            {/* Grid View */}
-            <TimelineGridView data={gridData} filters={filters} />
+            <TimelineGridView data={gridData} filters={filters} hourHeight={zoom} />
           </div>
         </>
-      ) : (
-        <div className="flex items-center justify-center h-64 text-muted-foreground">
-          <div>No data available</div>
-        </div>
-      )}
+      );
+    }
 
-      {/* Calendar Sidebar */}
+    // Week view
+    return (
+      <>
+        {/* Left Sidebar for Week View */}
+        <div className="xl:w-72 xl:flex-shrink-0">
+          <div className="xl:sticky xl:top-0 space-y-3">
+            <WeekSummaryCard stats={weekData?.weekStats || null} />
+          </div>
+        </div>
+
+        {/* Main Content - Week Grid */}
+        <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+          {/* Desktop Header */}
+          <div className="hidden xl:flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <ViewModeSelector viewMode={viewMode} onViewModeChange={setViewMode} />
+              <div className="w-px h-6 bg-border mx-1" />
+              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={goToPrevious}>
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <span className="text-sm font-medium">{formattedDate}</span>
+              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={goToNext} disabled={isNextDisabled}>
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+              <div className="flex items-center gap-1 ml-2">
+                <Button
+                  variant={isCurrentWeek ? 'secondary' : 'ghost'}
+                  size="sm"
+                  className="h-7 text-xs"
+                  onClick={() => handleDateSelect(new Date())}
+                >
+                  This Week
+                </Button>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <GlobalSearch onNavigateToDate={handleSearchNavigateToDate} />
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                onClick={() => setShowCalendar(!showCalendar)}
+              >
+                <Calendar className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+
+          <TimelineWeekView data={weekData || null} onDayClick={handleWeekDayClick} />
+        </div>
+      </>
+    );
+  };
+
+  return (
+    <div className="flex flex-col xl:flex-row gap-4 h-[calc(100vh-5rem)] lg:h-[calc(100vh-3rem)]">
+      {/* Mobile Header */}
+      <div className="xl:hidden flex items-center justify-between gap-2 flex-wrap">
+        <div className="flex items-center gap-2">
+          <ViewModeSelector viewMode={viewMode} onViewModeChange={setViewMode} />
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={goToPrevious}>
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <span className="text-sm font-medium min-w-[100px] text-center">{formattedDate}</span>
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={goToNext} disabled={isNextDisabled}>
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
+        <div className="flex items-center gap-2">
+          {viewMode === 'day' && (
+            <>
+              <FilterControls filters={filters} onFiltersChange={setFilters} />
+              <ZoomControls zoom={zoom} onZoomChange={setZoom} />
+            </>
+          )}
+          <GlobalSearch onNavigateToDate={handleSearchNavigateToDate} />
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            onClick={() => setShowCalendar(!showCalendar)}
+          >
+            <Calendar className="h-4 w-4" />
+          </Button>
+          {viewMode === 'day' && sessionsWithoutSummaries.length > 0 && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              onClick={handleBatchGenerateSummaries}
+              disabled={isBatchGenerating}
+              title={`Generate ${sessionsWithoutSummaries.length} summaries`}
+            >
+              {isBatchGenerating ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Sparkles className="h-4 w-4" />
+              )}
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {renderContent()}
+
       {showCalendar && (
         <div className="w-72 flex-shrink-0">
           <div className="sticky top-0">

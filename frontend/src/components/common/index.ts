@@ -1,4 +1,4 @@
-export { Screenshot, Filmstrip } from './Screenshot';
+export { Screenshot } from './Screenshot';
 export { AppBadge } from './AppBadge';
 export { TagBadge, TagList } from './TagBadge';
 export { DurationDisplay } from './DurationDisplay';

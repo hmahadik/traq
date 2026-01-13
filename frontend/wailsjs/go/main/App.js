@@ -74,6 +74,10 @@ export function GenerateSummary(arg1) {
   return window['go']['main']['App']['GenerateSummary'](arg1);
 }
 
+export function GenerateWeeklySummaryMarkdown(arg1, arg2) {
+  return window['go']['main']['App']['GenerateWeeklySummaryMarkdown'](arg1, arg2);
+}
+
 export function GetActivityTags(arg1) {
   return window['go']['main']['App']['GetActivityTags'](arg1);
 }
@@ -288,6 +292,10 @@ export function GetVersion() {
 
 export function GetWatchedDirectories() {
   return window['go']['main']['App']['GetWatchedDirectories']();
+}
+
+export function GetWeekTimelineData(arg1) {
+  return window['go']['main']['App']['GetWeekTimelineData'](arg1);
 }
 
 export function GetWeeklyStats(arg1) {

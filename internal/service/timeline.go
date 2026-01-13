@@ -332,25 +332,3 @@ func (s *TimelineService) GetRecentSessions(limit int) ([]*storage.Session, erro
 	}
 	return sessions, nil
 }
-
-// GetScreenshotsForDateRange returns screenshots for a date range.
-func (s *TimelineService) GetScreenshotsForDateRange(startDate, endDate string, limit int) ([]*storage.Screenshot, error) {
-	startT, err := time.ParseInLocation("2006-01-02", startDate, time.Local)
-	if err != nil {
-		return nil, err
-	}
-	endT, err := time.ParseInLocation("2006-01-02", endDate, time.Local)
-	if err != nil {
-		return nil, err
-	}
-
-	screenshots, err := s.store.GetScreenshotsByTimeRange(startT.Unix(), endT.Add(24*time.Hour).Unix()-1)
-	if err != nil {
-		return nil, err
-	}
-
-	if limit > 0 && len(screenshots) > limit {
-		return screenshots[:limit], nil
-	}
-	return screenshots, nil
-}

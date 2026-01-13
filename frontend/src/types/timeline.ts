@@ -173,29 +173,6 @@ export interface CategorizationRule {
   createdAt: number; // Unix timestamp
 }
 
-// UI State Types (transformed for rendering)
-
-export interface TimelineGridState {
-  date: string;
-  stats: DayStats | null;
-  topApps: TopApp[];
-  activeHours: number[]; // List of hours with activity (e.g., [8, 9, 10, 11, ...])
-  appColumns: AppColumnData[];
-  sessionBlocks: SessionBlock[];
-  categories: Record<string, string>;
-}
-
-export interface AppColumnData {
-  appName: string;
-  category: string;
-  totalDuration: number; // seconds
-  activityBlocks: ActivityBlock[];
-}
-
-export interface SessionBlock extends SessionSummaryWithPosition {
-  // Additional UI-specific fields if needed
-}
-
 // ============================================================================
 // Week View Types
 // ============================================================================
@@ -238,13 +215,14 @@ export interface WeekSummaryStats {
 
 // Category colors and configuration
 
-export type CategoryType = 'focus' | 'meetings' | 'comms' | 'other';
+export type CategoryType = 'focus' | 'meetings' | 'comms' | 'other' | 'breaks';
 
 export const CATEGORY_COLORS: Record<CategoryType, string> = {
   focus: 'bg-green-500',
   meetings: 'bg-red-500',
   comms: 'bg-purple-500',
   other: 'bg-gray-500',
+  breaks: 'bg-orange-500',
 };
 
 export const CATEGORY_BORDER_COLORS: Record<CategoryType, string> = {
@@ -252,6 +230,7 @@ export const CATEGORY_BORDER_COLORS: Record<CategoryType, string> = {
   meetings: 'border-l-red-500',
   comms: 'border-l-purple-500',
   other: 'border-l-gray-500',
+  breaks: 'border-l-orange-500',
 };
 
 export const CATEGORY_TEXT_COLORS: Record<CategoryType, string> = {
@@ -259,6 +238,7 @@ export const CATEGORY_TEXT_COLORS: Record<CategoryType, string> = {
   meetings: 'text-red-600 dark:text-red-400',
   comms: 'text-purple-600 dark:text-purple-400',
   other: 'text-gray-600 dark:text-gray-400',
+  breaks: 'text-orange-600 dark:text-orange-400',
 };
 
 export const CATEGORY_LABELS: Record<CategoryType, string> = {
@@ -266,6 +246,7 @@ export const CATEGORY_LABELS: Record<CategoryType, string> = {
   meetings: 'Meetings',
   comms: 'Communication',
   other: 'Other',
+  breaks: 'Breaks',
 };
 
 // Grid layout constants (Timely-style)

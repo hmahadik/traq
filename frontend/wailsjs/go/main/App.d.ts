@@ -42,6 +42,8 @@ export function GenerateReport(arg1:string,arg2:string,arg3:boolean):Promise<ser
 
 export function GenerateSummary(arg1:number):Promise<storage.Summary>;
 
+export function GenerateWeeklySummaryMarkdown(arg1:string,arg2:string):Promise<string>;
+
 export function GetActivityTags(arg1:string):Promise<Array<service.TagUsage>>;
 
 export function GetAllApps():Promise<Array<main.AppWithCategory>>;
@@ -149,6 +151,8 @@ export function GetTrackedRepositories():Promise<Array<storage.GitRepository>>;
 export function GetVersion():Promise<string>;
 
 export function GetWatchedDirectories():Promise<Array<string>>;
+
+export function GetWeekTimelineData(arg1:string):Promise<service.WeekTimelineData>;
 
 export function GetWeeklyStats(arg1:string):Promise<service.WeeklyStats>;
 

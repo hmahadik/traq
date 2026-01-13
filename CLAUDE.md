@@ -162,36 +162,6 @@ export function useTimelineGridData(date: string) {
 
 ---
 
-## Recent Implementations
-
-### Midnight Boundary Fix (2026-01-12)
-- **Bug:** Events/sessions spanning midnight weren't showing up on the next day's timeline
-- **Root cause:** SQL queries only checked `start_time` within range, missing events that started before but extended past midnight
-- **Fix:** Changed time range queries to use overlap detection: `start_time <= end AND end_time > start`
-- **Files changed:**
-  - `/internal/storage/focus.go` - Focus events, app usage, top apps queries
-  - `/internal/storage/sessions.go` - Sessions query
-  - `/internal/storage/afk.go` - AFK events query
-- **Test:** Added `TestGetFocusEventsByTimeRange_MidnightBoundary` regression test
-
-### Issue Reporting System (2026-01-11)
-- **Backend:** `issue_reports` table, CRUD in storage/issues.go, Slack webhook support
-- **Frontend:** ReportIssueDialog, GlobalErrorHandler, enhanced ErrorBoundary
-- **Config:** Webhook URL in Settings → System tab
-
-### App Name Mapping (2026-01-11)
-- **Backend:** `/internal/service/appnames.go` with 150+ mappings
-- Applied everywhere: Timeline, Analytics, Screenshots, Reports
-- Smart fallback: cleans dev suffixes, title-cases unknown apps
-
-### Timeline v3 Grid (2026-01-10)
-- Hour-based grid with app columns
-- AI Summary column with session summaries
-- Daily stats sidebar (total time, category breakdown)
-- Categorization rules system
-
----
-
 ## Common Tasks
 
 ### Adding a New API Endpoint

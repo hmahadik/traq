@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
-import { ChevronLeft, ChevronRight, Calendar } from 'lucide-react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import type { CalendarData, CalendarDay } from '@/types';
 
 interface CalendarWidgetProps {
@@ -121,16 +121,12 @@ export function CalendarWidget({
   return (
     <Card data-testid="calendar-widget">
       <CardHeader className="pb-2">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-sm flex items-center gap-2">
-            <Calendar className="h-4 w-4" />
-            Calendar
-          </CardTitle>
+        <div className="flex items-center justify-center">
           <div className="flex items-center gap-1">
             <Button variant="ghost" size="icon" className="h-7 w-7" onClick={goToPreviousMonth}>
               <ChevronLeft className="h-4 w-4" />
             </Button>
-            <span className="text-sm font-medium w-28 text-center">
+            <span className="text-sm font-medium min-w-[7rem] text-center whitespace-nowrap">
               {MONTHS[month]} {year}
             </span>
             <Button variant="ghost" size="icon" className="h-7 w-7" onClick={goToNextMonth}>

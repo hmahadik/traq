@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 )
@@ -51,6 +52,9 @@ type SummaryResult struct {
 	Confidence    string
 	ModelUsed     string
 	InferenceMs   int64
+	WorkThemes    []string
+	Meetings      []string
+	KeyActivities []string
 }
 
 // Service handles AI inference
@@ -187,7 +191,7 @@ type FocusEvent struct {
 func buildPrompt(ctx *SessionContext) string {
 	var sb strings.Builder
 
-	sb.WriteString("Analyze this work session and provide a brief summary.\n\n")
+	sb.WriteString("Analyze this work session and provide a detailed summary.\n\n")
 
 	// Duration info
 	duration := ctx.DurationSeconds
@@ -200,87 +204,160 @@ func buildPrompt(ctx *SessionContext) string {
 	}
 	sb.WriteString(fmt.Sprintf("Screenshots: %d\n\n", ctx.ScreenshotCount))
 
-	// Top applications
-	if len(ctx.TopApps) > 0 {
-		sb.WriteString("Applications Used:\n")
-		for _, app := range ctx.TopApps {
-			sb.WriteString(fmt.Sprintf("- %s\n", app))
-		}
-		sb.WriteString("\n")
-	}
-
-	// Focus events (window titles provide context)
+	// === GROUP FOCUS EVENTS BY APP ===
 	if len(ctx.FocusEvents) > 0 {
-		sb.WriteString("Window Activity:\n")
-		count := 0
+		sb.WriteString("=== APPLICATION ACTIVITY ===\n")
+
+		// Group by app
+		appWindows := make(map[string][]FocusEvent)
+		appDurations := make(map[string]float64)
 		for _, evt := range ctx.FocusEvents {
-			if evt.Duration > 30 && count < 10 { // Only significant events
-				sb.WriteString(fmt.Sprintf("- %s: %s (%.0fs)\n", evt.AppName, evt.WindowTitle, evt.Duration))
-				count++
+			appWindows[evt.AppName] = append(appWindows[evt.AppName], evt)
+			appDurations[evt.AppName] += evt.Duration
+		}
+
+		// Sort apps by duration (use slice for ordering)
+		type appDur struct {
+			name string
+			dur  float64
+		}
+		var sortedApps []appDur
+		for app, dur := range appDurations {
+			sortedApps = append(sortedApps, appDur{app, dur})
+		}
+		sort.Slice(sortedApps, func(i, j int) bool {
+			return sortedApps[i].dur > sortedApps[j].dur
+		})
+
+		// Output each app with its windows
+		for _, ad := range sortedApps {
+			appMins := int(ad.dur / 60)
+			if appMins < 1 {
+				continue
+			}
+
+			sb.WriteString(fmt.Sprintf("\n%s (%dm):\n", ad.name, appMins))
+
+			// Aggregate windows for this app
+			windowDurations := make(map[string]float64)
+			for _, evt := range appWindows[ad.name] {
+				windowDurations[evt.WindowTitle] += evt.Duration
+			}
+
+			// Sort windows by duration
+			type winDur struct {
+				title string
+				dur   float64
+			}
+			var sortedWindows []winDur
+			for title, dur := range windowDurations {
+				sortedWindows = append(sortedWindows, winDur{title, dur})
+			}
+			sort.Slice(sortedWindows, func(i, j int) bool {
+				return sortedWindows[i].dur > sortedWindows[j].dur
+			})
+
+			// Show top 5 windows per app
+			for i, wd := range sortedWindows {
+				if i >= 5 {
+					if len(sortedWindows) > 5 {
+						sb.WriteString(fmt.Sprintf("  ... and %d more windows\n", len(sortedWindows)-5))
+					}
+					break
+				}
+				mins := int(wd.dur / 60)
+				if mins >= 1 {
+					sb.WriteString(fmt.Sprintf("  - %s (%dm)\n", wd.title, mins))
+				}
 			}
 		}
 		sb.WriteString("\n")
 	}
 
-	// Shell commands
-	if len(ctx.ShellCommands) > 0 {
-		sb.WriteString("Shell Commands:\n")
-		for i, cmd := range ctx.ShellCommands {
-			if i >= 10 {
-				sb.WriteString(fmt.Sprintf("... and %d more commands\n", len(ctx.ShellCommands)-10))
-				break
+	// === DETECT MEETINGS ===
+	var meetingLines []string
+	for _, evt := range ctx.FocusEvents {
+		lower := strings.ToLower(evt.WindowTitle)
+		if strings.Contains(lower, "huddle") ||
+			strings.Contains(lower, "zoom meeting") ||
+			strings.Contains(lower, "meet.google.com") ||
+			(strings.Contains(lower, "teams") && strings.Contains(lower, "meeting")) {
+			mins := int(evt.Duration / 60)
+			if mins >= 1 {
+				meetingLines = append(meetingLines, fmt.Sprintf("- %s (%dm)", evt.WindowTitle, mins))
 			}
-			sb.WriteString(fmt.Sprintf("- %s\n", cmd))
+		}
+	}
+	if len(meetingLines) > 0 {
+		sb.WriteString("=== MEETINGS DETECTED ===\n")
+		for _, line := range meetingLines {
+			sb.WriteString(line + "\n")
 		}
 		sb.WriteString("\n")
 	}
 
-	// Git commits
+	// === GIT COMMITS (ALL) ===
 	if len(ctx.GitCommits) > 0 {
-		sb.WriteString("Git Commits:\n")
+		sb.WriteString("=== GIT COMMITS ===\n")
 		for _, commit := range ctx.GitCommits {
 			sb.WriteString(fmt.Sprintf("- %s\n", commit))
 		}
 		sb.WriteString("\n")
 	}
 
-	// File events
+	// === SHELL COMMANDS (ALL) ===
+	if len(ctx.ShellCommands) > 0 {
+		sb.WriteString("=== SHELL COMMANDS ===\n")
+		for _, cmd := range ctx.ShellCommands {
+			sb.WriteString(fmt.Sprintf("- %s\n", cmd))
+		}
+		sb.WriteString("\n")
+	}
+
+	// === FILE ACTIVITY (ALL) ===
 	if len(ctx.FileEvents) > 0 {
-		sb.WriteString("File Activity:\n")
-		for i, evt := range ctx.FileEvents {
-			if i >= 5 {
-				sb.WriteString(fmt.Sprintf("... and %d more file events\n", len(ctx.FileEvents)-5))
-				break
-			}
+		sb.WriteString("=== FILE ACTIVITY ===\n")
+		for _, evt := range ctx.FileEvents {
 			sb.WriteString(fmt.Sprintf("- %s\n", evt))
 		}
 		sb.WriteString("\n")
 	}
 
-	// Browser visits
+	// === BROWSER DOMAINS ===
 	if len(ctx.BrowserVisits) > 0 {
-		sb.WriteString("Browser Activity:\n")
-		for i, visit := range ctx.BrowserVisits {
-			if i >= 5 {
-				sb.WriteString(fmt.Sprintf("... and %d more visits\n", len(ctx.BrowserVisits)-5))
-				break
-			}
+		sb.WriteString("=== BROWSER ACTIVITY ===\n")
+		for _, visit := range ctx.BrowserVisits {
 			sb.WriteString(fmt.Sprintf("- %s\n", visit))
 		}
 		sb.WriteString("\n")
 	}
 
-	sb.WriteString(`
-Please respond in this exact JSON format:
+	// === ENHANCED PROMPT INSTRUCTIONS ===
+	sb.WriteString(`Please respond in this exact JSON format:
 {
-  "summary": "A brief 1-2 sentence summary of what was accomplished in this session",
-  "explanation": "A slightly longer explanation of the main activities",
+  "summary": "2-3 sentences describing SPECIFIC activities and accomplishments. Be specific about files, projects, documents worked on. Never use generic phrases like 'coding and browsing'.",
+  "explanation": "A paragraph explaining the main work themes and how activities connected.",
+  "workThemes": ["theme1", "theme2"],
+  "meetings": ["Meeting title 1", "Meeting title 2"],
+  "keyActivities": [
+    "Specific activity 1 with file/project names",
+    "Specific activity 2 with context",
+    "Specific activity 3"
+  ],
   "tags": ["tag1", "tag2", "tag3"],
   "confidence": "high"
 }
 
-The tags should be relevant activity categories like "coding", "browsing", "documentation", "meetings", "debugging", etc.
-The confidence should be "high", "medium", or "low" based on how clear the session's purpose was.
+GUIDELINES:
+- Be SPECIFIC: mention file names, project names, document titles, meeting channels
+- Detect work themes from related activities (e.g., files + commits in same project = "Project X development")
+- Extract meeting titles from window titles (e.g., "Huddle: #eng-mv" = "Eng sync with #eng-mv")
+- NEVER use generic phrases like "various activities", "code editing", "browser usage"
+- If you see multiple files from the same project, group them as a single theme
+- The summary should read like a human wrote it for a standup report
+- workThemes should be 2-4 word descriptions of what was worked on (e.g., "Report Enhancement", "Bug Fixes", "Documentation Review")
+- meetings should list clean meeting names extracted from window titles
+- keyActivities should be 3-5 specific things accomplished
 `)
 
 	return sb.String()
@@ -298,16 +375,22 @@ func parseResponse(response string) *SummaryResult {
 		jsonStr := response[start : end+1]
 
 		var parsed struct {
-			Summary     string   `json:"summary"`
-			Explanation string   `json:"explanation"`
-			Tags        []string `json:"tags"`
-			Confidence  string   `json:"confidence"`
+			Summary       string   `json:"summary"`
+			Explanation   string   `json:"explanation"`
+			Tags          []string `json:"tags"`
+			Confidence    string   `json:"confidence"`
+			WorkThemes    []string `json:"workThemes"`
+			Meetings      []string `json:"meetings"`
+			KeyActivities []string `json:"keyActivities"`
 		}
 
 		if err := json.Unmarshal([]byte(jsonStr), &parsed); err == nil {
 			result.Summary = parsed.Summary
 			result.Explanation = parsed.Explanation
 			result.Tags = parsed.Tags
+			result.WorkThemes = parsed.WorkThemes
+			result.Meetings = parsed.Meetings
+			result.KeyActivities = parsed.KeyActivities
 			if parsed.Confidence != "" {
 				result.Confidence = parsed.Confidence
 			}

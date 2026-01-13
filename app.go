@@ -489,6 +489,20 @@ func (a *App) GetTimelineGridData(date string) (result *service.TimelineGridData
 	return a.Timeline.GetTimelineGridData(date)
 }
 
+// GetWeekTimelineData returns aggregated data for week view.
+func (a *App) GetWeekTimelineData(startDate string) (result *service.WeekTimelineData, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			result = nil
+			err = fmt.Errorf("internal error: %v", r)
+		}
+	}()
+	if a == nil || !a.ready || a.Timeline == nil {
+		return nil, nil
+	}
+	return a.Timeline.GetWeekTimelineData(startDate)
+}
+
 // GetScreenshotsForSession returns paginated screenshots for a session.
 func (a *App) GetScreenshotsForSession(sessionID int64, page, perPage int) (*service.ScreenshotPage, error) {
 	if a.Timeline == nil {
@@ -550,28 +564,6 @@ func (a *App) DeleteSession(sessionID int64) error {
 	}
 	return a.store.DeleteSession(sessionID)
 }
-
-// GetTimelineEventsForDate returns all timeline events for a specific date.
-// TODO: This is a stub that needs to be properly implemented
-// func (a *App) GetTimelineEventsForDate(date string, eventTypes []string) (result *service.TimelineResponse, err error) {
-// 	defer func() {
-// 		if r := recover(); r != nil {
-// 			result = nil
-// 			err = fmt.Errorf("internal error: %v", r)
-// 		}
-// 	}()
-// 	if a == nil || !a.ready || a.Timeline == nil {
-// 		return nil, nil
-// 	}
-//
-// 	// Convert string event types to service EventType
-// 	var serviceEventTypes []service.EventType
-// 	for _, eventType := range eventTypes {
-// 		serviceEventTypes = append(serviceEventTypes, service.EventType(eventType))
-// 	}
-//
-// 	return a.Timeline.GetTimelineEventsForDate(date, serviceEventTypes)
-// }
 
 // ============================================================================
 // Screenshot Methods (exposed to frontend)
@@ -687,6 +679,14 @@ func (a *App) ParseTimeRange(input string) (*service.TimeRange, error) {
 		return nil, nil
 	}
 	return a.Reports.ParseTimeRange(input)
+}
+
+// GenerateWeeklySummaryMarkdown generates a comprehensive weekly summary in Markdown format.
+func (a *App) GenerateWeeklySummaryMarkdown(startDate, endDate string) (string, error) {
+	if a.Reports == nil {
+		return "", nil
+	}
+	return a.Reports.GenerateWeeklySummaryMarkdown(startDate, endDate)
 }
 
 // ============================================================================

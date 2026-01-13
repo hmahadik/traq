@@ -46,7 +46,7 @@ export const DailySummaryCard: React.FC<DailySummaryCardProps> = ({ stats }) => 
       <div>
         <div className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Hours Worked</div>
         <div className="flex items-baseline gap-2">
-          <span className="text-4xl font-bold bg-gradient-to-r from-primary via-purple-500 to-pink-500 bg-clip-text text-transparent">
+          <span className="text-4xl font-bold text-foreground">
             {formatDuration(stats.totalSeconds)}
           </span>
           <span className="text-lg text-muted-foreground">/ 8h</span>
@@ -57,7 +57,7 @@ export const DailySummaryCard: React.FC<DailySummaryCardProps> = ({ stats }) => 
         {/* Progress bar */}
         <div className="mt-2 h-1.5 bg-muted rounded-full overflow-hidden">
           <div
-            className={`h-full rounded-full transition-all duration-300 ${workdayPercent >= 100 ? 'bg-gradient-to-r from-emerald-400 to-emerald-600' : 'bg-gradient-to-r from-primary via-purple-500 to-pink-500'}`}
+            className={`h-full rounded-full transition-all duration-300 ${workdayPercent >= 100 ? 'bg-emerald-500' : 'bg-primary'}`}
             style={{ width: `${progressBarPercent}%` }}
           />
         </div>
@@ -77,20 +77,10 @@ export const DailySummaryCard: React.FC<DailySummaryCardProps> = ({ stats }) => 
         </div>
       )}
 
-      {/* Breaks & Longest Focus - Grid layout, no card styling */}
-      <div className="grid grid-cols-2 gap-4">
-        {/* Breaks */}
-        <div>
-          <div className="text-xs text-muted-foreground uppercase tracking-wide mb-0.5">Breaks</div>
-          <div className="text-lg font-semibold">{formatDuration(stats.breakDuration)}</div>
-          <div className="text-xs text-muted-foreground">{stats.breakCount} break{stats.breakCount !== 1 ? 's' : ''}</div>
-        </div>
-
-        {/* Longest Focus */}
-        <div>
-          <div className="text-xs text-muted-foreground uppercase tracking-wide mb-0.5">Longest Focus</div>
-          <div className="text-lg font-semibold">{formatDuration(stats.longestFocus)}</div>
-        </div>
+      {/* Longest Focus */}
+      <div>
+        <div className="text-xs text-muted-foreground uppercase tracking-wide mb-0.5">Longest Focus</div>
+        <div className="text-lg font-semibold">{formatDuration(stats.longestFocus)}</div>
       </div>
     </div>
   );

@@ -23,11 +23,6 @@ func NewSummaryService(store *storage.Store, inf *inference.Service) *SummarySer
 	}
 }
 
-// SetInferenceService sets the inference service (for late initialization)
-func (s *SummaryService) SetInferenceService(inf *inference.Service) {
-	s.inference = inf
-}
-
 // GenerateSummary generates a summary for a session
 func (s *SummaryService) GenerateSummary(sessionID int64) (*storage.Summary, error) {
 	// Get session

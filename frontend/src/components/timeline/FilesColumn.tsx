@@ -1,18 +1,27 @@
 import React from 'react';
-import { File, FileText, FilePlus, FileX, FileEdit, FolderOpen } from 'lucide-react';
+import { File, FileText, FilePlus, FileX, FileEdit, FolderOpen, Copy, Clock } from 'lucide-react';
 import { GRID_CONSTANTS, FileEventDisplay } from '@/types/timeline';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 
 interface FilesColumnProps {
   fileEvents: { [hour: number]: FileEventDisplay[] };
   hours: number[]; // Array of hours for grid alignment
   onFileClick?: (event: FileEventDisplay) => void;
+  hourHeight?: number;
 }
 
 export const FilesColumn: React.FC<FilesColumnProps> = ({
   fileEvents,
   hours,
   onFileClick,
+  hourHeight,
 }) => {
+  const effectiveHourHeight = hourHeight || GRID_CONSTANTS.HOUR_HEIGHT_PX;
   // Calculate total file events for the day
   const totalEvents = Object.values(fileEvents).reduce((sum, events) => sum + events.length, 0);
 
@@ -99,42 +108,27 @@ export const FilesColumn: React.FC<FilesColumnProps> = ({
       className="flex-shrink-0 border-r border-border"
       style={{ width: `${GRID_CONSTANTS.APP_COLUMN_WIDTH_PX}px` }}
     >
-      {/* Column Header */}
-      <div className="sticky top-0 z-10 bg-card border-b border-border px-3 py-2.5">
-        <div className="flex items-center gap-2">
-          {/* File icon */}
+      {/* Column Header - Fixed height */}
+      <div className="sticky top-0 z-10 bg-card border-b border-border px-2 h-11 flex items-center">
+        <div className="flex items-center gap-1.5 w-full min-w-0">
           <div className="w-5 h-5 rounded bg-indigo-500 flex items-center justify-center flex-shrink-0">
             <FolderOpen className="w-3 h-3 text-white" />
           </div>
-          {/* Column name */}
-          <div className="flex-1 min-w-0">
-            <div className="text-xs font-medium text-foreground truncate">Files</div>
-          </div>
-          {/* Total events badge */}
-          <div className="text-[11px] text-muted-foreground font-medium">
-            {totalEvents} {totalEvents === 1 ? 'event' : 'events'}
-          </div>
+          <div className="flex-1 min-w-0 truncate text-xs font-medium text-foreground">Files</div>
+          <div className="text-[10px] text-muted-foreground flex-shrink-0">{totalEvents}</div>
         </div>
       </div>
 
       {/* Hour Blocks with File Events */}
       <div className="relative bg-card">
-        {hours.map((hour) => (
+        {hours.map((hour, index) => (
           <div
             key={hour}
-            className="relative border-b border-border"
-            style={{ height: `${GRID_CONSTANTS.HOUR_HEIGHT_PX}px` }}
-          >
-            {/* Subtle grid pattern for empty state */}
-            <div
-              className="absolute inset-0 opacity-[0.03] dark:opacity-[0.05]"
-              style={{
-                backgroundImage:
-                  'repeating-linear-gradient(45deg, currentColor 0, currentColor 1px, transparent 0, transparent 50%)',
-                backgroundSize: '8px 8px',
-              }}
-            />
-          </div>
+            className={`relative border-b border-border ${
+              index % 2 === 0 ? 'bg-card' : 'bg-muted/30'
+            }`}
+            style={{ height: `${effectiveHourHeight}px` }}
+          />
         ))}
 
         {/* File Event Blocks (absolutely positioned) */}
@@ -144,63 +138,110 @@ export const FilesColumn: React.FC<FilesColumnProps> = ({
               // Calculate position relative to the first hour in the display
               const firstHour = hours[0];
               const hourIndex = parseInt(hour) - firstHour;
-              const top = hourIndex * GRID_CONSTANTS.HOUR_HEIGHT_PX + event.pixelPosition;
+              const top = hourIndex * effectiveHourHeight + event.pixelPosition;
 
               const EventIcon = getEventIcon(event.eventType);
               const colors = getEventColor(event.eventType);
 
+              // Format time for tooltip
+              const formatTime = (ts: number) => new Date(ts * 1000).toLocaleTimeString('en-US', {
+                hour: 'numeric',
+                minute: '2-digit',
+              });
+
+              // Full path
+              const fullPath = event.directory ? `${event.directory}/${event.fileName}` : event.fileName;
+
+              // Copy path to clipboard
+              const copyPath = (e: React.MouseEvent) => {
+                e.stopPropagation();
+                navigator.clipboard.writeText(fullPath);
+              };
+
               return (
-                <div
-                  key={event.id}
-                  className="absolute left-0 right-0 mx-2 cursor-pointer hover:shadow-md transition-shadow"
-                  style={{
-                    top: `${top}px`,
-                    minHeight: '32px',
-                  }}
-                  onClick={() => onFileClick?.(event)}
-                >
-                  <div className={`${colors.bg} border ${colors.border} rounded-md px-2 py-1.5`}>
-                    {/* File event header */}
-                    <div className="flex items-center gap-1.5 mb-1">
-                      <EventIcon className={`w-3 h-3 ${colors.icon} flex-shrink-0`} />
-                      <span className={`text-[10px] font-medium ${colors.icon} uppercase tracking-wide`}>
-                        {event.eventType}
-                      </span>
-                      {event.fileExtension && (
-                        <span className="text-[10px] text-muted-foreground truncate">
-                          .{event.fileExtension}
-                        </span>
-                      )}
-                    </div>
-
-                    {/* File name */}
-                    <div className="text-[11px] text-foreground line-clamp-2 leading-tight mb-1 font-medium">
-                      {event.fileName}
-                    </div>
-
-                    {/* Directory and size */}
-                    <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
-                      {event.directory && (
-                        <span className="truncate flex-1">
-                          {truncatePath(event.directory, 25)}
-                        </span>
-                      )}
-                      {event.fileSizeBytes > 0 && (
-                        <span className="flex-shrink-0 font-mono">
-                          {formatFileSize(event.fileSizeBytes)}
-                        </span>
-                      )}
-                    </div>
-
-                    {/* Old path for rename events */}
-                    {event.oldPath && (
-                      <div className="mt-1 text-[10px] text-muted-foreground flex items-center gap-1">
-                        <span>from:</span>
-                        <span className="truncate font-mono">{truncatePath(event.oldPath, 28)}</span>
+                <TooltipProvider key={event.id} delayDuration={100}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div
+                        className="absolute left-0 right-0 mx-1 cursor-pointer hover:shadow-md transition-shadow"
+                        style={{
+                          top: `${top}px`,
+                          minHeight: '28px',
+                        }}
+                        onClick={() => onFileClick?.(event)}
+                      >
+                        <div className={`${colors.bg} border ${colors.border} rounded-md px-2 py-1 overflow-hidden`}>
+                          {/* File event header */}
+                          <div className="flex items-center gap-1">
+                            <EventIcon className={`w-3 h-3 ${colors.icon} flex-shrink-0`} />
+                            <span className={`text-[9px] font-medium ${colors.icon} uppercase`}>
+                              {event.eventType}
+                            </span>
+                            <span className="text-[10px] text-foreground truncate flex-1">
+                              {event.fileName}
+                            </span>
+                          </div>
+                        </div>
                       </div>
-                    )}
-                  </div>
-                </div>
+                    </TooltipTrigger>
+                    <TooltipContent side="right" className="max-w-md p-3">
+                      <div className="space-y-3">
+                        {/* Header */}
+                        <div className="flex items-center gap-2">
+                          <EventIcon className={`w-4 h-4 ${colors.icon}`} />
+                          <span className={`font-semibold text-sm ${colors.icon} uppercase`}>
+                            {event.eventType}
+                          </span>
+                          {event.fileExtension && (
+                            <span className="text-xs text-muted-foreground px-1.5 py-0.5 bg-muted rounded">
+                              .{event.fileExtension}
+                            </span>
+                          )}
+                        </div>
+
+                        {/* File name */}
+                        <div className="text-sm font-medium text-foreground">
+                          {event.fileName}
+                        </div>
+
+                        {/* Full path with copy */}
+                        <div className="relative">
+                          <div className="text-xs font-mono bg-muted p-2 rounded pr-8 break-all">
+                            {fullPath}
+                          </div>
+                          <button
+                            onClick={copyPath}
+                            className="absolute top-1 right-1 p-1 hover:bg-background rounded transition-colors"
+                            title="Copy path"
+                          >
+                            <Copy className="w-3 h-3 text-muted-foreground" />
+                          </button>
+                        </div>
+
+                        {/* Meta info */}
+                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                          <span className="flex items-center gap-1">
+                            <Clock className="w-3 h-3" />
+                            {formatTime(event.timestamp)}
+                          </span>
+                          {event.fileSizeBytes > 0 && (
+                            <span>Size: {formatFileSize(event.fileSizeBytes)}</span>
+                          )}
+                        </div>
+
+                        {/* Old path for rename events */}
+                        {event.oldPath && (
+                          <div className="pt-2 border-t border-border">
+                            <div className="text-[10px] uppercase text-muted-foreground mb-1">Renamed from</div>
+                            <div className="text-xs font-mono text-muted-foreground break-all">
+                              {event.oldPath}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               );
             })
           )}

@@ -926,7 +926,26 @@ func (s *TimelineService) calculateDayStats(focusEvents []*storage.WindowFocusEv
 		}
 	}
 
-	// Calculate total time and category breakdown
+	// Get AFK events first to filter out inactive periods
+	afkEvents, _ := s.store.GetAFKEventsByTimeRange(dayStart.Unix(), dayEnd.Unix())
+
+	// Helper function to check if a time range overlaps with any AFK period
+	isOverlappingAFK := func(start, end int64) bool {
+		for _, afk := range afkEvents {
+			if !afk.EndTime.Valid {
+				continue // Skip ongoing AFK periods
+			}
+			afkStart := afk.StartTime
+			afkEnd := afk.EndTime.Int64
+			// Check for overlap: event overlaps AFK if it starts before AFK ends and ends after AFK starts
+			if start < afkEnd && end > afkStart {
+				return true
+			}
+		}
+		return false
+	}
+
+	// Calculate total time and category breakdown, excluding AFK periods
 	var totalSeconds float64
 	breakdown := map[string]float64{
 		"focus":    0,
@@ -936,32 +955,68 @@ func (s *TimelineService) calculateDayStats(focusEvents []*storage.WindowFocusEv
 	}
 
 	for _, event := range focusEvents {
+		// Skip events that overlap with AFK periods
+		if isOverlappingAFK(event.StartTime, event.EndTime) {
+			continue
+		}
+
 		totalSeconds += event.DurationSeconds
 		category := categories[event.AppName]
 		breakdown[category] += event.DurationSeconds
 	}
 
-	// Calculate breakdown percentages
-	breakdownPercent := make(map[string]float64)
-	if totalSeconds > 0 {
-		for category, seconds := range breakdown {
-			breakdownPercent[category] = (seconds / totalSeconds) * 100.0
+	// Count and categorize breaks (based on v1 logic: gaps between 3min and 2hr)
+	// Sort events by start time for gap detection
+	sortedEvents := make([]*storage.WindowFocusEvent, 0, len(focusEvents))
+	for _, event := range focusEvents {
+		if !isOverlappingAFK(event.StartTime, event.EndTime) {
+			sortedEvents = append(sortedEvents, event)
 		}
 	}
-
-	// Calculate longest continuous focus session
-	longestFocus := 0.0
-	currentFocus := 0.0
-	var lastEndTime int64
-
-	// Sort events by start time
-	sortedEvents := make([]*storage.WindowFocusEvent, len(focusEvents))
-	copy(sortedEvents, focusEvents)
 	sort.Slice(sortedEvents, func(i, j int) bool {
 		return sortedEvents[i].StartTime < sortedEvents[j].StartTime
 	})
 
+	// Calculate breaks between sessions
+	const minBreakSeconds = 180   // 3 minutes
+	const maxBreakSeconds = 7200  // 2 hours
+
+	var breakCount int
+	var breakDuration float64
+
+	for i := 1; i < len(sortedEvents); i++ {
+		gap := sortedEvents[i].StartTime - sortedEvents[i-1].EndTime
+		if gap >= minBreakSeconds && gap <= maxBreakSeconds {
+			breakCount++
+			breakDuration += float64(gap)
+		}
+	}
+
+	// Add breaks to the breakdown as a separate category
+	breakdown["breaks"] = breakDuration
+	totalSecondsWithBreaks := totalSeconds + breakDuration
+
+	// Calculate breakdown percentages (including breaks)
+	breakdownPercent := make(map[string]float64)
+	if totalSecondsWithBreaks > 0 {
+		for category, seconds := range breakdown {
+			breakdownPercent[category] = (seconds / totalSecondsWithBreaks) * 100.0
+		}
+	}
+
+	// Calculate longest continuous focus session (using only non-AFK events)
+	longestFocus := 0.0
+	currentFocus := 0.0
+	var lastEndTime int64
+
 	for _, event := range sortedEvents {
+		// Skip events during AFK (already filtered in sortedEvents, but double-check)
+		if isOverlappingAFK(event.StartTime, event.EndTime) {
+			currentFocus = 0
+			lastEndTime = 0
+			continue
+		}
+
 		category := categories[event.AppName]
 
 		// Only count "focus" category for longest focus calculation
@@ -984,7 +1039,7 @@ func (s *TimelineService) calculateDayStats(focusEvents []*storage.WindowFocusEv
 		}
 	}
 
-	// Calculate day span (first to last activity)
+	// Calculate day span (first to last activity, excluding AFK)
 	var daySpan *DaySpan
 	if len(sortedEvents) > 0 {
 		firstActivity := sortedEvents[0].StartTime
@@ -995,16 +1050,6 @@ func (s *TimelineService) calculateDayStats(focusEvents []*storage.WindowFocusEv
 			StartTime: firstActivity,
 			EndTime:   lastActivity,
 			SpanHours: spanSeconds / 3600.0,
-		}
-	}
-
-	// Count breaks (AFK events)
-	afkEvents, _ := s.store.GetAFKEventsByTimeRange(dayStart.Unix(), dayEnd.Unix())
-	breakCount := len(afkEvents)
-	var breakDuration float64
-	for _, afk := range afkEvents {
-		if afk.EndTime.Valid {
-			breakDuration += float64(afk.EndTime.Int64 - afk.StartTime)
 		}
 	}
 

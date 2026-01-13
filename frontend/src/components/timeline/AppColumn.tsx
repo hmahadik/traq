@@ -10,6 +10,7 @@ interface AppColumnProps {
   activityBlocks: ActivityBlockType[];
   hours: number[]; // Array of hours for grid alignment
   onBlockClick?: (block: ActivityBlockType) => void;
+  hourHeight?: number; // Override for effectiveHourHeight
 }
 
 export const AppColumn: React.FC<AppColumnProps> = ({
@@ -19,11 +20,16 @@ export const AppColumn: React.FC<AppColumnProps> = ({
   activityBlocks,
   hours,
   onBlockClick,
+  hourHeight,
 }) => {
-  // Group adjacent activities with small gaps (5 minutes or less) for cleaner display
+  const effectiveHourHeight = hourHeight || GRID_CONSTANTS.HOUR_HEIGHT_PX;
+  // Group adjacent activities with gaps up to 15 minutes for cleaner Timely-style display
   const groupedBlocks = useMemo(() => {
-    return groupAdjacentActivities(activityBlocks, 300); // 5 minute gap threshold
-  }, [activityBlocks]);
+    if (activityBlocks.length === 0) return [];
+    const grouped = groupAdjacentActivities(activityBlocks, 900); // 15 minute gap threshold
+    console.log(`[AppColumn ${appName}] ${activityBlocks.length} blocks -> ${grouped.length} grouped`);
+    return grouped;
+  }, [activityBlocks, appName]);
 
   // Format duration
   const formatDuration = (seconds: number): string => {
@@ -53,10 +59,9 @@ export const AppColumn: React.FC<AppColumnProps> = ({
       className="flex-shrink-0 border-r border-border"
       style={{ width: `${GRID_CONSTANTS.APP_COLUMN_WIDTH_PX}px` }}
     >
-      {/* Column Header - Timely style */}
-      <div className="sticky top-0 z-10 bg-card border-b border-border px-3 py-2.5">
-        <div className="flex items-center gap-2">
-          {/* App icon */}
+      {/* Column Header - Fixed height */}
+      <div className="sticky top-0 z-10 bg-card border-b border-border px-2 h-11 flex items-center">
+        <div className="flex items-center gap-1.5 w-full min-w-0">
           <div
             className={`w-5 h-5 rounded ${colors.icon} flex items-center justify-center flex-shrink-0`}
           >
@@ -64,14 +69,10 @@ export const AppColumn: React.FC<AppColumnProps> = ({
               {getAppInitials(appName)}
             </span>
           </div>
-          {/* App name and duration */}
-          <div className="flex-1 min-w-0">
-            <div className="text-xs font-medium text-foreground truncate" title={appName}>
-              {displayName}
-            </div>
+          <div className="flex-1 min-w-0 truncate text-xs font-medium text-foreground" title={displayName}>
+            {displayName}
           </div>
-          {/* Duration badge */}
-          <div className="text-[11px] text-muted-foreground font-medium">
+          <div className="text-[10px] text-muted-foreground flex-shrink-0">
             {formatDuration(totalDuration)}
           </div>
         </div>
@@ -82,25 +83,17 @@ export const AppColumn: React.FC<AppColumnProps> = ({
         {hours.map((hour, index) => (
           <div
             key={hour}
-            className="relative border-b border-border"
-            style={{ height: `${GRID_CONSTANTS.HOUR_HEIGHT_PX}px` }}
-          >
-            {/* Subtle grid pattern for empty state */}
-            <div
-              className="absolute inset-0 opacity-[0.03] dark:opacity-[0.05]"
-              style={{
-                backgroundImage:
-                  'repeating-linear-gradient(45deg, currentColor 0, currentColor 1px, transparent 0, transparent 50%)',
-                backgroundSize: '8px 8px',
-              }}
-            />
-          </div>
+            className={`relative border-b border-border ${
+              index % 2 === 0 ? 'bg-card' : 'bg-muted/30'
+            }`}
+            style={{ height: `${effectiveHourHeight}px` }}
+          />
         ))}
 
         {/* Activity Blocks (absolutely positioned) - using grouped blocks for cleaner display */}
         <div className="absolute inset-0">
           {groupedBlocks.map((block) => (
-            <ActivityBlock key={block.id} block={block} hours={hours} onClick={onBlockClick} />
+            <ActivityBlock key={block.id} block={block} hours={hours} onClick={onBlockClick} hourHeight={effectiveHourHeight} />
           ))}
         </div>
       </div>

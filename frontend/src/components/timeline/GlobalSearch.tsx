@@ -2,15 +2,20 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { Search, X, GitBranch, Terminal, FolderOpen, Globe, Camera, Loader2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { SearchAllDataSources } from '../../../wailsjs/go/main/App';
 import { cn } from '@/lib/utils';
 
 export interface SearchResult {
-  type: string;  // "git", "shell", "file", "browser", "screenshot"
+  type: string;
   id: number;
   timestamp: number;
-  date: string;  // YYYY-MM-DD
-  time: string;  // HH:MM:SS
+  date: string;
+  time: string;
   summary: string;
   details: string;
   appName?: string;
@@ -21,34 +26,28 @@ interface GlobalSearchProps {
 }
 
 export function GlobalSearch({ onNavigateToDate }: GlobalSearchProps) {
+  const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
-  const [showResults, setShowResults] = useState(false);
-  const searchRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
-  // Close results when clicking outside
   useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
-        setShowResults(false);
-      }
+    if (open) {
+      setTimeout(() => inputRef.current?.focus(), 100);
+    } else {
+      setQuery('');
+      setResults([]);
     }
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+  }, [open]);
 
   const performSearch = useCallback(async (searchQuery: string) => {
     if (!searchQuery || searchQuery.length < 2) {
       setResults([]);
-      setShowResults(false);
       return;
     }
 
     setIsSearching(true);
-    setShowResults(true);
-
     try {
       const searchResults = await SearchAllDataSources(searchQuery, 50);
       setResults(searchResults || []);
@@ -63,134 +62,90 @@ export function GlobalSearch({ onNavigateToDate }: GlobalSearchProps) {
   const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     setQuery(value);
-
-    // Debounce search
-    const timeoutId = setTimeout(() => {
-      performSearch(value);
-    }, 300);
-
+    const timeoutId = setTimeout(() => performSearch(value), 300);
     return () => clearTimeout(timeoutId);
   }, [performSearch]);
-
-  const handleClear = useCallback(() => {
-    setQuery('');
-    setResults([]);
-    setShowResults(false);
-  }, []);
 
   const handleResultClick = useCallback((result: SearchResult) => {
     if (onNavigateToDate) {
       onNavigateToDate(result.date);
     }
-    setShowResults(false);
+    setOpen(false);
   }, [onNavigateToDate]);
 
   const getResultIcon = (type: string) => {
     switch (type) {
-      case 'git':
-        return <GitBranch className="h-4 w-4 text-purple-500" />;
-      case 'shell':
-        return <Terminal className="h-4 w-4 text-slate-500" />;
-      case 'file':
-        return <FolderOpen className="h-4 w-4 text-indigo-500" />;
-      case 'browser':
-        return <Globe className="h-4 w-4 text-cyan-500" />;
-      case 'screenshot':
-        return <Camera className="h-4 w-4 text-blue-500" />;
-      default:
-        return <Search className="h-4 w-4" />;
-    }
-  };
-
-  const getResultTypeLabel = (type: string) => {
-    switch (type) {
-      case 'git':
-        return 'Git Commit';
-      case 'shell':
-        return 'Shell Command';
-      case 'file':
-        return 'File Event';
-      case 'browser':
-        return 'Browser Visit';
-      case 'screenshot':
-        return 'Screenshot';
-      default:
-        return type;
+      case 'git': return <GitBranch className="h-4 w-4 text-muted-foreground" />;
+      case 'shell': return <Terminal className="h-4 w-4 text-muted-foreground" />;
+      case 'file': return <FolderOpen className="h-4 w-4 text-muted-foreground" />;
+      case 'browser': return <Globe className="h-4 w-4 text-muted-foreground" />;
+      case 'screenshot': return <Camera className="h-4 w-4 text-muted-foreground" />;
+      default: return <Search className="h-4 w-4 text-muted-foreground" />;
     }
   };
 
   return (
-    <div ref={searchRef} className="relative w-full max-w-md">
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-        <Input
-          type="text"
-          placeholder="Search commits, files, commands..."
-          value={query}
-          onChange={handleInputChange}
-          onFocus={() => {
-            if (results.length > 0) {
-              setShowResults(true);
-            }
-          }}
-          className="pl-9 pr-9 w-full"
-        />
-        {query && (
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={handleClear}
-            className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7"
-          >
-            <X className="h-4 w-4" />
-          </Button>
-        )}
-      </div>
+    <DropdownMenu open={open} onOpenChange={setOpen}>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="icon" className="h-8 w-8">
+          <Search className="h-4 w-4" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent className="w-80 p-0" align="end">
+        <div className="p-2 border-b">
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+            <Input
+              ref={inputRef}
+              type="text"
+              placeholder="Search commits, files, commands..."
+              value={query}
+              onChange={handleInputChange}
+              className="pl-8 pr-8 h-9"
+            />
+            {query && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => { setQuery(''); setResults([]); }}
+                className="absolute right-0.5 top-1/2 -translate-y-1/2 h-7 w-7"
+              >
+                <X className="h-3.5 w-3.5" />
+              </Button>
+            )}
+          </div>
+        </div>
 
-      {/* Results Dropdown */}
-      {showResults && (
-        <div className="absolute top-full mt-2 w-full max-h-96 overflow-y-auto bg-background border rounded-lg shadow-lg z-50">
+        <div className="max-h-72 overflow-y-auto">
           {isSearching ? (
             <div className="p-4 flex items-center justify-center text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin mr-2" />
               Searching...
             </div>
+          ) : query.length < 2 ? (
+            <div className="p-4 text-center text-sm text-muted-foreground">
+              Type at least 2 characters
+            </div>
           ) : results.length === 0 ? (
-            <div className="p-4 text-center text-muted-foreground">
-              {query.length < 2 ? 'Type at least 2 characters to search' : 'No results found'}
+            <div className="p-4 text-center text-sm text-muted-foreground">
+              No results found
             </div>
           ) : (
-            <div className="py-2">
-              {results.map((result, index) => (
+            <div className="py-1">
+              {results.slice(0, 10).map((result, index) => (
                 <button
                   key={`${result.type}-${result.id}-${index}`}
                   onClick={() => handleResultClick(result)}
                   className={cn(
-                    'w-full px-4 py-3 text-left hover:bg-accent transition-colors',
-                    'border-b last:border-b-0 border-border',
+                    'w-full px-3 py-2 text-left hover:bg-accent transition-colors',
                     'focus:bg-accent focus:outline-none'
                   )}
                 >
-                  <div className="flex items-start gap-3">
+                  <div className="flex items-start gap-2">
                     <div className="mt-0.5">{getResultIcon(result.type)}</div>
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="text-xs font-medium text-muted-foreground">
-                          {getResultTypeLabel(result.type)}
-                        </span>
-                        <span className="text-xs text-muted-foreground">•</span>
-                        <span className="text-xs text-muted-foreground">
-                          {result.date} {result.time}
-                        </span>
-                      </div>
-                      <div className="text-sm font-medium truncate mb-1">
-                        {result.summary}
-                      </div>
-                      {result.details && (
-                        <div className="text-xs text-muted-foreground truncate">
-                          {result.details}
-                        </div>
-                      )}
+                      <div className="text-sm font-medium truncate">{result.summary}</div>
+                      <div className="text-xs text-muted-foreground">{result.date} {result.time}</div>
                     </div>
                   </div>
                 </button>
@@ -198,7 +153,7 @@ export function GlobalSearch({ onNavigateToDate }: GlobalSearchProps) {
             </div>
           )}
         </div>
-      )}
-    </div>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }

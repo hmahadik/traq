@@ -93,36 +93,3 @@ export function Screenshot({
     </div>
   );
 }
-
-// Filmstrip variant for horizontal scrolling
-interface FilmstripProps {
-  screenshots: ScreenshotType[];
-  onSelect?: (screenshot: ScreenshotType, index: number) => void;
-  selectedIndex?: number;
-}
-
-export function Filmstrip({ screenshots, onSelect, selectedIndex }: FilmstripProps) {
-  return (
-    <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-thin">
-      {screenshots.map((screenshot, index) => (
-        <div
-          key={screenshot.id}
-          className={cn(
-            'flex-shrink-0 rounded overflow-hidden cursor-pointer transition-all',
-            selectedIndex === index
-              ? 'ring-2 ring-primary scale-105'
-              : 'hover:ring-1 ring-primary/50'
-          )}
-          onClick={() => onSelect?.(screenshot, index)}
-        >
-          <Screenshot
-            screenshot={screenshot}
-            size="thumbnail"
-            showOverlay={false}
-            className="w-[120px]"
-          />
-        </div>
-      ))}
-    </div>
-  );
-}
