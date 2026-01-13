@@ -71,11 +71,6 @@ Bar chart showing activity by hour:
 - See quiet periods and breaks
 - Useful for optimizing your schedule
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="/screenshots/activity-heatmap-dark.png">
-  <img src="/screenshots/activity-heatmap.png" alt="Activity Heatmap">
-</picture>
-
 ## Export Options
 
 Export your analytics data in multiple formats:
