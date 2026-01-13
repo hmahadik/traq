@@ -4,9 +4,9 @@
  * Captures screenshots of all main views in both light and dark modes.
  * Output goes to docs/public/screenshots/
  *
- * IMPORTANT: This script captures REAL app data, not mock data.
- * The timeline defaults to "today" and other pages show actual data.
- * Ensure the app has been running and collecting data for compelling screenshots.
+ * IMPORTANT: This script uses MOCK DATA for clean, professional screenshots.
+ * Mock data is defined in frontend/src/api/mockData.ts.
+ * Update mock data when adding new features to keep screenshots current.
  *
  * Usage:
  *   npm run screenshots        # Capture all screenshots
@@ -26,30 +26,31 @@ const SCREENSHOT_DIR = path.join(__dirname, '../../../docs/public/screenshots');
 
 // Screenshot configurations
 // Note: App uses hash-based routing, so paths need /#/ prefix
-// Using real app data with today's date for compelling screenshots
+// Using mock data for clean, professional screenshots
+const MOCK_PARAM = '?mock=true';
 const screenshots = [
   {
     name: 'timeline',
-    path: '/#/timeline',
+    path: `/${MOCK_PARAM}#/timeline`,
     waitFor: '.timeline-grid, [data-testid="daily-summary"], main',
     waitForTimeout: 3000,
   },
   {
     name: 'analytics',
-    path: '/#/analytics',
+    path: `/${MOCK_PARAM}#/analytics`,
     waitFor: '.recharts-wrapper, [data-testid="stats-grid"], main',
     waitForTimeout: 3000,
   },
   {
     name: 'reports',
-    path: '/#/reports',
+    path: `/${MOCK_PARAM}#/reports`,
     action: 'generateReport',
     waitFor: '[data-testid="report-form"], main',
     waitForTimeout: 5000, // Extra time for report generation
   },
   {
     name: 'settings',
-    path: '/#/timeline',
+    path: `/${MOCK_PARAM}#/timeline`,
     action: 'openSettings',
     waitFor: '[role="dialog"]',
     waitForTimeout: 1000,
@@ -60,7 +61,7 @@ const screenshots = [
 const detailScreenshots = [
   {
     name: 'session-details',
-    path: '/#/session/1',
+    path: `/${MOCK_PARAM}#/session/1`,
     waitFor: 'main',
     waitForTimeout: 2000,
   },

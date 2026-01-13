@@ -4,9 +4,9 @@
  * Captures screenshots of main views at various screen sizes to verify
  * responsive layout behavior.
  *
- * IMPORTANT: This script captures REAL app data, not mock data.
- * The timeline defaults to "today" and other pages show actual data.
- * Ensure the app has been running and collecting data for compelling screenshots.
+ * IMPORTANT: This script uses MOCK DATA for clean, professional screenshots.
+ * Mock data is defined in frontend/src/api/mockData.ts.
+ * Update mock data when adding new features to keep screenshots current.
  *
  * Usage:
  *   npx playwright test --config=playwright.screenshots.config.ts capture-responsive
@@ -31,12 +31,13 @@ const VIEWPORTS = [
   { name: 'desktop-large', width: 1920, height: 1080 },  // Full HD
 ] as const;
 
-// Pages to capture (using real app data)
+// Pages to capture (using mock data for clean screenshots)
 // Note: App uses hash-based routing, so paths need /#/ prefix
+const MOCK_PARAM = '?mock=true';
 const PAGES = [
-  { name: 'timeline', path: '/#/timeline', waitFor: '.timeline-grid, [data-testid="daily-summary"], main' },
-  { name: 'analytics', path: '/#/analytics', waitFor: '.recharts-wrapper, [data-testid="stats-grid"], main' },
-  { name: 'reports', path: '/#/reports', waitFor: '[data-testid="report-form"], main' },
+  { name: 'timeline', path: `/${MOCK_PARAM}#/timeline`, waitFor: '.timeline-grid, [data-testid="daily-summary"], main' },
+  { name: 'analytics', path: `/${MOCK_PARAM}#/analytics`, waitFor: '.recharts-wrapper, [data-testid="stats-grid"], main' },
+  { name: 'reports', path: `/${MOCK_PARAM}#/reports`, waitFor: '[data-testid="report-form"], main' },
 ] as const;
 
 // Ensure screenshot directory exists
