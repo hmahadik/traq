@@ -280,12 +280,6 @@ func GetServerBinaryInfo() (*ServerBinaryInfo, error) {
 	platform := runtime.GOOS
 	arch := runtime.GOARCH
 
-	// Map Go arch names to llama.cpp release naming
-	archName := arch
-	if arch == "amd64" {
-		archName = "x64"
-	}
-
 	baseURL := fmt.Sprintf("https://github.com/ggerganov/llama.cpp/releases/download/%s", llamaCppVersion)
 
 	var info ServerBinaryInfo
@@ -314,7 +308,12 @@ func GetServerBinaryInfo() (*ServerBinaryInfo, error) {
 			info.DownloadURL = fmt.Sprintf("%s/llama-%s-bin-macos-x64.zip", baseURL, llamaCppVersion)
 		}
 	case "windows":
-		info.DownloadURL = fmt.Sprintf("%s/llama-%s-bin-win-%s.zip", baseURL, llamaCppVersion, archName)
+		if arch == "arm64" {
+			info.DownloadURL = fmt.Sprintf("%s/llama-%s-bin-win-llvm-arm64.zip", baseURL, llamaCppVersion)
+		} else {
+			// Use AVX2 build for modern x64 CPUs (widely supported since 2013)
+			info.DownloadURL = fmt.Sprintf("%s/llama-%s-bin-win-avx2-x64.zip", baseURL, llamaCppVersion)
+		}
 		info.Filename = "llama-server.exe"
 		info.Size = 60_000_000 // ~60MB compressed
 	default:
