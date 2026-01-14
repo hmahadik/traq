@@ -34,22 +34,32 @@ type Session struct {
 	DurationSeconds sql.NullInt64 `json:"durationSeconds"`
 	ScreenshotCount int           `json:"screenshotCount"`
 	SummaryID       sql.NullInt64 `json:"summaryId"`
+	ProjectID       sql.NullInt64 `json:"projectId"`
 	CreatedAt       int64         `json:"createdAt"`
 }
 
 // Summary represents an AI-generated summary.
 type Summary struct {
-	ID              int64          `json:"id"`
-	SessionID       sql.NullInt64  `json:"sessionId"`
-	Summary         string         `json:"summary"`
-	Explanation     sql.NullString `json:"explanation"`
-	Confidence      sql.NullString `json:"confidence"`
-	Tags            []string       `json:"tags"`
-	ModelUsed       string         `json:"modelUsed"`
-	InferenceTimeMs sql.NullInt64  `json:"inferenceTimeMs"`
-	ScreenshotIDs   []int64        `json:"screenshotIds"`
-	ContextJSON     sql.NullString `json:"contextJson"`
-	CreatedAt       int64          `json:"createdAt"`
+	ID              int64                   `json:"id"`
+	SessionID       sql.NullInt64           `json:"sessionId"`
+	Summary         string                  `json:"summary"`
+	Explanation     sql.NullString          `json:"explanation"`
+	Confidence      sql.NullString          `json:"confidence"`
+	Tags            []string                `json:"tags"`
+	Projects        []ProjectBreakdown      `json:"projects"`
+	ModelUsed       string                  `json:"modelUsed"`
+	InferenceTimeMs sql.NullInt64           `json:"inferenceTimeMs"`
+	ScreenshotIDs   []int64                 `json:"screenshotIds"`
+	ContextJSON     sql.NullString          `json:"contextJson"`
+	CreatedAt       int64                   `json:"createdAt"`
+}
+
+// ProjectBreakdown represents time spent on a project within a session.
+type ProjectBreakdown struct {
+	Name        string   `json:"name"`
+	TimeMinutes int      `json:"timeMinutes"`
+	Activities  []string `json:"activities"`
+	Confidence  string   `json:"confidence"`
 }
 
 // WindowFocusEvent represents a window focus change.
@@ -177,11 +187,20 @@ type HierarchicalSummary struct {
 
 // Project represents a tracked project.
 type Project struct {
-	ID                int64    `json:"id"`
-	Name              string   `json:"name"`
-	DetectionPatterns []string `json:"detectionPatterns"` // JSON array of path patterns
-	IsManual          bool     `json:"isManual"`
-	CreatedAt         int64    `json:"createdAt"`
+	ID                int64  `json:"id"`
+	Name              string `json:"name"`
+	DetectionPatterns string `json:"detectionPatterns"` // JSON string with detection rules
+	IsManual          bool   `json:"isManual"`
+	CreatedAt         int64  `json:"createdAt"`
+}
+
+// DetectionRules defines patterns for automatically detecting a project.
+type DetectionRules struct {
+	GitRepos            []string `json:"gitRepos,omitempty"`
+	FilePaths           []string `json:"filePaths,omitempty"`
+	WindowTitlePatterns []string `json:"windowTitlePatterns,omitempty"`
+	AppNames            []string `json:"appNames,omitempty"`
+	Domains             []string `json:"domains,omitempty"`
 }
 
 // TagUsageInfo represents tag aggregation info.

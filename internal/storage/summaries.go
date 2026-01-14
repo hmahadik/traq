@@ -2,6 +2,7 @@ package storage
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
 )
 
@@ -9,14 +10,17 @@ import (
 func (s *Store) SaveSummary(sum *Summary) (int64, error) {
 	tagsJSON := ToJSONString(sum.Tags)
 	screenshotIDsJSON := ToJSONString(sum.ScreenshotIDs)
+	projectsJSON := toProjectsJSON(sum.Projects)
 
 	result, err := s.db.Exec(`
 		INSERT INTO summaries (
 			session_id, summary, explanation, confidence, tags,
-			model_used, inference_time_ms, screenshot_ids, context_json
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			model_used, inference_time_ms, screenshot_ids, context_json,
+			projects
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		sum.SessionID, sum.Summary, sum.Explanation, sum.Confidence, tagsJSON,
 		sum.ModelUsed, sum.InferenceTimeMs, screenshotIDsJSON, sum.ContextJSON,
+		projectsJSON,
 	)
 	if err != nil {
 		return 0, fmt.Errorf("failed to insert summary: %w", err)
@@ -30,17 +34,38 @@ func (s *Store) SaveSummary(sum *Summary) (int64, error) {
 	return id, nil
 }
 
+// toProjectsJSON converts projects array to JSON string.
+func toProjectsJSON(projects []ProjectBreakdown) string {
+	if len(projects) == 0 {
+		return "[]"
+	}
+	b, _ := json.Marshal(projects)
+	return string(b)
+}
+
+// parseProjectsJSON parses projects JSON string to array.
+func parseProjectsJSON(s sql.NullString) []ProjectBreakdown {
+	if !s.Valid || s.String == "" || s.String == "[]" {
+		return []ProjectBreakdown{}
+	}
+	var projects []ProjectBreakdown
+	json.Unmarshal([]byte(s.String), &projects)
+	return projects
+}
+
 // GetSummary retrieves a summary by ID.
 func (s *Store) GetSummary(id int64) (*Summary, error) {
 	sum := &Summary{}
-	var tagsJSON, screenshotIDsJSON sql.NullString
+	var tagsJSON, screenshotIDsJSON, projectsJSON sql.NullString
 
 	err := s.db.QueryRow(`
 		SELECT id, session_id, summary, explanation, confidence, tags,
-		       model_used, inference_time_ms, screenshot_ids, context_json, created_at
+		       model_used, inference_time_ms, screenshot_ids, context_json, created_at,
+		       projects
 		FROM summaries WHERE id = ?`, id).Scan(
 		&sum.ID, &sum.SessionID, &sum.Summary, &sum.Explanation, &sum.Confidence, &tagsJSON,
 		&sum.ModelUsed, &sum.InferenceTimeMs, &screenshotIDsJSON, &sum.ContextJSON, &sum.CreatedAt,
+		&projectsJSON,
 	)
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -51,6 +76,7 @@ func (s *Store) GetSummary(id int64) (*Summary, error) {
 
 	sum.Tags = ParseJSONStringArray(tagsJSON)
 	sum.ScreenshotIDs = ParseJSONInt64Array(screenshotIDsJSON)
+	sum.Projects = parseProjectsJSON(projectsJSON)
 
 	return sum, nil
 }
@@ -58,15 +84,17 @@ func (s *Store) GetSummary(id int64) (*Summary, error) {
 // GetSummaryBySession retrieves the summary for a specific session.
 func (s *Store) GetSummaryBySession(sessionID int64) (*Summary, error) {
 	sum := &Summary{}
-	var tagsJSON, screenshotIDsJSON sql.NullString
+	var tagsJSON, screenshotIDsJSON, projectsJSON sql.NullString
 
 	err := s.db.QueryRow(`
 		SELECT id, session_id, summary, explanation, confidence, tags,
-		       model_used, inference_time_ms, screenshot_ids, context_json, created_at
+		       model_used, inference_time_ms, screenshot_ids, context_json, created_at,
+		       projects
 		FROM summaries WHERE session_id = ?
 		ORDER BY created_at DESC LIMIT 1`, sessionID).Scan(
 		&sum.ID, &sum.SessionID, &sum.Summary, &sum.Explanation, &sum.Confidence, &tagsJSON,
 		&sum.ModelUsed, &sum.InferenceTimeMs, &screenshotIDsJSON, &sum.ContextJSON, &sum.CreatedAt,
+		&projectsJSON,
 	)
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -77,6 +105,7 @@ func (s *Store) GetSummaryBySession(sessionID int64) (*Summary, error) {
 
 	sum.Tags = ParseJSONStringArray(tagsJSON)
 	sum.ScreenshotIDs = ParseJSONInt64Array(screenshotIDsJSON)
+	sum.Projects = parseProjectsJSON(projectsJSON)
 
 	return sum, nil
 }
@@ -85,7 +114,8 @@ func (s *Store) GetSummaryBySession(sessionID int64) (*Summary, error) {
 func (s *Store) GetSummariesByDateRange(start, end int64) ([]*Summary, error) {
 	rows, err := s.db.Query(`
 		SELECT id, session_id, summary, explanation, confidence, tags,
-		       model_used, inference_time_ms, screenshot_ids, context_json, created_at
+		       model_used, inference_time_ms, screenshot_ids, context_json, created_at,
+		       projects
 		FROM summaries
 		WHERE created_at >= ? AND created_at <= ?
 		ORDER BY created_at ASC`, start, end)
@@ -101,7 +131,8 @@ func (s *Store) GetSummariesByDateRange(start, end int64) ([]*Summary, error) {
 func (s *Store) GetRecentSummaries(limit int) ([]*Summary, error) {
 	rows, err := s.db.Query(`
 		SELECT id, session_id, summary, explanation, confidence, tags,
-		       model_used, inference_time_ms, screenshot_ids, context_json, created_at
+		       model_used, inference_time_ms, screenshot_ids, context_json, created_at,
+		       projects
 		FROM summaries
 		ORDER BY created_at DESC
 		LIMIT ?`, limit)
@@ -117,14 +148,17 @@ func (s *Store) GetRecentSummaries(limit int) ([]*Summary, error) {
 func (s *Store) UpdateSummary(sum *Summary) error {
 	tagsJSON := ToJSONString(sum.Tags)
 	screenshotIDsJSON := ToJSONString(sum.ScreenshotIDs)
+	projectsJSON := toProjectsJSON(sum.Projects)
 
 	_, err := s.db.Exec(`
 		UPDATE summaries SET
 			summary = ?, explanation = ?, confidence = ?, tags = ?,
-			model_used = ?, inference_time_ms = ?, screenshot_ids = ?, context_json = ?
+			model_used = ?, inference_time_ms = ?, screenshot_ids = ?, context_json = ?,
+			projects = ?
 		WHERE id = ?`,
 		sum.Summary, sum.Explanation, sum.Confidence, tagsJSON,
-		sum.ModelUsed, sum.InferenceTimeMs, screenshotIDsJSON, sum.ContextJSON, sum.ID,
+		sum.ModelUsed, sum.InferenceTimeMs, screenshotIDsJSON, sum.ContextJSON,
+		projectsJSON, sum.ID,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to update summary: %w", err)
@@ -163,7 +197,8 @@ func (s *Store) GetSummariesForSessions(sessionIDs []int64) (map[int64]*Summary,
 
 	query := fmt.Sprintf(`
 		SELECT id, session_id, summary, explanation, confidence, tags,
-		       model_used, inference_time_ms, screenshot_ids, context_json, created_at
+		       model_used, inference_time_ms, screenshot_ids, context_json, created_at,
+		       projects
 		FROM summaries
 		WHERE session_id IN (?%s)
 		ORDER BY session_id, created_at DESC`,
@@ -212,16 +247,18 @@ func scanSummaries(rows *sql.Rows) ([]*Summary, error) {
 	var summaries []*Summary
 	for rows.Next() {
 		sum := &Summary{}
-		var tagsJSON, screenshotIDsJSON sql.NullString
+		var tagsJSON, screenshotIDsJSON, projectsJSON sql.NullString
 		err := rows.Scan(
 			&sum.ID, &sum.SessionID, &sum.Summary, &sum.Explanation, &sum.Confidence, &tagsJSON,
 			&sum.ModelUsed, &sum.InferenceTimeMs, &screenshotIDsJSON, &sum.ContextJSON, &sum.CreatedAt,
+			&projectsJSON,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan summary: %w", err)
 		}
 		sum.Tags = ParseJSONStringArray(tagsJSON)
 		sum.ScreenshotIDs = ParseJSONInt64Array(screenshotIDsJSON)
+		sum.Projects = parseProjectsJSON(projectsJSON)
 		summaries = append(summaries, sum)
 	}
 	return summaries, rows.Err()

@@ -24,6 +24,8 @@ export function DeleteScreenshot(arg1:number):Promise<void>;
 
 export function DeleteSession(arg1:number):Promise<void>;
 
+export function DeleteSummary(arg1:number):Promise<void>;
+
 export function DeleteTag(arg1:string):Promise<number>;
 
 export function DeleteTimelineCategoryRule(arg1:string):Promise<void>;

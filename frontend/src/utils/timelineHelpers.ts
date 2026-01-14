@@ -540,3 +540,115 @@ export function snapTo15Minutes(
 
   return Math.floor(date.getTime() / 1000);
 }
+
+/**
+ * Flattens TimelineGridData into a chronological list of all events.
+ * This is used for the List Mode view.
+ *
+ * @param gridData - The timeline grid data from the backend
+ * @returns Array of timeline events sorted chronologically
+ */
+import type {
+  TimelineGridData,
+  TimelineListEvent,
+  ActivityBlock,
+  SessionSummaryWithPosition,
+  GitEventDisplay,
+  ShellEventDisplay,
+  FileEventDisplay,
+  BrowserEventDisplay,
+  AFKBlock
+} from '@/types/timeline';
+
+export function flattenTimelineData(gridData: TimelineGridData): TimelineListEvent[] {
+  const events: TimelineListEvent[] = [];
+
+  // Extract all activity blocks from hourly grid
+  Object.values(gridData.hourlyGrid).forEach((appMap) => {
+    Object.values(appMap).forEach((blocks) => {
+      blocks.forEach((block: ActivityBlock) => {
+        events.push({
+          id: `activity-${block.id}`,
+          type: 'activity',
+          timestamp: block.startTime,
+          data: block,
+        });
+      });
+    });
+  });
+
+  // Extract session summaries
+  gridData.sessionSummaries.forEach((session: SessionSummaryWithPosition) => {
+    events.push({
+      id: `session-${session.id}`,
+      type: 'session',
+      timestamp: session.startTime,
+      data: session,
+    });
+  });
+
+  // Extract git events
+  Object.values(gridData.gitEvents).forEach((hourEvents) => {
+    hourEvents.forEach((event: GitEventDisplay) => {
+      events.push({
+        id: `git-${event.id}`,
+        type: 'git',
+        timestamp: event.timestamp,
+        data: event,
+      });
+    });
+  });
+
+  // Extract shell events
+  Object.values(gridData.shellEvents).forEach((hourEvents) => {
+    hourEvents.forEach((event: ShellEventDisplay) => {
+      events.push({
+        id: `shell-${event.id}`,
+        type: 'shell',
+        timestamp: event.timestamp,
+        data: event,
+      });
+    });
+  });
+
+  // Extract file events
+  Object.values(gridData.fileEvents).forEach((hourEvents) => {
+    hourEvents.forEach((event: FileEventDisplay) => {
+      events.push({
+        id: `file-${event.id}`,
+        type: 'file',
+        timestamp: event.timestamp,
+        data: event,
+      });
+    });
+  });
+
+  // Extract browser events
+  Object.values(gridData.browserEvents).forEach((hourEvents) => {
+    hourEvents.forEach((event: BrowserEventDisplay) => {
+      events.push({
+        id: `browser-${event.id}`,
+        type: 'browser',
+        timestamp: event.timestamp,
+        data: event,
+      });
+    });
+  });
+
+  // Extract AFK blocks
+  Object.values(gridData.afkBlocks).forEach((hourBlocks) => {
+    hourBlocks.forEach((block: AFKBlock) => {
+      events.push({
+        id: `afk-${block.id}`,
+        type: 'afk',
+        timestamp: block.startTime,
+        data: block,
+      });
+    });
+  });
+
+  // Sort chronologically by timestamp (ascending)
+  events.sort((a, b) => a.timestamp - b.timestamp);
+
+  return events;
+}

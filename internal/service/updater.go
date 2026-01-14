@@ -71,7 +71,7 @@ func NewUpdateService(currentVersion, dataDir string) *UpdateService {
 		currentVersion: currentVersion,
 		dataDir:        dataDir,
 		repoOwner:      "hmahadik",
-		repoName:       "traq",
+		repoName:       "activity-tracker",
 		checkInterval:  5 * time.Hour,
 		enabled:        true,
 		stopCh:         make(chan struct{}),

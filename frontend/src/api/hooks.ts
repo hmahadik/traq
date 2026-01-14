@@ -648,6 +648,25 @@ export function useRegenerateSummary() {
   });
 }
 
+export function useDeleteSummary() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (summaryId: number) => api.summaries.deleteSummary(summaryId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['timeline'] });
+      queryClient.invalidateQueries({ queryKey: ['session'] });
+      queryClient.invalidateQueries({ queryKey: ['analytics'] });
+      toast.success('Summary deleted successfully');
+    },
+    onError: (error: unknown) => {
+      console.error('Delete summary failed:', error);
+      const message = error instanceof Error ? error.message : String(error);
+      toast.error(`Failed to delete summary: ${message}`);
+    },
+  });
+}
+
 export function useDeleteSession() {
   const queryClient = useQueryClient();
 

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -739,6 +740,14 @@ func (a *App) RegenerateSummary(sessionID int64) (*storage.Summary, error) {
 		return nil, fmt.Errorf("summary service not initialized")
 	}
 	return a.Summary.RegenerateSummary(sessionID)
+}
+
+// DeleteSummary deletes an AI summary.
+func (a *App) DeleteSummary(summaryID int64) error {
+	if !a.ready {
+		return errors.New("app not ready")
+	}
+	return a.store.DeleteSummary(summaryID)
 }
 
 // GetSummary retrieves a summary by ID.

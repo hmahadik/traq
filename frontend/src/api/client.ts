@@ -623,6 +623,11 @@ export const summaries = {
     await waitForReady();
     await App.RegenerateSummary(sessionId);
   },
+
+  deleteSummary: async (summaryId: number): Promise<void> => {
+    await waitForReady();
+    await App.DeleteSummary(summaryId);
+  },
 };
 
 /**

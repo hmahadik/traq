@@ -230,7 +230,9 @@ export function SessionCard({
             <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
               <Badge variant="secondary" className="gap-1 text-xs">
                 <Clock className="h-3 w-3" />
-                {formatDuration(session.durationSeconds ?? 0)}
+                {session.isOngoing
+                  ? formatDuration(Math.floor(Date.now() / 1000) - session.startTime)
+                  : formatDuration(session.durationSeconds ?? 0)}
               </Badge>
               <Badge variant="outline" className="gap-1 text-xs">
                 <Camera className="h-3 w-3" />

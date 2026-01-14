@@ -4,7 +4,7 @@ import (
 	"fmt"
 )
 
-const schemaVersion = 7
+const schemaVersion = 8
 
 const schema = `
 -- ============================================================================
@@ -289,6 +289,12 @@ func (s *Store) Migrate() error {
 			return fmt.Errorf("failed to apply migration 7: %w", err)
 		}
 	}
+	if currentVersion < 8 {
+		// Migration v8: Add projects column to summaries table for AI-detected project breakdowns
+		if err := s.applyMigration8(); err != nil {
+			return fmt.Errorf("failed to apply migration 8: %w", err)
+		}
+	}
 
 	// Record schema version
 	if currentVersion == 0 {
@@ -548,6 +554,18 @@ func (s *Store) applyMigration7() error {
 	`)
 	if err != nil {
 		return fmt.Errorf("failed to create issue_reports table: %w", err)
+	}
+
+	return nil
+}
+
+// applyMigration8 adds the projects column to summaries table for AI-detected project breakdowns.
+func (s *Store) applyMigration8() error {
+	// Add projects column to summaries table (JSON array of project breakdowns)
+	_, err := s.db.Exec(`ALTER TABLE summaries ADD COLUMN projects TEXT`)
+	if err != nil {
+		// Column might already exist if schema was recreated
+		return nil
 	}
 
 	return nil

@@ -93,72 +93,72 @@ export function ActivityLogTable({ focusEvents }: ActivityLogTableProps) {
   // Render sort icon for column headers
   const SortIcon = ({ field }: { field: SortField }) => {
     if (sortField !== field) {
-      return <ArrowUpDown className="ml-2 h-4 w-4 opacity-50" />;
+      return <ArrowUpDown className="ml-1 h-3 w-3 opacity-50" />;
     }
     return sortDirection === 'asc' ? (
-      <ArrowUp className="ml-2 h-4 w-4" />
+      <ArrowUp className="ml-1 h-3 w-3" />
     ) : (
-      <ArrowDown className="ml-2 h-4 w-4" />
+      <ArrowDown className="ml-1 h-3 w-3" />
     );
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       {/* Search Filter */}
       <div className="relative">
-        <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+        <Search className="absolute left-2 top-2 h-3.5 w-3.5 text-muted-foreground" />
         <Input
           placeholder="Search by app or window title..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className="pl-8"
+          className="pl-7 h-8 text-xs"
         />
       </div>
 
       {/* Table */}
       <div className="rounded-md border">
-        <table className="w-full">
+        <table className="w-full text-sm">
           <thead>
             <tr className="border-b bg-muted/50">
-              <th className="h-10 px-4 text-left align-middle font-medium text-muted-foreground">
+              <th className="h-8 px-2 text-left align-middle font-medium text-muted-foreground text-xs">
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={() => handleSort('startTime')}
-                  className="h-8 px-2"
+                  className="h-6 px-1 text-xs"
                 >
                   Time
                   <SortIcon field="startTime" />
                 </Button>
               </th>
-              <th className="h-10 px-4 text-left align-middle font-medium text-muted-foreground">
+              <th className="h-8 px-2 text-left align-middle font-medium text-muted-foreground text-xs">
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={() => handleSort('appName')}
-                  className="h-8 px-2"
+                  className="h-6 px-1 text-xs"
                 >
                   App
                   <SortIcon field="appName" />
                 </Button>
               </th>
-              <th className="h-10 px-4 text-left align-middle font-medium text-muted-foreground">
+              <th className="h-8 px-2 text-left align-middle font-medium text-muted-foreground text-xs">
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={() => handleSort('windowTitle')}
-                  className="h-8 px-2"
+                  className="h-6 px-1 text-xs"
                 >
                   Window
                   <SortIcon field="windowTitle" />
                 </Button>
               </th>
-              <th className="h-10 px-4 text-left align-middle font-medium text-muted-foreground">
+              <th className="h-8 px-2 text-left align-middle font-medium text-muted-foreground text-xs">
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={() => handleSort('durationSeconds')}
-                  className="h-8 px-2"
+                  className="h-6 px-1 text-xs"
                 >
                   Duration
                   <SortIcon field="durationSeconds" />
@@ -169,7 +169,7 @@ export function ActivityLogTable({ focusEvents }: ActivityLogTableProps) {
           <tbody>
             {sortedAndFilteredEvents.length === 0 ? (
               <tr>
-                <td colSpan={4} className="p-4 text-center text-muted-foreground">
+                <td colSpan={4} className="p-3 text-center text-muted-foreground text-xs">
                   {searchQuery ? 'No matching events found' : 'No focus events recorded'}
                 </td>
               </tr>
@@ -177,18 +177,18 @@ export function ActivityLogTable({ focusEvents }: ActivityLogTableProps) {
               sortedAndFilteredEvents.map((event) => {
                 const barWidth = (event.durationSeconds / maxDuration) * 100;
                 return (
-                  <tr key={event.id} className="border-b">
-                    <td className="p-4 align-middle font-mono text-sm">
+                  <tr key={event.id} className="border-b hover:bg-muted/30">
+                    <td className="p-2 align-middle font-mono text-xs">
                       {formatTimestamp(event.startTime)}
                     </td>
-                    <td className="p-4 align-middle font-medium">{event.appName}</td>
-                    <td className="p-4 align-middle max-w-md truncate" title={event.windowTitle}>
+                    <td className="p-2 align-middle font-medium text-xs">{event.appName}</td>
+                    <td className="p-2 align-middle max-w-md truncate text-xs" title={event.windowTitle}>
                       {event.windowTitle}
                     </td>
-                    <td className="p-4 align-middle">
+                    <td className="p-2 align-middle">
                       <div className="flex items-center gap-2">
-                        <span className="text-sm w-16">{formatDuration(event.durationSeconds)}</span>
-                        <div className="flex-1 h-4 bg-muted rounded-full overflow-hidden min-w-[100px]">
+                        <span className="text-xs w-12">{formatDuration(event.durationSeconds)}</span>
+                        <div className="flex-1 h-3 bg-muted rounded-full overflow-hidden min-w-[60px]">
                           <div
                             className="h-full bg-primary transition-all"
                             style={{ width: `${barWidth}%` }}
@@ -205,7 +205,7 @@ export function ActivityLogTable({ focusEvents }: ActivityLogTableProps) {
       </div>
 
       {/* Results count */}
-      <p className="text-sm text-muted-foreground">
+      <p className="text-xs text-muted-foreground text-center">
         Showing {sortedAndFilteredEvents.length} of {focusEvents.length} events
       </p>
     </div>

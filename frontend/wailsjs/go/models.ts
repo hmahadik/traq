@@ -2498,6 +2498,24 @@ export namespace storage {
 	        this.createdAt = source["createdAt"];
 	    }
 	}
+	export class ProjectBreakdown {
+	    name: string;
+	    timeMinutes: number;
+	    activities: string[];
+	    confidence: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ProjectBreakdown(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.timeMinutes = source["timeMinutes"];
+	        this.activities = source["activities"];
+	        this.confidence = source["confidence"];
+	    }
+	}
 	export class Screenshot {
 	    id: number;
 	    timestamp: number;
@@ -2567,6 +2585,7 @@ export namespace storage {
 	    durationSeconds: sql.NullInt64;
 	    screenshotCount: number;
 	    summaryId: sql.NullInt64;
+	    projectId: sql.NullInt64;
 	    createdAt: number;
 	
 	    static createFrom(source: any = {}) {
@@ -2581,6 +2600,7 @@ export namespace storage {
 	        this.durationSeconds = this.convertValues(source["durationSeconds"], sql.NullInt64);
 	        this.screenshotCount = source["screenshotCount"];
 	        this.summaryId = this.convertValues(source["summaryId"], sql.NullInt64);
+	        this.projectId = this.convertValues(source["projectId"], sql.NullInt64);
 	        this.createdAt = source["createdAt"];
 	    }
 	
@@ -2657,6 +2677,7 @@ export namespace storage {
 	    explanation: sql.NullString;
 	    confidence: sql.NullString;
 	    tags: string[];
+	    projects: ProjectBreakdown[];
 	    modelUsed: string;
 	    inferenceTimeMs: sql.NullInt64;
 	    screenshotIds: number[];
@@ -2675,6 +2696,7 @@ export namespace storage {
 	        this.explanation = this.convertValues(source["explanation"], sql.NullString);
 	        this.confidence = this.convertValues(source["confidence"], sql.NullString);
 	        this.tags = source["tags"];
+	        this.projects = this.convertValues(source["projects"], ProjectBreakdown);
 	        this.modelUsed = source["modelUsed"];
 	        this.inferenceTimeMs = this.convertValues(source["inferenceTimeMs"], sql.NullInt64);
 	        this.screenshotIds = source["screenshotIds"];

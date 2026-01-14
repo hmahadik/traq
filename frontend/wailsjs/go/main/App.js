@@ -38,6 +38,10 @@ export function DeleteSession(arg1) {
   return window['go']['main']['App']['DeleteSession'](arg1);
 }
 
+export function DeleteSummary(arg1) {
+  return window['go']['main']['App']['DeleteSummary'](arg1);
+}
+
 export function DeleteTag(arg1) {
   return window['go']['main']['App']['DeleteTag'](arg1);
 }

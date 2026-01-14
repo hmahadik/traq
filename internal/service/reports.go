@@ -2,6 +2,7 @@ package service
 
 import (
 	"fmt"
+	"math"
 	"regexp"
 	"sort"
 	"strconv"
@@ -227,41 +228,45 @@ func (s *ReportsService) buildEnhancedReportContext(tr *TimeRange) (*EnhancedRep
 }
 
 // aggregateAppUsageWithWindows groups focus events by app, then by window title.
+// Uses friendly name as key to deduplicate app variants (e.g., "traq" and "traq-dev-linux-amd64").
 func (s *ReportsService) aggregateAppUsageWithWindows(events []*storage.WindowFocusEvent) []*AppDetailedUsage {
-	// First pass: aggregate by app
+	// First pass: aggregate by FRIENDLY name to deduplicate app variants
 	appMap := make(map[string]*AppDetailedUsage)
-	windowMap := make(map[string]map[string]*WindowBreakdown) // app -> window -> breakdown
+	windowMap := make(map[string]map[string]*WindowBreakdown) // friendlyName -> window -> breakdown
 
 	var totalDuration float64
 	for _, evt := range events {
 		totalDuration += evt.DurationSeconds
 
-		// Get or create app entry
-		if _, ok := appMap[evt.AppName]; !ok {
-			appMap[evt.AppName] = &AppDetailedUsage{
+		// Use friendly name as key to deduplicate related app variants
+		friendlyName := GetFriendlyAppName(evt.AppName)
+
+		// Get or create app entry using friendly name as key
+		if _, ok := appMap[friendlyName]; !ok {
+			appMap[friendlyName] = &AppDetailedUsage{
 				AppName:      evt.AppName,
-				FriendlyName: GetFriendlyAppName(evt.AppName),
+				FriendlyName: friendlyName,
 				Category:     string(s.analytics.CategorizeApp(evt.AppName)),
 				Windows:      []WindowBreakdown{},
 			}
-			windowMap[evt.AppName] = make(map[string]*WindowBreakdown)
+			windowMap[friendlyName] = make(map[string]*WindowBreakdown)
 		}
-		appMap[evt.AppName].DurationSeconds += evt.DurationSeconds
+		appMap[friendlyName].DurationSeconds += evt.DurationSeconds
 
 		// Get or create window entry
-		if _, ok := windowMap[evt.AppName][evt.WindowTitle]; !ok {
+		if _, ok := windowMap[friendlyName][evt.WindowTitle]; !ok {
 			isMeeting, platform := s.detectMeetingFromTitle(evt.WindowTitle)
-			windowMap[evt.AppName][evt.WindowTitle] = &WindowBreakdown{
+			windowMap[friendlyName][evt.WindowTitle] = &WindowBreakdown{
 				WindowTitle:     evt.WindowTitle,
 				IsMeeting:       isMeeting,
 				MeetingPlatform: platform,
 				ProjectPath:     s.extractVSCodeProject(evt.WindowTitle),
 			}
 			if isMeeting {
-				appMap[evt.AppName].MeetingCount++
+				appMap[friendlyName].MeetingCount++
 			}
 		}
-		windowMap[evt.AppName][evt.WindowTitle].DurationSeconds += evt.DurationSeconds
+		windowMap[friendlyName][evt.WindowTitle].DurationSeconds += evt.DurationSeconds
 	}
 
 	// Second pass: calculate percentages and sort
@@ -2266,8 +2271,9 @@ func (s *ReportsService) buildWeeklySummaryData(startUnix, endUnix int64, startD
 	// Aggregate browser by domain with research topics
 	data.BrowserDomains, data.ResearchTopics = s.aggregateBrowserForWeekly(browserVisits, focusEvents)
 
-	// Build project summaries
-	data.Projects = s.buildProjectSummaries(focusEvents, gitCommits, browserVisits)
+	// Build project summaries from AI-detected projects (preferred)
+	// Fallback to heuristic detection if AI summaries not available
+	data.Projects = s.buildProjectSummariesFromAI(sessions, focusEvents, gitCommits, browserVisits)
 
 	// Build daily stats
 	data.DailyStats = s.buildDailyStatsForWeekly(startUnix, endUnix, sessions, gitCommits, focusEvents)
@@ -2551,6 +2557,244 @@ func (s *ReportsService) buildProjectSummaries(focusEvents []*storage.WindowFocu
 	})
 
 	return projects
+}
+
+// buildProjectSummariesFromAI builds project summaries using a hybrid approach:
+// - Time tracking from heuristics (focus events) for accurate hours
+// - AI-detected activities for granular accomplishments
+// This ensures accurate time while capturing work that doesn't show up in git.
+func (s *ReportsService) buildProjectSummariesFromAI(sessions []*storage.Session, focusEvents []*storage.WindowFocusEvent, commits []*storage.GitCommit, browserVisits []*storage.BrowserVisit) []ProjectSummary {
+	// STEP 1: Build base project map from heuristic detection (accurate time)
+	projectMap := make(map[string]*ProjectSummary)
+	repoPathCache := make(map[int64]string)
+
+	// Helper to get or create project
+	getProject := func(name string) *ProjectSummary {
+		if name == "" {
+			name = "Other"
+		}
+		// Normalize common variations
+		normalizedName := s.normalizeProjectName(name)
+		if p, ok := projectMap[normalizedName]; ok {
+			return p
+		}
+		projectMap[normalizedName] = &ProjectSummary{
+			Name:                 normalizedName,
+			DailyAccomplishments: make(map[string][]string),
+			Apps:                 []string{},
+		}
+		return projectMap[normalizedName]
+	}
+
+	// Helper to find matching project by fuzzy name
+	findMatchingProject := func(name string) *ProjectSummary {
+		normalizedName := s.normalizeProjectName(name)
+		if p, ok := projectMap[normalizedName]; ok {
+			return p
+		}
+		// Fuzzy match
+		lowerName := strings.ToLower(normalizedName)
+		for existingName, proj := range projectMap {
+			lowerExisting := strings.ToLower(existingName)
+			if strings.Contains(lowerExisting, lowerName) || strings.Contains(lowerName, lowerExisting) {
+				return proj
+			}
+		}
+		return nil
+	}
+
+	// From git commits - project detection + time proxy
+	for _, commit := range commits {
+		repoPath, ok := repoPathCache[commit.RepositoryID]
+		if !ok {
+			repo, err := s.store.GetGitRepository(commit.RepositoryID)
+			if err == nil && repo != nil {
+				repoPath = repo.Path
+			} else {
+				repoPath = "unknown"
+			}
+			repoPathCache[commit.RepositoryID] = repoPath
+		}
+
+		projectName := s.detectProjectFromGitRepo(repoPath)
+		project := getProject(projectName)
+		project.CommitCount++
+
+		// Add commit as accomplishment
+		day := time.Unix(commit.Timestamp, 0).Format("2006-01-02")
+		if !isBoringCommit(commit.Message) {
+			project.DailyAccomplishments[day] = append(
+				project.DailyAccomplishments[day],
+				commit.Message,
+			)
+		}
+	}
+
+	// From focus events - TIME TRACKING (this is the accurate source)
+	for _, evt := range focusEvents {
+		projectName := s.detectProjectFromWindowTitle(evt.WindowTitle, evt.AppName)
+		if projectName == "" {
+			continue
+		}
+		project := getProject(projectName)
+		project.Hours += evt.DurationSeconds / 3600
+
+		// Track apps used
+		appName := GetFriendlyAppName(evt.AppName)
+		found := false
+		for _, a := range project.Apps {
+			if a == appName {
+				found = true
+				break
+			}
+		}
+		if !found {
+			project.Apps = append(project.Apps, appName)
+		}
+	}
+
+	// From browser visits for research/AI projects
+	for _, visit := range browserVisits {
+		if visit.Title.Valid {
+			projectName := s.detectProjectFromBrowserTitle(visit.Title.String)
+			if projectName != "" {
+				project := getProject(projectName)
+				if visit.VisitDurationSeconds.Valid {
+					project.Hours += float64(visit.VisitDurationSeconds.Int64) / 3600
+				}
+			}
+		}
+	}
+
+	// STEP 2: Overlay AI-detected activities onto projects
+	sessionIDs := make([]int64, len(sessions))
+	for i, sess := range sessions {
+		sessionIDs[i] = sess.ID
+	}
+
+	summariesMap, err := s.store.GetSummariesForSessions(sessionIDs)
+	if err == nil && len(summariesMap) > 0 {
+		// Merge AI activities into existing projects
+		for _, sess := range sessions {
+			summary, ok := summariesMap[sess.ID]
+			if !ok || summary == nil || len(summary.Projects) == 0 {
+				continue
+			}
+
+			sessionDate := time.Unix(sess.StartTime, 0).Format("2006-01-02")
+
+			for _, aiProject := range summary.Projects {
+				// Find matching project or create new one
+				project := findMatchingProject(aiProject.Name)
+				if project == nil {
+					project = getProject(aiProject.Name)
+				}
+
+				// Add AI-detected activities (these are the granular ones git misses)
+				for _, activity := range aiProject.Activities {
+					if activity != "" && !s.isDuplicateActivity(project.DailyAccomplishments[sessionDate], activity) {
+						project.DailyAccomplishments[sessionDate] = append(
+							project.DailyAccomplishments[sessionDate],
+							activity,
+						)
+					}
+				}
+			}
+		}
+	}
+
+	// Calculate percentages
+	var totalHours float64
+	for _, p := range projectMap {
+		totalHours += p.Hours
+	}
+	for _, p := range projectMap {
+		if totalHours > 0 {
+			p.Percentage = (p.Hours / totalHours) * 100
+		}
+	}
+
+	// Convert map to sorted slice
+	var projects []ProjectSummary
+	for _, p := range projectMap {
+		projects = append(projects, *p)
+	}
+
+	// Sort by hours descending
+	sort.Slice(projects, func(i, j int) bool {
+		return projects[i].Hours > projects[j].Hours
+	})
+
+	return projects
+}
+
+// normalizeProjectName consolidates common project name variations.
+func (s *ReportsService) normalizeProjectName(name string) string {
+	lower := strings.ToLower(name)
+
+	// Traq variations
+	if strings.Contains(lower, "traq") || strings.Contains(lower, "activity-tracker") || strings.Contains(lower, "activity tracker") {
+		return "Traq"
+	}
+
+	// Synaptics variations
+	if strings.Contains(lower, "synaptics") || strings.Contains(lower, "sl261") || strings.Contains(lower, "sl2619") || strings.Contains(lower, "42t") || strings.Contains(lower, "42 tech") {
+		return "Synaptics/42T"
+	}
+
+	// Arcturus variations
+	if strings.Contains(lower, "arcturus") || strings.Contains(lower, "ucmib") {
+		return "Arcturus Admin"
+	}
+
+	// Claude Code variations
+	if strings.Contains(lower, "claude code") || strings.Contains(lower, "autonomous-coding") || strings.Contains(lower, "claude-quickstarts") {
+		return "Claude Code"
+	}
+
+	return name
+}
+
+// detectProjectFromBrowserTitle detects project from browser page title.
+func (s *ReportsService) detectProjectFromBrowserTitle(title string) string {
+	lower := strings.ToLower(title)
+
+	if strings.Contains(lower, "traq") || strings.Contains(lower, "activity-tracker") || strings.Contains(lower, "activity tracker") {
+		return "Traq"
+	}
+	if strings.Contains(lower, "synaptics") || strings.Contains(lower, "sl261") || strings.Contains(lower, "sl2619") {
+		return "Synaptics/42T"
+	}
+	if strings.Contains(lower, "autonomous-coding") || strings.Contains(lower, "claude-quickstarts") {
+		return "Claude Code"
+	}
+	if strings.Contains(lower, "functiongemma") || strings.Contains(lower, "fine-tuning gemma") {
+		return "AI/ML Research"
+	}
+	if strings.Contains(lower, "arcturus") {
+		return "Arcturus Admin"
+	}
+
+	return ""
+}
+
+// isDuplicateActivity checks if an activity is a duplicate or semantically similar.
+func (s *ReportsService) isDuplicateActivity(existing []string, newActivity string) bool {
+	lowerNew := strings.ToLower(newActivity)
+	for _, e := range existing {
+		lowerExisting := strings.ToLower(e)
+		// Exact match
+		if lowerExisting == lowerNew {
+			return true
+		}
+		// One contains the other (semantic similarity)
+		if len(lowerNew) > 20 && len(lowerExisting) > 20 {
+			if strings.Contains(lowerNew, lowerExisting[:20]) || strings.Contains(lowerExisting, lowerNew[:20]) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // buildDailyStatsForWeekly builds daily statistics for the weekly summary
@@ -3056,16 +3300,15 @@ func (s *ReportsService) formatWeeklySummaryHTML(data *WeeklySummaryData) string
 		sb.WriteString(`</div>`)
 	}
 
-	// Research & Learning (from Claude/AI)
+	// Research & Learning (from Claude/AI) - simplified, no time tracking
 	if len(data.ResearchTopics) > 0 {
 		sb.WriteString(`<div style="margin-bottom: 24px;">
 			<div style="font-size: 0.85rem; font-weight: 600; color: #f1f5f9; margin-bottom: 12px;">Research & Learning</div>`)
 		for _, topic := range data.ResearchTopics {
 			sb.WriteString(fmt.Sprintf(`
-				<div style="display: flex; justify-content: space-between; margin-bottom: 6px; padding: 6px 0; border-bottom: 1px solid rgba(148, 163, 184, 0.1);">
+				<div style="margin-bottom: 6px; padding: 6px 0; border-bottom: 1px solid rgba(148, 163, 184, 0.1);">
 					<span style="font-size: 0.8rem; color: #e2e8f0;">%s</span>
-					<span style="font-size: 0.75rem; color: #64748b;">%dm</span>
-				</div>`, topic.Topic, topic.DurationMins))
+				</div>`, topic.Topic))
 		}
 		sb.WriteString(`</div>`)
 	}
@@ -3182,9 +3425,20 @@ func (s *ReportsService) formatWeeklySummaryMarkdown(data *WeeklySummaryData) st
 
 	if len(data.Projects) > 0 {
 		var projectPcts []string
+		var shownTotal float64
 		for _, p := range data.Projects {
 			if p.Percentage >= 5 {
-				projectPcts = append(projectPcts, fmt.Sprintf("%s (%.0f%%)", p.Name, p.Percentage))
+				// Round to nearest integer for cleaner display
+				rounded := math.Round(p.Percentage)
+				projectPcts = append(projectPcts, fmt.Sprintf("%s (%.0f%%)", p.Name, rounded))
+				shownTotal += rounded
+			}
+		}
+		// Add "Other" if shown percentages don't account for all time
+		if shownTotal < 95 && shownTotal > 0 {
+			otherPct := math.Round(100 - shownTotal)
+			if otherPct >= 3 {
+				projectPcts = append(projectPcts, fmt.Sprintf("Other (%.0f%%)", otherPct))
 			}
 		}
 		if len(projectPcts) > 0 {
@@ -3211,18 +3465,36 @@ func (s *ReportsService) formatWeeklySummaryMarkdown(data *WeeklySummaryData) st
 
 	// Projects & Themes
 	sb.WriteString("## Projects & Themes\n\n")
-	for i, project := range data.Projects {
+	projectNumber := 0
+	for _, project := range data.Projects {
 		if project.Hours < 1 && project.CommitCount == 0 {
 			continue
 		}
 
+		// Check if project has meaningful content (accomplishments or git stats)
+		hasAccomplishments := false
+		for _, accs := range project.DailyAccomplishments {
+			if len(accs) > 0 {
+				hasAccomplishments = true
+				break
+			}
+		}
+		hasGitStats := project.Name == "Traq" && project.CommitCount > 0
+
+		// Skip empty project shells - must have at least accomplishments or git stats
+		if !hasAccomplishments && !hasGitStats {
+			continue
+		}
+
+		projectNumber++
+
 		// Enhanced project name for primary project
 		projectTitle := project.Name
-		if project.Name == "Traq" && i == 0 {
+		if project.Name == "Traq" && projectNumber == 1 {
 			projectTitle = "Traq v2 (Activity Tracker) - Primary Focus"
 		}
 
-		sb.WriteString(fmt.Sprintf("### %d. %s (~%.0f hours)\n\n", i+1, projectTitle, project.Hours))
+		sb.WriteString(fmt.Sprintf("### %d. %s (~%.0f hours)\n\n", projectNumber, projectTitle, project.Hours))
 
 		// Add overview description
 		desc := getProjectDescription(project.Name)
@@ -3240,7 +3512,7 @@ func (s *ReportsService) formatWeeklySummaryMarkdown(data *WeeklySummaryData) st
 		}
 
 		// Daily accomplishments
-		if len(project.DailyAccomplishments) > 0 {
+		if hasAccomplishments {
 			sb.WriteString("#### Key Accomplishments by Day:\n\n")
 
 			// Sort days
@@ -3268,7 +3540,7 @@ func (s *ReportsService) formatWeeklySummaryMarkdown(data *WeeklySummaryData) st
 		}
 
 		// Add Git Statistics for the primary project (Traq)
-		if project.Name == "Traq" && project.CommitCount > 0 {
+		if hasGitStats {
 			sb.WriteString("#### Git Statistics:\n")
 			sb.WriteString(fmt.Sprintf("- **%d commits** to traq repository\n", project.CommitCount))
 			sb.WriteString(fmt.Sprintf("- **%s lines inserted**, **%s lines deleted**\n",
@@ -3320,22 +3592,8 @@ func (s *ReportsService) formatWeeklySummaryMarkdown(data *WeeklySummaryData) st
 		sb.WriteString("---\n\n")
 	}
 
-	// Application Usage Summary
-	if len(data.AppUsage) > 0 {
-		sb.WriteString("## Application Usage Summary\n\n")
-		sb.WriteString("| Application | Total Hours | Primary Use |\n")
-		sb.WriteString("|-------------|-------------|-------------|\n")
-		for _, app := range data.AppUsage {
-			hours := app.DurationSeconds / 3600
-			if hours < 0.5 {
-				continue
-			}
-			use := s.inferAppPrimaryUse(app.AppName, app.Windows)
-			sb.WriteString(fmt.Sprintf("| %s | %.1fh | %s |\n",
-				app.FriendlyName, hours, use))
-		}
-		sb.WriteString("\n---\n\n")
-	}
+	// Application Usage Summary removed - was filler that duplicated info available elsewhere
+	// Top 3 apps are now mentioned in executive summary if significant
 
 	// Key Accomplishments
 	if len(data.KeyAccomplishments) > 0 {
@@ -3346,27 +3604,25 @@ func (s *ReportsService) formatWeeklySummaryMarkdown(data *WeeklySummaryData) st
 		sb.WriteString("\n---\n\n")
 	}
 
-	// Research & Learning
+	// Research & Learning - simplified to just topics without time tracking noise
 	if len(data.ResearchTopics) > 0 {
 		sb.WriteString("## Research & Learning\n\n")
-		sb.WriteString("### Topics Researched (via Claude):\n")
+		sb.WriteString("Topics researched via Claude/AI assistants:\n")
 		for _, topic := range data.ResearchTopics {
-			sb.WriteString(fmt.Sprintf("- %s (%d mins)\n", topic.Topic, topic.DurationMins))
+			sb.WriteString(fmt.Sprintf("- %s\n", topic.Topic))
 		}
 		sb.WriteString("\n---\n\n")
 	}
 
-	// Files Downloaded - always include this section
-	sb.WriteString("## Files Downloaded\n\n")
+	// Files Downloaded - only include if there are actual downloads
 	if len(data.Downloads) > 0 {
+		sb.WriteString("## Files Downloaded\n\n")
 		for _, dl := range data.Downloads {
 			desc := dl.Category
 			sb.WriteString(fmt.Sprintf("- `%s` - %s\n", dl.FileName, desc))
 		}
-	} else {
-		sb.WriteString("- No significant downloads recorded\n")
+		sb.WriteString("\n---\n\n")
 	}
-	sb.WriteString("\n---\n\n")
 
 	// Notes for Next Week
 	sb.WriteString("## Notes for Next Week\n\n")

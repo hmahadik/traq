@@ -21,12 +21,13 @@ interface TimelineGridViewProps {
   data: TimelineGridData;
   filters?: TimelineFilters;
   hourHeight?: number; // Dynamic hour height for zoom (default: GRID_CONSTANTS.HOUR_HEIGHT_PX)
+  onSessionClick?: (sessionId: number) => void; // Callback when session is clicked
 }
 
 // Header height for column headers (matches the header in HourColumn/AppColumn)
 const HEADER_HEIGHT_PX = 44;
 
-export const TimelineGridView: React.FC<TimelineGridViewProps> = ({ data, filters, hourHeight }) => {
+export const TimelineGridView: React.FC<TimelineGridViewProps> = ({ data, filters, hourHeight, onSessionClick }) => {
   const { hourlyGrid, sessionSummaries, topApps } = data;
 
   // Use provided hourHeight or fall back to default
@@ -126,26 +127,10 @@ export const TimelineGridView: React.FC<TimelineGridViewProps> = ({ data, filter
     }
   }, [allScreenshots]);
 
-  // Handle session click - filter screenshots by session time range and open gallery
+  // Handle session click - call parent callback to open drawer
   const handleSessionClick = useCallback((session: SessionSummaryWithPosition) => {
-    if (!allScreenshots || allScreenshots.length === 0) {
-      return;
-    }
-
-    const startTime = session.startTime;
-    const endTime = session.endTime || (startTime + (session.durationSeconds || 0));
-
-    // Filter screenshots within this session's time range
-    // The API returns ScreenshotDisplay | Screenshot union, but both have id/timestamp
-    const filtered = allScreenshots.filter((s: any) =>
-      s.timestamp >= startTime && s.timestamp <= endTime
-    ) as Screenshot[];
-
-    if (filtered.length > 0) {
-      setGalleryScreenshots(filtered);
-      setGalleryOpen(true);
-    }
-  }, [allScreenshots]);
+    onSessionClick?.(session.id);
+  }, [onSessionClick]);
 
   if (topApps.length === 0) {
     return (

@@ -2,6 +2,7 @@ package service
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -59,6 +60,23 @@ func (s *SummaryService) GenerateSummary(sessionID int64) (*storage.Summary, err
 		screenshotIDs = append(screenshotIDs, ss.ID)
 	}
 
+	// Convert inference.ProjectBreakdown to storage.ProjectBreakdown
+	var projects []storage.ProjectBreakdown
+	for _, p := range result.Projects {
+		projects = append(projects, storage.ProjectBreakdown{
+			Name:        p.Name,
+			TimeMinutes: p.TimeMinutes,
+			Activities:  p.Activities,
+			Confidence:  p.Confidence,
+		})
+	}
+
+	// Serialize context to JSON for storage
+	contextJSON := sql.NullString{}
+	if ctxBytes, err := json.Marshal(ctx); err == nil {
+		contextJSON = sql.NullString{String: string(ctxBytes), Valid: true}
+	}
+
 	// Save summary to database
 	summary := &storage.Summary{
 		SessionID:       sql.NullInt64{Int64: sessionID, Valid: true},
@@ -66,9 +84,11 @@ func (s *SummaryService) GenerateSummary(sessionID int64) (*storage.Summary, err
 		Explanation:     sql.NullString{String: result.Explanation, Valid: result.Explanation != ""},
 		Confidence:      sql.NullString{String: result.Confidence, Valid: result.Confidence != ""},
 		Tags:            result.Tags,
+		Projects:        projects,
 		ModelUsed:       result.ModelUsed,
 		InferenceTimeMs: sql.NullInt64{Int64: result.InferenceMs, Valid: true},
 		ScreenshotIDs:   screenshotIDs,
+		ContextJSON:     contextJSON,
 		CreatedAt:       time.Now().Unix(),
 	}
 

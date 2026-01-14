@@ -317,3 +317,16 @@ export const getAppColors = (appName: string): { bg: string; icon: string; text:
   }
   return DEFAULT_COLORS;
 };
+
+// ============================================================================
+// List View Types
+// ============================================================================
+
+export type TimelineEventType = 'activity' | 'session' | 'git' | 'shell' | 'file' | 'browser' | 'afk';
+
+export interface TimelineListEvent {
+  id: string; // Unique identifier: `${type}-${originalId}`
+  type: TimelineEventType;
+  timestamp: number; // Unix timestamp for sorting
+  data: ActivityBlock | SessionSummaryWithPosition | GitEventDisplay | ShellEventDisplay | FileEventDisplay | BrowserEventDisplay | AFKBlock;
+}
