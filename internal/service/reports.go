@@ -908,6 +908,49 @@ func isBoringCommit(message string) bool {
 	return false
 }
 
+// isGarbageActivity detects AI-generated activities that are clearly random browsing, not work.
+// These usually come from Wikipedia, news sites, or general interest browsing.
+func isGarbageActivity(activity string) bool {
+	lower := strings.ToLower(activity)
+
+	// Pattern 1: "Researched/Investigated [Topic]" where topic is clearly not work
+	garbagePatterns := []string{
+		"crude oil", "oil exports", "world war", "civil war", "revolution",
+		"investigated spain", "investigated france", "investigated germany",
+		"investigated china", "investigated russia", "investigated japan",
+		"researched venezuela", "researched ukraine", "researched israel",
+		"history of ", "biography of ", "population of ",
+		"geography of ", "economy of ", "climate of ",
+		"researched the history", "investigated the history",
+		"browsed news", "read news", "checked news",
+		"watched video", "youtube video", "streaming",
+		"social media", "twitter", "reddit", "facebook",
+		"sports scores", "game results", "match results",
+		"weather forecast", "stock prices", "cryptocurrency",
+	}
+
+	for _, pattern := range garbagePatterns {
+		if strings.Contains(lower, pattern) {
+			return true
+		}
+	}
+
+	// Pattern 2: Very generic activities
+	genericActivities := []string{
+		"browsed the web", "general browsing", "web browsing",
+		"various activities", "miscellaneous tasks", "general research",
+		"read articles", "viewed pages", "checked websites",
+	}
+
+	for _, generic := range genericActivities {
+		if strings.Contains(lower, generic) || lower == generic {
+			return true
+		}
+	}
+
+	return false
+}
+
 // cleanCommitMessage cleans up a commit message for display
 func cleanCommitMessage(msg string) string {
 	// Remove conventional commit prefixes like "feat:", "fix:", "chore:", etc.
@@ -2684,6 +2727,12 @@ func (s *ReportsService) buildProjectSummariesFromAI(sessions []*storage.Session
 			sessionDate := time.Unix(sess.StartTime, 0).Format("2006-01-02")
 
 			for _, aiProject := range summary.Projects {
+				// Skip generic "Research" projects - they're usually garbage from random browsing
+				aiProjectLower := strings.ToLower(aiProject.Name)
+				if aiProjectLower == "research" || aiProjectLower == "web research" || aiProjectLower == "browsing" {
+					continue
+				}
+
 				// Find matching project or create new one
 				project := findMatchingProject(aiProject.Name)
 				if project == nil {
@@ -2692,7 +2741,7 @@ func (s *ReportsService) buildProjectSummariesFromAI(sessions []*storage.Session
 
 				// Add AI-detected activities (these are the granular ones git misses)
 				for _, activity := range aiProject.Activities {
-					if activity != "" && !s.isDuplicateActivity(project.DailyAccomplishments[sessionDate], activity) {
+					if activity != "" && !s.isDuplicateActivity(project.DailyAccomplishments[sessionDate], activity) && !isGarbageActivity(activity) {
 						project.DailyAccomplishments[sessionDate] = append(
 							project.DailyAccomplishments[sessionDate],
 							activity,
@@ -3128,10 +3177,28 @@ func (s *ReportsService) formatWeeklySummaryHTML(data *WeeklySummaryData) string
 		sb.WriteString(`<div style="margin-bottom: 24px;">
 			<div class="report-card-title">Projects & Themes</div>`)
 
-		for i, project := range data.Projects {
+		projectNum := 0
+		for _, project := range data.Projects {
 			if project.Hours < 0.5 && project.CommitCount == 0 {
 				continue
 			}
+
+			// Check if project has meaningful content (accomplishments or commits)
+			hasAccomplishments := false
+			for _, accs := range project.DailyAccomplishments {
+				if len(accs) > 0 {
+					hasAccomplishments = true
+					break
+				}
+			}
+			hasCommits := project.CommitCount > 0
+
+			// Skip empty project shells - must have accomplishments or commits
+			if !hasAccomplishments && !hasCommits {
+				continue
+			}
+
+			projectNum++
 
 			// Project card
 			sb.WriteString(fmt.Sprintf(`
@@ -3139,7 +3206,7 @@ func (s *ReportsService) formatWeeklySummaryHTML(data *WeeklySummaryData) string
 					<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
 						<span class="report-project-title">%d. %s</span>
 						<span class="report-project-stats">~%.0fh (%.0f%%)</span>
-					</div>`, i+1, project.Name, project.Hours, project.Percentage))
+					</div>`, projectNum, project.Name, project.Hours, project.Percentage))
 
 			// Commit count
 			if project.CommitCount > 0 {
@@ -3217,39 +3284,7 @@ func (s *ReportsService) formatWeeklySummaryHTML(data *WeeklySummaryData) string
 		sb.WriteString(`</div>`)
 	}
 
-	// Top Applications
-	if len(data.AppUsage) > 0 {
-		sb.WriteString(`<div style="margin-bottom: 24px;">
-			<div style="font-size: 0.85rem; font-weight: 600; color: #f1f5f9; margin-bottom: 12px;">Top Applications</div>`)
-
-		maxDuration := data.AppUsage[0].DurationSeconds
-		for i, app := range data.AppUsage {
-			if i >= 8 {
-				break
-			}
-			appMins := int64(app.DurationSeconds / 60)
-			if appMins < 1 {
-				continue
-			}
-			barWidth := int(app.DurationSeconds / maxDuration * 100)
-			barColor := "#64748b"
-			if app.Category == "Focus" || app.Category == "productive" {
-				barColor = "#22c55e"
-			} else if app.Category == "Distraction" || app.Category == "distracting" {
-				barColor = "#ef4444"
-			}
-
-			sb.WriteString(fmt.Sprintf(`
-				<div style="display: flex; align-items: center; margin-bottom: 8px;">
-					<div style="width: 100px; font-size: 0.8rem; color: #e2e8f0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">%s</div>
-					<div style="flex: 1; height: 20px; background: rgba(30, 41, 59, 0.5); border-radius: 4px; margin: 0 12px; overflow: hidden;">
-						<div style="height: 100%%; width: %d%%; background: %s; border-radius: 4px;"></div>
-					</div>
-					<div style="width: 50px; text-align: right; font-size: 0.8rem; color: #94a3b8;">%s</div>
-				</div>`, app.FriendlyName, barWidth, barColor, formatMinutes(appMins)))
-		}
-		sb.WriteString(`</div>`)
-	}
+	// Top Applications section removed - was filler that duplicated info available in Analytics
 
 	// Key Accomplishments
 	if len(data.KeyAccomplishments) > 0 {
@@ -3427,12 +3462,28 @@ func (s *ReportsService) formatWeeklySummaryMarkdown(data *WeeklySummaryData) st
 		var projectPcts []string
 		var shownTotal float64
 		for _, p := range data.Projects {
-			if p.Percentage >= 5 {
-				// Round to nearest integer for cleaner display
-				rounded := math.Round(p.Percentage)
-				projectPcts = append(projectPcts, fmt.Sprintf("%s (%.0f%%)", p.Name, rounded))
-				shownTotal += rounded
+			if p.Percentage < 5 {
+				continue
 			}
+
+			// Only show projects that have meaningful content (accomplishments or commits)
+			hasContent := p.CommitCount > 0
+			if !hasContent {
+				for _, accs := range p.DailyAccomplishments {
+					if len(accs) > 0 {
+						hasContent = true
+						break
+					}
+				}
+			}
+			if !hasContent {
+				continue // Skip projects with time but no content
+			}
+
+			// Round to nearest integer for cleaner display
+			rounded := math.Round(p.Percentage)
+			projectPcts = append(projectPcts, fmt.Sprintf("%s (%.0f%%)", p.Name, rounded))
+			shownTotal += rounded
 		}
 		// Add "Other" if shown percentages don't account for all time
 		if shownTotal < 95 && shownTotal > 0 {
@@ -3471,7 +3522,7 @@ func (s *ReportsService) formatWeeklySummaryMarkdown(data *WeeklySummaryData) st
 			continue
 		}
 
-		// Check if project has meaningful content (accomplishments or git stats)
+		// Check if project has meaningful content (accomplishments or commits)
 		hasAccomplishments := false
 		for _, accs := range project.DailyAccomplishments {
 			if len(accs) > 0 {
@@ -3479,10 +3530,10 @@ func (s *ReportsService) formatWeeklySummaryMarkdown(data *WeeklySummaryData) st
 				break
 			}
 		}
-		hasGitStats := project.Name == "Traq" && project.CommitCount > 0
+		hasCommits := project.CommitCount > 0
 
-		// Skip empty project shells - must have at least accomplishments or git stats
-		if !hasAccomplishments && !hasGitStats {
+		// Skip empty project shells - must have at least accomplishments or commits
+		if !hasAccomplishments && !hasCommits {
 			continue
 		}
 
@@ -3539,12 +3590,19 @@ func (s *ReportsService) formatWeeklySummaryMarkdown(data *WeeklySummaryData) st
 			}
 		}
 
-		// Add Git Statistics for the primary project (Traq)
-		if hasGitStats {
+		// Add Git Statistics if project has commits
+		if hasCommits {
 			sb.WriteString("#### Git Statistics:\n")
-			sb.WriteString(fmt.Sprintf("- **%d commits** to traq repository\n", project.CommitCount))
-			sb.WriteString(fmt.Sprintf("- **%s lines inserted**, **%s lines deleted**\n",
-				formatNumber(data.TotalInsertions), formatNumber(data.TotalDeletions)))
+			repoName := strings.ToLower(project.Name)
+			if repoName == "" {
+				repoName = "repository"
+			}
+			sb.WriteString(fmt.Sprintf("- **%d commits** to %s\n", project.CommitCount, repoName))
+			// Only show insertions/deletions for primary project with significant commits
+			if project.CommitCount >= 5 && data.TotalInsertions > 0 {
+				sb.WriteString(fmt.Sprintf("- **%s lines inserted**, **%s lines deleted**\n",
+					formatNumber(data.TotalInsertions), formatNumber(data.TotalDeletions)))
+			}
 			sb.WriteString("\n")
 		}
 
