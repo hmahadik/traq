@@ -186,14 +186,22 @@ func (s *Store) DeleteSession(id int64) error {
 	}
 	defer tx.Rollback()
 
+	// Clear the session's summary_id reference first (sessions.summary_id -> summaries.id)
+	_, err = tx.Exec("UPDATE sessions SET summary_id = NULL WHERE id = ?", id)
+	if err != nil {
+		return fmt.Errorf("failed to clear session summary reference: %w", err)
+	}
+
 	// Delete related data in order (respecting foreign key constraints)
 	tables := []string{
 		"summaries",
-		"focus_events",
+		"window_focus_events",
+		"afk_events",
 		"shell_commands",
 		"git_commits",
 		"file_events",
 		"browser_history",
+		"issue_reports",
 		"screenshots",
 	}
 

@@ -168,7 +168,13 @@ func (s *Store) UpdateSummary(sum *Summary) error {
 
 // DeleteSummary deletes a summary by ID.
 func (s *Store) DeleteSummary(id int64) error {
-	_, err := s.db.Exec("DELETE FROM summaries WHERE id = ?", id)
+	// Clear any session references first (sessions.summary_id -> summaries.id)
+	_, err := s.db.Exec("UPDATE sessions SET summary_id = NULL WHERE summary_id = ?", id)
+	if err != nil {
+		return fmt.Errorf("failed to clear session summary reference: %w", err)
+	}
+
+	_, err = s.db.Exec("DELETE FROM summaries WHERE id = ?", id)
 	if err != nil {
 		return fmt.Errorf("failed to delete summary: %w", err)
 	}
