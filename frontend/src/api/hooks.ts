@@ -266,6 +266,7 @@ export function useSessionContext(sessionId: number) {
     queryKey: queryKeys.timeline.context(sessionId),
     queryFn: () => api.timeline.getSessionContext(sessionId),
     staleTime: 30_000,
+    enabled: sessionId > 0, // Don't fetch for invalid session IDs
   });
 }
 
@@ -547,6 +548,14 @@ export function useDataDir() {
     queryKey: ['system', 'dataDir'],
     queryFn: () => api.system.getDataDir(),
     staleTime: Infinity, // Data directory doesn't change
+  });
+}
+
+export function useVersion() {
+  return useQuery({
+    queryKey: ['system', 'version'],
+    queryFn: () => api.system.getVersion(),
+    staleTime: Infinity, // Version doesn't change during runtime
   });
 }
 

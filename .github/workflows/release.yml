@@ -31,12 +31,12 @@ jobs:
           - os: ubuntu-latest
             platform: linux
             arch: amd64
-            artifact: traq-linux-amd64
+            artifact: traq-linux-amd64.AppImage
             wails_flags: "-tags webkit2_41"
           - os: windows-latest
             platform: windows
             arch: amd64
-            artifact: traq-windows-amd64.exe
+            artifact: traq-windows-amd64-installer.exe
             wails_flags: ""
           - os: macos-latest
             platform: darwin
@@ -65,7 +65,7 @@ jobs:
         if: matrix.platform == 'linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev imagemagick libfuse2
 
       # Install Wails CLI
       - name: Install Wails
@@ -90,22 +90,29 @@ jobs:
         if: matrix.platform == 'linux'
         run: wails build -platform linux/amd64 ${{ matrix.wails_flags }} -ldflags "-X main.Version=${{ steps.version.outputs.VERSION }}"
 
-      - name: Build for Windows
+      - name: Build for Windows (with NSIS installer)
         if: matrix.platform == 'windows'
-        run: wails build -platform windows/amd64 -ldflags "-X main.Version=${{ steps.version.outputs.VERSION }}"
+        run: wails build --nsis -platform windows/amd64 -ldflags "-X main.Version=${{ steps.version.outputs.VERSION }}"
 
       - name: Build for macOS (Universal)
         if: matrix.platform == 'darwin'
         run: wails build -platform darwin/universal -ldflags "-X main.Version=${{ steps.version.outputs.VERSION }}"
 
+      # Build AppImage for Linux
+      - name: Build Linux AppImage
+        if: matrix.platform == 'linux'
+        run: |
+          chmod +x scripts/build-appimage.sh
+          ./scripts/build-appimage.sh
+
       # Rename artifacts
       - name: Rename Linux artifact
         if: matrix.platform == 'linux'
-        run: mv build/bin/traq build/bin/${{ matrix.artifact }}
+        run: mv build/bin/traq-x86_64.AppImage build/bin/${{ matrix.artifact }}
 
       - name: Rename Windows artifact
         if: matrix.platform == 'windows'
-        run: mv build/bin/traq.exe build/bin/${{ matrix.artifact }}
+        run: mv build/bin/traq-amd64-installer.exe build/bin/${{ matrix.artifact }}
 
       - name: Rename macOS artifact
         if: matrix.platform == 'darwin'
@@ -141,8 +148,8 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            artifacts/traq-linux-amd64/traq-linux-amd64
-            artifacts/traq-windows-amd64.exe/traq-windows-amd64.exe
+            artifacts/traq-linux-amd64.AppImage/traq-linux-amd64.AppImage
+            artifacts/traq-windows-amd64-installer.exe/traq-windows-amd64-installer.exe
             artifacts/traq-macos-universal/traq-macos-universal.zip
           # Mark as latest release (not pre-release) when CI passes
           prerelease: false

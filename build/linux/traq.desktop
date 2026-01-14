@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=Traq
+Comment=Privacy-first activity tracker - your work, automatically documented
+Exec=traq
+Icon=traq
+Type=Application
+Categories=Utility;Office;
+Terminal=false
+StartupWMClass=traq

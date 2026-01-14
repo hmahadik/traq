@@ -20,7 +20,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Progress } from '@/components/ui/progress';
-import { useConfig, useUpdateConfig, useInferenceStatus, useAvailableModels, useDownloadModel, useServerStatus, useDownloadServer, useStorageStats, useOpenDataDir, useDataDir, useOptimizeDatabase, useAvailableMonitors, useTestIssueWebhook } from '@/api/hooks';
+import { useConfig, useUpdateConfig, useInferenceStatus, useAvailableModels, useDownloadModel, useServerStatus, useDownloadServer, useStorageStats, useOpenDataDir, useDataDir, useOptimizeDatabase, useAvailableMonitors, useTestIssueWebhook, useVersion } from '@/api/hooks';
 import { formatBytes } from '@/lib/utils';
 import { CategoriesTab } from '@/components/settings/CategoriesTab';
 import { TimelineCategoriesTab } from '@/components/settings/TimelineCategoriesTab';
@@ -47,6 +47,7 @@ export function SettingsDrawer({ open, onOpenChange }: SettingsDrawerProps) {
   const openDataDir = useOpenDataDir();
   const optimizeDatabase = useOptimizeDatabase();
   const testWebhook = useTestIssueWebhook();
+  const { data: version } = useVersion();
 
   const handleOptimizeDatabase = async () => {
     try {
@@ -1073,6 +1074,21 @@ export function SettingsDrawer({ open, onOpenChange }: SettingsDrawerProps) {
               <Button variant="destructive" className="w-full">
                 Clear All Data
               </Button>
+            </div>
+
+            {/* Version Info */}
+            <div className="pt-4 border-t">
+              <div className="flex items-center justify-between text-sm text-muted-foreground">
+                <span>Version {version || 'dev'}</span>
+                <a
+                  href="https://github.com/hmahadik/activity-tracker/releases"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="hover:text-foreground hover:underline"
+                >
+                  Release Notes
+                </a>
+              </div>
             </div>
           </TabsContent>
         </Tabs>
