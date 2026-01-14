@@ -110,9 +110,19 @@ jobs:
         if: matrix.platform == 'linux'
         run: mv build/bin/traq-x86_64.AppImage build/bin/${{ matrix.artifact }}
 
+      - name: List Windows build output
+        if: matrix.platform == 'windows'
+        run: ls -la build/bin/
+        shell: bash
+
       - name: Rename Windows artifact
         if: matrix.platform == 'windows'
-        run: mv build/bin/traq-amd64-installer.exe build/bin/${{ matrix.artifact }}
+        run: |
+          # Find the installer file (could be various naming patterns)
+          INSTALLER=$(ls build/bin/*installer*.exe 2>/dev/null || ls build/bin/*.exe 2>/dev/null | head -1)
+          echo "Found installer: $INSTALLER"
+          mv "$INSTALLER" build/bin/${{ matrix.artifact }}
+        shell: bash
 
       - name: Rename macOS artifact
         if: matrix.platform == 'darwin'
