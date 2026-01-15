@@ -14,6 +14,8 @@ interface BrowserColumnProps {
   hours: number[]; // Array of hours for grid alignment
   onVisitClick?: (event: BrowserEventDisplay) => void;
   hourHeight?: number;
+  lassoPreviewKeys?: Set<string>;
+  selectedEventKeys?: Set<string>;
 }
 
 export const BrowserColumn: React.FC<BrowserColumnProps> = ({
@@ -21,6 +23,8 @@ export const BrowserColumn: React.FC<BrowserColumnProps> = ({
   hours,
   onVisitClick,
   hourHeight,
+  lassoPreviewKeys,
+  selectedEventKeys,
 }) => {
   const effectiveHourHeight = hourHeight || GRID_CONSTANTS.HOUR_HEIGHT_PX;
 
@@ -166,16 +170,25 @@ export const BrowserColumn: React.FC<BrowserColumnProps> = ({
             const BrowserIcon = getBrowserIcon(event.browser);
             const colors = getBrowserColor(event.browser);
 
+            // Check if any event in this group is in the lasso preview or selected
+            const isHighlighted = event.eventIds.some(id => {
+              const key = `browser:${id}`;
+              return lassoPreviewKeys?.has(key) || selectedEventKeys?.has(key);
+            });
+
             return (
               <TooltipProvider key={event.id} delayDuration={100}>
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <div
-                      className="absolute left-0 right-0 mx-1 cursor-pointer hover:shadow-md transition-shadow"
+                      className={`absolute left-0 right-0 mx-1 cursor-pointer hover:shadow-md transition-shadow ${
+                        isHighlighted ? 'ring-2 ring-blue-400 ring-offset-1' : ''
+                      }`}
                       style={{
                         top: `${top}px`,
                         height: `${height}px`,
                       }}
+                      data-event-keys={JSON.stringify(event.eventIds.map(id => `browser:${id}`))}
                       onClick={() => onVisitClick?.(event as unknown as BrowserEventDisplay)}
                     >
                       <div className={`${colors.bg} border ${colors.border} rounded-md px-2 py-1 h-full overflow-hidden`}>

@@ -13,6 +13,8 @@ interface FilesColumnProps {
   hours: number[]; // Array of hours for grid alignment
   onFileClick?: (event: FileEventDisplay) => void;
   hourHeight?: number;
+  lassoPreviewKeys?: Set<string>;
+  selectedEventKeys?: Set<string>;
 }
 
 export const FilesColumn: React.FC<FilesColumnProps> = ({
@@ -20,6 +22,8 @@ export const FilesColumn: React.FC<FilesColumnProps> = ({
   hours,
   onFileClick,
   hourHeight,
+  lassoPreviewKeys,
+  selectedEventKeys,
 }) => {
   const effectiveHourHeight = hourHeight || GRID_CONSTANTS.HOUR_HEIGHT_PX;
   // Calculate total file events for the day
@@ -158,16 +162,23 @@ export const FilesColumn: React.FC<FilesColumnProps> = ({
                 navigator.clipboard.writeText(fullPath);
               };
 
+              // Check if this event is in the lasso preview or selected
+              const key = `file:${event.id}`;
+              const isHighlighted = lassoPreviewKeys?.has(key) || selectedEventKeys?.has(key);
+
               return (
                 <TooltipProvider key={event.id} delayDuration={100}>
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <div
-                        className="absolute left-0 right-0 mx-1 cursor-pointer hover:shadow-md transition-shadow"
+                        className={`absolute left-0 right-0 mx-1 cursor-pointer hover:shadow-md transition-shadow ${
+                          isHighlighted ? 'ring-2 ring-blue-400 ring-offset-1' : ''
+                        }`}
                         style={{
                           top: `${top}px`,
                           minHeight: '28px',
                         }}
+                        data-event-key={`file:${event.id}`}
                         onClick={() => onFileClick?.(event)}
                       >
                         <div className={`${colors.bg} border ${colors.border} rounded-md px-2 py-1 overflow-hidden`}>

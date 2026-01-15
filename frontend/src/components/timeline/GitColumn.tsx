@@ -14,6 +14,8 @@ interface GitColumnProps {
   hours: number[];
   onCommitClick?: (event: GitEventDisplay) => void;
   hourHeight?: number;
+  lassoPreviewKeys?: Set<string>;
+  selectedEventKeys?: Set<string>;
 }
 
 export const GitColumn: React.FC<GitColumnProps> = ({
@@ -21,6 +23,8 @@ export const GitColumn: React.FC<GitColumnProps> = ({
   hours,
   onCommitClick,
   hourHeight,
+  lassoPreviewKeys,
+  selectedEventKeys,
 }) => {
   const effectiveHourHeight = hourHeight || GRID_CONSTANTS.HOUR_HEIGHT_PX;
 
@@ -95,16 +99,25 @@ export const GitColumn: React.FC<GitColumnProps> = ({
             const durationHours = durationSeconds / 3600;
             const height = Math.max(36, durationHours * effectiveHourHeight);
 
+            // Check if any event in this group is in the lasso preview or selected
+            const isHighlighted = group.events.some(e => {
+              const key = `git:${e.id}`;
+              return lassoPreviewKeys?.has(key) || selectedEventKeys?.has(key);
+            });
+
             return (
               <TooltipProvider key={group.id} delayDuration={100}>
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <div
-                      className="absolute left-0 right-0 mx-1 cursor-pointer hover:shadow-md transition-shadow"
+                      className={`absolute left-0 right-0 mx-1 cursor-pointer hover:shadow-md transition-shadow ${
+                        isHighlighted ? 'ring-2 ring-blue-400 ring-offset-1' : ''
+                      }`}
                       style={{
                         top: `${top}px`,
                         height: `${height}px`,
                       }}
+                      data-event-keys={JSON.stringify(group.events.map(e => `git:${e.id}`))}
                       onClick={() => onCommitClick?.(group.events[0] as unknown as GitEventDisplay)}
                     >
                       <div className="bg-purple-100 dark:bg-purple-900/30 border border-purple-300 dark:border-purple-700 rounded-md px-2 py-1 h-full overflow-hidden">

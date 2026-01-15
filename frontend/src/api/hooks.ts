@@ -832,19 +832,6 @@ export function useDeleteIssueReport() {
   });
 }
 
-export function useTestIssueWebhook() {
-  return useMutation({
-    mutationFn: () => api.issues.testWebhook(),
-    onSuccess: () => {
-      toast.success('Test notification sent');
-    },
-    onError: (error: unknown) => {
-      const message = error instanceof Error ? error.message : String(error);
-      toast.error(`Webhook test failed: ${message}`);
-    },
-  });
-}
-
 // ============================================================================
 // Activity (Focus Event) Hooks
 // ============================================================================

@@ -11,6 +11,8 @@ import {
 interface ClusterColumnProps {
   clusters: ActivityCluster[];
   hourHeight: number;
+  lassoPreviewKeys?: Set<string>;
+  selectedEventKeys?: Set<string>;
 }
 
 interface GroupedCluster {
@@ -94,7 +96,7 @@ function groupOverlappingClusters(clusters: ActivityCluster[]): GroupedCluster[]
   return grouped;
 }
 
-export function ClusterColumn({ clusters, hourHeight }: ClusterColumnProps) {
+export function ClusterColumn({ clusters, hourHeight, lassoPreviewKeys, selectedEventKeys }: ClusterColumnProps) {
   // Group overlapping clusters
   const groupedClusters = useMemo(() => groupOverlappingClusters(clusters), [clusters]);
 
@@ -107,17 +109,33 @@ export function ClusterColumn({ clusters, hourHeight }: ClusterColumnProps) {
       {groupedClusters.map((group, index) => {
         const height = Math.max(group.pixelHeight, 28);
 
+        // Build all event keys for this cluster group
+        const eventKeys = [
+          ...group.gitEventIds.map(id => `git:${id}`),
+          ...group.shellEventIds.map(id => `shell:${id}`),
+          ...group.fileEventIds.map(id => `file:${id}`),
+          ...group.browserEventIds.map(id => `browser:${id}`),
+        ];
+
+        // Check if any event in this cluster is highlighted
+        const isHighlighted = eventKeys.some(key =>
+          lassoPreviewKeys?.has(key) || selectedEventKeys?.has(key)
+        );
+
         return (
           <TooltipProvider key={group.id} delayDuration={100}>
             <Tooltip>
               <TooltipTrigger asChild>
                 <div
-                  className="absolute left-0 right-0 cursor-pointer"
+                  className={`absolute left-0 right-0 cursor-pointer ${
+                    isHighlighted ? 'ring-2 ring-blue-400 ring-offset-1 rounded-md' : ''
+                  }`}
                   style={{
                     top: `${group.pixelPosition}px`,
                     height: `${height}px`,
                     zIndex: index,
                   }}
+                  data-event-keys={JSON.stringify(eventKeys)}
                 >
                   <div className="mx-1 h-full rounded-md border border-amber-300 dark:border-amber-600 bg-amber-50 dark:bg-amber-900/30 hover:border-amber-400 dark:hover:border-amber-500 hover:shadow-md transition-all overflow-hidden">
                     <div className="p-1.5 h-full flex flex-col">

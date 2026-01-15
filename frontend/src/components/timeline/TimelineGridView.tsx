@@ -17,6 +17,9 @@ import { ImageGallery } from '@/components/common/ImageGallery';
 import { useScreenshotsForDate } from '@/api/hooks';
 import type { Screenshot } from '@/types';
 
+// Event key format: "eventType:id" e.g. "activity:123", "browser:456"
+type EventKey = string;
+
 interface TimelineGridViewProps {
   data: TimelineGridData;
   filters?: TimelineFilters;
@@ -31,9 +34,14 @@ interface TimelineGridViewProps {
   onLassoStart?: (x: number, y: number) => void;
   onLassoMove?: (x: number, y: number) => void;
   onLassoEnd?: (intersectingIds: number[]) => void;
+  // Multi-type event selection via lasso (new)
+  selectedEventKeys?: Set<EventKey>;
+  onLassoEndWithKeys?: (keys: EventKey[]) => void;
   // Lasso preview (real-time highlighting during drag)
   lassoPreviewIds?: Set<number>;
   onLassoPreview?: (ids: number[]) => void;
+  lassoPreviewKeys?: Set<EventKey>;
+  onLassoPreviewKeys?: (keys: EventKey[]) => void;
 }
 
 // Header height for column headers (matches the header in HourColumn/AppColumn)
@@ -51,8 +59,12 @@ export const TimelineGridView: React.FC<TimelineGridViewProps> = ({
   onLassoStart,
   onLassoMove,
   onLassoEnd,
+  selectedEventKeys,
+  onLassoEndWithKeys,
   lassoPreviewIds,
   onLassoPreview,
+  lassoPreviewKeys,
+  onLassoPreviewKeys,
 }) => {
   const { hourlyGrid, sessionSummaries, topApps } = data;
   const gridContainerRef = React.useRef<HTMLDivElement>(null);
@@ -171,7 +183,59 @@ export const TimelineGridView: React.FC<TimelineGridViewProps> = ({
     return blocks;
   }, [hourlyGrid]);
 
-  // Find activity blocks that intersect with a rectangle
+  // Find all events that intersect with a rectangle (returns EventKeys)
+  const findIntersectingEvents = useCallback(
+    (rect: { x: number; y: number; width: number; height: number }): EventKey[] => {
+      if (!gridContainerRef.current) return [];
+
+      const intersectingKeys: EventKey[] = [];
+      const containerRect = gridContainerRef.current.getBoundingClientRect();
+
+      // Helper to check if element intersects with rect
+      const checkIntersection = (element: Element): boolean => {
+        const elementRect = element.getBoundingClientRect();
+        const elemX = elementRect.left - containerRect.left;
+        const elemY = elementRect.top - containerRect.top;
+        const elemWidth = elementRect.width;
+        const elemHeight = elementRect.height;
+
+        return (
+          rect.x < elemX + elemWidth &&
+          rect.x + rect.width > elemX &&
+          rect.y < elemY + elemHeight &&
+          rect.y + rect.height > elemY
+        );
+      };
+
+      // Find elements with single event key (activities, files, afk)
+      const singleKeyElements = gridContainerRef.current.querySelectorAll('[data-event-key]');
+      singleKeyElements.forEach((element) => {
+        const eventKey = element.getAttribute('data-event-key');
+        if (eventKey && checkIntersection(element)) {
+          intersectingKeys.push(eventKey);
+        }
+      });
+
+      // Find elements with multiple event keys (grouped git, shell, browser)
+      const multiKeyElements = gridContainerRef.current.querySelectorAll('[data-event-keys]');
+      multiKeyElements.forEach((element) => {
+        const eventKeysJson = element.getAttribute('data-event-keys');
+        if (eventKeysJson && checkIntersection(element)) {
+          try {
+            const keys = JSON.parse(eventKeysJson) as EventKey[];
+            intersectingKeys.push(...keys);
+          } catch (e) {
+            console.error('Failed to parse event keys:', e);
+          }
+        }
+      });
+
+      return intersectingKeys;
+    },
+    []
+  );
+
+  // Legacy: Find activity blocks that intersect with a rectangle (returns activity IDs only)
   const findIntersectingActivities = useCallback(
     (rect: { x: number; y: number; width: number; height: number }) => {
       if (!gridContainerRef.current) return [];
@@ -248,22 +312,38 @@ export const TimelineGridView: React.FC<TimelineGridViewProps> = ({
         height: Math.abs(y - startY),
       };
 
-      // Find intersecting activities and update preview
+      // Find intersecting events and update preview (new multi-type)
+      if (onLassoPreviewKeys) {
+        const intersectingKeys = findIntersectingEvents(currentRect);
+        onLassoPreviewKeys(intersectingKeys);
+      }
+
+      // Legacy: Find intersecting activities and update preview
       if (onLassoPreview) {
         const intersecting = findIntersectingActivities(currentRect);
         onLassoPreview(intersecting);
       }
     },
-    [onLassoMove, lassoRect, onLassoPreview, findIntersectingActivities]
+    [onLassoMove, lassoRect, onLassoPreview, onLassoPreviewKeys, findIntersectingActivities, findIntersectingEvents]
   );
 
   const handleMouseUp = useCallback(() => {
-    if (!lassoRect || !onLassoEnd) return;
+    if (!lassoRect) return;
 
-    const intersectingIds = findIntersectingActivities(lassoRect);
-    onLassoEnd(intersectingIds);
+    // New: call multi-type event callback
+    if (onLassoEndWithKeys) {
+      const intersectingKeys = findIntersectingEvents(lassoRect);
+      onLassoEndWithKeys(intersectingKeys);
+    }
+
+    // Legacy: call activity-only callback
+    if (onLassoEnd) {
+      const intersectingIds = findIntersectingActivities(lassoRect);
+      onLassoEnd(intersectingIds);
+    }
+
     lassoStartRef.current = null;
-  }, [lassoRect, onLassoEnd, findIntersectingActivities]);
+  }, [lassoRect, onLassoEnd, onLassoEndWithKeys, findIntersectingActivities, findIntersectingEvents]);
 
   if (topApps.length === 0) {
     return (
@@ -303,6 +383,8 @@ export const TimelineGridView: React.FC<TimelineGridViewProps> = ({
             hours={activeHours}
             onSessionClick={handleSessionClick}
             hourHeight={effectiveHourHeight}
+            lassoPreviewKeys={lassoPreviewKeys}
+            selectedEventKeys={selectedEventKeys}
           />
 
           {/* AFK Column - Shows away-from-keyboard periods */}
@@ -311,6 +393,8 @@ export const TimelineGridView: React.FC<TimelineGridViewProps> = ({
               afkBlocks={data.afkBlocks}
               hours={activeHours}
               hourHeight={effectiveHourHeight}
+              lassoPreviewKeys={lassoPreviewKeys}
+              selectedEventKeys={selectedEventKeys}
             />
           )}
 
@@ -342,7 +426,7 @@ export const TimelineGridView: React.FC<TimelineGridViewProps> = ({
                     style={{ height: `${effectiveHourHeight}px` }}
                   >
                     {clusters.length > 0 && (
-                      <ClusterColumn clusters={clusters} hourHeight={effectiveHourHeight} />
+                      <ClusterColumn clusters={clusters} hourHeight={effectiveHourHeight} lassoPreviewKeys={lassoPreviewKeys} selectedEventKeys={selectedEventKeys} />
                     )}
                   </div>
                 );
@@ -357,22 +441,22 @@ export const TimelineGridView: React.FC<TimelineGridViewProps> = ({
 
           {/* Git Column */}
           {activeFilters.showGit && (
-            <GitColumn gitEvents={data.gitEvents || {}} hours={activeHours} hourHeight={effectiveHourHeight} />
+            <GitColumn gitEvents={data.gitEvents || {}} hours={activeHours} hourHeight={effectiveHourHeight} lassoPreviewKeys={lassoPreviewKeys} selectedEventKeys={selectedEventKeys} />
           )}
 
           {/* Shell Column */}
           {activeFilters.showShell && (
-            <ShellColumn shellEvents={data.shellEvents || {}} hours={activeHours} hourHeight={effectiveHourHeight} />
+            <ShellColumn shellEvents={data.shellEvents || {}} hours={activeHours} hourHeight={effectiveHourHeight} lassoPreviewKeys={lassoPreviewKeys} selectedEventKeys={selectedEventKeys} />
           )}
 
           {/* Files Column */}
           {activeFilters.showFiles && (
-            <FilesColumn fileEvents={data.fileEvents || {}} hours={activeHours} hourHeight={effectiveHourHeight} />
+            <FilesColumn fileEvents={data.fileEvents || {}} hours={activeHours} hourHeight={effectiveHourHeight} lassoPreviewKeys={lassoPreviewKeys} selectedEventKeys={selectedEventKeys} />
           )}
 
           {/* Browser Column */}
           {activeFilters.showBrowser && (
-            <BrowserColumn browserEvents={data.browserEvents || {}} hours={activeHours} hourHeight={effectiveHourHeight} />
+            <BrowserColumn browserEvents={data.browserEvents || {}} hours={activeHours} hourHeight={effectiveHourHeight} lassoPreviewKeys={lassoPreviewKeys} selectedEventKeys={selectedEventKeys} />
           )}
 
           {/* App Columns (Scrollable) */}

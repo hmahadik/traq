@@ -14,6 +14,8 @@ interface AISummaryColumnProps {
   hours: number[]; // Array of hours for grid alignment
   onSessionClick?: (session: SessionSummaryWithPosition) => void;
   hourHeight?: number; // Override for effectiveHourHeight
+  lassoPreviewKeys?: Set<string>;
+  selectedEventKeys?: Set<string>;
 }
 
 // Category to border color mapping (Timely-style)
@@ -29,6 +31,8 @@ export const AISummaryColumn: React.FC<AISummaryColumnProps> = ({
   hours,
   onSessionClick,
   hourHeight,
+  lassoPreviewKeys,
+  selectedEventKeys,
 }) => {
   const effectiveHourHeight = hourHeight || GRID_CONSTANTS.HOUR_HEIGHT_PX;
   // Process sessions to snap to 15-minute boundaries for cleaner display
@@ -144,16 +148,23 @@ export const AISummaryColumn: React.FC<AISummaryColumnProps> = ({
             const showSummary = actualHeight >= 32;
             const showTime = actualHeight >= 22;
 
+            // Check if this session is highlighted
+            const key = `session:${session.id}`;
+            const isHighlighted = lassoPreviewKeys?.has(key) || selectedEventKeys?.has(key);
+
             return (
               <TooltipProvider key={session.id} delayDuration={100}>
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <div
-                      className={`absolute left-1 right-1 rounded-md bg-card border border-border border-l-4 ${borderClass} shadow-sm hover:shadow-md transition-shadow cursor-pointer overflow-hidden`}
+                      className={`absolute left-1 right-1 rounded-md bg-card border border-border border-l-4 ${borderClass} shadow-sm hover:shadow-md transition-shadow cursor-pointer overflow-hidden ${
+                        isHighlighted ? 'ring-2 ring-blue-400 ring-offset-1' : ''
+                      }`}
                       style={{
                         top: `${absoluteTop}px`,
                         height: `${actualHeight}px`,
                       }}
+                      data-event-key={`session:${session.id}`}
                       onClick={() => onSessionClick?.(session)}
                       role="button"
                       aria-label={`Session from ${formatTime(session.startTime)} - ${session.summary || 'No summary'}`}

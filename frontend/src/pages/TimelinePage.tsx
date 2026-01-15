@@ -111,8 +111,11 @@ export function TimelinePage() {
   const deleteFileEvents = useDeleteFileEvents();
   const deleteAFKEvents = useDeleteAFKEvents();
 
-  // State for multi-type event selection (list view only)
+  // State for multi-type event selection (works in both grid and list views)
   const [selectedEventKeys, setSelectedEventKeys] = useState<Set<EventKey>>(new Set());
+
+  // Lasso preview keys for all event types (grid view highlighting)
+  const [lassoPreviewKeys, setLassoPreviewKeys] = useState<Set<EventKey>>(new Set());
 
   // View mode state with localStorage persistence
   const [viewMode, setViewMode] = useState<ViewMode>(() => {
@@ -292,6 +295,17 @@ export function TimelinePage() {
   const handleActivityDoubleClick = useCallback((activity: ActivityBlock) => {
     setEditingActivity(activity);
     setEditDialogOpen(true);
+  }, []);
+
+  // Handle lasso end with EventKeys (selects all event types in grid view)
+  const handleLassoEndWithKeys = useCallback((keys: string[]) => {
+    setSelectedEventKeys(new Set(keys));
+    setLassoPreviewKeys(new Set());
+  }, []);
+
+  // Handle lasso preview with EventKeys (highlights all event types during drag)
+  const handleLassoPreviewKeys = useCallback((keys: string[]) => {
+    setLassoPreviewKeys(new Set(keys));
   }, []);
 
   // Handle event selection for list view (supports all event types)
@@ -626,8 +640,12 @@ export function TimelinePage() {
                 onLassoStart={startLasso}
                 onLassoMove={updateLasso}
                 onLassoEnd={endLasso}
+                selectedEventKeys={selectedEventKeys}
+                onLassoEndWithKeys={handleLassoEndWithKeys}
                 lassoPreviewIds={lassoPreviewIds}
                 onLassoPreview={setLassoPreviewIds}
+                lassoPreviewKeys={lassoPreviewKeys}
+                onLassoPreviewKeys={handleLassoPreviewKeys}
               />
             ) : displayMode === 'list' ? (
               <TimelineListView
@@ -780,7 +798,7 @@ export function TimelinePage() {
       {/* Activity Selection Toolbar */}
       {viewMode === 'day' && (
         <SelectionToolbar
-          selectedCount={selectedCount + selectedEventKeys.size}
+          selectedCount={selectedEventKeys.size > 0 ? selectedEventKeys.size : selectedCount}
           onDelete={handleDeleteSelected}
           onEdit={handleEditSelected}
           onClear={clearAllSelections}

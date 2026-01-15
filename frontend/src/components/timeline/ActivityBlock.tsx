@@ -104,6 +104,7 @@ export const ActivityBlock: React.FC<ActivityBlockProps> = ({
               height: `${actualHeight}px`,
             }}
             data-activity-id={block.id}
+            data-event-key={`activity:${block.id}`}
             onClick={(e) => {
               if (onSelect) {
                 onSelect(block.id, e);

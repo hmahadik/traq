@@ -152,6 +152,53 @@ type CommitsByRepo struct {
 	Commits     []*storage.GitCommit `json:"commits"`
 }
 
+// formatHoursMinutes converts a float64 hours value to "X hours Y minutes" format.
+// Examples: 3.1 -> "3 hours 6 minutes", 1.0 -> "1 hour", 0.5 -> "30 minutes"
+func formatHoursMinutes(hours float64) string {
+	totalMinutes := int(math.Round(hours * 60))
+	h := totalMinutes / 60
+	m := totalMinutes % 60
+
+	if h == 0 {
+		if m == 1 {
+			return "1 minute"
+		}
+		return fmt.Sprintf("%d minutes", m)
+	}
+	if m == 0 {
+		if h == 1 {
+			return "1 hour"
+		}
+		return fmt.Sprintf("%d hours", h)
+	}
+
+	hourWord := "hours"
+	if h == 1 {
+		hourWord = "hour"
+	}
+	minuteWord := "minutes"
+	if m == 1 {
+		minuteWord = "minute"
+	}
+	return fmt.Sprintf("%d %s %d %s", h, hourWord, m, minuteWord)
+}
+
+// formatHoursMinutesShort converts a float64 hours value to "Xh Ym" format.
+// Examples: 3.1 -> "3h 6m", 1.0 -> "1h", 0.5 -> "30m"
+func formatHoursMinutesShort(hours float64) string {
+	totalMinutes := int(math.Round(hours * 60))
+	h := totalMinutes / 60
+	m := totalMinutes % 60
+
+	if h == 0 {
+		return fmt.Sprintf("%dm", m)
+	}
+	if m == 0 {
+		return fmt.Sprintf("%dh", h)
+	}
+	return fmt.Sprintf("%dh %dm", h, m)
+}
+
 // buildEnhancedReportContext fetches all data needed for reports and aggregates it.
 func (s *ReportsService) buildEnhancedReportContext(tr *TimeRange) (*EnhancedReportContext, error) {
 	ctx := &EnhancedReportContext{
@@ -3098,8 +3145,8 @@ func (s *ReportsService) formatWeeklySummaryHTML(data *WeeklySummaryData) string
 
 	// Stats line
 	sb.WriteString(fmt.Sprintf(`<div class="report-stat-meta">
-		<strong class="report-stat-value" style="font-size: 0.85rem; font-weight: 600;">%.1f hours</strong> active time across <strong class="report-stat-value" style="font-size: 0.85rem; font-weight: 600;">%d sessions</strong>`,
-		data.TotalHours, data.SessionCount))
+		<strong class="report-stat-value" style="font-size: 0.85rem; font-weight: 600;">%s</strong> active time across <strong class="report-stat-value" style="font-size: 0.85rem; font-weight: 600;">%d sessions</strong>`,
+		formatHoursMinutes(data.TotalHours), data.SessionCount))
 	if data.GitCommitCount > 0 {
 		sb.WriteString(fmt.Sprintf(` • <strong style="color: #f97316;">%d commits</strong>`, data.GitCommitCount))
 	}
@@ -3112,9 +3159,9 @@ func (s *ReportsService) formatWeeklySummaryHTML(data *WeeklySummaryData) string
 	sb.WriteString(fmt.Sprintf(`
 		<div class="report-stat-card">
 			<div class="report-stat-label">Active Time</div>
-			<div class="report-stat-value">%.1fh</div>
+			<div class="report-stat-value">%s</div>
 			<div class="report-stat-meta">%d sessions</div>
-		</div>`, data.TotalHours, data.SessionCount))
+		</div>`, formatHoursMinutesShort(data.TotalHours), data.SessionCount))
 
 	// Commits Card
 	if data.GitCommitCount > 0 {
@@ -3163,10 +3210,10 @@ func (s *ReportsService) formatWeeklySummaryHTML(data *WeeklySummaryData) string
 				sb.WriteString(fmt.Sprintf(`
 					<tr>
 						<td style="text-align: left;">%s</td>
-						<td style="text-align: right;">%.1fh</td>
+						<td style="text-align: right;">%s</td>
 						<td style="text-align: right;" class="report-stat-meta">%d</td>
 						<td style="text-align: left;" class="report-stat-meta">%s</td>
-					</tr>`, day.DayName, day.Hours, day.SessionCount, focus))
+					</tr>`, day.DayName, formatHoursMinutesShort(day.Hours), day.SessionCount, focus))
 			}
 		}
 		sb.WriteString(`</tbody></table></div></div>`)
@@ -3455,8 +3502,8 @@ func (s *ReportsService) formatWeeklySummaryMarkdown(data *WeeklySummaryData) st
 	sb.WriteString(execSummary + "\n\n")
 
 	// Total active time and project percentages
-	sb.WriteString(fmt.Sprintf("**Total Active Time:** %.1f hours across %d sessions\n",
-		data.TotalHours, data.SessionCount))
+	sb.WriteString(fmt.Sprintf("**Total Active Time:** %s across %d sessions\n",
+		formatHoursMinutes(data.TotalHours), data.SessionCount))
 
 	if len(data.Projects) > 0 {
 		var projectPcts []string
@@ -3508,8 +3555,8 @@ func (s *ReportsService) formatWeeklySummaryMarkdown(data *WeeklySummaryData) st
 			if focus == "" {
 				focus = "-"
 			}
-			sb.WriteString(fmt.Sprintf("| %s | %.1fh | %d | %s |\n",
-				day.DayName, day.Hours, day.SessionCount, focus))
+			sb.WriteString(fmt.Sprintf("| %s | %s | %d | %s |\n",
+				day.DayName, formatHoursMinutesShort(day.Hours), day.SessionCount, focus))
 		}
 	}
 	sb.WriteString("\n---\n\n")

@@ -14,6 +14,8 @@ interface ShellColumnProps {
   hours: number[];
   onCommandClick?: (event: ShellEventDisplay) => void;
   hourHeight?: number;
+  lassoPreviewKeys?: Set<string>;
+  selectedEventKeys?: Set<string>;
 }
 
 export const ShellColumn: React.FC<ShellColumnProps> = ({
@@ -21,6 +23,8 @@ export const ShellColumn: React.FC<ShellColumnProps> = ({
   hours,
   onCommandClick,
   hourHeight,
+  lassoPreviewKeys,
+  selectedEventKeys,
 }) => {
   const effectiveHourHeight = hourHeight || GRID_CONSTANTS.HOUR_HEIGHT_PX;
 
@@ -125,16 +129,25 @@ export const ShellColumn: React.FC<ShellColumnProps> = ({
               ? 'bg-red-50 dark:bg-red-900/20'
               : 'bg-slate-100 dark:bg-slate-900/30';
 
+            // Check if any event in this group is in the lasso preview or selected
+            const isHighlighted = group.events.some(e => {
+              const key = `shell:${e.id}`;
+              return lassoPreviewKeys?.has(key) || selectedEventKeys?.has(key);
+            });
+
             return (
               <TooltipProvider key={group.id} delayDuration={100}>
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <div
-                      className="absolute left-0 right-0 mx-1 cursor-pointer hover:shadow-md transition-shadow"
+                      className={`absolute left-0 right-0 mx-1 cursor-pointer hover:shadow-md transition-shadow ${
+                        isHighlighted ? 'ring-2 ring-blue-400 ring-offset-1' : ''
+                      }`}
                       style={{
                         top: `${top}px`,
                         height: `${height}px`,
                       }}
+                      data-event-keys={JSON.stringify(group.events.map(e => `shell:${e.id}`))}
                       onClick={() => onCommandClick?.(group.events[0] as unknown as ShellEventDisplay)}
                     >
                       <div className={`${bgColor} border ${borderColor} rounded-md px-2 py-1 h-full overflow-hidden`}>

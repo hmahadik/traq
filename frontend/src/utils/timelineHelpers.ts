@@ -188,6 +188,7 @@ export interface GroupedBrowserEvent extends BrowserEventForGrouping {
   mergedDomains: string[]; // All domains in this group
   startTimestamp: number;
   endTimestamp: number;
+  eventIds: number[]; // All event IDs in this group for selection
 }
 
 /**
@@ -220,6 +221,7 @@ export function groupBrowserEventsByDomain(
         mergedDomains: [event.domain],
         startTimestamp: event.timestamp,
         endTimestamp: eventEndTime,
+        eventIds: [event.id],
       };
     } else {
       // Check if this event overlaps or is close to current group
@@ -230,6 +232,7 @@ export function groupBrowserEventsByDomain(
         currentGroup.endTimestamp = Math.max(currentGroup.endTimestamp, eventEndTime);
         currentGroup.totalDurationSeconds += event.visitDurationSeconds || 0;
         currentGroup.mergedCount++;
+        currentGroup.eventIds.push(event.id);
 
         // Keep unique titles
         if (!currentGroup.mergedTitles.includes(event.title)) {
@@ -258,6 +261,7 @@ export function groupBrowserEventsByDomain(
           mergedDomains: [event.domain],
           startTimestamp: event.timestamp,
           endTimestamp: eventEndTime,
+          eventIds: [event.id],
         };
       }
     }
