@@ -132,6 +132,100 @@ func (s *Store) GetWindowFocusEventsBySession(sessionID int64) ([]*WindowFocusEv
 	return s.GetFocusEventsBySession(sessionID)
 }
 
+// GetFocusEventByID retrieves a single focus event by ID.
+func (s *Store) GetFocusEventByID(id int64) (*WindowFocusEvent, error) {
+	event := &WindowFocusEvent{}
+	err := s.db.QueryRow(`
+		SELECT id, window_title, app_name, window_class,
+		       start_time, end_time, duration_seconds, session_id, created_at
+		FROM window_focus_events
+		WHERE id = ?`, id).Scan(
+		&event.ID, &event.WindowTitle, &event.AppName, &event.WindowClass,
+		&event.StartTime, &event.EndTime, &event.DurationSeconds, &event.SessionID, &event.CreatedAt,
+	)
+	if err == sql.ErrNoRows {
+		return nil, fmt.Errorf("focus event not found: %d", id)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to get focus event: %w", err)
+	}
+	return event, nil
+}
+
+// UpdateFocusEvent updates editable fields of a window focus event.
+// Duration is recalculated from the time range.
+func (s *Store) UpdateFocusEvent(id int64, windowTitle, appName string, startTime, endTime int64) error {
+	durationSeconds := float64(endTime-startTime) / 1.0 // Already in seconds
+
+	result, err := s.db.Exec(`
+		UPDATE window_focus_events
+		SET window_title = ?, app_name = ?, start_time = ?, end_time = ?, duration_seconds = ?
+		WHERE id = ?`,
+		windowTitle, appName, startTime, endTime, durationSeconds, id)
+	if err != nil {
+		return fmt.Errorf("failed to update focus event: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected: %w", err)
+	}
+	if rowsAffected == 0 {
+		return fmt.Errorf("focus event not found: %d", id)
+	}
+	return nil
+}
+
+// DeleteFocusEvent removes a single focus event.
+func (s *Store) DeleteFocusEvent(id int64) error {
+	result, err := s.db.Exec(`DELETE FROM window_focus_events WHERE id = ?`, id)
+	if err != nil {
+		return fmt.Errorf("failed to delete focus event: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected: %w", err)
+	}
+	if rowsAffected == 0 {
+		return fmt.Errorf("focus event not found: %d", id)
+	}
+	return nil
+}
+
+// DeleteFocusEvents removes multiple focus events (bulk delete).
+func (s *Store) DeleteFocusEvents(ids []int64) error {
+	if len(ids) == 0 {
+		return nil
+	}
+
+	// Build placeholder string for IN clause
+	placeholders := ""
+	args := make([]interface{}, len(ids))
+	for i, id := range ids {
+		if i > 0 {
+			placeholders += ","
+		}
+		placeholders += "?"
+		args[i] = id
+	}
+
+	query := fmt.Sprintf(`DELETE FROM window_focus_events WHERE id IN (%s)`, placeholders)
+	result, err := s.db.Exec(query, args...)
+	if err != nil {
+		return fmt.Errorf("failed to delete focus events: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected: %w", err)
+	}
+	if rowsAffected == 0 {
+		return fmt.Errorf("no focus events found to delete")
+	}
+	return nil
+}
+
 func scanFocusEvents(rows *sql.Rows) ([]*WindowFocusEvent, error) {
 	var events []*WindowFocusEvent
 	for rows.Next() {

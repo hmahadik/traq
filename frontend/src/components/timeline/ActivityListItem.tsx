@@ -5,9 +5,17 @@ import { formatDecimalHours } from '@/utils/timelineHelpers';
 
 interface ActivityListItemProps {
   activity: ActivityBlock;
+  isSelected?: boolean;
+  onClick?: (e: React.MouseEvent) => void;
+  onDoubleClick?: () => void;
 }
 
-export function ActivityListItem({ activity }: ActivityListItemProps) {
+export function ActivityListItem({
+  activity,
+  isSelected,
+  onClick,
+  onDoubleClick,
+}: ActivityListItemProps) {
   const colors = getAppColors(activity.appName);
   const duration = formatDecimalHours(activity.durationSeconds / 3600);
 
@@ -41,6 +49,10 @@ export function ActivityListItem({ activity }: ActivityListItemProps) {
       duration={duration}
       timestamp={activity.startTime}
       metadata={metadata}
+      isSelected={isSelected}
+      onClick={onClick}
+      onDoubleClick={onDoubleClick}
+      dataActivityId={activity.id}
     />
   );
 }

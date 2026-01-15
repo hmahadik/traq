@@ -563,6 +563,41 @@ export const screenshots = {
 };
 
 /**
+ * Activities API - Window focus events (ActivityBlocks)
+ */
+export const activities = {
+  /** Get a single focus event by ID */
+  get: async (id: number) => {
+    await waitForReady();
+    return withRetry(() => App.GetFocusEventByID(id));
+  },
+
+  /** Update editable fields of a focus event */
+  update: async (
+    id: number,
+    windowTitle: string,
+    appName: string,
+    startTime: number,
+    endTime: number
+  ) => {
+    await waitForReady();
+    return App.UpdateFocusEvent(id, windowTitle, appName, startTime, endTime);
+  },
+
+  /** Delete a single focus event */
+  delete: async (id: number) => {
+    await waitForReady();
+    return App.DeleteFocusEvent(id);
+  },
+
+  /** Delete multiple focus events (bulk delete) */
+  deleteMany: async (ids: number[]) => {
+    await waitForReady();
+    return App.DeleteFocusEvents(ids);
+  },
+};
+
+/**
  * System API
  */
 export const system = {
@@ -849,6 +884,7 @@ export const api = {
   reports,
   config,
   screenshots,
+  activities,
   system,
   summaries,
   git,

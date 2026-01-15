@@ -12,6 +12,10 @@ export function CheckForUpdate():Promise<service.UpdateInfo>;
 
 export function DeleteAppCategory(arg1:string):Promise<void>;
 
+export function DeleteFocusEvent(arg1:number):Promise<void>;
+
+export function DeleteFocusEvents(arg1:Array<number>):Promise<void>;
+
 export function DeleteHierarchicalSummary(arg1:number):Promise<void>;
 
 export function DeleteIssueReport(arg1:number):Promise<void>;
@@ -89,6 +93,8 @@ export function GetDataSourceStats(arg1:number,arg2:number):Promise<service.Data
 export function GetFileAllowedExtensions():Promise<Array<string>>;
 
 export function GetFocusDistribution(arg1:string):Promise<Array<service.HourlyFocus>>;
+
+export function GetFocusEventByID(arg1:number):Promise<storage.WindowFocusEvent>;
 
 export function GetHierarchicalSummary(arg1:string,arg2:string):Promise<storage.HierarchicalSummary>;
 
@@ -215,6 +221,8 @@ export function UnregisterGitRepository(arg1:number):Promise<void>;
 export function UnwatchDirectory(arg1:string):Promise<void>;
 
 export function UpdateConfig(arg1:Record<string, any>):Promise<void>;
+
+export function UpdateFocusEvent(arg1:number,arg2:string,arg3:string,arg4:number,arg5:number):Promise<void>;
 
 export function UpdateHierarchicalSummary(arg1:number,arg2:string):Promise<void>;
 

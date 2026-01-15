@@ -14,6 +14,10 @@ interface TimelineListViewProps {
   data: TimelineGridData;
   filters: TimelineFilters;
   onSessionClick?: (sessionId: number) => void;
+  // Selection props
+  selectedActivityIds?: Set<number>;
+  onActivitySelect?: (id: number, event: React.MouseEvent, orderedIds: number[]) => void;
+  onActivityDoubleClick?: (activity: ActivityBlock) => void;
 }
 
 interface GroupedEvents {
@@ -21,9 +25,23 @@ interface GroupedEvents {
   events: TimelineListEvent[];
 }
 
-export function TimelineListView({ data, filters, onSessionClick }: TimelineListViewProps) {
+export function TimelineListView({
+  data,
+  filters,
+  onSessionClick,
+  selectedActivityIds,
+  onActivitySelect,
+  onActivityDoubleClick,
+}: TimelineListViewProps) {
   // Flatten grid data into chronological list
   const allEvents = useMemo(() => flattenTimelineData(data), [data]);
+
+  // Get ordered list of activity IDs for range selection
+  const orderedActivityIds = useMemo(() => {
+    return allEvents
+      .filter((e) => e.type === 'activity')
+      .map((e) => (e.data as ActivityBlock).id);
+  }, [allEvents]);
 
   // Apply filters
   const filteredEvents = useMemo(() => {
@@ -96,8 +114,17 @@ export function TimelineListView({ data, filters, onSessionClick }: TimelineList
   // Render appropriate component based on event type
   const renderEvent = (event: TimelineListEvent) => {
     switch (event.type) {
-      case 'activity':
-        return <ActivityListItem activity={event.data as ActivityBlock} />;
+      case 'activity': {
+        const activity = event.data as ActivityBlock;
+        return (
+          <ActivityListItem
+            activity={activity}
+            isSelected={selectedActivityIds?.has(activity.id)}
+            onClick={onActivitySelect ? (e) => onActivitySelect(activity.id, e, orderedActivityIds) : undefined}
+            onDoubleClick={onActivityDoubleClick ? () => onActivityDoubleClick(activity) : undefined}
+          />
+        );
+      }
       case 'session':
         return <SessionListItem session={event.data as SessionSummaryWithPosition} onClick={onSessionClick} />;
       case 'git':

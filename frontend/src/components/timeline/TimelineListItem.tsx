@@ -9,6 +9,9 @@ interface TimelineListItemProps {
   metadata?: ReactNode;
   children?: ReactNode; // For screenshot thumbnails
   onClick?: () => void;
+  isSelected?: boolean;
+  onDoubleClick?: () => void;
+  dataActivityId?: number;
 }
 
 export function TimelineListItem({
@@ -20,6 +23,9 @@ export function TimelineListItem({
   metadata,
   children,
   onClick,
+  isSelected = false,
+  onDoubleClick,
+  dataActivityId,
 }: TimelineListItemProps) {
   const formattedTime = new Date(timestamp * 1000).toLocaleTimeString('en-US', {
     hour: 'numeric',
@@ -29,8 +35,13 @@ export function TimelineListItem({
 
   return (
     <div
-      className={`flex items-center gap-3 px-3 py-2 border-b last:border-b-0 hover:bg-accent/30 transition-colors text-xs ${onClick ? 'cursor-pointer' : ''}`}
+      className={`flex items-center gap-3 px-3 py-2 border-b last:border-b-0 hover:bg-accent/30 transition-colors text-xs ${onClick ? 'cursor-pointer' : ''} ${
+        isSelected ? 'bg-blue-500/10 ring-1 ring-blue-500 ring-inset' : ''
+      }`}
       onClick={onClick}
+      onDoubleClick={onDoubleClick}
+      data-activity-id={dataActivityId}
+      aria-selected={isSelected}
     >
       {/* Time */}
       <div className="w-16 flex-shrink-0 text-muted-foreground font-mono">{formattedTime}</div>

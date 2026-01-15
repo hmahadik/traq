@@ -14,9 +14,21 @@ interface ActivityBlockProps {
   hours: number[]; // Array of displayed hours for position calculation
   onClick?: (block: ActivityBlockType) => void;
   hourHeight?: number;
+  // Selection props
+  isSelected?: boolean;
+  onSelect?: (id: number, event: React.MouseEvent) => void;
+  onDoubleClick?: (block: ActivityBlockType) => void;
 }
 
-export const ActivityBlock: React.FC<ActivityBlockProps> = ({ block, hours, onClick, hourHeight }) => {
+export const ActivityBlock: React.FC<ActivityBlockProps> = ({
+  block,
+  hours,
+  onClick,
+  hourHeight,
+  isSelected = false,
+  onSelect,
+  onDoubleClick,
+}) => {
   const effectiveHourHeight = hourHeight || GRID_CONSTANTS.HOUR_HEIGHT_PX;
   const { pixelPosition, windowTitle, appName, durationSeconds, startTime, hourOffset } = block;
 
@@ -78,14 +90,27 @@ export const ActivityBlock: React.FC<ActivityBlockProps> = ({ block, hours, onCl
       <Tooltip>
         <TooltipTrigger asChild>
           <div
-            className={`absolute left-1 right-1 ${roundedClass} ${colors.bg} hover:shadow-md transition-all cursor-pointer overflow-hidden border border-black/5 dark:border-white/10`}
+            className={`absolute left-1 right-1 ${roundedClass} ${colors.bg} hover:shadow-md transition-all cursor-pointer overflow-hidden border ${
+              isSelected
+                ? 'ring-2 ring-blue-500 ring-offset-1 border-blue-500'
+                : 'border-black/5 dark:border-white/10'
+            }`}
             style={{
               top: `${absoluteTop}px`,
               height: `${actualHeight}px`,
             }}
-            onClick={() => onClick?.(block)}
+            data-activity-id={block.id}
+            onClick={(e) => {
+              if (onSelect) {
+                onSelect(block.id, e);
+              } else {
+                onClick?.(block);
+              }
+            }}
+            onDoubleClick={() => onDoubleClick?.(block)}
             role="button"
             aria-label={`${getAppDisplayName(appName)} activity from ${formatTime(startTime)} for ${formatDuration(durationSeconds)}`}
+            aria-selected={isSelected}
           >
             {showIcon && (
               <div className="flex items-start gap-2 p-2">

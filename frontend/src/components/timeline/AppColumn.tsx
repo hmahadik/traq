@@ -11,6 +11,10 @@ interface AppColumnProps {
   hours: number[]; // Array of hours for grid alignment
   onBlockClick?: (block: ActivityBlockType) => void;
   hourHeight?: number; // Override for effectiveHourHeight
+  // Selection props
+  selectedActivityIds?: Set<number>;
+  onActivitySelect?: (id: number, event: React.MouseEvent) => void;
+  onActivityDoubleClick?: (block: ActivityBlockType) => void;
 }
 
 export const AppColumn: React.FC<AppColumnProps> = ({
@@ -21,6 +25,9 @@ export const AppColumn: React.FC<AppColumnProps> = ({
   hours,
   onBlockClick,
   hourHeight,
+  selectedActivityIds,
+  onActivitySelect,
+  onActivityDoubleClick,
 }) => {
   const effectiveHourHeight = hourHeight || GRID_CONSTANTS.HOUR_HEIGHT_PX;
   // Group adjacent activities with gaps up to 15 minutes for cleaner Timely-style display
@@ -93,7 +100,16 @@ export const AppColumn: React.FC<AppColumnProps> = ({
         {/* Activity Blocks (absolutely positioned) - using grouped blocks for cleaner display */}
         <div className="absolute inset-0">
           {groupedBlocks.map((block) => (
-            <ActivityBlock key={block.id} block={block} hours={hours} onClick={onBlockClick} hourHeight={effectiveHourHeight} />
+            <ActivityBlock
+              key={block.id}
+              block={block}
+              hours={hours}
+              onClick={onBlockClick}
+              hourHeight={effectiveHourHeight}
+              isSelected={selectedActivityIds?.has(block.id)}
+              onSelect={onActivitySelect}
+              onDoubleClick={onActivityDoubleClick}
+            />
           ))}
         </div>
       </div>

@@ -3,7 +3,7 @@ import { useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { ChevronLeft, ChevronRight, Calendar, Sparkles, Loader2 } from 'lucide-react';
 import { CalendarWidget, ViewModeSelector, ViewMode } from '@/components/timeline';
-import { useTimelineGridData, useCalendarHeatmap, useGenerateSummary, useWeekTimelineData } from '@/api/hooks';
+import { useTimelineGridData, useCalendarHeatmap, useGenerateSummary, useWeekTimelineData, useDeleteActivities } from '@/api/hooks';
 import { TimelineGridView } from '@/components/timeline/TimelineGridView';
 import { TimelineListView } from '@/components/timeline/TimelineListView';
 import { SplitTimelineView } from '@/components/timeline/SplitTimelineView';
@@ -18,6 +18,10 @@ import { FilterControls, TimelineFilters } from '@/components/timeline/FilterCon
 import { GlobalSearch } from '@/components/timeline/GlobalSearch';
 import { ZoomControls, ZoomLevel, DEFAULT_ZOOM, ZOOM_LEVELS } from '@/components/timeline/ZoomControls';
 import { SessionDetailDrawer } from '@/components/session/SessionDetailDrawer';
+import { SelectionToolbar } from '@/components/timeline/SelectionToolbar';
+import { ActivityEditDialog } from '@/components/timeline/ActivityEditDialog';
+import { useActivitySelection } from '@/hooks/useActivitySelection';
+import type { ActivityBlock } from '@/types/timeline';
 import { toast } from 'sonner';
 
 function getDateString(date: Date): string {
@@ -69,6 +73,25 @@ export function TimelinePage() {
   // Session detail drawer state
   const [sessionDrawerOpen, setSessionDrawerOpen] = useState(false);
   const [selectedSessionId, setSelectedSessionId] = useState<number | null>(null);
+
+  // Activity selection state
+  const {
+    selectedIds: selectedActivityIds,
+    selectedCount,
+    clearSelection,
+    handleClick: handleActivityClick,
+    lassoRect,
+    startLasso,
+    updateLasso,
+    endLasso,
+  } = useActivitySelection();
+
+  // Activity edit dialog state
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editingActivity, setEditingActivity] = useState<ActivityBlock | null>(null);
+
+  // Delete mutation
+  const deleteActivities = useDeleteActivities();
 
   // View mode state with localStorage persistence
   const [viewMode, setViewMode] = useState<ViewMode>(() => {
@@ -227,6 +250,47 @@ export function TimelinePage() {
     setSelectedSessionId(sessionId);
     setSessionDrawerOpen(true);
   }, []);
+
+  // Handle activity selection (for grid view - simple click)
+  const handleActivitySelect = useCallback(
+    (id: number, event: React.MouseEvent) => {
+      handleActivityClick(id, event);
+    },
+    [handleActivityClick]
+  );
+
+  // Handle activity selection for list view (needs ordered IDs for shift+click range)
+  const handleListActivitySelect = useCallback(
+    (id: number, event: React.MouseEvent, orderedIds: number[]) => {
+      handleActivityClick(id, event, orderedIds);
+    },
+    [handleActivityClick]
+  );
+
+  // Handle double-click to edit activity
+  const handleActivityDoubleClick = useCallback((activity: ActivityBlock) => {
+    setEditingActivity(activity);
+    setEditDialogOpen(true);
+  }, []);
+
+  // Handle bulk delete
+  const handleDeleteSelected = useCallback(async () => {
+    if (selectedActivityIds.size === 0) return;
+
+    try {
+      await deleteActivities.mutateAsync(Array.from(selectedActivityIds));
+      clearSelection();
+      toast.success(`Deleted ${selectedActivityIds.size} activities`);
+    } catch (error) {
+      console.error('Failed to delete activities:', error);
+      toast.error('Failed to delete activities');
+    }
+  }, [selectedActivityIds, deleteActivities, clearSelection]);
+
+  // Clear selection when date changes
+  useEffect(() => {
+    clearSelection();
+  }, [dateStr, clearSelection]);
 
   // Navigation handlers - adjust based on view mode
   const goToPrevious = useCallback(() => {
@@ -402,12 +466,44 @@ export function TimelinePage() {
             </div>
 
             {displayMode === 'grid' ? (
-              <TimelineGridView data={gridData} filters={filters} hourHeight={zoom} onSessionClick={handleSessionClick} />
+              <TimelineGridView
+                data={gridData}
+                filters={filters}
+                hourHeight={zoom}
+                onSessionClick={handleSessionClick}
+                selectedActivityIds={selectedActivityIds}
+                onActivitySelect={handleActivitySelect}
+                onActivityDoubleClick={handleActivityDoubleClick}
+                lassoRect={lassoRect}
+                onLassoStart={startLasso}
+                onLassoMove={updateLasso}
+                onLassoEnd={endLasso}
+              />
             ) : displayMode === 'list' ? (
-              <TimelineListView data={gridData} filters={filters} onSessionClick={handleSessionClick} />
+              <TimelineListView
+                data={gridData}
+                filters={filters}
+                onSessionClick={handleSessionClick}
+                selectedActivityIds={selectedActivityIds}
+                onActivitySelect={handleListActivitySelect}
+                onActivityDoubleClick={handleActivityDoubleClick}
+              />
             ) : (
               /* Split view - Grid and List side by side with synchronized scrolling */
-              <SplitTimelineView data={gridData} filters={filters} hourHeight={zoom} onSessionClick={handleSessionClick} />
+              <SplitTimelineView
+                data={gridData}
+                filters={filters}
+                hourHeight={zoom}
+                onSessionClick={handleSessionClick}
+                selectedActivityIds={selectedActivityIds}
+                onActivitySelect={handleActivitySelect}
+                onActivityDoubleClick={handleActivityDoubleClick}
+                lassoRect={lassoRect}
+                onLassoStart={startLasso}
+                onLassoMove={updateLasso}
+                onLassoEnd={endLasso}
+                onListActivitySelect={handleListActivitySelect}
+              />
             )}
           </div>
         </>
@@ -525,6 +621,26 @@ export function TimelinePage() {
         open={sessionDrawerOpen}
         onOpenChange={setSessionDrawerOpen}
         sessionId={selectedSessionId}
+      />
+
+      {/* Activity Selection Toolbar */}
+      {viewMode === 'day' && (
+        <SelectionToolbar
+          selectedCount={selectedCount}
+          onDelete={handleDeleteSelected}
+          onClear={clearSelection}
+          isDeleting={deleteActivities.isPending}
+        />
+      )}
+
+      {/* Activity Edit Dialog */}
+      <ActivityEditDialog
+        activity={editingActivity}
+        open={editDialogOpen}
+        onOpenChange={(open) => {
+          setEditDialogOpen(open);
+          if (!open) setEditingActivity(null);
+        }}
       />
 
       {showCalendar && (

@@ -242,7 +242,13 @@ func (a *App) GetDaemonStatus() (result *service.DaemonStatus, err error) {
 		}
 	}()
 	if a == nil || !a.ready || a.Config == nil {
-		return nil, nil
+		// Return a default "not running" status instead of nil
+		// to avoid JSON parse errors in Wails (nil can't be serialized)
+		return &service.DaemonStatus{
+			Running: false,
+			Paused:  false,
+			IsAFK:   false,
+		}, nil
 	}
 	return a.Config.GetDaemonStatus()
 }
@@ -570,8 +576,9 @@ func (a *App) GetScreenshotsForDate(date string) ([]*service.ScreenshotDisplay, 
 
 // GetSessionContext returns all context for a session.
 func (a *App) GetSessionContext(sessionID int64) (*service.SessionContext, error) {
-	if a.Timeline == nil {
-		return nil, nil
+	// Return empty context for not-ready state or invalid session ID
+	if a == nil || !a.ready || a.Timeline == nil || sessionID <= 0 {
+		return &service.SessionContext{}, nil
 	}
 	return a.Timeline.GetSessionContext(sessionID)
 }
@@ -652,6 +659,42 @@ func (a *App) DeleteScreenshot(id int64) error {
 		return nil
 	}
 	return a.Screenshots.DeleteScreenshot(id)
+}
+
+// ============================================================================
+// Focus Event Methods (exposed to frontend)
+// ============================================================================
+
+// GetFocusEventByID retrieves a single focus event by ID.
+func (a *App) GetFocusEventByID(id int64) (*storage.WindowFocusEvent, error) {
+	if a.store == nil {
+		return nil, fmt.Errorf("store not initialized")
+	}
+	return a.store.GetFocusEventByID(id)
+}
+
+// UpdateFocusEvent updates editable fields of a window focus event.
+func (a *App) UpdateFocusEvent(id int64, windowTitle, appName string, startTime, endTime int64) error {
+	if a.store == nil {
+		return fmt.Errorf("store not initialized")
+	}
+	return a.store.UpdateFocusEvent(id, windowTitle, appName, startTime, endTime)
+}
+
+// DeleteFocusEvent removes a single focus event.
+func (a *App) DeleteFocusEvent(id int64) error {
+	if a.store == nil {
+		return fmt.Errorf("store not initialized")
+	}
+	return a.store.DeleteFocusEvent(id)
+}
+
+// DeleteFocusEvents removes multiple focus events (bulk delete).
+func (a *App) DeleteFocusEvents(ids []int64) error {
+	if a.store == nil {
+		return fmt.Errorf("store not initialized")
+	}
+	return a.store.DeleteFocusEvents(ids)
 }
 
 // ============================================================================
@@ -779,7 +822,13 @@ func (a *App) GetConfig() (result *service.Config, err error) {
 		}
 	}()
 	if a == nil || !a.ready || a.Config == nil {
-		return nil, nil
+		// Return minimal default config to avoid JSON parse errors
+		// (nil can't be serialized by Wails)
+		return &service.Config{
+			UI: &service.UIConfig{
+				Theme: "system",
+			},
+		}, nil
 	}
 	return a.Config.GetConfig()
 }

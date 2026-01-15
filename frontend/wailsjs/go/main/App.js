@@ -14,6 +14,14 @@ export function DeleteAppCategory(arg1) {
   return window['go']['main']['App']['DeleteAppCategory'](arg1);
 }
 
+export function DeleteFocusEvent(arg1) {
+  return window['go']['main']['App']['DeleteFocusEvent'](arg1);
+}
+
+export function DeleteFocusEvents(arg1) {
+  return window['go']['main']['App']['DeleteFocusEvents'](arg1);
+}
+
 export function DeleteHierarchicalSummary(arg1) {
   return window['go']['main']['App']['DeleteHierarchicalSummary'](arg1);
 }
@@ -168,6 +176,10 @@ export function GetFileAllowedExtensions() {
 
 export function GetFocusDistribution(arg1) {
   return window['go']['main']['App']['GetFocusDistribution'](arg1);
+}
+
+export function GetFocusEventByID(arg1) {
+  return window['go']['main']['App']['GetFocusEventByID'](arg1);
 }
 
 export function GetHierarchicalSummary(arg1, arg2) {
@@ -420,6 +432,10 @@ export function UnwatchDirectory(arg1) {
 
 export function UpdateConfig(arg1) {
   return window['go']['main']['App']['UpdateConfig'](arg1);
+}
+
+export function UpdateFocusEvent(arg1, arg2, arg3, arg4, arg5) {
+  return window['go']['main']['App']['UpdateFocusEvent'](arg1, arg2, arg3, arg4, arg5);
 }
 
 export function UpdateHierarchicalSummary(arg1, arg2) {

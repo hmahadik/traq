@@ -844,3 +844,82 @@ export function useTestIssueWebhook() {
     },
   });
 }
+
+// ============================================================================
+// Activity (Focus Event) Hooks
+// ============================================================================
+
+/**
+ * Update a single activity (window focus event)
+ */
+export function useUpdateActivity() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      id,
+      windowTitle,
+      appName,
+      startTime,
+      endTime,
+    }: {
+      id: number;
+      windowTitle: string;
+      appName: string;
+      startTime: number;
+      endTime: number;
+    }) => api.activities.update(id, windowTitle, appName, startTime, endTime),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['timeline'] });
+      queryClient.invalidateQueries({ queryKey: ['analytics'] });
+      toast.success('Activity updated');
+    },
+    onError: (error: unknown) => {
+      console.error('Update activity failed:', error);
+      const message = error instanceof Error ? error.message : String(error);
+      toast.error(`Failed to update activity: ${message}`);
+    },
+  });
+}
+
+/**
+ * Delete a single activity (window focus event)
+ */
+export function useDeleteActivity() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: number) => api.activities.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['timeline'] });
+      queryClient.invalidateQueries({ queryKey: ['analytics'] });
+      toast.success('Activity deleted');
+    },
+    onError: (error: unknown) => {
+      console.error('Delete activity failed:', error);
+      const message = error instanceof Error ? error.message : String(error);
+      toast.error(`Failed to delete activity: ${message}`);
+    },
+  });
+}
+
+/**
+ * Delete multiple activities (bulk delete)
+ */
+export function useDeleteActivities() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (ids: number[]) => api.activities.deleteMany(ids),
+    onSuccess: (_, ids) => {
+      queryClient.invalidateQueries({ queryKey: ['timeline'] });
+      queryClient.invalidateQueries({ queryKey: ['analytics'] });
+      toast.success(`${ids.length} activities deleted`);
+    },
+    onError: (error: unknown) => {
+      console.error('Bulk delete activities failed:', error);
+      const message = error instanceof Error ? error.message : String(error);
+      toast.error(`Failed to delete activities: ${message}`);
+    },
+  });
+}

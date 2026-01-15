@@ -22,13 +22,35 @@ interface TimelineGridViewProps {
   filters?: TimelineFilters;
   hourHeight?: number; // Dynamic hour height for zoom (default: GRID_CONSTANTS.HOUR_HEIGHT_PX)
   onSessionClick?: (sessionId: number) => void; // Callback when session is clicked
+  // Selection props
+  selectedActivityIds?: Set<number>;
+  onActivitySelect?: (id: number, event: React.MouseEvent) => void;
+  onActivityDoubleClick?: (block: ActivityBlockType) => void;
+  // Lasso selection props
+  lassoRect?: { x: number; y: number; width: number; height: number } | null;
+  onLassoStart?: (x: number, y: number) => void;
+  onLassoMove?: (x: number, y: number) => void;
+  onLassoEnd?: (intersectingIds: number[]) => void;
 }
 
 // Header height for column headers (matches the header in HourColumn/AppColumn)
 const HEADER_HEIGHT_PX = 44;
 
-export const TimelineGridView: React.FC<TimelineGridViewProps> = ({ data, filters, hourHeight, onSessionClick }) => {
+export const TimelineGridView: React.FC<TimelineGridViewProps> = ({
+  data,
+  filters,
+  hourHeight,
+  onSessionClick,
+  selectedActivityIds,
+  onActivitySelect,
+  onActivityDoubleClick,
+  lassoRect,
+  onLassoStart,
+  onLassoMove,
+  onLassoEnd,
+}) => {
   const { hourlyGrid, sessionSummaries, topApps } = data;
+  const gridContainerRef = React.useRef<HTMLDivElement>(null);
 
   // Use provided hourHeight or fall back to default
   const effectiveHourHeight = hourHeight || GRID_CONSTANTS.HOUR_HEIGHT_PX;
@@ -132,6 +154,92 @@ export const TimelineGridView: React.FC<TimelineGridViewProps> = ({ data, filter
     onSessionClick?.(session.id);
   }, [onSessionClick]);
 
+  // Collect all activity blocks for lasso intersection detection
+  const allActivityBlocks = useMemo(() => {
+    const blocks: ActivityBlockType[] = [];
+    Object.values(hourlyGrid).forEach((appActivities) => {
+      Object.values(appActivities).forEach((activities) => {
+        blocks.push(...activities);
+      });
+    });
+    return blocks;
+  }, [hourlyGrid]);
+
+  // Find activity blocks that intersect with a rectangle
+  const findIntersectingActivities = useCallback(
+    (rect: { x: number; y: number; width: number; height: number }) => {
+      if (!gridContainerRef.current) return [];
+
+      const intersecting: number[] = [];
+      const activityElements = gridContainerRef.current.querySelectorAll('[data-activity-id]');
+
+      activityElements.forEach((element) => {
+        const activityId = parseInt(element.getAttribute('data-activity-id') || '0', 10);
+        if (!activityId) return;
+
+        const elementRect = element.getBoundingClientRect();
+        const containerRect = gridContainerRef.current!.getBoundingClientRect();
+
+        // Convert element position to container-relative coordinates
+        const elemX = elementRect.left - containerRect.left;
+        const elemY = elementRect.top - containerRect.top;
+        const elemWidth = elementRect.width;
+        const elemHeight = elementRect.height;
+
+        // Check intersection
+        const intersects =
+          rect.x < elemX + elemWidth &&
+          rect.x + rect.width > elemX &&
+          rect.y < elemY + elemHeight &&
+          rect.y + rect.height > elemY;
+
+        if (intersects) {
+          intersecting.push(activityId);
+        }
+      });
+
+      return intersecting;
+    },
+    []
+  );
+
+  // Lasso mouse handlers
+  const handleMouseDown = useCallback(
+    (e: React.MouseEvent) => {
+      // Only start lasso on left click, not on activity blocks
+      if (e.button !== 0) return;
+      const target = e.target as HTMLElement;
+      if (target.closest('[data-activity-id]')) return; // Don't start lasso on activity blocks
+
+      if (!gridContainerRef.current || !onLassoStart) return;
+
+      const containerRect = gridContainerRef.current.getBoundingClientRect();
+      const x = e.clientX - containerRect.left;
+      const y = e.clientY - containerRect.top;
+      onLassoStart(x, y);
+    },
+    [onLassoStart]
+  );
+
+  const handleMouseMove = useCallback(
+    (e: React.MouseEvent) => {
+      if (!gridContainerRef.current || !onLassoMove || !lassoRect) return;
+
+      const containerRect = gridContainerRef.current.getBoundingClientRect();
+      const x = e.clientX - containerRect.left;
+      const y = e.clientY - containerRect.top;
+      onLassoMove(x, y);
+    },
+    [onLassoMove, lassoRect]
+  );
+
+  const handleMouseUp = useCallback(() => {
+    if (!lassoRect || !onLassoEnd) return;
+
+    const intersectingIds = findIntersectingActivities(lassoRect);
+    onLassoEnd(intersectingIds);
+  }, [lassoRect, onLassoEnd, findIntersectingActivities]);
+
   if (topApps.length === 0) {
     return (
       <div className="flex items-center justify-center h-64 text-muted-foreground bg-muted/50 rounded-lg">
@@ -148,7 +256,14 @@ export const TimelineGridView: React.FC<TimelineGridViewProps> = ({ data, filter
   const gridHeight = HEADER_HEIGHT_PX + (24 * effectiveHourHeight);
 
   return (
-    <div className="relative bg-card border border-border flex-1 min-h-0 overflow-hidden">
+    <div
+      className="relative bg-card border border-border flex-1 min-h-0 overflow-hidden"
+      ref={gridContainerRef}
+      onMouseDown={handleMouseDown}
+      onMouseMove={handleMouseMove}
+      onMouseUp={handleMouseUp}
+      onMouseLeave={handleMouseUp}
+    >
       {/* Full-screen scrollable container - spans entire available space */}
       <ScrollArea className="h-full w-full" type="always">
         <div className="flex min-w-full relative" style={{ height: `${gridHeight}px`, minWidth: 'max-content' }}>
@@ -244,6 +359,9 @@ export const TimelineGridView: React.FC<TimelineGridViewProps> = ({ data, filter
               hours={activeHours}
               onBlockClick={handleActivityBlockClick}
               hourHeight={effectiveHourHeight}
+              selectedActivityIds={selectedActivityIds}
+              onActivitySelect={onActivitySelect}
+              onActivityDoubleClick={onActivityDoubleClick}
             />
           ))}
 
@@ -270,6 +388,19 @@ export const TimelineGridView: React.FC<TimelineGridViewProps> = ({ data, filter
         open={galleryOpen}
         onOpenChange={setGalleryOpen}
       />
+
+      {/* Lasso selection overlay */}
+      {lassoRect && (
+        <div
+          className="absolute border-2 border-blue-500 bg-blue-500/10 pointer-events-none z-50"
+          style={{
+            left: `${lassoRect.x}px`,
+            top: `${lassoRect.y}px`,
+            width: `${lassoRect.width}px`,
+            height: `${lassoRect.height}px`,
+          }}
+        />
+      )}
     </div>
   );
 };
