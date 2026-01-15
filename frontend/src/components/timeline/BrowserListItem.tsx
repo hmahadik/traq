@@ -5,6 +5,8 @@ import { formatDecimalHours } from '@/utils/timelineHelpers';
 
 interface BrowserListItemProps {
   browserEvent: BrowserEventDisplay;
+  isSelected?: boolean;
+  onClick?: (e: React.MouseEvent) => void;
 }
 
 function getBrowserColor(browser: string) {
@@ -27,7 +29,7 @@ function getBrowserColor(browser: string) {
   }
 }
 
-export function BrowserListItem({ browserEvent }: BrowserListItemProps) {
+export function BrowserListItem({ browserEvent, isSelected, onClick }: BrowserListItemProps) {
   const browserColor = getBrowserColor(browserEvent.browser);
 
   const icon = (
@@ -59,6 +61,9 @@ export function BrowserListItem({ browserEvent }: BrowserListItemProps) {
       duration={duration}
       timestamp={browserEvent.timestamp}
       metadata={metadata}
+      isSelected={isSelected}
+      onClick={onClick}
+      selectable={Boolean(onClick)}
       reserveCheckboxSpace
     />
   );

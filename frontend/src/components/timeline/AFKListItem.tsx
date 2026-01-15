@@ -5,6 +5,8 @@ import { formatDecimalHours } from '@/utils/timelineHelpers';
 
 interface AFKListItemProps {
   afkBlock: AFKBlock;
+  isSelected?: boolean;
+  onClick?: (e: React.MouseEvent) => void;
 }
 
 function getTriggerLabel(triggerType: string) {
@@ -31,7 +33,7 @@ function getTriggerIcon(triggerType: string) {
   }
 }
 
-export function AFKListItem({ afkBlock }: AFKListItemProps) {
+export function AFKListItem({ afkBlock, isSelected, onClick }: AFKListItemProps) {
   const duration = formatDecimalHours(afkBlock.durationSeconds / 3600);
   const triggerLabel = getTriggerLabel(afkBlock.triggerType);
 
@@ -48,6 +50,9 @@ export function AFKListItem({ afkBlock }: AFKListItemProps) {
       details={triggerLabel}
       duration={duration}
       timestamp={afkBlock.startTime}
+      isSelected={isSelected}
+      onClick={onClick}
+      selectable={Boolean(onClick)}
       reserveCheckboxSpace
     />
   );

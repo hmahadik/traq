@@ -147,6 +147,61 @@ func (s *Store) CountFileEventsByTimeRange(start, end int64) (int64, error) {
 	return count, err
 }
 
+// DeleteFileEvent deletes a single file event by ID.
+func (s *Store) DeleteFileEvent(id int64) error {
+	result, err := s.db.Exec("DELETE FROM file_events WHERE id = ?", id)
+	if err != nil {
+		return fmt.Errorf("failed to delete file event: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected: %w", err)
+	}
+
+	if rowsAffected == 0 {
+		return fmt.Errorf("no file event found with ID %d", id)
+	}
+
+	return nil
+}
+
+// DeleteFileEvents deletes multiple file events by ID.
+func (s *Store) DeleteFileEvents(ids []int64) error {
+	if len(ids) == 0 {
+		return nil
+	}
+
+	// Build placeholders for IN clause
+	placeholders := ""
+	args := make([]interface{}, len(ids))
+	for i, id := range ids {
+		if i > 0 {
+			placeholders += ","
+		}
+		placeholders += "?"
+		args[i] = id
+	}
+
+	query := fmt.Sprintf("DELETE FROM file_events WHERE id IN (%s)", placeholders)
+
+	result, err := s.db.Exec(query, args...)
+	if err != nil {
+		return fmt.Errorf("failed to delete file events: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected: %w", err)
+	}
+
+	if rowsAffected == 0 {
+		return fmt.Errorf("no file events found with the given IDs")
+	}
+
+	return nil
+}
+
 func scanFileEvents(rows *sql.Rows) ([]*FileEvent, error) {
 	var events []*FileEvent
 	for rows.Next() {

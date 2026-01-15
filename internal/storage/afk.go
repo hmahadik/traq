@@ -123,6 +123,61 @@ func (s *Store) CloseOrphanedAFKEvents(endTime int64) error {
 	return nil
 }
 
+// DeleteAFKEvent deletes a single AFK event by ID.
+func (s *Store) DeleteAFKEvent(id int64) error {
+	result, err := s.db.Exec("DELETE FROM afk_events WHERE id = ?", id)
+	if err != nil {
+		return fmt.Errorf("failed to delete AFK event: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected: %w", err)
+	}
+
+	if rowsAffected == 0 {
+		return fmt.Errorf("no AFK event found with ID %d", id)
+	}
+
+	return nil
+}
+
+// DeleteAFKEvents deletes multiple AFK events by ID.
+func (s *Store) DeleteAFKEvents(ids []int64) error {
+	if len(ids) == 0 {
+		return nil
+	}
+
+	// Build placeholders for IN clause
+	placeholders := ""
+	args := make([]interface{}, len(ids))
+	for i, id := range ids {
+		if i > 0 {
+			placeholders += ","
+		}
+		placeholders += "?"
+		args[i] = id
+	}
+
+	query := fmt.Sprintf("DELETE FROM afk_events WHERE id IN (%s)", placeholders)
+
+	result, err := s.db.Exec(query, args...)
+	if err != nil {
+		return fmt.Errorf("failed to delete AFK events: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected: %w", err)
+	}
+
+	if rowsAffected == 0 {
+		return fmt.Errorf("no AFK events found with the given IDs")
+	}
+
+	return nil
+}
+
 func scanAFKEvents(rows *sql.Rows) ([]*AFKEvent, error) {
 	var events []*AFKEvent
 	for rows.Next() {

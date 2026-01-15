@@ -10,11 +10,19 @@ export function AddTagToSession(arg1:number,arg2:string):Promise<void>;
 
 export function CheckForUpdate():Promise<service.UpdateInfo>;
 
+export function DeleteAFKEvents(arg1:Array<number>):Promise<void>;
+
 export function DeleteAppCategory(arg1:string):Promise<void>;
+
+export function DeleteBrowserVisits(arg1:Array<number>):Promise<void>;
+
+export function DeleteFileEvents(arg1:Array<number>):Promise<void>;
 
 export function DeleteFocusEvent(arg1:number):Promise<void>;
 
 export function DeleteFocusEvents(arg1:Array<number>):Promise<void>;
+
+export function DeleteGitCommits(arg1:Array<number>):Promise<void>;
 
 export function DeleteHierarchicalSummary(arg1:number):Promise<void>;
 
@@ -27,6 +35,8 @@ export function DeleteReport(arg1:number):Promise<void>;
 export function DeleteScreenshot(arg1:number):Promise<void>;
 
 export function DeleteSession(arg1:number):Promise<void>;
+
+export function DeleteShellCommands(arg1:Array<number>):Promise<void>;
 
 export function DeleteSummary(arg1:number):Promise<void>;
 

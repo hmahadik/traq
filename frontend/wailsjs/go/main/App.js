@@ -10,8 +10,20 @@ export function CheckForUpdate() {
   return window['go']['main']['App']['CheckForUpdate']();
 }
 
+export function DeleteAFKEvents(arg1) {
+  return window['go']['main']['App']['DeleteAFKEvents'](arg1);
+}
+
 export function DeleteAppCategory(arg1) {
   return window['go']['main']['App']['DeleteAppCategory'](arg1);
+}
+
+export function DeleteBrowserVisits(arg1) {
+  return window['go']['main']['App']['DeleteBrowserVisits'](arg1);
+}
+
+export function DeleteFileEvents(arg1) {
+  return window['go']['main']['App']['DeleteFileEvents'](arg1);
 }
 
 export function DeleteFocusEvent(arg1) {
@@ -20,6 +32,10 @@ export function DeleteFocusEvent(arg1) {
 
 export function DeleteFocusEvents(arg1) {
   return window['go']['main']['App']['DeleteFocusEvents'](arg1);
+}
+
+export function DeleteGitCommits(arg1) {
+  return window['go']['main']['App']['DeleteGitCommits'](arg1);
 }
 
 export function DeleteHierarchicalSummary(arg1) {
@@ -44,6 +60,10 @@ export function DeleteScreenshot(arg1) {
 
 export function DeleteSession(arg1) {
   return window['go']['main']['App']['DeleteSession'](arg1);
+}
+
+export function DeleteShellCommands(arg1) {
+  return window['go']['main']['App']['DeleteShellCommands'](arg1);
 }
 
 export function DeleteSummary(arg1) {

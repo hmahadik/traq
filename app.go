@@ -719,6 +719,46 @@ func (a *App) DeleteFocusEvents(ids []int64) error {
 	return a.store.DeleteFocusEvents(ids)
 }
 
+// DeleteBrowserVisits removes multiple browser visits (bulk delete).
+func (a *App) DeleteBrowserVisits(ids []int64) error {
+	if a.store == nil {
+		return fmt.Errorf("store not initialized")
+	}
+	return a.store.DeleteBrowserVisits(ids)
+}
+
+// DeleteGitCommits removes multiple git commits (bulk delete).
+func (a *App) DeleteGitCommits(ids []int64) error {
+	if a.store == nil {
+		return fmt.Errorf("store not initialized")
+	}
+	return a.store.DeleteGitCommits(ids)
+}
+
+// DeleteShellCommands removes multiple shell commands (bulk delete).
+func (a *App) DeleteShellCommands(ids []int64) error {
+	if a.store == nil {
+		return fmt.Errorf("store not initialized")
+	}
+	return a.store.DeleteShellCommands(ids)
+}
+
+// DeleteFileEvents removes multiple file events (bulk delete).
+func (a *App) DeleteFileEvents(ids []int64) error {
+	if a.store == nil {
+		return fmt.Errorf("store not initialized")
+	}
+	return a.store.DeleteFileEvents(ids)
+}
+
+// DeleteAFKEvents removes multiple AFK events (bulk delete).
+func (a *App) DeleteAFKEvents(ids []int64) error {
+	if a.store == nil {
+		return fmt.Errorf("store not initialized")
+	}
+	return a.store.DeleteAFKEvents(ids)
+}
+
 // ============================================================================
 // Reports Methods (exposed to frontend)
 // ============================================================================

@@ -923,3 +923,107 @@ export function useDeleteActivities() {
     },
   });
 }
+
+// ============================================================================
+// Event Deletion Hooks (non-activity event types)
+// ============================================================================
+
+/**
+ * Delete multiple browser visits
+ */
+export function useDeleteBrowserVisits() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (ids: number[]) => api.events.deleteBrowserVisits(ids),
+    onSuccess: (_, ids) => {
+      queryClient.invalidateQueries({ queryKey: ['timeline'] });
+      toast.success(`${ids.length} browser visits deleted`);
+    },
+    onError: (error: unknown) => {
+      console.error('Delete browser visits failed:', error);
+      const message = error instanceof Error ? error.message : String(error);
+      toast.error(`Failed to delete browser visits: ${message}`);
+    },
+  });
+}
+
+/**
+ * Delete multiple git commits
+ */
+export function useDeleteGitCommits() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (ids: number[]) => api.events.deleteGitCommits(ids),
+    onSuccess: (_, ids) => {
+      queryClient.invalidateQueries({ queryKey: ['timeline'] });
+      toast.success(`${ids.length} git commits deleted`);
+    },
+    onError: (error: unknown) => {
+      console.error('Delete git commits failed:', error);
+      const message = error instanceof Error ? error.message : String(error);
+      toast.error(`Failed to delete git commits: ${message}`);
+    },
+  });
+}
+
+/**
+ * Delete multiple shell commands
+ */
+export function useDeleteShellCommands() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (ids: number[]) => api.events.deleteShellCommands(ids),
+    onSuccess: (_, ids) => {
+      queryClient.invalidateQueries({ queryKey: ['timeline'] });
+      toast.success(`${ids.length} shell commands deleted`);
+    },
+    onError: (error: unknown) => {
+      console.error('Delete shell commands failed:', error);
+      const message = error instanceof Error ? error.message : String(error);
+      toast.error(`Failed to delete shell commands: ${message}`);
+    },
+  });
+}
+
+/**
+ * Delete multiple file events
+ */
+export function useDeleteFileEvents() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (ids: number[]) => api.events.deleteFileEvents(ids),
+    onSuccess: (_, ids) => {
+      queryClient.invalidateQueries({ queryKey: ['timeline'] });
+      toast.success(`${ids.length} file events deleted`);
+    },
+    onError: (error: unknown) => {
+      console.error('Delete file events failed:', error);
+      const message = error instanceof Error ? error.message : String(error);
+      toast.error(`Failed to delete file events: ${message}`);
+    },
+  });
+}
+
+/**
+ * Delete multiple AFK events
+ */
+export function useDeleteAFKEvents() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (ids: number[]) => api.events.deleteAFKEvents(ids),
+    onSuccess: (_, ids) => {
+      queryClient.invalidateQueries({ queryKey: ['timeline'] });
+      toast.success(`${ids.length} AFK events deleted`);
+    },
+    onError: (error: unknown) => {
+      console.error('Delete AFK events failed:', error);
+      const message = error instanceof Error ? error.message : String(error);
+      toast.error(`Failed to delete AFK events: ${message}`);
+    },
+  });
+}

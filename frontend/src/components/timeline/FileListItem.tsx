@@ -4,6 +4,8 @@ import { TimelineListItem } from './TimelineListItem';
 
 interface FileListItemProps {
   fileEvent: FileEventDisplay;
+  isSelected?: boolean;
+  onClick?: (e: React.MouseEvent) => void;
 }
 
 function getFileIcon(extension: string) {
@@ -50,7 +52,7 @@ function getEventTypeColor(eventType: string) {
   }
 }
 
-export function FileListItem({ fileEvent }: FileListItemProps) {
+export function FileListItem({ fileEvent, isSelected, onClick }: FileListItemProps) {
   const icon = (
     <div className="w-5 h-5 rounded bg-amber-500 flex items-center justify-center text-white">
       {getFileIcon(fileEvent.fileExtension)}
@@ -83,6 +85,9 @@ export function FileListItem({ fileEvent }: FileListItemProps) {
       details={details}
       timestamp={fileEvent.timestamp}
       metadata={metadata}
+      isSelected={isSelected}
+      onClick={onClick}
+      selectable={Boolean(onClick)}
       reserveCheckboxSpace
     />
   );

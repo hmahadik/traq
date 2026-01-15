@@ -248,6 +248,61 @@ func (s *Store) GetAllGitCommits() ([]*GitCommit, error) {
 	return scanGitCommits(rows)
 }
 
+// DeleteGitCommit deletes a single git commit by ID.
+func (s *Store) DeleteGitCommit(id int64) error {
+	result, err := s.db.Exec("DELETE FROM git_commits WHERE id = ?", id)
+	if err != nil {
+		return fmt.Errorf("failed to delete git commit: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected: %w", err)
+	}
+
+	if rowsAffected == 0 {
+		return fmt.Errorf("no git commit found with ID %d", id)
+	}
+
+	return nil
+}
+
+// DeleteGitCommits deletes multiple git commits by ID.
+func (s *Store) DeleteGitCommits(ids []int64) error {
+	if len(ids) == 0 {
+		return nil
+	}
+
+	// Build placeholders for IN clause
+	placeholders := ""
+	args := make([]interface{}, len(ids))
+	for i, id := range ids {
+		if i > 0 {
+			placeholders += ","
+		}
+		placeholders += "?"
+		args[i] = id
+	}
+
+	query := fmt.Sprintf("DELETE FROM git_commits WHERE id IN (%s)", placeholders)
+
+	result, err := s.db.Exec(query, args...)
+	if err != nil {
+		return fmt.Errorf("failed to delete git commits: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected: %w", err)
+	}
+
+	if rowsAffected == 0 {
+		return fmt.Errorf("no git commits found with the given IDs")
+	}
+
+	return nil
+}
+
 func scanGitCommits(rows *sql.Rows) ([]*GitCommit, error) {
 	var commits []*GitCommit
 	for rows.Next() {

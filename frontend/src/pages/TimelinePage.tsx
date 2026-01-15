@@ -3,9 +3,20 @@ import { useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { ChevronLeft, ChevronRight, Calendar, Sparkles, Loader2 } from 'lucide-react';
 import { CalendarWidget, ViewModeSelector, ViewMode } from '@/components/timeline';
-import { useTimelineGridData, useCalendarHeatmap, useGenerateSummary, useWeekTimelineData, useDeleteActivities } from '@/api/hooks';
+import {
+  useTimelineGridData,
+  useCalendarHeatmap,
+  useGenerateSummary,
+  useWeekTimelineData,
+  useDeleteActivities,
+  useDeleteBrowserVisits,
+  useDeleteGitCommits,
+  useDeleteShellCommands,
+  useDeleteFileEvents,
+  useDeleteAFKEvents,
+} from '@/api/hooks';
 import { TimelineGridView } from '@/components/timeline/TimelineGridView';
-import { TimelineListView } from '@/components/timeline/TimelineListView';
+import { TimelineListView, EventKey, parseEventKey, makeEventKey } from '@/components/timeline/TimelineListView';
 import { SplitTimelineView } from '@/components/timeline/SplitTimelineView';
 import { ListModeToggle, DisplayMode } from '@/components/timeline/ListModeToggle';
 import { TimelineWeekView, TimelineWeekViewSkeleton } from '@/components/timeline/TimelineWeekView';
@@ -18,7 +29,7 @@ import { FilterControls, TimelineFilters } from '@/components/timeline/FilterCon
 import { GlobalSearch } from '@/components/timeline/GlobalSearch';
 import { ZoomControls, ZoomLevel, DEFAULT_ZOOM, ZOOM_LEVELS } from '@/components/timeline/ZoomControls';
 import { SessionDetailDrawer } from '@/components/session/SessionDetailDrawer';
-import { SelectionToolbar } from '@/components/timeline/SelectionToolbar';
+import { SelectionToolbar, SelectionBreakdown } from '@/components/timeline/SelectionToolbar';
 import { ActivityEditDialog } from '@/components/timeline/ActivityEditDialog';
 import { useActivitySelection } from '@/hooks/useActivitySelection';
 import type { ActivityBlock } from '@/types/timeline';
@@ -92,8 +103,16 @@ export function TimelinePage() {
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editingActivity, setEditingActivity] = useState<ActivityBlock | null>(null);
 
-  // Delete mutation
+  // Delete mutations for all event types
   const deleteActivities = useDeleteActivities();
+  const deleteBrowserVisits = useDeleteBrowserVisits();
+  const deleteGitCommits = useDeleteGitCommits();
+  const deleteShellCommands = useDeleteShellCommands();
+  const deleteFileEvents = useDeleteFileEvents();
+  const deleteAFKEvents = useDeleteAFKEvents();
+
+  // State for multi-type event selection (list view only)
+  const [selectedEventKeys, setSelectedEventKeys] = useState<Set<EventKey>>(new Set());
 
   // View mode state with localStorage persistence
   const [viewMode, setViewMode] = useState<ViewMode>(() => {
@@ -275,19 +294,128 @@ export function TimelinePage() {
     setEditDialogOpen(true);
   }, []);
 
-  // Handle bulk delete
+  // Handle event selection for list view (supports all event types)
+  const handleEventSelect = useCallback((key: EventKey, event: React.MouseEvent) => {
+    setSelectedEventKeys((prev) => {
+      const next = new Set(prev);
+      if (event.ctrlKey || event.metaKey) {
+        // Toggle selection
+        if (next.has(key)) {
+          next.delete(key);
+        } else {
+          next.add(key);
+        }
+      } else {
+        // Single selection - clear others and select this one
+        next.clear();
+        next.add(key);
+      }
+      return next;
+    });
+    // Also sync activity selection for backward compatibility
+    const { type, id } = parseEventKey(key);
+    if (type === 'activity') {
+      handleActivityClick(id, event);
+    }
+  }, [handleActivityClick]);
+
+  // Compute breakdown from selectedEventKeys
+  const selectionBreakdown = useMemo((): SelectionBreakdown => {
+    const breakdown: SelectionBreakdown = {};
+    selectedEventKeys.forEach((key) => {
+      const { type } = parseEventKey(key);
+      switch (type) {
+        case 'activity':
+          breakdown.activity = (breakdown.activity || 0) + 1;
+          break;
+        case 'browser':
+          breakdown.browser = (breakdown.browser || 0) + 1;
+          break;
+        case 'git':
+          breakdown.git = (breakdown.git || 0) + 1;
+          break;
+        case 'shell':
+          breakdown.shell = (breakdown.shell || 0) + 1;
+          break;
+        case 'file':
+          breakdown.file = (breakdown.file || 0) + 1;
+          break;
+        case 'afk':
+          breakdown.afk = (breakdown.afk || 0) + 1;
+          break;
+      }
+    });
+    return breakdown;
+  }, [selectedEventKeys]);
+
+  // Clear all selections (both activity-specific and event-generic)
+  const clearAllSelections = useCallback(() => {
+    clearSelection();
+    setSelectedEventKeys(new Set());
+  }, [clearSelection]);
+
+  // Handle bulk delete - supports all event types
   const handleDeleteSelected = useCallback(async () => {
-    if (selectedActivityIds.size === 0) return;
+    // Group selected items by type
+    const byType: Record<string, number[]> = {};
+    selectedEventKeys.forEach((key) => {
+      const { type, id } = parseEventKey(key);
+      if (!byType[type]) byType[type] = [];
+      byType[type].push(id);
+    });
+
+    // Also include activity IDs from grid selection (for backwards compatibility)
+    if (selectedActivityIds.size > 0 && !byType['activity']) {
+      byType['activity'] = Array.from(selectedActivityIds);
+    } else if (selectedActivityIds.size > 0 && byType['activity']) {
+      // Merge, avoiding duplicates
+      const activitySet = new Set([...byType['activity'], ...Array.from(selectedActivityIds)]);
+      byType['activity'] = Array.from(activitySet);
+    }
+
+    const totalCount = Object.values(byType).reduce((sum, ids) => sum + ids.length, 0);
+    if (totalCount === 0) return;
 
     try {
-      await deleteActivities.mutateAsync(Array.from(selectedActivityIds));
-      clearSelection();
-      toast.success(`Deleted ${selectedActivityIds.size} activities`);
+      const promises: Promise<void>[] = [];
+
+      if (byType['activity']?.length) {
+        promises.push(deleteActivities.mutateAsync(byType['activity']));
+      }
+      if (byType['browser']?.length) {
+        promises.push(deleteBrowserVisits.mutateAsync(byType['browser']));
+      }
+      if (byType['git']?.length) {
+        promises.push(deleteGitCommits.mutateAsync(byType['git']));
+      }
+      if (byType['shell']?.length) {
+        promises.push(deleteShellCommands.mutateAsync(byType['shell']));
+      }
+      if (byType['file']?.length) {
+        promises.push(deleteFileEvents.mutateAsync(byType['file']));
+      }
+      if (byType['afk']?.length) {
+        promises.push(deleteAFKEvents.mutateAsync(byType['afk']));
+      }
+
+      await Promise.all(promises);
+      clearAllSelections();
+      toast.success(`Deleted ${totalCount} ${totalCount === 1 ? 'item' : 'items'}`);
     } catch (error) {
-      console.error('Failed to delete activities:', error);
-      toast.error('Failed to delete activities');
+      console.error('Failed to delete items:', error);
+      toast.error('Failed to delete selected items');
     }
-  }, [selectedActivityIds, deleteActivities, clearSelection]);
+  }, [
+    selectedEventKeys,
+    selectedActivityIds,
+    deleteActivities,
+    deleteBrowserVisits,
+    deleteGitCommits,
+    deleteShellCommands,
+    deleteFileEvents,
+    deleteAFKEvents,
+    clearAllSelections,
+  ]);
 
   // Handle edit from selection toolbar (for single selection)
   const handleEditSelected = useCallback(() => {
@@ -309,8 +437,8 @@ export function TimelinePage() {
 
   // Clear selection when date changes
   useEffect(() => {
-    clearSelection();
-  }, [dateStr, clearSelection]);
+    clearAllSelections();
+  }, [dateStr, clearAllSelections]);
 
   // Navigation handlers - adjust based on view mode
   const goToPrevious = useCallback(() => {
@@ -509,6 +637,8 @@ export function TimelinePage() {
                 selectedActivityIds={selectedActivityIds}
                 onActivitySelect={handleListActivitySelect}
                 onActivityDoubleClick={handleActivityDoubleClick}
+                selectedEventKeys={selectedEventKeys}
+                onEventSelect={handleEventSelect}
               />
             ) : (
               /* Split view - Grid and List side by side with synchronized scrolling */
@@ -650,11 +780,19 @@ export function TimelinePage() {
       {/* Activity Selection Toolbar */}
       {viewMode === 'day' && (
         <SelectionToolbar
-          selectedCount={selectedCount}
+          selectedCount={selectedCount + selectedEventKeys.size}
           onDelete={handleDeleteSelected}
           onEdit={handleEditSelected}
-          onClear={clearSelection}
-          isDeleting={deleteActivities.isPending}
+          onClear={clearAllSelections}
+          isDeleting={
+            deleteActivities.isPending ||
+            deleteBrowserVisits.isPending ||
+            deleteGitCommits.isPending ||
+            deleteShellCommands.isPending ||
+            deleteFileEvents.isPending ||
+            deleteAFKEvents.isPending
+          }
+          breakdown={selectedEventKeys.size > 0 ? selectionBreakdown : (selectedCount > 0 ? { activity: selectedCount } : undefined)}
         />
       )}
 

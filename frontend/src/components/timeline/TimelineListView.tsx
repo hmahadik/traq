@@ -10,11 +10,22 @@ import { FileListItem } from './FileListItem';
 import { BrowserListItem } from './BrowserListItem';
 import { AFKListItem } from './AFKListItem';
 
+// Event key format: "eventType:id" e.g. "activity:123", "browser:456"
+export type EventKey = string;
+export const makeEventKey = (type: string, id: number): EventKey => `${type}:${id}`;
+export const parseEventKey = (key: EventKey): { type: string; id: number } => {
+  const [type, idStr] = key.split(':');
+  return { type, id: parseInt(idStr, 10) };
+};
+
 interface TimelineListViewProps {
   data: TimelineGridData;
   filters: TimelineFilters;
   onSessionClick?: (sessionId: number) => void;
-  // Selection props
+  // Selection props - supports all event types via event keys
+  selectedEventKeys?: Set<EventKey>;
+  onEventSelect?: (key: EventKey, event: React.MouseEvent) => void;
+  // Legacy activity-specific props (for compatibility)
   selectedActivityIds?: Set<number>;
   onActivitySelect?: (id: number, event: React.MouseEvent, orderedIds: number[]) => void;
   onActivityDoubleClick?: (activity: ActivityBlock) => void;
@@ -29,6 +40,8 @@ export function TimelineListView({
   data,
   filters,
   onSessionClick,
+  selectedEventKeys,
+  onEventSelect,
   selectedActivityIds,
   onActivitySelect,
   onActivityDoubleClick,
@@ -111,32 +124,93 @@ export function TimelineListView({
     );
   }
 
+  // Helper to check if an event is selected
+  const isEventSelected = (type: string, id: number): boolean => {
+    if (selectedEventKeys?.has(makeEventKey(type, id))) return true;
+    // Legacy: check activity IDs for backward compatibility
+    if (type === 'activity' && selectedActivityIds?.has(id)) return true;
+    return false;
+  };
+
+  // Helper to handle event selection
+  const handleEventClick = (type: string, id: number, e: React.MouseEvent) => {
+    if (onEventSelect) {
+      onEventSelect(makeEventKey(type, id), e);
+    } else if (type === 'activity' && onActivitySelect) {
+      // Legacy: fall back to activity-specific handler
+      onActivitySelect(id, e, orderedActivityIds);
+    }
+  };
+
   // Render appropriate component based on event type
   const renderEvent = (event: TimelineListEvent) => {
+    const eventId = (event.data as { id: number }).id;
+    const canSelect = Boolean(onEventSelect || (event.type === 'activity' && onActivitySelect));
+
     switch (event.type) {
       case 'activity': {
         const activity = event.data as ActivityBlock;
         return (
           <ActivityListItem
             activity={activity}
-            isSelected={selectedActivityIds?.has(activity.id)}
-            onClick={onActivitySelect ? (e) => onActivitySelect(activity.id, e, orderedActivityIds) : undefined}
+            isSelected={isEventSelected('activity', activity.id)}
+            onClick={canSelect ? (e) => handleEventClick('activity', activity.id, e) : undefined}
             onDoubleClick={onActivityDoubleClick ? () => onActivityDoubleClick(activity) : undefined}
           />
         );
       }
       case 'session':
         return <SessionListItem session={event.data as SessionSummaryWithPosition} onClick={onSessionClick} />;
-      case 'git':
-        return <GitListItem gitEvent={event.data as GitEventDisplay} />;
-      case 'shell':
-        return <ShellListItem shellEvent={event.data as ShellEventDisplay} />;
-      case 'file':
-        return <FileListItem fileEvent={event.data as FileEventDisplay} />;
-      case 'browser':
-        return <BrowserListItem browserEvent={event.data as BrowserEventDisplay} />;
-      case 'afk':
-        return <AFKListItem afkBlock={event.data as AFKBlock} />;
+      case 'git': {
+        const gitEvent = event.data as GitEventDisplay;
+        return (
+          <GitListItem
+            gitEvent={gitEvent}
+            isSelected={isEventSelected('git', gitEvent.id)}
+            onClick={canSelect ? (e) => handleEventClick('git', gitEvent.id, e) : undefined}
+          />
+        );
+      }
+      case 'shell': {
+        const shellEvent = event.data as ShellEventDisplay;
+        return (
+          <ShellListItem
+            shellEvent={shellEvent}
+            isSelected={isEventSelected('shell', shellEvent.id)}
+            onClick={canSelect ? (e) => handleEventClick('shell', shellEvent.id, e) : undefined}
+          />
+        );
+      }
+      case 'file': {
+        const fileEvent = event.data as FileEventDisplay;
+        return (
+          <FileListItem
+            fileEvent={fileEvent}
+            isSelected={isEventSelected('file', fileEvent.id)}
+            onClick={canSelect ? (e) => handleEventClick('file', fileEvent.id, e) : undefined}
+          />
+        );
+      }
+      case 'browser': {
+        const browserEvent = event.data as BrowserEventDisplay;
+        return (
+          <BrowserListItem
+            browserEvent={browserEvent}
+            isSelected={isEventSelected('browser', browserEvent.id)}
+            onClick={canSelect ? (e) => handleEventClick('browser', browserEvent.id, e) : undefined}
+          />
+        );
+      }
+      case 'afk': {
+        const afkBlock = event.data as AFKBlock;
+        return (
+          <AFKListItem
+            afkBlock={afkBlock}
+            isSelected={isEventSelected('afk', afkBlock.id)}
+            onClick={canSelect ? (e) => handleEventClick('afk', afkBlock.id, e) : undefined}
+          />
+        );
+      }
       default:
         return null;
     }

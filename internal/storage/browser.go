@@ -181,6 +181,61 @@ func (s *Store) CountUniqueDomainsByTimeRange(start, end int64) (int64, error) {
 	return count, err
 }
 
+// DeleteBrowserVisit deletes a single browser visit by ID.
+func (s *Store) DeleteBrowserVisit(id int64) error {
+	result, err := s.db.Exec("DELETE FROM browser_history WHERE id = ?", id)
+	if err != nil {
+		return fmt.Errorf("failed to delete browser visit: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected: %w", err)
+	}
+
+	if rowsAffected == 0 {
+		return fmt.Errorf("no browser visit found with ID %d", id)
+	}
+
+	return nil
+}
+
+// DeleteBrowserVisits deletes multiple browser visits by ID.
+func (s *Store) DeleteBrowserVisits(ids []int64) error {
+	if len(ids) == 0 {
+		return nil
+	}
+
+	// Build placeholders for IN clause
+	placeholders := ""
+	args := make([]interface{}, len(ids))
+	for i, id := range ids {
+		if i > 0 {
+			placeholders += ","
+		}
+		placeholders += "?"
+		args[i] = id
+	}
+
+	query := fmt.Sprintf("DELETE FROM browser_history WHERE id IN (%s)", placeholders)
+
+	result, err := s.db.Exec(query, args...)
+	if err != nil {
+		return fmt.Errorf("failed to delete browser visits: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected: %w", err)
+	}
+
+	if rowsAffected == 0 {
+		return fmt.Errorf("no browser visits found with the given IDs")
+	}
+
+	return nil
+}
+
 func scanBrowserVisits(rows *sql.Rows) ([]*BrowserVisit, error) {
 	var visits []*BrowserVisit
 	for rows.Next() {

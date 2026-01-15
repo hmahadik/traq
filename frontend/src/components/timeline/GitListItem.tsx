@@ -4,9 +4,11 @@ import { TimelineListItem } from './TimelineListItem';
 
 interface GitListItemProps {
   gitEvent: GitEventDisplay;
+  isSelected?: boolean;
+  onClick?: (e: React.MouseEvent) => void;
 }
 
-export function GitListItem({ gitEvent }: GitListItemProps) {
+export function GitListItem({ gitEvent, isSelected, onClick }: GitListItemProps) {
   const icon = (
     <div className="w-5 h-5 rounded bg-orange-500 flex items-center justify-center text-white">
       <GitBranch className="w-3 h-3" />
@@ -28,6 +30,9 @@ export function GitListItem({ gitEvent }: GitListItemProps) {
       details={details}
       timestamp={gitEvent.timestamp}
       metadata={metadata}
+      isSelected={isSelected}
+      onClick={onClick}
+      selectable={Boolean(onClick)}
       reserveCheckboxSpace
     />
   );

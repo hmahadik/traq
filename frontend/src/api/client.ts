@@ -598,6 +598,41 @@ export const activities = {
 };
 
 /**
+ * Events API - Deletion for non-activity event types
+ */
+export const events = {
+  /** Delete multiple browser visits */
+  deleteBrowserVisits: async (ids: number[]) => {
+    await waitForReady();
+    return App.DeleteBrowserVisits(ids);
+  },
+
+  /** Delete multiple git commits */
+  deleteGitCommits: async (ids: number[]) => {
+    await waitForReady();
+    return App.DeleteGitCommits(ids);
+  },
+
+  /** Delete multiple shell commands */
+  deleteShellCommands: async (ids: number[]) => {
+    await waitForReady();
+    return App.DeleteShellCommands(ids);
+  },
+
+  /** Delete multiple file events */
+  deleteFileEvents: async (ids: number[]) => {
+    await waitForReady();
+    return App.DeleteFileEvents(ids);
+  },
+
+  /** Delete multiple AFK events */
+  deleteAFKEvents: async (ids: number[]) => {
+    await waitForReady();
+    return App.DeleteAFKEvents(ids);
+  },
+};
+
+/**
  * System API
  */
 export const system = {
@@ -885,6 +920,7 @@ export const api = {
   config,
   screenshots,
   activities,
+  events,
   system,
   summaries,
   git,

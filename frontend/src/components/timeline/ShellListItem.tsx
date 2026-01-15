@@ -5,9 +5,11 @@ import { formatDecimalHours } from '@/utils/timelineHelpers';
 
 interface ShellListItemProps {
   shellEvent: ShellEventDisplay;
+  isSelected?: boolean;
+  onClick?: (e: React.MouseEvent) => void;
 }
 
-export function ShellListItem({ shellEvent }: ShellListItemProps) {
+export function ShellListItem({ shellEvent, isSelected, onClick }: ShellListItemProps) {
   const icon = (
     <div className="w-5 h-5 rounded bg-slate-700 dark:bg-slate-400 flex items-center justify-center text-white dark:text-slate-900">
       <Terminal className="w-3 h-3" />
@@ -34,6 +36,9 @@ export function ShellListItem({ shellEvent }: ShellListItemProps) {
       duration={duration}
       timestamp={shellEvent.timestamp}
       metadata={metadata}
+      isSelected={isSelected}
+      onClick={onClick}
+      selectable={Boolean(onClick)}
       reserveCheckboxSpace
     />
   );
