@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"traq/internal/inference"
+	"traq/internal/lock"
 	"traq/internal/platform"
 	"traq/internal/service"
 	"traq/internal/storage"
@@ -29,9 +30,10 @@ type App struct {
 	ready bool // Set to true after startup completes
 
 	// Core components
-	platform platform.Platform
-	store    *storage.Store
-	daemon   *tracker.Daemon
+	platform     platform.Platform
+	store        *storage.Store
+	daemon       *tracker.Daemon
+	instanceLock *lock.InstanceLock
 
 	// Services (exposed to frontend via Wails bindings)
 	Analytics   *service.AnalyticsService
@@ -68,6 +70,21 @@ func (a *App) startup(ctx context.Context) {
 
 	// Ensure data directory exists
 	dataDir := a.platform.DataDir()
+
+	// Acquire instance lock to prevent multiple instances
+	a.instanceLock = lock.New(dataDir)
+	if err := a.instanceLock.Acquire(); err != nil {
+		log.Printf("Instance lock error: %v", err)
+		// Show error dialog and quit
+		wailsRuntime.MessageDialog(ctx, wailsRuntime.MessageDialogOptions{
+			Type:    wailsRuntime.ErrorDialog,
+			Title:   "Traq Already Running",
+			Message: "Another instance of Traq is already running.\n\nPlease close the existing instance before starting a new one.",
+		})
+		wailsRuntime.Quit(ctx)
+		return
+	}
+
 	dbPath := filepath.Join(dataDir, "data.db")
 
 	// Initialize storage
@@ -219,6 +236,11 @@ func (a *App) shutdown(ctx context.Context) {
 		if err := a.store.Close(); err != nil {
 			log.Printf("Error closing storage: %v", err)
 		}
+	}
+
+	// Release instance lock
+	if a.instanceLock != nil {
+		a.instanceLock.Release()
 	}
 }
 
