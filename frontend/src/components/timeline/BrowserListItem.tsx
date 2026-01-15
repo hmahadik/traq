@@ -59,6 +59,7 @@ export function BrowserListItem({ browserEvent }: BrowserListItemProps) {
       duration={duration}
       timestamp={browserEvent.timestamp}
       metadata={metadata}
+      reserveCheckboxSpace
     />
   );
 }

@@ -33,6 +33,7 @@ export function SessionListItem({ session, onClick }: SessionListItemProps) {
       duration={duration}
       timestamp={session.startTime}
       metadata={metadata}
+      reserveCheckboxSpace
     />
   );
 }

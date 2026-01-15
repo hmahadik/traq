@@ -6,7 +6,7 @@
  */
 
 import { useEffect } from 'react';
-import { Trash2, X } from 'lucide-react';
+import { Trash2, X, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   AlertDialog,
@@ -24,6 +24,7 @@ interface SelectionToolbarProps {
   selectedCount: number;
   onDelete: () => void;
   onClear: () => void;
+  onEdit?: () => void; // Only available when exactly 1 activity selected
   isDeleting?: boolean;
 }
 
@@ -31,6 +32,7 @@ export function SelectionToolbar({
   selectedCount,
   onDelete,
   onClear,
+  onEdit,
   isDeleting = false,
 }: SelectionToolbarProps) {
   // Handle keyboard shortcuts
@@ -61,6 +63,21 @@ export function SelectionToolbar({
         </span>
 
         <div className="h-4 w-px bg-border" />
+
+        {/* Edit button - only enabled for single selection */}
+        {onEdit && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onEdit}
+            disabled={selectedCount !== 1}
+            className="gap-1.5"
+            title={selectedCount === 1 ? 'Edit activity' : 'Select exactly 1 activity to edit'}
+          >
+            <Pencil className="h-4 w-4" />
+            Edit
+          </Button>
+        )}
 
         <AlertDialog>
           <AlertDialogTrigger asChild>

@@ -28,6 +28,7 @@ export function GitListItem({ gitEvent }: GitListItemProps) {
       details={details}
       timestamp={gitEvent.timestamp}
       metadata={metadata}
+      reserveCheckboxSpace
     />
   );
 }

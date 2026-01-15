@@ -31,6 +31,9 @@ interface TimelineGridViewProps {
   onLassoStart?: (x: number, y: number) => void;
   onLassoMove?: (x: number, y: number) => void;
   onLassoEnd?: (intersectingIds: number[]) => void;
+  // Lasso preview (real-time highlighting during drag)
+  lassoPreviewIds?: Set<number>;
+  onLassoPreview?: (ids: number[]) => void;
 }
 
 // Header height for column headers (matches the header in HourColumn/AppColumn)
@@ -48,9 +51,12 @@ export const TimelineGridView: React.FC<TimelineGridViewProps> = ({
   onLassoStart,
   onLassoMove,
   onLassoEnd,
+  lassoPreviewIds,
+  onLassoPreview,
 }) => {
   const { hourlyGrid, sessionSummaries, topApps } = data;
   const gridContainerRef = React.useRef<HTMLDivElement>(null);
+  const lassoStartRef = React.useRef<{ x: number; y: number } | null>(null);
 
   // Use provided hourHeight or fall back to default
   const effectiveHourHeight = hourHeight || GRID_CONSTANTS.HOUR_HEIGHT_PX;
@@ -216,6 +222,8 @@ export const TimelineGridView: React.FC<TimelineGridViewProps> = ({
       const containerRect = gridContainerRef.current.getBoundingClientRect();
       const x = e.clientX - containerRect.left;
       const y = e.clientY - containerRect.top;
+      // Store start point for preview rect calculation
+      lassoStartRef.current = { x, y };
       onLassoStart(x, y);
     },
     [onLassoStart]
@@ -223,14 +231,30 @@ export const TimelineGridView: React.FC<TimelineGridViewProps> = ({
 
   const handleMouseMove = useCallback(
     (e: React.MouseEvent) => {
-      if (!gridContainerRef.current || !onLassoMove || !lassoRect) return;
+      if (!gridContainerRef.current || !onLassoMove || !lassoRect || !lassoStartRef.current) return;
 
       const containerRect = gridContainerRef.current.getBoundingClientRect();
       const x = e.clientX - containerRect.left;
       const y = e.clientY - containerRect.top;
       onLassoMove(x, y);
+
+      // Compute current lasso rectangle using stored start point
+      const startX = lassoStartRef.current.x;
+      const startY = lassoStartRef.current.y;
+      const currentRect = {
+        x: Math.min(startX, x),
+        y: Math.min(startY, y),
+        width: Math.abs(x - startX),
+        height: Math.abs(y - startY),
+      };
+
+      // Find intersecting activities and update preview
+      if (onLassoPreview) {
+        const intersecting = findIntersectingActivities(currentRect);
+        onLassoPreview(intersecting);
+      }
     },
-    [onLassoMove, lassoRect]
+    [onLassoMove, lassoRect, onLassoPreview, findIntersectingActivities]
   );
 
   const handleMouseUp = useCallback(() => {
@@ -238,6 +262,7 @@ export const TimelineGridView: React.FC<TimelineGridViewProps> = ({
 
     const intersectingIds = findIntersectingActivities(lassoRect);
     onLassoEnd(intersectingIds);
+    lassoStartRef.current = null;
   }, [lassoRect, onLassoEnd, findIntersectingActivities]);
 
   if (topApps.length === 0) {
@@ -257,7 +282,9 @@ export const TimelineGridView: React.FC<TimelineGridViewProps> = ({
 
   return (
     <div
-      className="relative bg-card border border-border flex-1 min-h-0 overflow-hidden"
+      className={`relative bg-card border border-border flex-1 min-h-0 overflow-hidden ${
+        lassoRect ? 'select-none cursor-crosshair' : ''
+      }`}
       ref={gridContainerRef}
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
@@ -362,6 +389,7 @@ export const TimelineGridView: React.FC<TimelineGridViewProps> = ({
               selectedActivityIds={selectedActivityIds}
               onActivitySelect={onActivitySelect}
               onActivityDoubleClick={onActivityDoubleClick}
+              lassoPreviewIds={lassoPreviewIds}
             />
           ))}
 

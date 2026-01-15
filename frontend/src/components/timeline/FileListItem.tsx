@@ -83,6 +83,7 @@ export function FileListItem({ fileEvent }: FileListItemProps) {
       details={details}
       timestamp={fileEvent.timestamp}
       metadata={metadata}
+      reserveCheckboxSpace
     />
   );
 }

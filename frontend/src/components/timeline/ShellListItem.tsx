@@ -34,6 +34,7 @@ export function ShellListItem({ shellEvent }: ShellListItemProps) {
       duration={duration}
       timestamp={shellEvent.timestamp}
       metadata={metadata}
+      reserveCheckboxSpace
     />
   );
 }

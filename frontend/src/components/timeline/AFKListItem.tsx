@@ -48,6 +48,7 @@ export function AFKListItem({ afkBlock }: AFKListItemProps) {
       details={triggerLabel}
       duration={duration}
       timestamp={afkBlock.startTime}
+      reserveCheckboxSpace
     />
   );
 }

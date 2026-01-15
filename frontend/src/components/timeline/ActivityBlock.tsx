@@ -16,6 +16,7 @@ interface ActivityBlockProps {
   hourHeight?: number;
   // Selection props
   isSelected?: boolean;
+  isLassoPreview?: boolean; // Real-time lasso selection preview
   onSelect?: (id: number, event: React.MouseEvent) => void;
   onDoubleClick?: (block: ActivityBlockType) => void;
 }
@@ -26,6 +27,7 @@ export const ActivityBlock: React.FC<ActivityBlockProps> = ({
   onClick,
   hourHeight,
   isSelected = false,
+  isLassoPreview = false,
   onSelect,
   onDoubleClick,
 }) => {
@@ -93,6 +95,8 @@ export const ActivityBlock: React.FC<ActivityBlockProps> = ({
             className={`absolute left-1 right-1 ${roundedClass} ${colors.bg} hover:shadow-md transition-all cursor-pointer overflow-hidden border ${
               isSelected
                 ? 'ring-2 ring-blue-500 ring-offset-1 border-blue-500'
+                : isLassoPreview
+                ? 'ring-2 ring-blue-400/60 ring-offset-1 border-blue-400 bg-blue-500/10'
                 : 'border-black/5 dark:border-white/10'
             }`}
             style={{

@@ -84,6 +84,8 @@ export function TimelinePage() {
     startLasso,
     updateLasso,
     endLasso,
+    lassoPreviewIds,
+    setLassoPreviewIds,
   } = useActivitySelection();
 
   // Activity edit dialog state
@@ -287,6 +289,24 @@ export function TimelinePage() {
     }
   }, [selectedActivityIds, deleteActivities, clearSelection]);
 
+  // Handle edit from selection toolbar (for single selection)
+  const handleEditSelected = useCallback(() => {
+    if (selectedActivityIds.size !== 1 || !gridData) return;
+
+    const selectedId = Array.from(selectedActivityIds)[0];
+    // Find the activity in the grid data
+    for (const hourActivities of Object.values(gridData.hourlyGrid)) {
+      for (const appActivities of Object.values(hourActivities)) {
+        const activity = appActivities.find((a) => a.id === selectedId);
+        if (activity) {
+          setEditingActivity(activity);
+          setEditDialogOpen(true);
+          return;
+        }
+      }
+    }
+  }, [selectedActivityIds, gridData]);
+
   // Clear selection when date changes
   useEffect(() => {
     clearSelection();
@@ -478,6 +498,8 @@ export function TimelinePage() {
                 onLassoStart={startLasso}
                 onLassoMove={updateLasso}
                 onLassoEnd={endLasso}
+                lassoPreviewIds={lassoPreviewIds}
+                onLassoPreview={setLassoPreviewIds}
               />
             ) : displayMode === 'list' ? (
               <TimelineListView
@@ -503,6 +525,8 @@ export function TimelinePage() {
                 onLassoMove={updateLasso}
                 onLassoEnd={endLasso}
                 onListActivitySelect={handleListActivitySelect}
+                lassoPreviewIds={lassoPreviewIds}
+                onLassoPreview={setLassoPreviewIds}
               />
             )}
           </div>
@@ -628,6 +652,7 @@ export function TimelinePage() {
         <SelectionToolbar
           selectedCount={selectedCount}
           onDelete={handleDeleteSelected}
+          onEdit={handleEditSelected}
           onClear={clearSelection}
           isDeleting={deleteActivities.isPending}
         />

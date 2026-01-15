@@ -53,6 +53,8 @@ export function ActivityListItem({
       onClick={onClick}
       onDoubleClick={onDoubleClick}
       dataActivityId={activity.id}
+      selectable={Boolean(onClick)} // Show checkbox when selection is enabled
+      reserveCheckboxSpace // Always reserve space for alignment
     />
   );
 }

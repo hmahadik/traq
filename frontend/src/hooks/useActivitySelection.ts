@@ -47,6 +47,10 @@ export interface UseActivitySelectionReturn {
 
   // Lasso rectangle for rendering
   lassoRect: { x: number; y: number; width: number; height: number } | null;
+
+  // Lasso preview IDs (updated during drag for real-time feedback)
+  lassoPreviewIds: Set<number>;
+  setLassoPreviewIds: (ids: number[]) => void;
 }
 
 export function useActivitySelection(): UseActivitySelectionReturn {
@@ -57,9 +61,15 @@ export function useActivitySelection(): UseActivitySelectionReturn {
     startPoint: null,
     currentPoint: null,
   });
+  const [lassoPreviewIds, setLassoPreviewIdsState] = useState<Set<number>>(new Set());
 
   // Track if we're adding to selection during lasso
   const lassoAdditive = useRef(false);
+
+  // Set lasso preview IDs (called during drag for real-time feedback)
+  const setLassoPreviewIds = useCallback((ids: number[]) => {
+    setLassoPreviewIdsState(new Set(ids));
+  }, []);
 
   // Check if an ID is selected
   const isSelected = useCallback(
@@ -182,6 +192,8 @@ export function useActivitySelection(): UseActivitySelectionReturn {
         startPoint: null,
         currentPoint: null,
       });
+      // Clear preview when lasso ends
+      setLassoPreviewIdsState(new Set());
     },
     []
   );
@@ -193,6 +205,8 @@ export function useActivitySelection(): UseActivitySelectionReturn {
       startPoint: null,
       currentPoint: null,
     });
+    // Clear preview when lasso cancelled
+    setLassoPreviewIdsState(new Set());
   }, []);
 
   // Calculate lasso rectangle for rendering
@@ -222,5 +236,7 @@ export function useActivitySelection(): UseActivitySelectionReturn {
     endLasso,
     cancelLasso,
     lassoRect,
+    lassoPreviewIds,
+    setLassoPreviewIds,
   };
 }

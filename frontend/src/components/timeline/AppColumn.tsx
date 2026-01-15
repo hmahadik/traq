@@ -15,6 +15,8 @@ interface AppColumnProps {
   selectedActivityIds?: Set<number>;
   onActivitySelect?: (id: number, event: React.MouseEvent) => void;
   onActivityDoubleClick?: (block: ActivityBlockType) => void;
+  // Lasso preview (real-time highlighting during drag)
+  lassoPreviewIds?: Set<number>;
 }
 
 export const AppColumn: React.FC<AppColumnProps> = ({
@@ -28,6 +30,7 @@ export const AppColumn: React.FC<AppColumnProps> = ({
   selectedActivityIds,
   onActivitySelect,
   onActivityDoubleClick,
+  lassoPreviewIds,
 }) => {
   const effectiveHourHeight = hourHeight || GRID_CONSTANTS.HOUR_HEIGHT_PX;
   // Group adjacent activities with gaps up to 15 minutes for cleaner Timely-style display
@@ -107,6 +110,7 @@ export const AppColumn: React.FC<AppColumnProps> = ({
               onClick={onBlockClick}
               hourHeight={effectiveHourHeight}
               isSelected={selectedActivityIds?.has(block.id)}
+              isLassoPreview={lassoPreviewIds?.has(block.id)}
               onSelect={onActivitySelect}
               onDoubleClick={onActivityDoubleClick}
             />
