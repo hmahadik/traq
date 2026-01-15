@@ -6,15 +6,15 @@ Download the latest release for your platform:
 
 | Platform | Download |
 |----------|----------|
-| Linux (x64) | [traq-linux-amd64](https://github.com/hmahadik/activity-tracker/releases/latest/download/traq-linux-amd64) |
+| Linux (x64) | [traq-linux-amd64.AppImage](https://github.com/hmahadik/activity-tracker/releases/latest/download/traq-linux-amd64.AppImage) |
 | macOS (Universal) | [traq-macos-universal.zip](https://github.com/hmahadik/activity-tracker/releases/latest/download/traq-macos-universal.zip) |
-| Windows (x64) | [traq-windows-amd64.exe](https://github.com/hmahadik/activity-tracker/releases/latest/download/traq-windows-amd64.exe) |
+| Windows (x64) | [traq-windows-amd64-installer.exe](https://github.com/hmahadik/activity-tracker/releases/latest/download/traq-windows-amd64-installer.exe) |
 
 ### Linux
 
 ```bash
-# Download and make executable
-curl -L -o traq https://github.com/hmahadik/activity-tracker/releases/latest/download/traq-linux-amd64
+# Download the AppImage
+curl -L -o traq https://github.com/hmahadik/activity-tracker/releases/latest/download/traq-linux-amd64.AppImage
 chmod +x traq
 
 # Run

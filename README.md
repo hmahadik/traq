@@ -129,10 +129,23 @@ sudo apt install xdotool
 
 ## Installation
 
+### Quick Install (Pre-built Binary)
+
+```bash
+# Download the AppImage
+curl -L -o traq https://github.com/hmahadik/activity-tracker/releases/latest/download/traq-linux-amd64.AppImage
+chmod +x traq
+
+# Run it
+./traq
+```
+
+### Build from Source
+
 ```bash
 # Clone the repository
-git clone <repository-url>
-cd traq
+git clone https://github.com/hmahadik/activity-tracker.git
+cd activity-tracker
 
 # Install dependencies
 make install-deps
