@@ -248,6 +248,35 @@ func (s *Store) CountSessions() (int64, error) {
 	return count, err
 }
 
+// CloseOrphanedSessions closes any sessions that have no end_time and started more than
+// maxAgeSeconds ago. This handles zombie sessions from crashes or multiple instances.
+// Returns the number of sessions closed.
+func (s *Store) CloseOrphanedSessions(currentTime int64, maxAgeSeconds int64) (int, error) {
+	cutoff := currentTime - maxAgeSeconds
+
+	// Find orphaned sessions and close them at their last activity time
+	// Use the latest screenshot, focus event, or start_time as the end time
+	result, err := s.db.Exec(`
+		UPDATE sessions
+		SET end_time = COALESCE(
+			(SELECT MAX(timestamp) FROM screenshots WHERE session_id = sessions.id),
+			(SELECT MAX(end_time) FROM window_focus_events WHERE session_id = sessions.id),
+			start_time + 3600
+		),
+		duration_seconds = COALESCE(
+			(SELECT MAX(timestamp) FROM screenshots WHERE session_id = sessions.id),
+			(SELECT MAX(end_time) FROM window_focus_events WHERE session_id = sessions.id),
+			start_time + 3600
+		) - start_time
+		WHERE end_time IS NULL AND start_time < ?`, cutoff)
+	if err != nil {
+		return 0, fmt.Errorf("failed to close orphaned sessions: %w", err)
+	}
+
+	count, _ := result.RowsAffected()
+	return int(count), nil
+}
+
 // GetTotalActiveTime returns the sum of all session durations in seconds.
 // Only counts positive durations (ignores corrupt data with negative values).
 func (s *Store) GetTotalActiveTime() (int64, error) {

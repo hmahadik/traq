@@ -403,3 +403,48 @@ func TestGetSessionsByTimeRange(t *testing.T) {
 		t.Errorf("got %d sessions, want 2", len(sessions))
 	}
 }
+
+func TestCloseOrphanedSessions(t *testing.T) {
+	store, cleanup := testStore(t)
+	defer cleanup()
+
+	now := time.Now().Unix()
+
+	// Create an orphaned session (old, no end_time)
+	orphanedID, _ := store.CreateSession(now - 86400) // 24 hours ago
+
+	// Create a recent open session (should NOT be closed)
+	recentID, _ := store.CreateSession(now - 3600) // 1 hour ago
+
+	// Create a properly closed session
+	closedID, _ := store.CreateSession(now - 7200) // 2 hours ago
+	store.EndSession(closedID, now-5400)
+
+	// Close orphaned sessions older than 12 hours
+	maxAge := int64(12 * 60 * 60) // 12 hours
+	count, err := store.CloseOrphanedSessions(now, maxAge)
+	if err != nil {
+		t.Fatalf("failed to close orphaned sessions: %v", err)
+	}
+	if count != 1 {
+		t.Errorf("got %d closed sessions, want 1", count)
+	}
+
+	// Verify orphaned session is now closed
+	orphaned, _ := store.GetSession(orphanedID)
+	if !orphaned.EndTime.Valid {
+		t.Error("orphaned session should have end_time set")
+	}
+
+	// Verify recent session is still open
+	recent, _ := store.GetSession(recentID)
+	if recent.EndTime.Valid {
+		t.Error("recent session should still be open")
+	}
+
+	// Verify closed session is unchanged
+	closed, _ := store.GetSession(closedID)
+	if !closed.EndTime.Valid {
+		t.Error("closed session should still have end_time")
+	}
+}

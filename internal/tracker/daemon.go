@@ -123,6 +123,15 @@ func (d *Daemon) Start() error {
 		fmt.Printf("Warning: failed to close orphaned AFK events: %v\n", err)
 	}
 
+	// Close any orphaned sessions from crashes or multiple instances
+	// Sessions older than 12 hours without an end_time are considered orphaned
+	const maxSessionAge = 12 * 60 * 60 // 12 hours in seconds
+	if count, err := d.store.CloseOrphanedSessions(time.Now().Unix(), maxSessionAge); err != nil {
+		fmt.Printf("Warning: failed to close orphaned sessions: %v\n", err)
+	} else if count > 0 {
+		fmt.Printf("Closed %d orphaned session(s) from previous run\n", count)
+	}
+
 	// Start or resume a session
 	session, err := d.session.StartSession()
 	if err != nil {
