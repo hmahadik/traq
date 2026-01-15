@@ -542,6 +542,7 @@ export namespace service {
 	    }
 	}
 	export class IssuesConfig {
+	    crashReportingEnabled: boolean;
 	    webhookEnabled: boolean;
 	    webhookUrl: string;
 	
@@ -551,6 +552,7 @@ export namespace service {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.crashReportingEnabled = source["crashReportingEnabled"];
 	        this.webhookEnabled = source["webhookEnabled"];
 	        this.webhookUrl = source["webhookUrl"];
 	    }

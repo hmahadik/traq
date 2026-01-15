@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/getsentry/sentry-go"
 	"traq/internal/platform"
 	"traq/internal/storage"
 )
@@ -222,6 +223,14 @@ type DaemonStatus struct {
 }
 
 func (d *Daemon) run() {
+	// Recover from panics and report to Sentry
+	defer func() {
+		if r := recover(); r != nil {
+			sentry.CurrentHub().Recover(r)
+			sentry.Flush(2 * time.Second)
+		}
+	}()
+
 	ticker := time.NewTicker(d.config.Interval)
 	defer ticker.Stop()
 

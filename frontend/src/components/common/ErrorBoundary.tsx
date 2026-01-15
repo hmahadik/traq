@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useRouteError, isRouteErrorResponse, useNavigate, useLocation } from 'react-router-dom';
+import * as Sentry from '@sentry/react';
 import { Button } from '@/components/ui/button';
 import { AlertTriangle, Home, RefreshCw, Bug } from 'lucide-react';
 import { api } from '@/api/client';
@@ -30,11 +31,20 @@ export function RouteErrorBoundary() {
   useEffect(() => {
     if (!hasAutoReported) {
       setHasAutoReported(true);
+
+      // Report to Sentry (primary crash reporting)
+      const errorObj = error instanceof Error ? error : new Error(message);
+      Sentry.captureException(errorObj, {
+        tags: { source: 'route_error_boundary' },
+        extra: { pageRoute: location.pathname },
+      });
+
+      // Also report to local backend (for offline access)
       api.issues
         .report('crash', message, details || '', 'Auto-captured from route error boundary', location.pathname)
-        .catch((err) => console.error('[ErrorBoundary] Failed to auto-report:', err));
+        .catch((err) => console.error('[ErrorBoundary] Failed to auto-report locally:', err));
     }
-  }, [hasAutoReported, message, details, location.pathname]);
+  }, [hasAutoReported, error, message, details, location.pathname]);
 
   const handleRetry = () => {
     window.location.reload();

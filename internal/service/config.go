@@ -55,8 +55,9 @@ type UpdateConfig struct {
 
 // IssuesConfig contains issue reporting settings.
 type IssuesConfig struct {
-	WebhookEnabled bool   `json:"webhookEnabled"`
-	WebhookUrl     string `json:"webhookUrl"`
+	CrashReportingEnabled bool   `json:"crashReportingEnabled"` // Send crash reports to Sentry
+	WebhookEnabled        bool   `json:"webhookEnabled"`
+	WebhookUrl            string `json:"webhookUrl"`
 }
 
 // InferenceConfig contains AI inference settings.
@@ -273,8 +274,12 @@ func (s *ConfigService) GetConfig() (*Config, error) {
 
 	// Issues settings
 	config.Issues = &IssuesConfig{
-		WebhookEnabled: false,
-		WebhookUrl:     "",
+		CrashReportingEnabled: true, // Default: send crash reports to Sentry
+		WebhookEnabled:        false,
+		WebhookUrl:            "",
+	}
+	if val, err := s.store.GetConfig("issues.crashReportingEnabled"); err == nil {
+		config.Issues.CrashReportingEnabled = val != "false" // Default true unless explicitly disabled
 	}
 	if val, err := s.store.GetConfig("issues.webhookEnabled"); err == nil {
 		config.Issues.WebhookEnabled = val == "true"
@@ -457,8 +462,9 @@ func mapToStorageKey(frontendKey string) string {
 		"inference.cloud.endpoint": "inference.cloud.endpoint",
 
 		// Issues settings
-		"issues.webhookEnabled": "issues.webhookEnabled",
-		"issues.webhookUrl":     "issues.webhookUrl",
+		"issues.crashReportingEnabled": "issues.crashReportingEnabled",
+		"issues.webhookEnabled":        "issues.webhookEnabled",
+		"issues.webhookUrl":            "issues.webhookUrl",
 
 		// Update settings
 		"update.autoUpdate":         "update.autoUpdate",

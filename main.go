@@ -8,11 +8,13 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"traq/internal/platform"
 	"traq/internal/service"
 	"traq/internal/tray"
 
+	"github.com/getsentry/sentry-go"
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
@@ -62,6 +64,9 @@ func (h *screenshotHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	http.ServeFile(w, r, fullPath)
 }
 
+// SentryDSN is the Sentry data source name for crash reporting
+const SentryDSN = "https://5bad525b80919fbf0be0f8617d24d259@o4510716123348992.ingest.us.sentry.io/4510716130623488"
+
 func main() {
 	// Check for pending updates BEFORE starting the app
 	// This applies any staged update from a previous session
@@ -75,6 +80,17 @@ func main() {
 		service.RestartSelf()
 		return // Should not reach here
 	}
+
+	// Initialize Sentry for crash reporting
+	if err := sentry.Init(sentry.ClientOptions{
+		Dsn:              SentryDSN,
+		Release:          Version,
+		Environment:      getEnvironment(),
+		AttachStacktrace: true,
+	}); err != nil {
+		log.Printf("Sentry init failed: %v", err)
+	}
+	defer sentry.Flush(2 * time.Second)
 
 	// Create an instance of the app structure
 	app := NewApp()
@@ -154,4 +170,12 @@ func main() {
 	if err != nil {
 		println("Error:", err.Error())
 	}
+}
+
+// getEnvironment returns "development" for dev builds, "production" otherwise
+func getEnvironment() string {
+	if Version == "dev" {
+		return "development"
+	}
+	return "production"
 }

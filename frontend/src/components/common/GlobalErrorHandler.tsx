@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback, ReactNode } from 'react';
 import { useLocation } from 'react-router-dom';
+import * as Sentry from '@sentry/react';
 import { api } from '@/api/client';
 import { ReportIssueDialog } from './ReportIssueDialog';
 
@@ -25,10 +26,17 @@ export function GlobalErrorHandler({ children }: GlobalErrorHandlerProps) {
     async (error: Error | string, source?: string) => {
       const errorMessage = typeof error === 'string' ? error : error.message;
       const errorStack = typeof error === 'string' ? undefined : error.stack;
+      const errorObj = typeof error === 'string' ? new Error(error) : error;
 
       console.error('[GlobalErrorHandler] Caught error:', errorMessage);
 
-      // Auto-report crash to backend (silent, non-blocking)
+      // Report to Sentry (primary crash reporting)
+      Sentry.captureException(errorObj, {
+        tags: { source: source || 'unknown' },
+        extra: { pageRoute: location.pathname },
+      });
+
+      // Also report to local backend (for offline access)
       try {
         await api.issues.report(
           'crash',
@@ -38,7 +46,7 @@ export function GlobalErrorHandler({ children }: GlobalErrorHandlerProps) {
           location.pathname
         );
       } catch (reportError) {
-        console.error('[GlobalErrorHandler] Failed to auto-report:', reportError);
+        console.error('[GlobalErrorHandler] Failed to auto-report locally:', reportError);
       }
 
       // Show dialog so user can add context

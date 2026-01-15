@@ -1,4 +1,4 @@
-import { Database, FolderOpen, HardDrive, Image, Monitor, Sparkles, Bell, Loader2 } from 'lucide-react';
+import { Database, FolderOpen, HardDrive, Image, Monitor, Sparkles, Bug } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   Dialog,
@@ -20,7 +20,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Progress } from '@/components/ui/progress';
-import { useConfig, useUpdateConfig, useInferenceStatus, useAvailableModels, useDownloadModel, useServerStatus, useDownloadServer, useStorageStats, useOpenDataDir, useDataDir, useOptimizeDatabase, useAvailableMonitors, useTestIssueWebhook, useVersion } from '@/api/hooks';
+import { useConfig, useUpdateConfig, useInferenceStatus, useAvailableModels, useDownloadModel, useServerStatus, useDownloadServer, useStorageStats, useOpenDataDir, useDataDir, useOptimizeDatabase, useAvailableMonitors, useVersion } from '@/api/hooks';
 import { formatBytes } from '@/lib/utils';
 import { CategoriesTab } from '@/components/settings/CategoriesTab';
 import { TimelineCategoriesTab } from '@/components/settings/TimelineCategoriesTab';
@@ -46,7 +46,6 @@ export function SettingsDrawer({ open, onOpenChange }: SettingsDrawerProps) {
   const updateConfig = useUpdateConfig();
   const openDataDir = useOpenDataDir();
   const optimizeDatabase = useOptimizeDatabase();
-  const testWebhook = useTestIssueWebhook();
   const { data: version } = useVersion();
 
   const handleOptimizeDatabase = async () => {
@@ -1016,55 +1015,27 @@ export function SettingsDrawer({ open, onOpenChange }: SettingsDrawerProps) {
               />
             </div>
 
-            {/* Crash Report Webhook */}
+            {/* Crash Reporting */}
             <div className="space-y-3 p-3 rounded-lg bg-muted/30">
               <div className="flex items-center gap-2">
-                <Bell className="h-4 w-4" />
-                <label className="text-sm font-medium">Crash Report Notifications</label>
+                <Bug className="h-4 w-4" />
+                <label className="text-sm font-medium">Crash Reporting</label>
               </div>
               <p className="text-xs text-muted-foreground">
-                Get notified when the app crashes via webhook (Slack, Discord, Teams, etc.)
+                Help improve Traq by automatically sending anonymous crash reports.
+                No personal data is collected.
               </p>
               <div className="flex items-center justify-between">
-                <span className="text-sm">Enable webhook</span>
+                <span className="text-sm">Send crash reports</span>
                 <Switch
-                  checked={config.issues?.webhookEnabled || false}
+                  checked={config.issues?.crashReportingEnabled !== false}
                   onCheckedChange={(enabled) =>
                     updateConfig.mutate({
-                      issues: { ...config.issues, webhookEnabled: enabled },
+                      issues: { ...config.issues, crashReportingEnabled: enabled },
                     })
                   }
                 />
               </div>
-              {(config.issues?.webhookEnabled || false) && (
-                <div className="space-y-2">
-                  <Input
-                    placeholder="https://hooks.slack.com/services/..."
-                    value={config.issues?.webhookUrl || ''}
-                    onChange={(e) =>
-                      updateConfig.mutate({
-                        issues: { ...config.issues, webhookUrl: e.target.value },
-                      })
-                    }
-                  />
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="w-full"
-                    onClick={() => testWebhook.mutate()}
-                    disabled={testWebhook.isPending || !config.issues?.webhookUrl}
-                  >
-                    {testWebhook.isPending ? (
-                      <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Sending...
-                      </>
-                    ) : (
-                      'Send Test Notification'
-                    )}
-                  </Button>
-                </div>
-              )}
             </div>
 
             <div className="space-y-2">
