@@ -7,6 +7,7 @@ import { ReportsPage } from '../pages/reports.page';
 import { ScreenshotsPage } from '../pages/screenshots.page';
 import { IssueReportDialog } from '../pages/issue-dialog';
 import { ActivitySelectionPage } from '../pages/activity-selection.page';
+import { ProjectsPage } from '../pages/projects.page';
 
 type Fixtures = {
   timelinePage: TimelinePage;
@@ -17,6 +18,7 @@ type Fixtures = {
   screenshotsPage: ScreenshotsPage;
   issueDialog: IssueReportDialog;
   activitySelectionPage: ActivitySelectionPage;
+  projectsPage: ProjectsPage;
 };
 
 export const test = base.extend<Fixtures>({
@@ -43,6 +45,9 @@ export const test = base.extend<Fixtures>({
   },
   activitySelectionPage: async ({ page }, use) => {
     await use(new ActivitySelectionPage(page));
+  },
+  projectsPage: async ({ page }, use) => {
+    await use(new ProjectsPage(page));
   },
 });
 

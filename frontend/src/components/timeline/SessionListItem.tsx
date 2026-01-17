@@ -20,7 +20,7 @@ export function SessionListItem({ session, onClick }: SessionListItemProps) {
 
   const categoryColor = CATEGORY_TEXT_COLORS[session.category as keyof typeof CATEGORY_TEXT_COLORS] || '';
 
-  const metadata = session.topApps.length > 0 ? (
+  const metadata = session.topApps?.length > 0 ? (
     <span className={categoryColor}>{session.topApps.slice(0, 2).join(', ')}</span>
   ) : null;
 

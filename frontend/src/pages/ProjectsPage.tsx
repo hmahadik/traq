@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Plus, Pencil, Trash2, X, Clock, FileCode, GitCommit, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -185,10 +185,21 @@ function ProjectFormDialog({
   isSaving: boolean;
 }) {
   const [formData, setFormData] = useState<ProjectFormData>({
-    name: project?.name || '',
-    color: project?.color || COLOR_PALETTE[Math.floor(Math.random() * COLOR_PALETTE.length)],
-    description: project?.description || '',
+    name: '',
+    color: COLOR_PALETTE[0],
+    description: '',
   });
+
+  // Reset form data when dialog opens or project changes
+  useEffect(() => {
+    if (open) {
+      setFormData({
+        name: project?.name || '',
+        color: project?.color || COLOR_PALETTE[Math.floor(Math.random() * COLOR_PALETTE.length)],
+        description: project?.description || '',
+      });
+    }
+  }, [open, project]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

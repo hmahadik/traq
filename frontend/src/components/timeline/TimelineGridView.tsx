@@ -127,6 +127,7 @@ export const TimelineGridView: React.FC<TimelineGridViewProps> = ({
 
   // Prepare app columns data - limit to MAX_APP_COLUMNS to reduce scrolling
   const appColumns = useMemo(() => {
+    if (!topApps) return [];
     return topApps.slice(0, GRID_CONSTANTS.MAX_APP_COLUMNS).map((app) => {
       // Collect all activity blocks for this app across all hours
       const activityBlocks: any[] = [];
@@ -345,7 +346,7 @@ export const TimelineGridView: React.FC<TimelineGridViewProps> = ({
     lassoStartRef.current = null;
   }, [lassoRect, onLassoEnd, onLassoEndWithKeys, findIntersectingActivities, findIntersectingEvents]);
 
-  if (topApps.length === 0) {
+  if (!topApps || topApps.length === 0) {
     return (
       <div className="flex items-center justify-center h-64 text-muted-foreground bg-muted/50 rounded-lg">
         <div className="text-center">

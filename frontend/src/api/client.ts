@@ -855,6 +855,81 @@ export const hierarchicalSummaries = {
 };
 
 /**
+ * Project types - re-export from Wails bindings
+ */
+// Re-export Project types from storage namespace
+export type Project = import('@wailsjs/go/models').storage.Project;
+export type ProjectPattern = import('@wailsjs/go/models').storage.ProjectPattern;
+export type ProjectStats = import('@wailsjs/go/models').storage.ProjectStats;
+
+/**
+ * Projects API - Project management for activity organization
+ */
+export const projects = {
+  /** Get all projects */
+  getAll: async () => {
+    await waitForReady();
+    const result = await withRetry(() => App.GetProjects());
+    return result || [];
+  },
+
+  /** Get a single project by ID */
+  get: async (id: number) => {
+    await waitForReady();
+    return withRetry(() => App.GetProject(id));
+  },
+
+  /** Create a new project */
+  create: async (name: string, color: string, description: string) => {
+    await waitForReady();
+    return App.CreateProject(name, color, description);
+  },
+
+  /** Update an existing project */
+  update: async (id: number, name: string, color: string, description: string) => {
+    await waitForReady();
+    return App.UpdateProject(id, name, color, description);
+  },
+
+  /** Delete a project */
+  delete: async (id: number) => {
+    await waitForReady();
+    return App.DeleteProject(id);
+  },
+
+  /** Get project statistics */
+  getStats: async (id: number) => {
+    await waitForReady();
+    return withRetry(() => App.GetProjectStats(id));
+  },
+
+  /** Get learned patterns for a project */
+  getPatterns: async (id: number) => {
+    await waitForReady();
+    const result = await withRetry(() => App.GetProjectPatterns(id));
+    return result || [];
+  },
+
+  /** Delete a learned pattern */
+  deletePattern: async (patternId: number) => {
+    await waitForReady();
+    return App.DeleteProjectPattern(patternId);
+  },
+
+  /** Assign an event to a project */
+  assignEvent: async (eventType: string, eventId: number, projectId: number) => {
+    await waitForReady();
+    return App.AssignEventToProject(eventType, eventId, projectId);
+  },
+
+  /** Get count of events without project assignment */
+  getUnassignedCount: async () => {
+    await waitForReady();
+    return withRetry(() => App.GetUnassignedEventCount());
+  },
+};
+
+/**
  * Issue Reporting API - Crash reports and manual issue flagging
  */
 export interface IssueReport {
@@ -928,4 +1003,5 @@ export const api = {
   tags,
   hierarchicalSummaries,
   issues,
+  projects,
 };

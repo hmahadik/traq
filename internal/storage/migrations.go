@@ -318,9 +318,11 @@ func (s *Store) Migrate() error {
 	return nil
 }
 
-// repairMissingTables creates any tables that might be missing due to partial migration failures.
-// This is a safety net for databases that have the schema version set but are missing tables.
+// repairMissingTables creates any tables or columns that might be missing due to partial migration failures.
+// This is a safety net for databases that have the schema version set but are missing tables/columns.
 func (s *Store) repairMissingTables() {
+	// Repair missing columns in projects table (migration 9 may have failed partially)
+	s.repairProjectsTable()
 	// Check and create project_patterns table if missing
 	var count int
 	err := s.db.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='project_patterns'`).Scan(&count)
@@ -358,6 +360,31 @@ func (s *Store) repairMissingTables() {
 		`)
 		s.db.Exec(`CREATE INDEX IF NOT EXISTS idx_assignment_examples_project ON assignment_examples(project_id)`)
 		s.db.Exec(`CREATE INDEX IF NOT EXISTS idx_assignment_examples_created ON assignment_examples(created_at)`)
+	}
+}
+
+// repairProjectsTable adds missing columns to the projects table.
+// This repairs databases where migration 9's ALTER TABLE statements failed silently.
+func (s *Store) repairProjectsTable() {
+	// Check if projects table exists first
+	var tableCount int
+	err := s.db.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='projects'`).Scan(&tableCount)
+	if err != nil || tableCount == 0 {
+		return // Table doesn't exist, nothing to repair
+	}
+
+	// Check and add 'color' column if missing
+	var colorCount int
+	err = s.db.QueryRow(`SELECT COUNT(*) FROM pragma_table_info('projects') WHERE name = 'color'`).Scan(&colorCount)
+	if err == nil && colorCount == 0 {
+		s.db.Exec(`ALTER TABLE projects ADD COLUMN color TEXT DEFAULT '#6366f1'`)
+	}
+
+	// Check and add 'description' column if missing
+	var descCount int
+	err = s.db.QueryRow(`SELECT COUNT(*) FROM pragma_table_info('projects') WHERE name = 'description'`).Scan(&descCount)
+	if err == nil && descCount == 0 {
+		s.db.Exec(`ALTER TABLE projects ADD COLUMN description TEXT`)
 	}
 }
 
