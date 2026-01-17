@@ -8,7 +8,11 @@ import {tracker} from '../models';
 
 export function AddTagToSession(arg1:number,arg2:string):Promise<void>;
 
+export function AssignEventToProject(arg1:string,arg2:number,arg3:number):Promise<void>;
+
 export function CheckForUpdate():Promise<service.UpdateInfo>;
+
+export function CreateProject(arg1:string,arg2:string,arg3:string):Promise<storage.Project>;
 
 export function DeleteAFKEvents(arg1:Array<number>):Promise<void>;
 
@@ -29,6 +33,10 @@ export function DeleteHierarchicalSummary(arg1:number):Promise<void>;
 export function DeleteIssueReport(arg1:number):Promise<void>;
 
 export function DeleteModel(arg1:string):Promise<void>;
+
+export function DeleteProject(arg1:number):Promise<void>;
+
+export function DeleteProjectPattern(arg1:number):Promise<void>;
 
 export function DeleteReport(arg1:number):Promise<void>;
 
@@ -126,6 +134,14 @@ export function GetMonthlyStats(arg1:number,arg2:number):Promise<service.Monthly
 
 export function GetProductivityScore(arg1:string):Promise<service.ProductivityScore>;
 
+export function GetProject(arg1:number):Promise<storage.Project>;
+
+export function GetProjectPatterns(arg1:number):Promise<Array<storage.ProjectPattern>>;
+
+export function GetProjectStats(arg1:number):Promise<storage.ProjectStats>;
+
+export function GetProjects():Promise<Array<storage.Project>>;
+
 export function GetRecentSessions(arg1:number):Promise<Array<storage.Session>>;
 
 export function GetReport(arg1:number):Promise<service.Report>;
@@ -167,6 +183,8 @@ export function GetTimelineGridData(arg1:string):Promise<service.TimelineGridDat
 export function GetTopWindows(arg1:string,arg2:number):Promise<Array<service.WindowUsage>>;
 
 export function GetTrackedRepositories():Promise<Array<storage.GitRepository>>;
+
+export function GetUnassignedEventCount():Promise<number>;
 
 export function GetUpdateStatus():Promise<service.UpdateStatus>;
 
@@ -222,6 +240,8 @@ export function StartTracking():Promise<void>;
 
 export function StopTracking():Promise<void>;
 
+export function SuggestProject(arg1:storage.AssignmentContext):Promise<service.AssignmentResult>;
+
 export function TestIssueWebhook():Promise<void>;
 
 export function TriggerUpdate():Promise<void>;
@@ -235,5 +255,7 @@ export function UpdateConfig(arg1:Record<string, any>):Promise<void>;
 export function UpdateFocusEvent(arg1:number,arg2:string,arg3:string,arg4:number,arg5:number):Promise<void>;
 
 export function UpdateHierarchicalSummary(arg1:number,arg2:string):Promise<void>;
+
+export function UpdateProject(arg1:number,arg2:string,arg3:string,arg4:string):Promise<void>;
 
 export function WatchDirectory(arg1:string):Promise<void>;

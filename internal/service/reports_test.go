@@ -26,7 +26,8 @@ func setupReportsTest(t *testing.T) (*ReportsService, *storage.Store, func()) {
 
 	timeline := NewTimelineService(store)
 	analytics := NewAnalyticsService(store)
-	service := NewReportsService(store, timeline, analytics)
+	projects := NewProjectAssignmentService(store)
+	service := NewReportsService(store, timeline, analytics, projects)
 
 	cleanup := func() {
 		store.Close()

@@ -262,6 +262,28 @@ export namespace service {
 	        this.focusCount = source["focusCount"];
 	    }
 	}
+	export class AssignmentResult {
+	    projectId: number;
+	    projectName: string;
+	    color: string;
+	    confidence: number;
+	    source: string;
+	    reason: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new AssignmentResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.projectId = source["projectId"];
+	        this.projectName = source["projectName"];
+	        this.color = source["color"];
+	        this.confidence = source["confidence"];
+	        this.source = source["source"];
+	        this.reason = source["reason"];
+	    }
+	}
 	export class BrowserConfig {
 	    enabled: boolean;
 	    browsers: string[];
@@ -2254,6 +2276,30 @@ export namespace storage {
 	        this.updatedAt = source["updatedAt"];
 	    }
 	}
+	export class AssignmentContext {
+	    appName?: string;
+	    windowTitle?: string;
+	    url?: string;
+	    gitRepo?: string;
+	    filePath?: string;
+	    branchName?: string;
+	    domain?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new AssignmentContext(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.appName = source["appName"];
+	        this.windowTitle = source["windowTitle"];
+	        this.url = source["url"];
+	        this.gitRepo = source["gitRepo"];
+	        this.filePath = source["filePath"];
+	        this.branchName = source["branchName"];
+	        this.domain = source["domain"];
+	    }
+	}
 	export class BrowserVisit {
 	    id: number;
 	    timestamp: number;
@@ -2390,6 +2436,9 @@ export namespace storage {
 	    authorEmail: sql.NullString;
 	    isMerge: boolean;
 	    sessionId: sql.NullInt64;
+	    projectId: sql.NullInt64;
+	    projectConfidence: sql.NullFloat64;
+	    projectSource: sql.NullString;
 	    createdAt: number;
 	
 	    static createFrom(source: any = {}) {
@@ -2413,6 +2462,9 @@ export namespace storage {
 	        this.authorEmail = this.convertValues(source["authorEmail"], sql.NullString);
 	        this.isMerge = source["isMerge"];
 	        this.sessionId = this.convertValues(source["sessionId"], sql.NullInt64);
+	        this.projectId = this.convertValues(source["projectId"], sql.NullInt64);
+	        this.projectConfidence = this.convertValues(source["projectConfidence"], sql.NullFloat64);
+	        this.projectSource = this.convertValues(source["projectSource"], sql.NullString);
 	        this.createdAt = source["createdAt"];
 	    }
 	
@@ -2500,6 +2552,32 @@ export namespace storage {
 	        this.createdAt = source["createdAt"];
 	    }
 	}
+	export class Project {
+	    id: number;
+	    name: string;
+	    color: string;
+	    description?: string;
+	    detectionPatterns: string;
+	    isManual: boolean;
+	    createdAt: number;
+	    updatedAt?: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new Project(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.name = source["name"];
+	        this.color = source["color"];
+	        this.description = source["description"];
+	        this.detectionPatterns = source["detectionPatterns"];
+	        this.isManual = source["isManual"];
+	        this.createdAt = source["createdAt"];
+	        this.updatedAt = source["updatedAt"];
+	    }
+	}
 	export class ProjectBreakdown {
 	    name: string;
 	    timeMinutes: number;
@@ -2516,6 +2594,54 @@ export namespace storage {
 	        this.timeMinutes = source["timeMinutes"];
 	        this.activities = source["activities"];
 	        this.confidence = source["confidence"];
+	    }
+	}
+	export class ProjectPattern {
+	    id: number;
+	    projectId: number;
+	    patternType: string;
+	    patternValue: string;
+	    matchType: string;
+	    weight: number;
+	    hitCount: number;
+	    lastUsedAt?: number;
+	    createdAt: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new ProjectPattern(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.projectId = source["projectId"];
+	        this.patternType = source["patternType"];
+	        this.patternValue = source["patternValue"];
+	        this.matchType = source["matchType"];
+	        this.weight = source["weight"];
+	        this.hitCount = source["hitCount"];
+	        this.lastUsedAt = source["lastUsedAt"];
+	        this.createdAt = source["createdAt"];
+	    }
+	}
+	export class ProjectStats {
+	    screenshotCount: number;
+	    focusEventCount: number;
+	    gitCommitCount: number;
+	    totalMinutes: number;
+	    patternCount: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new ProjectStats(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.screenshotCount = source["screenshotCount"];
+	        this.focusEventCount = source["focusEventCount"];
+	        this.gitCommitCount = source["gitCommitCount"];
+	        this.totalMinutes = source["totalMinutes"];
+	        this.patternCount = source["patternCount"];
 	    }
 	}
 	export class Screenshot {
@@ -2535,6 +2661,9 @@ export namespace storage {
 	    monitorWidth: sql.NullInt64;
 	    monitorHeight: sql.NullInt64;
 	    sessionId: sql.NullInt64;
+	    projectId: sql.NullInt64;
+	    projectConfidence: sql.NullFloat64;
+	    projectSource: sql.NullString;
 	    createdAt: number;
 	
 	    static createFrom(source: any = {}) {
@@ -2559,6 +2688,9 @@ export namespace storage {
 	        this.monitorWidth = this.convertValues(source["monitorWidth"], sql.NullInt64);
 	        this.monitorHeight = this.convertValues(source["monitorHeight"], sql.NullInt64);
 	        this.sessionId = this.convertValues(source["sessionId"], sql.NullInt64);
+	        this.projectId = this.convertValues(source["projectId"], sql.NullInt64);
+	        this.projectConfidence = this.convertValues(source["projectConfidence"], sql.NullFloat64);
+	        this.projectSource = this.convertValues(source["projectSource"], sql.NullString);
 	        this.createdAt = source["createdAt"];
 	    }
 	
@@ -2747,6 +2879,9 @@ export namespace storage {
 	    endTime: number;
 	    durationSeconds: number;
 	    sessionId: sql.NullInt64;
+	    projectId: sql.NullInt64;
+	    projectConfidence: sql.NullFloat64;
+	    projectSource: sql.NullString;
 	    createdAt: number;
 	
 	    static createFrom(source: any = {}) {
@@ -2763,6 +2898,9 @@ export namespace storage {
 	        this.endTime = source["endTime"];
 	        this.durationSeconds = source["durationSeconds"];
 	        this.sessionId = this.convertValues(source["sessionId"], sql.NullInt64);
+	        this.projectId = this.convertValues(source["projectId"], sql.NullInt64);
+	        this.projectConfidence = this.convertValues(source["projectConfidence"], sql.NullFloat64);
+	        this.projectSource = this.convertValues(source["projectSource"], sql.NullString);
 	        this.createdAt = source["createdAt"];
 	    }
 	

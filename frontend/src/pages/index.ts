@@ -5,3 +5,4 @@ export { ScreenshotsPage } from './ScreenshotsPage';
 export { DayPage } from './DayPage';
 export { SettingsPage } from './SettingsPage';
 export { SessionDetailPage } from './SessionDetailPage';
+export { ProjectsPage } from './ProjectsPage';

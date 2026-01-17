@@ -10,6 +10,7 @@ import {
   DayPage,
   SettingsPage,
   SessionDetailPage,
+  ProjectsPage,
 } from '@/pages';
 
 const queryClient = new QueryClient({
@@ -36,6 +37,7 @@ const router = createHashRouter([
       { path: 'day/:date', element: <DayPage /> },
       { path: 'settings', element: <SettingsPage /> },
       { path: 'session/:id', element: <SessionDetailPage /> },
+      { path: 'projects', element: <ProjectsPage /> },
     ],
   },
 ]);

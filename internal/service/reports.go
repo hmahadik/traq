@@ -17,14 +17,16 @@ type ReportsService struct {
 	store     *storage.Store
 	timeline  *TimelineService
 	analytics *AnalyticsService
+	projects  *ProjectAssignmentService
 }
 
 // NewReportsService creates a new ReportsService.
-func NewReportsService(store *storage.Store, timeline *TimelineService, analytics *AnalyticsService) *ReportsService {
+func NewReportsService(store *storage.Store, timeline *TimelineService, analytics *AnalyticsService, projects *ProjectAssignmentService) *ReportsService {
 	return &ReportsService{
 		store:     store,
 		timeline:  timeline,
 		analytics: analytics,
+		projects:  projects,
 	}
 }
 
@@ -569,8 +571,35 @@ func (s *ReportsService) inferDomainTopic(domain string) string {
 	return "Other"
 }
 
+// detectProjectFromLearnedPatterns attempts to match using learned project patterns.
+// Returns project name if matched with sufficient confidence, empty string otherwise.
+func (s *ReportsService) detectProjectFromLearnedPatterns(ctx *storage.AssignmentContext) string {
+	if s.projects == nil {
+		return ""
+	}
+
+	result := s.projects.matchPatterns(ctx)
+	if result != nil && result.Confidence >= 0.5 {
+		// Get project name from storage
+		project, err := s.store.GetProject(result.ProjectID)
+		if err == nil && project != nil {
+			return project.Name
+		}
+	}
+	return ""
+}
+
 // detectProjectFromWindowTitle extracts project name from various window title patterns.
 func (s *ReportsService) detectProjectFromWindowTitle(windowTitle, appName string) string {
+	// First, try learned patterns
+	if projectName := s.detectProjectFromLearnedPatterns(&storage.AssignmentContext{
+		AppName:     appName,
+		WindowTitle: windowTitle,
+	}); projectName != "" {
+		return projectName
+	}
+
+	// Fall back to hardcoded detection
 	lower := strings.ToLower(windowTitle)
 	appLower := strings.ToLower(appName)
 
@@ -599,7 +628,9 @@ func (s *ReportsService) detectProjectFromWindowTitle(windowTitle, appName strin
 				if strings.Contains(partLower, "activity-tracker") || strings.Contains(partLower, "activity tracker") {
 					return "Traq"
 				}
-				if strings.Contains(partLower, "synaptics") || strings.Contains(partLower, "sl261") || strings.Contains(partLower, "sl2619") {
+				if strings.Contains(partLower, "synaptics") || strings.Contains(partLower, "sl261") || strings.Contains(partLower, "sl2619") ||
+					strings.Contains(partLower, "torq") || strings.Contains(partLower, "tflite") ||
+					strings.Contains(partLower, "mobilenet") || strings.Contains(partLower, "yolo") {
 					return "Synaptics/42T"
 				}
 				if strings.Contains(partLower, "arcturus") {
@@ -633,6 +664,14 @@ func (s *ReportsService) detectProjectFromWindowTitle(windowTitle, appName strin
 
 // detectProjectFromGitRepo extracts project name from git repository path.
 func (s *ReportsService) detectProjectFromGitRepo(repoPath string) string {
+	// First, try learned patterns
+	if projectName := s.detectProjectFromLearnedPatterns(&storage.AssignmentContext{
+		GitRepo: repoPath,
+	}); projectName != "" {
+		return projectName
+	}
+
+	// Fall back to hardcoded detection
 	lower := strings.ToLower(repoPath)
 
 	if strings.Contains(lower, "traq") || strings.Contains(lower, "activity-tracker") {
@@ -2641,9 +2680,13 @@ func (s *ReportsService) buildProjectSummaries(focusEvents []*storage.WindowFocu
 		projects = append(projects, *p)
 	}
 
-	// Sort by hours descending
+	// Sort by hours descending, with commit count as tiebreaker
 	sort.Slice(projects, func(i, j int) bool {
-		return projects[i].Hours > projects[j].Hours
+		if projects[i].Hours != projects[j].Hours {
+			return projects[i].Hours > projects[j].Hours
+		}
+		// Tiebreaker: more commits = more important
+		return projects[i].CommitCount > projects[j].CommitCount
 	})
 
 	return projects
@@ -2816,9 +2859,13 @@ func (s *ReportsService) buildProjectSummariesFromAI(sessions []*storage.Session
 		projects = append(projects, *p)
 	}
 
-	// Sort by hours descending
+	// Sort by hours descending, with commit count as tiebreaker
 	sort.Slice(projects, func(i, j int) bool {
-		return projects[i].Hours > projects[j].Hours
+		if projects[i].Hours != projects[j].Hours {
+			return projects[i].Hours > projects[j].Hours
+		}
+		// Tiebreaker: more commits = more important
+		return projects[i].CommitCount > projects[j].CommitCount
 	})
 
 	return projects
@@ -3135,10 +3182,28 @@ func (s *ReportsService) formatWeeklySummaryHTML(data *WeeklySummaryData) string
 	sb.WriteString(`<div class="report-card">`)
 	sb.WriteString(`<div class="report-card-title">Executive Summary</div>`)
 
-	// Build executive summary
+	// Build executive summary - use first project that has meaningful content
 	primaryProject := "development work"
-	if len(data.Projects) > 0 && data.Projects[0].Hours > 0 {
-		primaryProject = fmt.Sprintf("<strong>%s</strong>", data.Projects[0].Name)
+	for _, project := range data.Projects {
+		// Skip projects with < 0.5 hours and no commits (same filter as Projects section)
+		if project.Hours < 0.5 && project.CommitCount == 0 {
+			continue
+		}
+		// Check if project has meaningful content (accomplishments or commits)
+		hasAccomplishments := false
+		for _, accs := range project.DailyAccomplishments {
+			if len(accs) > 0 {
+				hasAccomplishments = true
+				break
+			}
+		}
+		hasSignificantTime := project.Hours >= 0.5
+		if !hasAccomplishments && project.CommitCount == 0 && !hasSignificantTime {
+			continue
+		}
+		// Found a meaningful project
+		primaryProject = fmt.Sprintf("<strong>%s</strong>", project.Name)
+		break
 	}
 	execSummary := fmt.Sprintf("This period was focused on %s.", primaryProject)
 	sb.WriteString(fmt.Sprintf(`<p class="report-text" style="margin: 0 0 12px 0;">%s</p>`, execSummary))
@@ -3239,9 +3304,11 @@ func (s *ReportsService) formatWeeklySummaryHTML(data *WeeklySummaryData) string
 				}
 			}
 			hasCommits := project.CommitCount > 0
+			hasSignificantTime := project.Hours >= 0.5
 
-			// Skip empty project shells - must have accomplishments or commits
-			if !hasAccomplishments && !hasCommits {
+			// Skip empty project shells - must have accomplishments, commits, OR significant time
+			// This ensures research/browser work still appears even without git activity
+			if !hasAccomplishments && !hasCommits && !hasSignificantTime {
 				continue
 			}
 
@@ -3449,10 +3516,33 @@ func (s *ReportsService) formatWeeklySummaryMarkdown(data *WeeklySummaryData) st
 	sb.WriteString("## Executive Summary\n\n")
 
 	// Build executive summary text - more detailed and descriptive like the target
+	// Use first project that has meaningful content (same filter as Projects section)
 	primaryProject := "development work"
 	var hasFeatureCompletion bool
-	if len(data.Projects) > 0 && data.Projects[0].Hours > 0 {
-		p := data.Projects[0]
+	var foundProject *ProjectSummary
+	for i := range data.Projects {
+		p := &data.Projects[i]
+		// Skip projects with < 0.5 hours and no commits
+		if p.Hours < 0.5 && p.CommitCount == 0 {
+			continue
+		}
+		// Check if project has meaningful content (accomplishments or commits)
+		hasAccomplishments := false
+		for _, accs := range p.DailyAccomplishments {
+			if len(accs) > 0 {
+				hasAccomplishments = true
+				break
+			}
+		}
+		hasSignificantTime := p.Hours >= 0.5
+		if !hasAccomplishments && p.CommitCount == 0 && !hasSignificantTime {
+			continue
+		}
+		foundProject = p
+		break
+	}
+
+	if foundProject != nil {
 		// Check for 100% completion milestone
 		for _, acc := range data.KeyAccomplishments {
 			lower := strings.ToLower(acc)
@@ -3462,14 +3552,14 @@ func (s *ReportsService) formatWeeklySummaryMarkdown(data *WeeklySummaryData) st
 			}
 		}
 
-		if p.Name == "Traq" {
+		if foundProject.Name == "Traq" {
 			if hasFeatureCompletion {
 				primaryProject = "**intensive development work on Traq v2 (Activity Tracker)**, achieving **100% feature completion (64/64 tests passing)**"
 			} else {
 				primaryProject = "**intensive development work on Traq v2 (Activity Tracker)**"
 			}
 		} else {
-			primaryProject = fmt.Sprintf("**%s**", p.Name)
+			primaryProject = fmt.Sprintf("**%s**", foundProject.Name)
 		}
 	}
 
@@ -3893,8 +3983,11 @@ func (s *ReportsService) extractCommunicationStats(events []*storage.WindowFocus
 			}
 		}
 
-		// Zoom
-		if strings.Contains(lower, "zoom") {
+		// Video calls: Zoom, Google Meet, Teams (check app name AND window title)
+		if strings.Contains(lower, "zoom") ||
+			strings.Contains(windowLower, "meet.google.com") ||
+			strings.Contains(windowLower, "meet -") ||
+			(strings.Contains(windowLower, "microsoft teams") && strings.Contains(windowLower, "meeting")) {
 			totalZoom += mins
 		}
 

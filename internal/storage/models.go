@@ -7,23 +7,26 @@ import (
 
 // Screenshot represents a captured screenshot.
 type Screenshot struct {
-	ID            int64          `json:"id"`
-	Timestamp     int64          `json:"timestamp"`
-	Filepath      string         `json:"filepath"`
-	DHash         string         `json:"dhash"`
-	WindowTitle   sql.NullString `json:"windowTitle"`
-	AppName       sql.NullString `json:"appName"`
-	WindowClass   sql.NullString `json:"windowClass"`
-	ProcessPID    sql.NullInt64  `json:"processPid"`
-	WindowX       sql.NullInt64  `json:"windowX"`
-	WindowY       sql.NullInt64  `json:"windowY"`
-	WindowWidth   sql.NullInt64  `json:"windowWidth"`
-	WindowHeight  sql.NullInt64  `json:"windowHeight"`
-	MonitorName   sql.NullString `json:"monitorName"`
-	MonitorWidth  sql.NullInt64  `json:"monitorWidth"`
-	MonitorHeight sql.NullInt64  `json:"monitorHeight"`
-	SessionID     sql.NullInt64  `json:"sessionId"`
-	CreatedAt     int64          `json:"createdAt"`
+	ID                int64           `json:"id"`
+	Timestamp         int64           `json:"timestamp"`
+	Filepath          string          `json:"filepath"`
+	DHash             string          `json:"dhash"`
+	WindowTitle       sql.NullString  `json:"windowTitle"`
+	AppName           sql.NullString  `json:"appName"`
+	WindowClass       sql.NullString  `json:"windowClass"`
+	ProcessPID        sql.NullInt64   `json:"processPid"`
+	WindowX           sql.NullInt64   `json:"windowX"`
+	WindowY           sql.NullInt64   `json:"windowY"`
+	WindowWidth       sql.NullInt64   `json:"windowWidth"`
+	WindowHeight      sql.NullInt64   `json:"windowHeight"`
+	MonitorName       sql.NullString  `json:"monitorName"`
+	MonitorWidth      sql.NullInt64   `json:"monitorWidth"`
+	MonitorHeight     sql.NullInt64   `json:"monitorHeight"`
+	SessionID         sql.NullInt64   `json:"sessionId"`
+	ProjectID         sql.NullInt64   `json:"projectId"`
+	ProjectConfidence sql.NullFloat64 `json:"projectConfidence"`
+	ProjectSource     sql.NullString  `json:"projectSource"` // 'unassigned', 'user', 'rule', 'ai'
+	CreatedAt         int64           `json:"createdAt"`
 }
 
 // Session represents a work session.
@@ -64,15 +67,18 @@ type ProjectBreakdown struct {
 
 // WindowFocusEvent represents a window focus change.
 type WindowFocusEvent struct {
-	ID              int64          `json:"id"`
-	WindowTitle     string         `json:"windowTitle"`
-	AppName         string         `json:"appName"`
-	WindowClass     sql.NullString `json:"windowClass"`
-	StartTime       int64          `json:"startTime"`
-	EndTime         int64          `json:"endTime"`
-	DurationSeconds float64        `json:"durationSeconds"`
-	SessionID       sql.NullInt64  `json:"sessionId"`
-	CreatedAt       int64          `json:"createdAt"`
+	ID                int64           `json:"id"`
+	WindowTitle       string          `json:"windowTitle"`
+	AppName           string          `json:"appName"`
+	WindowClass       sql.NullString  `json:"windowClass"`
+	StartTime         int64           `json:"startTime"`
+	EndTime           int64           `json:"endTime"`
+	DurationSeconds   float64         `json:"durationSeconds"`
+	SessionID         sql.NullInt64   `json:"sessionId"`
+	ProjectID         sql.NullInt64   `json:"projectId"`
+	ProjectConfidence sql.NullFloat64 `json:"projectConfidence"`
+	ProjectSource     sql.NullString  `json:"projectSource"` // 'unassigned', 'user', 'rule', 'ai'
+	CreatedAt         int64           `json:"createdAt"`
 }
 
 // ShellCommand represents a shell command from history.
@@ -102,22 +108,25 @@ type GitRepository struct {
 
 // GitCommit represents a git commit.
 type GitCommit struct {
-	ID             int64          `json:"id"`
-	Timestamp      int64          `json:"timestamp"`
-	CommitHash     string         `json:"commitHash"`
-	ShortHash      string         `json:"shortHash"`
-	RepositoryID   int64          `json:"repositoryId"`
-	Branch         sql.NullString `json:"branch"`
-	Message        string         `json:"message"`
-	MessageSubject string         `json:"messageSubject"`
-	FilesChanged   sql.NullInt64  `json:"filesChanged"`
-	Insertions     sql.NullInt64  `json:"insertions"`
-	Deletions      sql.NullInt64  `json:"deletions"`
-	AuthorName     sql.NullString `json:"authorName"`
-	AuthorEmail    sql.NullString `json:"authorEmail"`
-	IsMerge        bool           `json:"isMerge"`
-	SessionID      sql.NullInt64  `json:"sessionId"`
-	CreatedAt      int64          `json:"createdAt"`
+	ID                int64           `json:"id"`
+	Timestamp         int64           `json:"timestamp"`
+	CommitHash        string          `json:"commitHash"`
+	ShortHash         string          `json:"shortHash"`
+	RepositoryID      int64           `json:"repositoryId"`
+	Branch            sql.NullString  `json:"branch"`
+	Message           string          `json:"message"`
+	MessageSubject    string          `json:"messageSubject"`
+	FilesChanged      sql.NullInt64   `json:"filesChanged"`
+	Insertions        sql.NullInt64   `json:"insertions"`
+	Deletions         sql.NullInt64   `json:"deletions"`
+	AuthorName        sql.NullString  `json:"authorName"`
+	AuthorEmail       sql.NullString  `json:"authorEmail"`
+	IsMerge           bool            `json:"isMerge"`
+	SessionID         sql.NullInt64   `json:"sessionId"`
+	ProjectID         sql.NullInt64   `json:"projectId"`
+	ProjectConfidence sql.NullFloat64 `json:"projectConfidence"`
+	ProjectSource     sql.NullString  `json:"projectSource"` // 'unassigned', 'user', 'rule', 'ai'
+	CreatedAt         int64           `json:"createdAt"`
 }
 
 // FileEvent represents a file system event.
@@ -189,9 +198,46 @@ type HierarchicalSummary struct {
 type Project struct {
 	ID                int64  `json:"id"`
 	Name              string `json:"name"`
+	Color             string `json:"color"`
+	Description       string `json:"description,omitempty"`
 	DetectionPatterns string `json:"detectionPatterns"` // JSON string with detection rules
 	IsManual          bool   `json:"isManual"`
 	CreatedAt         int64  `json:"createdAt"`
+	UpdatedAt         int64  `json:"updatedAt,omitempty"`
+}
+
+// ProjectPattern represents a learned pattern for project detection.
+type ProjectPattern struct {
+	ID           int64   `json:"id"`
+	ProjectID    int64   `json:"projectId"`
+	PatternType  string  `json:"patternType"`  // 'app_name', 'window_title', 'git_repo', 'domain', 'path'
+	PatternValue string  `json:"patternValue"`
+	MatchType    string  `json:"matchType"`    // 'exact', 'contains', 'prefix', 'suffix', 'regex'
+	Weight       float64 `json:"weight"`
+	HitCount     int     `json:"hitCount"`
+	LastUsedAt   int64   `json:"lastUsedAt,omitempty"`
+	CreatedAt    int64   `json:"createdAt"`
+}
+
+// AssignmentExample stores user assignment context for few-shot learning.
+type AssignmentExample struct {
+	ID          int64  `json:"id"`
+	ProjectID   int64  `json:"projectId"`
+	EventType   string `json:"eventType"` // 'screenshot', 'focus', 'git'
+	EventID     int64  `json:"eventId"`
+	ContextJSON string `json:"contextJson"`
+	CreatedAt   int64  `json:"createdAt"`
+}
+
+// AssignmentContext captures event context for pattern learning and AI suggestions.
+type AssignmentContext struct {
+	AppName     string `json:"appName,omitempty"`
+	WindowTitle string `json:"windowTitle,omitempty"`
+	URL         string `json:"url,omitempty"`
+	GitRepo     string `json:"gitRepo,omitempty"`
+	FilePath    string `json:"filePath,omitempty"`
+	BranchName  string `json:"branchName,omitempty"`
+	Domain      string `json:"domain,omitempty"`
 }
 
 // DetectionRules defines patterns for automatically detecting a project.

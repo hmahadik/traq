@@ -44,6 +44,7 @@ type App struct {
 	Summary     *service.SummaryService
 	Issues      *service.IssueService
 	Update      *service.UpdateService
+	Projects    *service.ProjectAssignmentService
 
 	// Inference engine
 	inference *inference.Service
@@ -127,8 +128,12 @@ func (a *App) startup(ctx context.Context) {
 		}
 	}
 
-	// Initialize reports service (after timeline and analytics services)
-	a.Reports = service.NewReportsService(a.store, a.Timeline, a.Analytics)
+	// Initialize projects service (for project assignment and learning)
+	// Must be before Reports since Reports uses it for pattern matching
+	a.Projects = service.NewProjectAssignmentService(a.store)
+
+	// Initialize reports service (after timeline, analytics, and projects services)
+	a.Reports = service.NewReportsService(a.store, a.Timeline, a.Analytics, a.Projects)
 
 	// Initialize inference service from config
 	config, _ := a.Config.GetConfig()
@@ -1466,6 +1471,98 @@ func (a *App) TestIssueWebhook() error {
 		return fmt.Errorf("issues service not initialized")
 	}
 	return a.Issues.TestWebhook()
+}
+
+// ============================================================================
+// Project Methods (exposed to frontend)
+// ============================================================================
+
+// GetProjects returns all projects.
+func (a *App) GetProjects() ([]storage.Project, error) {
+	if a.Projects == nil {
+		return nil, nil
+	}
+	return a.Projects.GetProjects()
+}
+
+// GetProject returns a single project by ID.
+func (a *App) GetProject(projectID int64) (*storage.Project, error) {
+	if a.Projects == nil {
+		return nil, nil
+	}
+	return a.Projects.GetProject(projectID)
+}
+
+// CreateProject creates a new project.
+func (a *App) CreateProject(name, color, description string) (*storage.Project, error) {
+	if a.Projects == nil {
+		return nil, fmt.Errorf("projects service not initialized")
+	}
+	return a.Projects.CreateProject(name, color, description)
+}
+
+// UpdateProject updates a project.
+func (a *App) UpdateProject(projectID int64, name, color, description string) error {
+	if a.Projects == nil {
+		return fmt.Errorf("projects service not initialized")
+	}
+	return a.Projects.UpdateProject(projectID, name, color, description)
+}
+
+// DeleteProject deletes a project and clears its assignments.
+func (a *App) DeleteProject(projectID int64) error {
+	if a.Projects == nil {
+		return fmt.Errorf("projects service not initialized")
+	}
+	return a.Projects.DeleteProject(projectID)
+}
+
+// GetProjectStats returns aggregate stats for a project.
+func (a *App) GetProjectStats(projectID int64) (*storage.ProjectStats, error) {
+	if a.Projects == nil {
+		return nil, nil
+	}
+	return a.Projects.GetProjectStats(projectID)
+}
+
+// GetProjectPatterns returns learned patterns for a project.
+func (a *App) GetProjectPatterns(projectID int64) ([]storage.ProjectPattern, error) {
+	if a.Projects == nil {
+		return nil, nil
+	}
+	return a.Projects.GetProjectPatterns(projectID)
+}
+
+// DeleteProjectPattern deletes a learned pattern.
+func (a *App) DeleteProjectPattern(patternID int64) error {
+	if a.Projects == nil {
+		return fmt.Errorf("projects service not initialized")
+	}
+	return a.Projects.DeletePattern(patternID)
+}
+
+// AssignEventToProject manually assigns an event to a project.
+func (a *App) AssignEventToProject(eventType string, eventID, projectID int64) error {
+	if a.Projects == nil {
+		return fmt.Errorf("projects service not initialized")
+	}
+	return a.Projects.ManualAssign(eventType, eventID, projectID)
+}
+
+// SuggestProject gets a project suggestion for an event context.
+func (a *App) SuggestProject(ctx *storage.AssignmentContext) *service.AssignmentResult {
+	if a.Projects == nil {
+		return nil
+	}
+	return a.Projects.SuggestProject(ctx)
+}
+
+// GetUnassignedEventCount returns the count of events without project assignment.
+func (a *App) GetUnassignedEventCount() (int, error) {
+	if a.store == nil {
+		return 0, nil
+	}
+	return a.store.GetUnassignedEventCount()
 }
 
 // ============================================================================

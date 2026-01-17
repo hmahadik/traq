@@ -6,8 +6,16 @@ export function AddTagToSession(arg1, arg2) {
   return window['go']['main']['App']['AddTagToSession'](arg1, arg2);
 }
 
+export function AssignEventToProject(arg1, arg2, arg3) {
+  return window['go']['main']['App']['AssignEventToProject'](arg1, arg2, arg3);
+}
+
 export function CheckForUpdate() {
   return window['go']['main']['App']['CheckForUpdate']();
+}
+
+export function CreateProject(arg1, arg2, arg3) {
+  return window['go']['main']['App']['CreateProject'](arg1, arg2, arg3);
 }
 
 export function DeleteAFKEvents(arg1) {
@@ -48,6 +56,14 @@ export function DeleteIssueReport(arg1) {
 
 export function DeleteModel(arg1) {
   return window['go']['main']['App']['DeleteModel'](arg1);
+}
+
+export function DeleteProject(arg1) {
+  return window['go']['main']['App']['DeleteProject'](arg1);
+}
+
+export function DeleteProjectPattern(arg1) {
+  return window['go']['main']['App']['DeleteProjectPattern'](arg1);
 }
 
 export function DeleteReport(arg1) {
@@ -242,6 +258,22 @@ export function GetProductivityScore(arg1) {
   return window['go']['main']['App']['GetProductivityScore'](arg1);
 }
 
+export function GetProject(arg1) {
+  return window['go']['main']['App']['GetProject'](arg1);
+}
+
+export function GetProjectPatterns(arg1) {
+  return window['go']['main']['App']['GetProjectPatterns'](arg1);
+}
+
+export function GetProjectStats(arg1) {
+  return window['go']['main']['App']['GetProjectStats'](arg1);
+}
+
+export function GetProjects() {
+  return window['go']['main']['App']['GetProjects']();
+}
+
 export function GetRecentSessions(arg1) {
   return window['go']['main']['App']['GetRecentSessions'](arg1);
 }
@@ -324,6 +356,10 @@ export function GetTopWindows(arg1, arg2) {
 
 export function GetTrackedRepositories() {
   return window['go']['main']['App']['GetTrackedRepositories']();
+}
+
+export function GetUnassignedEventCount() {
+  return window['go']['main']['App']['GetUnassignedEventCount']();
 }
 
 export function GetUpdateStatus() {
@@ -434,6 +470,10 @@ export function StopTracking() {
   return window['go']['main']['App']['StopTracking']();
 }
 
+export function SuggestProject(arg1) {
+  return window['go']['main']['App']['SuggestProject'](arg1);
+}
+
 export function TestIssueWebhook() {
   return window['go']['main']['App']['TestIssueWebhook']();
 }
@@ -460,6 +500,10 @@ export function UpdateFocusEvent(arg1, arg2, arg3, arg4, arg5) {
 
 export function UpdateHierarchicalSummary(arg1, arg2) {
   return window['go']['main']['App']['UpdateHierarchicalSummary'](arg1, arg2);
+}
+
+export function UpdateProject(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['UpdateProject'](arg1, arg2, arg3, arg4);
 }
 
 export function WatchDirectory(arg1) {

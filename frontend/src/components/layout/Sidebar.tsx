@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Clock, PieChart, ClipboardList, Camera, Image, Loader2, Menu, X, Pause, Play, Settings, Bug } from 'lucide-react';
+import { Clock, PieChart, ClipboardList, Camera, Image, Loader2, Menu, X, Pause, Play, Settings, Bug, FolderKanban } from 'lucide-react';
 import logoSrc from '@/assets/logo-minimal.svg';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -14,6 +14,7 @@ const navItems = [
   { to: '/analytics', label: 'Analytics', icon: PieChart },
   { to: '/screenshots', label: 'Screenshots', icon: Image },
   { to: '/reports', label: 'Reports', icon: ClipboardList },
+  { to: '/projects', label: 'Projects', icon: FolderKanban },
 ];
 
 interface SidebarProps {

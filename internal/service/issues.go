@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/getsentry/sentry-go"
 	"traq/internal/storage"
 )
 
@@ -88,12 +89,64 @@ func (s *IssueService) CreateIssueReport(req CreateIssueRequest) (*IssueReport, 
 	}
 	report.ID = id
 
+	// Send to Sentry (both crash and manual reports)
+	go s.sendToSentry(report)
+
 	// Send webhook if enabled and this is a crash report
 	if req.ReportType == "crash" {
 		go s.sendWebhookIfEnabled(report)
 	}
 
 	return s.toServiceReport(report), nil
+}
+
+// sendToSentry sends the issue report to Sentry for centralized tracking
+func (s *IssueService) sendToSentry(report *storage.IssueReport) {
+	// Create Sentry event based on report type
+	if report.ReportType == "crash" && report.ErrorMessage.Valid {
+		// For crash reports, capture as exception
+		sentry.WithScope(func(scope *sentry.Scope) {
+			scope.SetTag("report_type", report.ReportType)
+			scope.SetTag("source", "backend_issue_service")
+			if report.PageRoute.Valid {
+				scope.SetTag("page_route", report.PageRoute.String)
+			}
+			if report.AppVersion.Valid {
+				scope.SetExtra("app_version", report.AppVersion.String)
+			}
+			if report.UserDescription.Valid {
+				scope.SetExtra("user_description", report.UserDescription.String)
+			}
+			if report.StackTrace.Valid {
+				scope.SetExtra("stack_trace", report.StackTrace.String)
+			}
+			scope.SetExtra("report_id", report.ID)
+
+			sentry.CaptureMessage(fmt.Sprintf("[Crash] %s", report.ErrorMessage.String))
+		})
+	} else {
+		// For manual reports, capture as message
+		sentry.WithScope(func(scope *sentry.Scope) {
+			scope.SetTag("report_type", report.ReportType)
+			scope.SetTag("source", "backend_issue_service")
+			if report.PageRoute.Valid {
+				scope.SetTag("page_route", report.PageRoute.String)
+			}
+			if report.AppVersion.Valid {
+				scope.SetExtra("app_version", report.AppVersion.String)
+			}
+			scope.SetExtra("report_id", report.ID)
+
+			message := "Manual issue report"
+			if report.UserDescription.Valid && report.UserDescription.String != "" {
+				message = report.UserDescription.String
+			} else if report.ErrorMessage.Valid && report.ErrorMessage.String != "" {
+				message = report.ErrorMessage.String
+			}
+
+			sentry.CaptureMessage(fmt.Sprintf("[Manual] %s", message))
+		})
+	}
 }
 
 // GetIssueReports returns recent issue reports

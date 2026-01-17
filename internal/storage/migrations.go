@@ -4,7 +4,7 @@ import (
 	"fmt"
 )
 
-const schemaVersion = 8
+const schemaVersion = 9
 
 const schema = `
 -- ============================================================================
@@ -295,6 +295,12 @@ func (s *Store) Migrate() error {
 			return fmt.Errorf("failed to apply migration 8: %w", err)
 		}
 	}
+	if currentVersion < 9 {
+		// Migration v9: Add project assignment support with learning
+		if err := s.applyMigration9(); err != nil {
+			return fmt.Errorf("failed to apply migration 9: %w", err)
+		}
+	}
 
 	// Record schema version
 	if currentVersion == 0 {
@@ -306,7 +312,53 @@ func (s *Store) Migrate() error {
 		return fmt.Errorf("failed to update schema version: %w", err)
 	}
 
+	// Run repair checks for tables that might be missing due to partial migrations
+	s.repairMissingTables()
+
 	return nil
+}
+
+// repairMissingTables creates any tables that might be missing due to partial migration failures.
+// This is a safety net for databases that have the schema version set but are missing tables.
+func (s *Store) repairMissingTables() {
+	// Check and create project_patterns table if missing
+	var count int
+	err := s.db.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='project_patterns'`).Scan(&count)
+	if err == nil && count == 0 {
+		s.db.Exec(`
+			CREATE TABLE IF NOT EXISTS project_patterns (
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+				pattern_type TEXT NOT NULL,
+				pattern_value TEXT NOT NULL,
+				match_type TEXT NOT NULL DEFAULT 'contains',
+				weight REAL DEFAULT 1.0,
+				hit_count INTEGER DEFAULT 1,
+				last_used_at INTEGER,
+				created_at INTEGER DEFAULT (strftime('%s', 'now')),
+				UNIQUE(project_id, pattern_type, pattern_value, match_type)
+			)
+		`)
+		s.db.Exec(`CREATE INDEX IF NOT EXISTS idx_project_patterns_lookup ON project_patterns(pattern_type, pattern_value)`)
+		s.db.Exec(`CREATE INDEX IF NOT EXISTS idx_project_patterns_project ON project_patterns(project_id)`)
+	}
+
+	// Check and create assignment_examples table if missing
+	err = s.db.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='assignment_examples'`).Scan(&count)
+	if err == nil && count == 0 {
+		s.db.Exec(`
+			CREATE TABLE IF NOT EXISTS assignment_examples (
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+				event_type TEXT NOT NULL,
+				event_id INTEGER NOT NULL,
+				context_json TEXT NOT NULL,
+				created_at INTEGER DEFAULT (strftime('%s', 'now'))
+			)
+		`)
+		s.db.Exec(`CREATE INDEX IF NOT EXISTS idx_assignment_examples_project ON assignment_examples(project_id)`)
+		s.db.Exec(`CREATE INDEX IF NOT EXISTS idx_assignment_examples_created ON assignment_examples(created_at)`)
+	}
 }
 
 // applyMigration2 adds window_class column to screenshots table.
@@ -567,6 +619,82 @@ func (s *Store) applyMigration8() error {
 		// Column might already exist if schema was recreated
 		return nil
 	}
+
+	return nil
+}
+
+// applyMigration9 adds project assignment support with pattern learning.
+// - Adds project_id, project_confidence, project_source columns to event tables
+// - Creates project_patterns table for learned matching rules
+// - Creates assignment_examples table for few-shot AI learning
+// - Adds color and description columns to projects table
+func (s *Store) applyMigration9() error {
+	// 1. Add color and description columns to projects table
+	s.db.Exec(`ALTER TABLE projects ADD COLUMN color TEXT DEFAULT '#6366f1'`)
+	s.db.Exec(`ALTER TABLE projects ADD COLUMN description TEXT`)
+
+	// 2. Add project assignment columns to screenshots
+	s.db.Exec(`ALTER TABLE screenshots ADD COLUMN project_id INTEGER REFERENCES projects(id)`)
+	s.db.Exec(`ALTER TABLE screenshots ADD COLUMN project_confidence REAL DEFAULT 0.0`)
+	s.db.Exec(`ALTER TABLE screenshots ADD COLUMN project_source TEXT DEFAULT 'unassigned'`)
+
+	// 3. Add project assignment columns to window_focus_events
+	s.db.Exec(`ALTER TABLE window_focus_events ADD COLUMN project_id INTEGER REFERENCES projects(id)`)
+	s.db.Exec(`ALTER TABLE window_focus_events ADD COLUMN project_confidence REAL DEFAULT 0.0`)
+	s.db.Exec(`ALTER TABLE window_focus_events ADD COLUMN project_source TEXT DEFAULT 'unassigned'`)
+
+	// 4. Add project assignment columns to git_commits
+	s.db.Exec(`ALTER TABLE git_commits ADD COLUMN project_id INTEGER REFERENCES projects(id)`)
+	s.db.Exec(`ALTER TABLE git_commits ADD COLUMN project_confidence REAL DEFAULT 0.0`)
+	s.db.Exec(`ALTER TABLE git_commits ADD COLUMN project_source TEXT DEFAULT 'unassigned'`)
+
+	// 5. Create project_patterns table for learned matching rules
+	// Use separate statements because SQLite/Go doesn't handle multi-statement well
+	_, err := s.db.Exec(`
+		CREATE TABLE IF NOT EXISTS project_patterns (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+			pattern_type TEXT NOT NULL,
+			pattern_value TEXT NOT NULL,
+			match_type TEXT NOT NULL DEFAULT 'contains',
+			weight REAL DEFAULT 1.0,
+			hit_count INTEGER DEFAULT 1,
+			last_used_at INTEGER,
+			created_at INTEGER DEFAULT (strftime('%s', 'now')),
+			UNIQUE(project_id, pattern_type, pattern_value, match_type)
+		)
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to create project_patterns table: %w", err)
+	}
+
+	// Create indexes separately
+	s.db.Exec(`CREATE INDEX IF NOT EXISTS idx_project_patterns_lookup ON project_patterns(pattern_type, pattern_value)`)
+	s.db.Exec(`CREATE INDEX IF NOT EXISTS idx_project_patterns_project ON project_patterns(project_id)`)
+
+	// 6. Create assignment_examples table for few-shot AI learning
+	_, err = s.db.Exec(`
+		CREATE TABLE IF NOT EXISTS assignment_examples (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+			event_type TEXT NOT NULL,
+			event_id INTEGER NOT NULL,
+			context_json TEXT NOT NULL,
+			created_at INTEGER DEFAULT (strftime('%s', 'now'))
+		)
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to create assignment_examples table: %w", err)
+	}
+
+	// Create indexes separately
+	s.db.Exec(`CREATE INDEX IF NOT EXISTS idx_assignment_examples_project ON assignment_examples(project_id)`)
+	s.db.Exec(`CREATE INDEX IF NOT EXISTS idx_assignment_examples_created ON assignment_examples(created_at)`)
+
+	// 7. Create indexes for project_id lookups on event tables
+	s.db.Exec(`CREATE INDEX IF NOT EXISTS idx_screenshots_project ON screenshots(project_id)`)
+	s.db.Exec(`CREATE INDEX IF NOT EXISTS idx_focus_project ON window_focus_events(project_id)`)
+	s.db.Exec(`CREATE INDEX IF NOT EXISTS idx_git_project ON git_commits(project_id)`)
 
 	return nil
 }

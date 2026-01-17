@@ -1014,3 +1014,168 @@ export function useDeleteAFKEvents() {
     },
   });
 }
+
+// ============================================================================
+// Project Hooks
+// ============================================================================
+
+/**
+ * Get all projects
+ */
+export function useProjects() {
+  return useQuery({
+    queryKey: ['projects'],
+    queryFn: () => api.projects.getAll(),
+    staleTime: 1000 * 60 * 5, // 5 minutes
+  });
+}
+
+/**
+ * Get a single project by ID
+ */
+export function useProject(id: number) {
+  return useQuery({
+    queryKey: ['project', id],
+    queryFn: () => api.projects.get(id),
+    enabled: id > 0,
+  });
+}
+
+/**
+ * Get project stats
+ */
+export function useProjectStats(id: number) {
+  return useQuery({
+    queryKey: ['project', id, 'stats'],
+    queryFn: () => api.projects.getStats(id),
+    enabled: id > 0,
+  });
+}
+
+/**
+ * Get learned patterns for a project
+ */
+export function useProjectPatterns(id: number) {
+  return useQuery({
+    queryKey: ['project', id, 'patterns'],
+    queryFn: () => api.projects.getPatterns(id),
+    enabled: id > 0,
+  });
+}
+
+/**
+ * Create a new project
+ */
+export function useCreateProject() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ name, color, description }: { name: string; color: string; description: string }) =>
+      api.projects.create(name, color, description),
+    onSuccess: (project) => {
+      queryClient.invalidateQueries({ queryKey: ['projects'] });
+      toast.success(`Project "${project?.name}" created`);
+    },
+    onError: (error: unknown) => {
+      console.error('Create project failed:', error);
+      const message = error instanceof Error ? error.message : String(error);
+      toast.error(`Failed to create project: ${message}`);
+    },
+  });
+}
+
+/**
+ * Update a project
+ */
+export function useUpdateProject() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, name, color, description }: { id: number; name: string; color: string; description: string }) =>
+      api.projects.update(id, name, color, description),
+    onSuccess: (_, { id, name }) => {
+      queryClient.invalidateQueries({ queryKey: ['projects'] });
+      queryClient.invalidateQueries({ queryKey: ['project', id] });
+      toast.success(`Project "${name}" updated`);
+    },
+    onError: (error: unknown) => {
+      console.error('Update project failed:', error);
+      const message = error instanceof Error ? error.message : String(error);
+      toast.error(`Failed to update project: ${message}`);
+    },
+  });
+}
+
+/**
+ * Delete a project
+ */
+export function useDeleteProject() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: number) => api.projects.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['projects'] });
+      queryClient.invalidateQueries({ queryKey: ['timeline'] });
+      toast.success('Project deleted');
+    },
+    onError: (error: unknown) => {
+      console.error('Delete project failed:', error);
+      const message = error instanceof Error ? error.message : String(error);
+      toast.error(`Failed to delete project: ${message}`);
+    },
+  });
+}
+
+/**
+ * Delete a learned pattern
+ */
+export function useDeleteProjectPattern() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (patternId: number) => api.projects.deletePattern(patternId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['project'] });
+      toast.success('Pattern deleted');
+    },
+    onError: (error: unknown) => {
+      console.error('Delete pattern failed:', error);
+      const message = error instanceof Error ? error.message : String(error);
+      toast.error(`Failed to delete pattern: ${message}`);
+    },
+  });
+}
+
+/**
+ * Assign an event to a project
+ */
+export function useAssignEventToProject() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ eventType, eventId, projectId }: { eventType: string; eventId: number; projectId: number }) =>
+      api.projects.assignEvent(eventType, eventId, projectId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['timeline'] });
+      queryClient.invalidateQueries({ queryKey: ['project'] });
+      toast.success('Event assigned to project');
+    },
+    onError: (error: unknown) => {
+      console.error('Assign event failed:', error);
+      const message = error instanceof Error ? error.message : String(error);
+      toast.error(`Failed to assign event: ${message}`);
+    },
+  });
+}
+
+/**
+ * Get count of unassigned events
+ */
+export function useUnassignedEventCount() {
+  return useQuery({
+    queryKey: ['unassigned-events-count'],
+    queryFn: () => api.projects.getUnassignedCount(),
+    staleTime: 1000 * 60, // 1 minute
+  });
+}

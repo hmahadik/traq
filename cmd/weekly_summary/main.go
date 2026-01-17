@@ -32,7 +32,8 @@ func main() {
 	// Initialize services
 	analytics := service.NewAnalyticsService(store)
 	timeline := service.NewTimelineService(store)
-	reports := service.NewReportsService(store, timeline, analytics)
+	projects := service.NewProjectAssignmentService(store)
+	reports := service.NewReportsService(store, timeline, analytics, projects)
 
 	// Generate weekly summary for Jan 6-12, 2026
 	startDate := "2026-01-06"
