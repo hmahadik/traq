@@ -120,7 +120,8 @@ export function useTimelineGridData(date: string) {
 ├── api/            # API client + React Query hooks
 ├── components/
 │   ├── common/     # Shared components (ErrorBoundary, ReportIssueDialog)
-│   ├── layout/     # AppLayout, Sidebar, SettingsDrawer
+│   ├── layout/     # AppLayout, Sidebar, UnifiedHeader
+│   ├── settings/   # Settings page section components
 │   └── timeline/   # Timeline v3 components
 ├── pages/          # Route pages
 └── types/          # TypeScript types
@@ -229,7 +230,7 @@ npx playwright test
 | Report Generation | `reports.spec.ts` | `reports.page.ts` |
 | Screenshot Browser | `screenshots.spec.ts` | `screenshots.page.ts` |
 | Issue Reporting | `issue-reporting.spec.ts` | `issue-dialog.ts` |
-| Settings | `settings.spec.ts` | `settings-drawer.ts` |
+| Settings | *(needs rewrite for new `/settings` page)* | - |
 
 ### Running Tests
 
@@ -278,7 +279,7 @@ npx playwright test --headed
 | DB migrations | `/internal/storage/migrations.go` |
 | API client | `/frontend/src/api/client.ts` |
 | React Query hooks | `/frontend/src/api/hooks.ts` |
-| Settings UI | `/frontend/src/components/layout/SettingsDrawer.tsx` |
+| Settings UI | `/frontend/src/pages/SettingsPage.tsx`, `/frontend/src/components/settings/` |
 | Timeline UI | `/frontend/src/components/timeline/` |
 | UX backlog | `/UI_BACKLOG.md` |
 | Full spec | `/TRAQ_SPEC.md` |

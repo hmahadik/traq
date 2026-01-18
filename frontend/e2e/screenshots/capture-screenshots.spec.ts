@@ -16,7 +16,6 @@
 
 import { test } from '@playwright/test';
 import { BasePage } from '../pages/base.page';
-import { SettingsDrawer } from '../pages/settings-drawer';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -50,9 +49,8 @@ const screenshots = [
   },
   {
     name: 'settings',
-    path: `/${MOCK_PARAM}#/timeline`,
-    action: 'openSettings',
-    waitFor: '[role="dialog"]',
+    path: `/${MOCK_PARAM}#/settings`,
+    waitFor: 'main',
     waitForTimeout: 1000,
   },
 ] as const;
@@ -99,11 +97,9 @@ test.describe('Documentation Screenshots', () => {
   test.describe.configure({ mode: 'serial' });
 
   let basePage: BasePage;
-  let settingsDrawer: SettingsDrawer;
 
   test.beforeEach(async ({ page }) => {
     basePage = new BasePage(page);
-    settingsDrawer = new SettingsDrawer(page);
   });
 
   for (const theme of ['light', 'dark'] as Theme[]) {
@@ -125,9 +121,7 @@ test.describe('Documentation Screenshots', () => {
           await setTheme(page, theme);
 
           // Handle special actions
-          if (shot.action === 'openSettings') {
-            await basePage.openSettings();
-          } else if (shot.action === 'generateReport') {
+          if (shot.action === 'generateReport') {
             // Click the "Generate Report" button
             const generateButton = page.getByRole('button', { name: /Generate Report/i });
             await generateButton.waitFor({ state: 'visible', timeout: 5000 });
@@ -171,11 +165,6 @@ test.describe('Documentation Screenshots', () => {
 
           // Capture screenshot
           await captureScreenshot(page, shot.name, theme);
-
-          // Close settings drawer if open before next screenshot
-          if (shot.action === 'openSettings') {
-            await settingsDrawer.close();
-          }
         }
       });
 
