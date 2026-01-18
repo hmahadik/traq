@@ -1,15 +1,12 @@
-import { useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import { Toaster } from 'sonner';
 import { useTheme } from '../../hooks/useTheme';
 import { Sidebar } from './Sidebar';
-import { SettingsDrawer } from './SettingsDrawer';
 import { DateProvider } from '@/contexts';
 import { GlobalErrorHandler } from '@/components/common/GlobalErrorHandler';
 
 export function AppLayout() {
   useTheme();
-  const [settingsOpen, setSettingsOpen] = useState(false);
 
   return (
     <DateProvider>
@@ -22,7 +19,6 @@ export function AppLayout() {
               <Outlet />
             </div>
           </main>
-          <SettingsDrawer open={settingsOpen} onOpenChange={setSettingsOpen} />
           <Toaster position="bottom-right" />
         </div>
       </GlobalErrorHandler>
