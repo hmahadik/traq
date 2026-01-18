@@ -25,7 +25,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { useUpdateActivity } from '@/api/hooks';
+import { useUpdateActivity, useProjects, useAssignEventToProject } from '@/api/hooks';
 import type { ActivityBlock } from '@/types/timeline';
 
 interface ActivityEditDialogProps {
@@ -49,6 +49,8 @@ export function ActivityEditDialog({
   knownAppNames = [],
 }: ActivityEditDialogProps) {
   const updateActivity = useUpdateActivity();
+  const { data: projects } = useProjects();
+  const assignEventToProject = useAssignEventToProject();
 
   // Form state
   const [appName, setAppName] = useState('');
@@ -56,6 +58,7 @@ export function ActivityEditDialog({
   const [category, setCategory] = useState('other');
   const [startTime, setStartTime] = useState('');
   const [endTime, setEndTime] = useState('');
+  const [selectedProjectId, setSelectedProjectId] = useState<string>('_none');
 
   // Initialize form when activity changes
   useEffect(() => {
@@ -66,6 +69,7 @@ export function ActivityEditDialog({
       // Format timestamps as HH:mm for time inputs
       setStartTime(format(new Date(activity.startTime * 1000), 'HH:mm'));
       setEndTime(format(new Date(activity.endTime * 1000), 'HH:mm'));
+      setSelectedProjectId('_none'); // Reset project selection
     }
   }, [activity]);
 
@@ -130,6 +134,16 @@ export function ActivityEditDialog({
         startTime: startTimestamp,
         endTime: endTimestamp,
       });
+
+      // Assign to project if selected (not '_none')
+      if (selectedProjectId && selectedProjectId !== '_none') {
+        await assignEventToProject.mutateAsync({
+          eventType: 'activity',
+          eventId: activity.id,
+          projectId: parseInt(selectedProjectId, 10),
+        });
+      }
+
       onOpenChange(false);
     } catch (error) {
       // Error is handled by the mutation's onError
@@ -199,6 +213,35 @@ export function ActivityEditDialog({
             </Select>
           </div>
 
+          {/* Project */}
+          {projects && projects.length > 0 && (
+            <div className="grid gap-2">
+              <Label htmlFor="project">Assign to Project</Label>
+              <Select value={selectedProjectId} onValueChange={setSelectedProjectId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="No project" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="_none">No project</SelectItem>
+                  {projects.map((project) => (
+                    <SelectItem key={project.id} value={String(project.id)}>
+                      <div className="flex items-center gap-2">
+                        <div
+                          className="w-2 h-2 rounded-full"
+                          style={{ backgroundColor: project.color }}
+                        />
+                        {project.name}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Assigning teaches the system to match similar activities
+              </p>
+            </div>
+          )}
+
           {/* Time Range */}
           <div className="grid grid-cols-2 gap-4">
             <div className="grid gap-2">
@@ -235,9 +278,9 @@ export function ActivityEditDialog({
           </Button>
           <Button
             onClick={handleSave}
-            disabled={!isValid || updateActivity.isPending}
+            disabled={!isValid || updateActivity.isPending || assignEventToProject.isPending}
           >
-            {updateActivity.isPending ? 'Saving...' : 'Save'}
+            {updateActivity.isPending || assignEventToProject.isPending ? 'Saving...' : 'Save'}
           </Button>
         </DialogFooter>
       </DialogContent>

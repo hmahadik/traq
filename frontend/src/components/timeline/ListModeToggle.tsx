@@ -1,7 +1,7 @@
-import { Grid3x3, List, Columns2 } from 'lucide-react';
+import { Grid3x3, List, Columns2, Circle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-export type DisplayMode = 'grid' | 'list' | 'split';
+export type DisplayMode = 'grid' | 'list' | 'split' | 'drops';
 
 interface ListModeToggleProps {
   displayMode: DisplayMode;
@@ -46,6 +46,18 @@ export function ListModeToggle({ displayMode, onDisplayModeChange }: ListModeTog
       >
         <List className="h-3.5 w-3.5" />
         List
+      </button>
+      <button
+        className={cn(
+          'px-3 py-1 text-sm font-medium rounded-md transition-colors inline-flex items-center gap-1.5',
+          displayMode === 'drops'
+            ? 'bg-background text-foreground shadow-sm'
+            : 'text-muted-foreground hover:text-foreground'
+        )}
+        onClick={() => onDisplayModeChange('drops')}
+      >
+        <Circle className="h-3.5 w-3.5" />
+        Drops
       </button>
     </div>
   );

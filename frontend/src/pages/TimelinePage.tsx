@@ -8,6 +8,7 @@ import {
   useCalendarHeatmap,
   useGenerateSummary,
   useWeekTimelineData,
+  useScreenshotsForDate,
   useDeleteActivities,
   useDeleteBrowserVisits,
   useDeleteGitCommits,
@@ -18,6 +19,7 @@ import {
 import { TimelineGridView } from '@/components/timeline/TimelineGridView';
 import { TimelineListView, EventKey, parseEventKey, makeEventKey } from '@/components/timeline/TimelineListView';
 import { SplitTimelineView } from '@/components/timeline/SplitTimelineView';
+import { EventDropsTimeline, EventDot } from '@/components/timeline/eventDrops';
 import { ListModeToggle, DisplayMode } from '@/components/timeline/ListModeToggle';
 import { TimelineWeekView, TimelineWeekViewSkeleton } from '@/components/timeline/TimelineWeekView';
 import { DailySummaryCard } from '@/components/timeline/DailySummaryCard';
@@ -128,11 +130,11 @@ export function TimelinePage() {
     return 'day';
   });
 
-  // Display mode state for day view (grid vs list vs split)
+  // Display mode state for day view (grid vs list vs split vs drops)
   const [displayMode, setDisplayMode] = useState<DisplayMode>(() => {
     try {
       const stored = localStorage.getItem(DISPLAY_MODE_STORAGE_KEY);
-      if (stored === 'grid' || stored === 'list' || stored === 'split') return stored as DisplayMode;
+      if (stored === 'grid' || stored === 'list' || stored === 'split' || stored === 'drops') return stored as DisplayMode;
     } catch (e) {
       console.error('Failed to load display mode from localStorage:', e);
     }
@@ -235,6 +237,10 @@ export function TimelinePage() {
     selectedDate.getFullYear(),
     selectedDate.getMonth() + 1
   );
+  // Fetch screenshots for EventDrops view
+  const { data: screenshotsData } = useScreenshotsForDate(dateStr, {
+    enabled: displayMode === 'drops',
+  });
   const generateSummary = useGenerateSummary();
 
   const sessionsWithoutSummaries = useMemo(() => {
@@ -273,6 +279,81 @@ export function TimelinePage() {
   const handleSessionClick = useCallback((sessionId: number) => {
     setSelectedSessionId(sessionId);
     setSessionDrawerOpen(true);
+  }, []);
+
+  // Handle EventDrops event delete
+  const handleEventDropDelete = useCallback((event: EventDot) => {
+    const id = event.originalId;
+    const label = event.label.length > 30 ? event.label.slice(0, 30) + '...' : event.label;
+
+    const onSuccess = () => {
+      toast.success(`Deleted: ${label}`);
+    };
+    const onError = () => {
+      toast.error(`Failed to delete: ${label}`);
+    };
+
+    switch (event.type) {
+      case 'activity':
+        deleteActivities.mutate([id], { onSuccess, onError });
+        break;
+      case 'browser':
+        deleteBrowserVisits.mutate([id], { onSuccess, onError });
+        break;
+      case 'git':
+        deleteGitCommits.mutate([id], { onSuccess, onError });
+        break;
+      case 'shell':
+        deleteShellCommands.mutate([id], { onSuccess, onError });
+        break;
+      case 'file':
+        deleteFileEvents.mutate([id], { onSuccess, onError });
+        break;
+      case 'afk':
+        deleteAFKEvents.mutate([id], { onSuccess, onError });
+        break;
+      case 'screenshot':
+        // Screenshots don't have a delete mutation yet
+        toast.info('Screenshot deletion not yet implemented');
+        break;
+    }
+  }, [deleteActivities, deleteBrowserVisits, deleteGitCommits, deleteShellCommands, deleteFileEvents, deleteAFKEvents]);
+
+  // Handle EventDrops event edit
+  const handleEventDropEdit = useCallback((event: EventDot) => {
+    // Only activities can be edited for now
+    if (event.type === 'activity' && gridData) {
+      // Find the activity in the grid data
+      for (const hourActivities of Object.values(gridData.hourlyGrid)) {
+        for (const appActivities of Object.values(hourActivities)) {
+          const activity = appActivities.find((a) => a.id === event.originalId);
+          if (activity) {
+            setEditingActivity(activity);
+            setEditDialogOpen(true);
+            return;
+          }
+        }
+      }
+      toast.error('Could not find activity to edit');
+    } else {
+      toast.info(`Editing ${event.type} events not yet supported`);
+    }
+  }, [gridData]);
+
+  // Handle EventDrops view screenshot
+  const handleEventDropViewScreenshot = useCallback((event: EventDot) => {
+    if (event.type === 'screenshot') {
+      // Navigate to screenshots page with this screenshot selected
+      // For now, just show a toast - full implementation would open a viewer
+      const meta = event.metadata as { filePath?: string };
+      if (meta.filePath) {
+        // Could open a modal here, for now toast with path
+        toast.info(`Screenshot: ${meta.filePath.split('/').pop()}`);
+      }
+    } else if (event.type === 'activity') {
+      // For activities, would need to find associated screenshot by timestamp
+      toast.info('Screenshot viewing for activities coming soon');
+    }
   }, []);
 
   // Handle activity selection (for grid view - simple click)
@@ -657,6 +738,16 @@ export function TimelinePage() {
                 onActivityDoubleClick={handleActivityDoubleClick}
                 selectedEventKeys={selectedEventKeys}
                 onEventSelect={handleEventSelect}
+              />
+            ) : displayMode === 'drops' ? (
+              /* EventDrops view - D3-based horizontal timeline */
+              <EventDropsTimeline
+                data={gridData}
+                filters={filters}
+                screenshots={screenshotsData}
+                onEventDelete={handleEventDropDelete}
+                onEventEdit={handleEventDropEdit}
+                onViewScreenshot={handleEventDropViewScreenshot}
               />
             ) : (
               /* Split view - Grid and List side by side with synchronized scrolling */
