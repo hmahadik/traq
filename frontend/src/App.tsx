@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { createHashRouter, Navigate, RouterProvider } from 'react-router-dom';
+import { createHashRouter, RouterProvider } from 'react-router-dom';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { RouteErrorBoundary } from '@/components/common';
 import {
