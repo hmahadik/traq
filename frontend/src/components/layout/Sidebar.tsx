@@ -17,11 +17,7 @@ const navItems = [
   { to: '/projects', label: 'Projects', icon: FolderKanban },
 ];
 
-interface SidebarProps {
-  onSettingsClick?: () => void;
-}
-
-export function Sidebar({ onSettingsClick }: SidebarProps) {
+export function Sidebar() {
   const location = useLocation();
   const [isCapturing, setIsCapturing] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
@@ -194,21 +190,22 @@ export function Sidebar({ onSettingsClick }: SidebarProps) {
           </Tooltip>
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                className="w-full flex flex-col items-center gap-1 h-auto py-2 transition-colors duration-75"
-                onClick={() => {
-                  onSettingsClick?.();
-                  setMobileMenuOpen(false);
-                }}
-                aria-label="Settings"
+              <Link
+                to="/settings"
+                className={cn(
+                  'w-full flex flex-col items-center gap-1 h-auto py-2 transition-colors duration-75',
+                  location.pathname.startsWith('/settings')
+                    ? 'text-primary'
+                    : 'text-muted-foreground hover:text-foreground'
+                )}
+                onClick={() => setMobileMenuOpen(false)}
               >
                 <Settings className="h-5 w-5" />
                 <span className="text-xs font-medium">Settings</span>
-              </Button>
+              </Link>
             </TooltipTrigger>
             <TooltipContent side="right">
-              <p>Open settings</p>
+              <p>Settings</p>
             </TooltipContent>
           </Tooltip>
         </TooltipProvider>
