@@ -1,13 +1,29 @@
-import { useNavigate } from 'react-router-dom';
-import { useEffect } from 'react';
+import { Navigate, Route, Routes } from 'react-router-dom';
+import { SettingsSidebar } from '@/components/settings/SettingsSidebar';
+import {
+  CaptureSettings,
+  DataSourcesSettings,
+  AISettings,
+  CategoriesSettings,
+  GeneralSettings,
+} from '@/components/settings/sections';
 
-// Settings is now a drawer, redirect to timeline
 export function SettingsPage() {
-  const navigate = useNavigate();
-
-  useEffect(() => {
-    navigate('/');
-  }, [navigate]);
-
-  return null;
+  return (
+    <div className="h-full flex -mx-4 sm:-mx-6 -my-6">
+      <SettingsSidebar />
+      <div className="flex-1 overflow-y-auto">
+        <div className="max-w-2xl p-6">
+          <Routes>
+            <Route index element={<Navigate to="capture" replace />} />
+            <Route path="capture" element={<CaptureSettings />} />
+            <Route path="data-sources" element={<DataSourcesSettings />} />
+            <Route path="ai" element={<AISettings />} />
+            <Route path="categories" element={<CategoriesSettings />} />
+            <Route path="general" element={<GeneralSettings />} />
+          </Routes>
+        </div>
+      </div>
+    </div>
+  );
 }
