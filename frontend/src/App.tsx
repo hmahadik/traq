@@ -35,7 +35,7 @@ const router = createHashRouter([
       { path: 'reports', element: <ReportsPage /> },
       { path: 'screenshots', element: <ScreenshotsPage /> },
       { path: 'day/:date', element: <DayPage /> },
-      { path: 'settings', element: <SettingsPage /> },
+      { path: 'settings/*', element: <SettingsPage /> },
       { path: 'session/:id', element: <SessionDetailPage /> },
       { path: 'projects', element: <ProjectsPage /> },
     ],
