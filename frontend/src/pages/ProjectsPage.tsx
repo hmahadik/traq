@@ -307,8 +307,10 @@ export function ProjectsPage() {
   };
 
   const handleDelete = () => {
-    if (!deletingProject) return;
-    deleteProject.mutate(deletingProject.id, {
+    // Capture ID before dialog close can clear deletingProject state
+    const projectId = deletingProject?.id;
+    if (!projectId) return;
+    deleteProject.mutate(projectId, {
       onSuccess: () => setDeletingProject(null),
     });
   };
