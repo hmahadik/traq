@@ -37,10 +37,16 @@ export function Screenshot({
     full: 'w-full max-w-[1920px]',
   };
 
+  // Use actual monitor dimensions for aspect ratio, fallback to 16:9
+  const aspectRatio = screenshot.monitorWidth && screenshot.monitorHeight
+    ? screenshot.monitorWidth / screenshot.monitorHeight
+    : 16 / 9;
+
   if (isLoading) {
     return (
       <Skeleton
-        className={cn('aspect-video rounded', sizeClasses[size], className)}
+        className={cn('rounded', sizeClasses[size], className)}
+        style={{ aspectRatio }}
       />
     );
   }
@@ -48,11 +54,12 @@ export function Screenshot({
   return (
     <div
       className={cn(
-        'relative aspect-video rounded overflow-hidden bg-muted cursor-pointer group',
+        'relative rounded overflow-hidden bg-muted cursor-pointer group',
         sizeClasses[size],
         onClick && 'hover:ring-2 ring-primary transition-all',
         className
       )}
+      style={{ aspectRatio }}
       onClick={onClick}
     >
       <img
