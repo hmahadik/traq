@@ -188,6 +188,10 @@ export namespace service {
 	    minuteOffset: number;
 	    pixelPosition: number;
 	    pixelHeight: number;
+	    projectId?: number;
+	    projectColor?: string;
+	    projectSource?: string;
+	    projectConfidence?: number;
 	
 	    static createFrom(source: any = {}) {
 	        return new ActivityBlock(source);
@@ -206,6 +210,10 @@ export namespace service {
 	        this.minuteOffset = source["minuteOffset"];
 	        this.pixelPosition = source["pixelPosition"];
 	        this.pixelHeight = source["pixelHeight"];
+	        this.projectId = source["projectId"];
+	        this.projectColor = source["projectColor"];
+	        this.projectSource = source["projectSource"];
+	        this.projectConfidence = source["projectConfidence"];
 	    }
 	}
 	export class ActivityCluster {

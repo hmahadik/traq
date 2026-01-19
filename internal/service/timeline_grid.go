@@ -53,17 +53,21 @@ type TopApp struct {
 
 // ActivityBlock represents a single focus event block in the grid.
 type ActivityBlock struct {
-	ID              int64   `json:"id"`
-	WindowTitle     string  `json:"windowTitle"`
-	AppName         string  `json:"appName"`
-	StartTime       int64   `json:"startTime"`
-	EndTime         int64   `json:"endTime"`
-	DurationSeconds float64 `json:"durationSeconds"`
-	Category        string  `json:"category"`
-	HourOffset      int     `json:"hourOffset"`      // Hour of day (0-23)
-	MinuteOffset    int     `json:"minuteOffset"`    // Minute within hour (0-59)
-	PixelPosition   float64 `json:"pixelPosition"`   // Vertical position in pixels (0-60)
-	PixelHeight     float64 `json:"pixelHeight"`     // Height in pixels
+	ID                int64   `json:"id"`
+	WindowTitle       string  `json:"windowTitle"`
+	AppName           string  `json:"appName"`
+	StartTime         int64   `json:"startTime"`
+	EndTime           int64   `json:"endTime"`
+	DurationSeconds   float64 `json:"durationSeconds"`
+	Category          string  `json:"category"`
+	HourOffset        int     `json:"hourOffset"`                       // Hour of day (0-23)
+	MinuteOffset      int     `json:"minuteOffset"`                     // Minute within hour (0-59)
+	PixelPosition     float64 `json:"pixelPosition"`                    // Vertical position in pixels (0-60)
+	PixelHeight       float64 `json:"pixelHeight"`                      // Height in pixels
+	ProjectID         int64   `json:"projectId,omitempty"`              // Assigned project ID
+	ProjectColor      string  `json:"projectColor,omitempty"`           // Project color for visual distinction
+	ProjectSource     string  `json:"projectSource,omitempty"`          // 'unassigned', 'user', 'rule', 'ai'
+	ProjectConfidence float64 `json:"projectConfidence,omitempty"`      // Confidence of project assignment (0-1)
 }
 
 // SessionSummaryWithPosition extends SessionSummary with positioning info for the grid.
@@ -251,6 +255,17 @@ func (s *TimelineService) GetTimelineGridData(date string) (*TimelineGridData, e
 		return nil, fmt.Errorf("failed to fetch app categories: %w", err)
 	}
 
+	// Fetch all projects and build a map for O(1) color lookup
+	projects, err := s.store.GetProjects()
+	if err != nil {
+		// Non-fatal: continue without project colors
+		projects = []storage.Project{}
+	}
+	projectMap := make(map[int64]storage.Project)
+	for _, proj := range projects {
+		projectMap[proj.ID] = proj
+	}
+
 	// Build hourly grid: hour -> app -> blocks
 	// IMPORTANT: Events may span midnight or hour boundaries, so we clip them
 	hourlyGrid := make(map[int]map[string][]ActivityBlock)
@@ -303,6 +318,20 @@ func (s *TimelineService) GetTimelineGridData(date string) (*TimelineGridData, e
 			MinuteOffset:    minute,
 			PixelPosition:   pixelPosition,
 			PixelHeight:     pixelHeight,
+		}
+
+		// Populate project fields if event has a project assignment
+		if event.ProjectID.Valid && event.ProjectID.Int64 > 0 {
+			block.ProjectID = event.ProjectID.Int64
+			if proj, ok := projectMap[event.ProjectID.Int64]; ok {
+				block.ProjectColor = proj.Color
+			}
+			if event.ProjectSource.Valid {
+				block.ProjectSource = event.ProjectSource.String
+			}
+			if event.ProjectConfidence.Valid {
+				block.ProjectConfidence = event.ProjectConfidence.Float64
+			}
 		}
 
 		if hourlyGrid[hour] == nil {
