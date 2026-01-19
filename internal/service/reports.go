@@ -589,8 +589,8 @@ func (s *ReportsService) detectProjectFromLearnedPatterns(ctx *storage.Assignmen
 	return ""
 }
 
-// detectProjectFromWindowTitle extracts project name from various window title patterns.
-func (s *ReportsService) detectProjectFromWindowTitle(windowTitle, appName string) string {
+// DetectProjectFromWindowTitle extracts project name from various window title patterns.
+func (s *ReportsService) DetectProjectFromWindowTitle(windowTitle, appName string) string {
 	// First, try learned patterns
 	if projectName := s.detectProjectFromLearnedPatterns(&storage.AssignmentContext{
 		AppName:     appName,
@@ -662,8 +662,8 @@ func (s *ReportsService) detectProjectFromWindowTitle(windowTitle, appName strin
 	return ""
 }
 
-// detectProjectFromGitRepo extracts project name from git repository path.
-func (s *ReportsService) detectProjectFromGitRepo(repoPath string) string {
+// DetectProjectFromGitRepo extracts project name from git repository path.
+func (s *ReportsService) DetectProjectFromGitRepo(repoPath string) string {
 	// First, try learned patterns
 	if projectName := s.detectProjectFromLearnedPatterns(&storage.AssignmentContext{
 		GitRepo: repoPath,
@@ -725,7 +725,7 @@ func (s *ReportsService) groupCommitsByRepo(commits []*storage.GitCommit) []*Com
 		}
 
 		// Extract repo name from path
-		repoName := s.detectProjectFromGitRepo(repoPath)
+		repoName := s.DetectProjectFromGitRepo(repoPath)
 
 		if existing, ok := repoMap[repoID]; ok {
 			existing.Commits = append(existing.Commits, commit)
@@ -788,7 +788,7 @@ func (s *ReportsService) groupActivitiesByProject(ctx *EnhancedReportContext) []
 			}
 			repoPathCache[commit.RepositoryID] = repoPath
 		}
-		projectName := s.detectProjectFromGitRepo(repoPath)
+		projectName := s.DetectProjectFromGitRepo(repoPath)
 		project := getProject(projectName)
 		project.Commits = append(project.Commits, commit)
 		project.CommitCount++
@@ -816,7 +816,7 @@ func (s *ReportsService) groupActivitiesByProject(ctx *EnhancedReportContext) []
 	// Group focus events by project
 	for _, app := range ctx.AppUsage {
 		for _, window := range app.Windows {
-			projectName := s.detectProjectFromWindowTitle(window.WindowTitle, app.AppName)
+			projectName := s.DetectProjectFromWindowTitle(window.WindowTitle, app.AppName)
 			if projectName != "" {
 				project := getProject(projectName)
 				project.DurationSeconds += window.DurationSeconds
@@ -2728,7 +2728,7 @@ func (s *ReportsService) buildProjectSummaries(focusEvents []*storage.WindowFocu
 			repoPathCache[commit.RepositoryID] = repoPath
 		}
 
-		projectName := s.detectProjectFromGitRepo(repoPath)
+		projectName := s.DetectProjectFromGitRepo(repoPath)
 		project := getProject(projectName)
 		project.CommitCount++
 
@@ -2741,7 +2741,7 @@ func (s *ReportsService) buildProjectSummaries(focusEvents []*storage.WindowFocu
 
 	// From focus events - time tracking
 	for _, evt := range focusEvents {
-		projectName := s.detectProjectFromWindowTitle(evt.WindowTitle, evt.AppName)
+		projectName := s.DetectProjectFromWindowTitle(evt.WindowTitle, evt.AppName)
 		if projectName == "" {
 			continue
 		}
@@ -2875,7 +2875,7 @@ func (s *ReportsService) buildProjectSummariesFromAI(sessions []*storage.Session
 			repoPathCache[commit.RepositoryID] = repoPath
 		}
 
-		projectName := s.detectProjectFromGitRepo(repoPath)
+		projectName := s.DetectProjectFromGitRepo(repoPath)
 		project := getProject(projectName)
 		project.CommitCount++
 
@@ -2891,7 +2891,7 @@ func (s *ReportsService) buildProjectSummariesFromAI(sessions []*storage.Session
 
 	// From focus events - TIME TRACKING (this is the accurate source)
 	for _, evt := range focusEvents {
-		projectName := s.detectProjectFromWindowTitle(evt.WindowTitle, evt.AppName)
+		projectName := s.DetectProjectFromWindowTitle(evt.WindowTitle, evt.AppName)
 		if projectName == "" {
 			continue
 		}
@@ -2915,7 +2915,7 @@ func (s *ReportsService) buildProjectSummariesFromAI(sessions []*storage.Session
 	// From browser visits for research/AI projects
 	for _, visit := range browserVisits {
 		if visit.Title.Valid {
-			projectName := s.detectProjectFromBrowserTitle(visit.Title.String)
+			projectName := s.DetectProjectFromBrowserTitle(visit.Title.String)
 			if projectName != "" {
 				project := getProject(projectName)
 				if visit.VisitDurationSeconds.Valid {
@@ -3024,8 +3024,8 @@ func (s *ReportsService) normalizeProjectName(name string) string {
 	return name
 }
 
-// detectProjectFromBrowserTitle detects project from browser page title.
-func (s *ReportsService) detectProjectFromBrowserTitle(title string) string {
+// DetectProjectFromBrowserTitle detects project from browser page title.
+func (s *ReportsService) DetectProjectFromBrowserTitle(title string) string {
 	lower := strings.ToLower(title)
 
 	if strings.Contains(lower, "traq") || strings.Contains(lower, "activity-tracker") || strings.Contains(lower, "activity tracker") {

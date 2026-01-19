@@ -2376,6 +2376,30 @@ export namespace storage {
 	        this.domain = source["domain"];
 	    }
 	}
+	export class AssignmentMetrics {
+	    periodStart: number;
+	    periodEnd: number;
+	    totalActivities: number;
+	    autoAssigned: number;
+	    userAssigned: number;
+	    corrections: number;
+	    accuracyRate: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new AssignmentMetrics(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.periodStart = source["periodStart"];
+	        this.periodEnd = source["periodEnd"];
+	        this.totalActivities = source["totalActivities"];
+	        this.autoAssigned = source["autoAssigned"];
+	        this.userAssigned = source["userAssigned"];
+	        this.corrections = source["corrections"];
+	        this.accuracyRate = source["accuracyRate"];
+	    }
+	}
 	export class BrowserVisit {
 	    id: number;
 	    timestamp: number;
@@ -2652,6 +2676,32 @@ export namespace storage {
 	        this.isManual = source["isManual"];
 	        this.createdAt = source["createdAt"];
 	        this.updatedAt = source["updatedAt"];
+	    }
+	}
+	export class ProjectActivity {
+	    eventType: string;
+	    eventId: number;
+	    appName: string;
+	    windowTitle: string;
+	    startTime: number;
+	    durationSeconds: number;
+	    confidence: number;
+	    source: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ProjectActivity(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.eventType = source["eventType"];
+	        this.eventId = source["eventId"];
+	        this.appName = source["appName"];
+	        this.windowTitle = source["windowTitle"];
+	        this.startTime = source["startTime"];
+	        this.durationSeconds = source["durationSeconds"];
+	        this.confidence = source["confidence"];
+	        this.source = source["source"];
 	    }
 	}
 	export class ProjectBreakdown {

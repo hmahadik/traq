@@ -425,6 +425,23 @@ export const reportConfig = {
 };
 
 /**
+ * Projects Config API - Settings for project assignment
+ */
+export const projectsConfig = {
+  /** Get whether new activities should be auto-assigned to projects */
+  getAutoAssign: async (): Promise<boolean> => {
+    await waitForReady();
+    return withRetry(() => App.GetProjectsAutoAssign());
+  },
+
+  /** Set whether new activities should be auto-assigned to projects */
+  setAutoAssign: async (enabled: boolean): Promise<void> => {
+    await waitForReady();
+    return App.SetProjectsAutoAssign(enabled);
+  },
+};
+
+/**
  * Config API
  */
 export const config = {
@@ -1069,6 +1086,7 @@ export const api = {
   timeline,
   reports,
   reportConfig,
+  projectsConfig,
   config,
   screenshots,
   entries,

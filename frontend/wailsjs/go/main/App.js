@@ -10,6 +10,10 @@ export function AssignEventToProject(arg1, arg2, arg3) {
   return window['go']['main']['App']['AssignEventToProject'](arg1, arg2, arg3);
 }
 
+export function AutoDiscoverProjects() {
+  return window['go']['main']['App']['AutoDiscoverProjects']();
+}
+
 export function BackfillProjects(arg1, arg2, arg3) {
   return window['go']['main']['App']['BackfillProjects'](arg1, arg2, arg3);
 }
@@ -126,6 +130,10 @@ export function ForceCapture() {
   return window['go']['main']['App']['ForceCapture']();
 }
 
+export function GenerateProjectReport(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['GenerateProjectReport'](arg1, arg2, arg3, arg4);
+}
+
 export function GenerateReport(arg1, arg2, arg3) {
   return window['go']['main']['App']['GenerateReport'](arg1, arg2, arg3);
 }
@@ -156,6 +164,10 @@ export function GetAppCategories() {
 
 export function GetAppUsage(arg1, arg2) {
   return window['go']['main']['App']['GetAppUsage'](arg1, arg2);
+}
+
+export function GetAssignmentMetrics() {
+  return window['go']['main']['App']['GetAssignmentMetrics']();
 }
 
 export function GetAvailableModels() {
@@ -274,6 +286,10 @@ export function GetProject(arg1) {
   return window['go']['main']['App']['GetProject'](arg1);
 }
 
+export function GetProjectActivities(arg1, arg2, arg3) {
+  return window['go']['main']['App']['GetProjectActivities'](arg1, arg2, arg3);
+}
+
 export function GetProjectPatterns(arg1) {
   return window['go']['main']['App']['GetProjectPatterns'](arg1);
 }
@@ -284,6 +300,10 @@ export function GetProjectStats(arg1) {
 
 export function GetProjects() {
   return window['go']['main']['App']['GetProjects']();
+}
+
+export function GetProjectsAutoAssign() {
+  return window['go']['main']['App']['GetProjectsAutoAssign']();
 }
 
 export function GetRecentSessions(arg1) {
@@ -480,6 +500,10 @@ export function SetAppTimelineCategory(arg1, arg2) {
 
 export function SetFileAllowedExtensions(arg1) {
   return window['go']['main']['App']['SetFileAllowedExtensions'](arg1);
+}
+
+export function SetProjectsAutoAssign(arg1) {
+  return window['go']['main']['App']['SetProjectsAutoAssign'](arg1);
 }
 
 export function SetReportIncludeUnassigned(arg1) {

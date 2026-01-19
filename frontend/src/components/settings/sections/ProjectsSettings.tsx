@@ -9,6 +9,8 @@ import { SettingsRow } from '../SettingsRow';
 import {
   useReportIncludeUnassigned,
   useSetReportIncludeUnassigned,
+  useProjectsAutoAssign,
+  useSetProjectsAutoAssign,
   useBackfillPreview,
   useBackfillRun,
 } from '@/api/hooks';
@@ -20,9 +22,12 @@ interface BackfillResult {
   noMatch: number;
 }
 
-export function BackfillSettings() {
+export function ProjectsSettings() {
   const { data: includeUnassigned = true } = useReportIncludeUnassigned();
   const setIncludeUnassigned = useSetReportIncludeUnassigned();
+
+  const { data: autoAssign = false } = useProjectsAutoAssign();
+  const setAutoAssign = useSetProjectsAutoAssign();
 
   const backfillPreview = useBackfillPreview();
   const backfillRun = useBackfillRun();
@@ -72,6 +77,23 @@ export function BackfillSettings() {
 
   return (
     <div className="space-y-6">
+      {/* Auto-Assignment */}
+      <SettingsCard
+        title="Auto-Assignment"
+        description="Automatically assign activities to projects as they are tracked"
+      >
+        <SettingsRow
+          label="Auto-assign new activities"
+          description="When enabled, new activities will be automatically assigned to matching projects"
+        >
+          <Switch
+            checked={autoAssign}
+            onCheckedChange={(checked) => setAutoAssign.mutate(checked)}
+            disabled={setAutoAssign.isPending}
+          />
+        </SettingsRow>
+      </SettingsCard>
+
       {/* Report Config */}
       <SettingsCard
         title="Report Settings"

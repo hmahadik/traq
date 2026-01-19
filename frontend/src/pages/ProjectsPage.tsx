@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Plus, Pencil, Trash2, X, Clock, FileCode, GitCommit, Sparkles } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Plus, Pencil, Trash2, X, Clock, FileCode, GitCommit, Sparkles, CheckSquare, Square } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -82,6 +83,9 @@ function ProjectCard({
   onEdit,
   onDelete,
   onDeletePattern,
+  selectionMode,
+  isSelected,
+  onToggleSelect,
 }: {
   project: Project;
   stats?: ProjectStats | null;
@@ -89,26 +93,49 @@ function ProjectCard({
   onEdit: () => void;
   onDelete: () => void;
   onDeletePattern: (patternId: number) => void;
+  selectionMode?: boolean;
+  isSelected?: boolean;
+  onToggleSelect?: () => void;
 }) {
   return (
-    <Card className="relative">
+    <Card
+      className={`relative ${selectionMode ? 'cursor-pointer' : ''} ${isSelected ? 'ring-2 ring-primary' : ''}`}
+      onClick={selectionMode ? onToggleSelect : undefined}
+    >
       <CardHeader className="pb-2">
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-2">
+            {selectionMode && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onToggleSelect?.();
+                }}
+                className="p-0.5 -ml-1"
+              >
+                {isSelected ? (
+                  <CheckSquare className="h-5 w-5 text-primary" />
+                ) : (
+                  <Square className="h-5 w-5 text-muted-foreground" />
+                )}
+              </button>
+            )}
             <div
               className="w-4 h-4 rounded-full shrink-0"
               style={{ backgroundColor: project.color }}
             />
             <CardTitle className="text-lg">{project.name}</CardTitle>
           </div>
-          <div className="flex gap-1">
-            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onEdit}>
-              <Pencil className="h-4 w-4" />
-            </Button>
-            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={onDelete}>
-              <Trash2 className="h-4 w-4" />
-            </Button>
-          </div>
+          {!selectionMode && (
+            <div className="flex gap-1">
+              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onEdit}>
+                <Pencil className="h-4 w-4" />
+              </Button>
+              <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={onDelete}>
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
         </div>
         {project.description && (
           <CardDescription className="mt-1">{project.description}</CardDescription>
@@ -300,6 +327,42 @@ export function ProjectsPage() {
   const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [deletingProject, setDeletingProject] = useState<Project | null>(null);
 
+  // Selection mode state
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+
+  const toggleSelect = (id: number) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
+  const selectAll = () => {
+    if (!projects) return;
+    setSelectedIds(new Set(projects.map((p) => p.id)));
+  };
+
+  const exitSelectionMode = () => {
+    setSelectionMode(false);
+    setSelectedIds(new Set());
+  };
+
+  const handleBulkDelete = async () => {
+    const idsToDelete = Array.from(selectedIds);
+    for (const id of idsToDelete) {
+      await deleteProject.mutateAsync(id);
+    }
+    exitSelectionMode();
+    setBulkDeleteOpen(false);
+  };
+
   const handleCreate = (data: ProjectFormData) => {
     createProject.mutate(data, {
       onSuccess: () => setFormOpen(false),
@@ -342,21 +405,61 @@ export function ProjectsPage() {
             Organize activities into projects. Traq learns from your assignments to auto-suggest.
           </p>
         </div>
-        <Button onClick={() => setFormOpen(true)}>
-          <Plus className="h-4 w-4 mr-2" />
-          New Project
-        </Button>
+        {selectionMode ? (
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={selectAll}
+              disabled={!projects || selectedIds.size === projects.length}
+            >
+              Select All
+            </Button>
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={() => setBulkDeleteOpen(true)}
+              disabled={selectedIds.size === 0}
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Delete ({selectedIds.size})
+            </Button>
+            <Button variant="ghost" size="sm" onClick={exitSelectionMode}>
+              Cancel
+            </Button>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2">
+            {projects && projects.length > 1 && (
+              <Button variant="outline" onClick={() => setSelectionMode(true)}>
+                <CheckSquare className="h-4 w-4 mr-2" />
+                Select
+              </Button>
+            )}
+            <Button onClick={() => setFormOpen(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              New Project
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Unassigned count notice */}
       {unassignedCount != null && unassignedCount > 0 && (
         <Card className="bg-amber-50 dark:bg-amber-950 border-amber-200 dark:border-amber-800">
-          <CardContent className="flex items-center gap-3 py-3">
-            <Sparkles className="h-5 w-5 text-amber-600 dark:text-amber-400" />
-            <span className="text-sm">
-              You have <strong>{unassignedCount.toLocaleString()}</strong> activities without project
-              assignments. Assign them to help Traq learn your patterns.
-            </span>
+          <CardContent className="flex items-center justify-between py-3">
+            <div className="flex items-center gap-3">
+              <Sparkles className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+              <span className="text-sm">
+                You have <strong>{unassignedCount.toLocaleString()}</strong> activities without project assignments.
+              </span>
+            </div>
+            <Link
+              to="/settings/projects"
+              className="text-sm text-amber-700 dark:text-amber-400 hover:underline font-medium"
+            >
+              Configure in Settings →
+            </Link>
           </CardContent>
         </Card>
       )}
@@ -380,6 +483,9 @@ export function ProjectsPage() {
               }}
               onDelete={() => setDeletingProject(project)}
               onDeletePattern={handleDeletePattern}
+              selectionMode={selectionMode}
+              isSelected={selectedIds.has(project.id)}
+              onToggleSelect={() => toggleSelect(project.id)}
             />
           ))}
         </div>
@@ -427,6 +533,29 @@ export function ProjectsPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Bulk delete confirmation */}
+      <AlertDialog open={bulkDeleteOpen} onOpenChange={setBulkDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete {selectedIds.size} Projects</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete {selectedIds.size} projects? This will remove all learned
+              patterns and clear project assignments from events. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleBulkDelete}
+              className="bg-destructive text-destructive-foreground"
+              disabled={deleteProject.isPending}
+            >
+              {deleteProject.isPending ? 'Deleting...' : `Delete ${selectedIds.size} Projects`}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
@@ -437,11 +566,17 @@ function ProjectCardWithData({
   onEdit,
   onDelete,
   onDeletePattern,
+  selectionMode,
+  isSelected,
+  onToggleSelect,
 }: {
   project: Project;
   onEdit: () => void;
   onDelete: () => void;
   onDeletePattern: (patternId: number) => void;
+  selectionMode?: boolean;
+  isSelected?: boolean;
+  onToggleSelect?: () => void;
 }) {
   const { data: stats } = useProjectStats(project.id);
   const { data: patterns } = useProjectPatterns(project.id);
@@ -454,6 +589,9 @@ function ProjectCardWithData({
       onEdit={onEdit}
       onDelete={onDelete}
       onDeletePattern={onDeletePattern}
+      selectionMode={selectionMode}
+      isSelected={isSelected}
+      onToggleSelect={onToggleSelect}
     />
   );
 }

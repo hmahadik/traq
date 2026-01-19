@@ -1,6 +1,7 @@
 package service
 
 import (
+	"strings"
 	"time"
 
 	"traq/internal/storage"
@@ -10,13 +11,15 @@ import (
 type BackfillService struct {
 	store    *storage.Store
 	projects *ProjectAssignmentService
+	reports  *ReportsService
 }
 
 // NewBackfillService creates a new BackfillService
-func NewBackfillService(store *storage.Store, projects *ProjectAssignmentService) *BackfillService {
+func NewBackfillService(store *storage.Store, projects *ProjectAssignmentService, reports *ReportsService) *BackfillService {
 	return &BackfillService{
 		store:    store,
 		projects: projects,
+		reports:  reports,
 	}
 }
 
@@ -55,15 +58,22 @@ func (s *BackfillService) processBackfill(startDate, endDate string, minConfiden
 	startUnix := start.Unix()
 	endUnix := end.Unix()
 
-	// Get all focus events in range (including project assignment info)
+	result := &BackfillResult{}
+
+	// Build project name -> ID lookup for detection function results
+	projectsByName := make(map[string]int64)
+	projects, _ := s.store.GetProjects()
+	for _, p := range projects {
+		projectsByName[strings.ToLower(p.Name)] = p.ID
+	}
+
+	// Process focus events
 	events, err := s.store.GetFocusEventsForBackfill(startUnix, endUnix)
 	if err != nil {
 		return nil, err
 	}
 
-	result := &BackfillResult{
-		TotalProcessed: len(events),
-	}
+	result.TotalProcessed += len(events)
 
 	for _, event := range events {
 		// Skip already assigned
@@ -78,22 +88,91 @@ func (s *BackfillService) processBackfill(startDate, endDate string, minConfiden
 			WindowTitle: event.WindowTitle,
 		}
 
-		// Try to match patterns
+		// Try learned patterns first
 		match := s.projects.SuggestProject(ctx)
-		if match == nil || match.Confidence < minConfidence {
-			result.NoMatch++
+		if match != nil && match.Confidence >= minConfidence {
+			if commit {
+				s.store.SetEventProject("focus", event.ID, match.ProjectID, match.Confidence, "rule")
+			}
+			result.AutoAssigned++
 			continue
 		}
 
-		// Assign if committing
-		if commit {
-			err := s.store.SetEventProject("focus", event.ID, match.ProjectID, match.Confidence, "rule")
-			if err != nil {
-				// Log but continue
-				continue
+		// Fallback: use detection functions from reports
+		if s.reports != nil {
+			projectName := s.reports.DetectProjectFromWindowTitle(event.WindowTitle, event.AppName)
+			if projectName != "" {
+				if projectID, ok := projectsByName[strings.ToLower(projectName)]; ok {
+					if commit {
+						s.store.SetEventProject("focus", event.ID, projectID, 0.8, "detection")
+					}
+					result.AutoAssigned++
+					continue
+				}
 			}
 		}
-		result.AutoAssigned++
+
+		result.NoMatch++
+	}
+
+	// Process git commits
+	commits, err := s.store.GetGitCommitsByTimeRange(startUnix, endUnix)
+	if err == nil {
+		repoPathCache := make(map[int64]string)
+
+		result.TotalProcessed += len(commits)
+
+		for _, gitCommit := range commits {
+			// Skip already assigned
+			if gitCommit.ProjectID.Valid && gitCommit.ProjectID.Int64 != 0 {
+				result.AlreadyAssigned++
+				continue
+			}
+
+			// Get repo path
+			repoPath, ok := repoPathCache[gitCommit.RepositoryID]
+			if !ok {
+				repo, err := s.store.GetGitRepository(gitCommit.RepositoryID)
+				if err == nil && repo != nil {
+					repoPath = repo.Path
+				}
+				repoPathCache[gitCommit.RepositoryID] = repoPath
+			}
+
+			if repoPath == "" {
+				result.NoMatch++
+				continue
+			}
+
+			// Try learned patterns first
+			ctx := &storage.AssignmentContext{
+				GitRepo: repoPath,
+			}
+			match := s.projects.SuggestProject(ctx)
+			if match != nil && match.Confidence >= minConfidence {
+				if commit {
+					s.store.SetEventProject("git", gitCommit.ID, match.ProjectID, match.Confidence, "rule")
+				}
+				result.AutoAssigned++
+				continue
+			}
+
+			// Fallback: use detection functions from reports
+			if s.reports != nil {
+				projectName := s.reports.DetectProjectFromGitRepo(repoPath)
+				if projectName != "" && projectName != "Other" {
+					if projectID, ok := projectsByName[strings.ToLower(projectName)]; ok {
+						if commit {
+							s.store.SetEventProject("git", gitCommit.ID, projectID, 0.9, "detection")
+						}
+						result.AutoAssigned++
+						continue
+					}
+				}
+			}
+
+			result.NoMatch++
+		}
 	}
 
 	return result, nil

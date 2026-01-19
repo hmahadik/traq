@@ -92,6 +92,10 @@ export const queryKeys = {
     all: ['reportConfig'] as const,
     includeUnassigned: () => [...queryKeys.reportConfig.all, 'includeUnassigned'] as const,
   },
+  projectsConfig: {
+    all: ['projectsConfig'] as const,
+    autoAssign: () => [...queryKeys.projectsConfig.all, 'autoAssign'] as const,
+  },
 };
 
 // ============================================================================
@@ -1335,6 +1339,33 @@ export function useSetReportIncludeUnassigned() {
     mutationFn: (include: boolean) => api.reportConfig.setIncludeUnassigned(include),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.reportConfig.all });
+    },
+  });
+}
+
+// ============================================================================
+// Projects Config Hooks
+// ============================================================================
+
+/**
+ * Get whether new activities should be auto-assigned to projects
+ */
+export function useProjectsAutoAssign() {
+  return useQuery({
+    queryKey: queryKeys.projectsConfig.autoAssign(),
+    queryFn: () => api.projectsConfig.getAutoAssign(),
+  });
+}
+
+/**
+ * Set whether new activities should be auto-assigned to projects
+ */
+export function useSetProjectsAutoAssign() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (enabled: boolean) => api.projectsConfig.setAutoAssign(enabled),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.projectsConfig.all });
     },
   });
 }

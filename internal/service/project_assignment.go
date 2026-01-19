@@ -15,6 +15,7 @@ import (
 type ProjectAssignmentService struct {
 	store        *storage.Store
 	patternCache *PatternCache
+	reports      *ReportsService // Set after creation to avoid circular dependency
 }
 
 // PatternCache holds in-memory pattern rules for fast matching.
@@ -47,6 +48,200 @@ func NewProjectAssignmentService(store *storage.Store) *ProjectAssignmentService
 	// Load patterns initially
 	svc.refreshPatternCache()
 	return svc
+}
+
+// SetReportsService sets the reports service reference (called after both services are created).
+func (s *ProjectAssignmentService) SetReportsService(reports *ReportsService) {
+	s.reports = reports
+}
+
+// ============================================================================
+// Auto-Discovery
+// ============================================================================
+
+// projectColors is a palette of distinct colors for auto-discovered projects.
+var projectColors = []string{
+	"#6366f1", // Indigo
+	"#8b5cf6", // Violet
+	"#ec4899", // Pink
+	"#f43f5e", // Rose
+	"#f97316", // Orange
+	"#eab308", // Yellow
+	"#22c55e", // Green
+	"#14b8a6", // Teal
+	"#06b6d4", // Cyan
+	"#3b82f6", // Blue
+}
+
+// AutoDiscoverProjects discovers projects from historical data and creates them.
+// It only creates projects that don't already exist (by name).
+func (s *ProjectAssignmentService) AutoDiscoverProjects() ([]storage.Project, error) {
+	if s.reports == nil {
+		log.Printf("AutoDiscoverProjects: reports service not set, skipping")
+		return nil, nil
+	}
+
+	// 1. Get existing projects for deduplication
+	existingProjects, err := s.store.GetProjects()
+	if err != nil {
+		return nil, err
+	}
+	existingNames := make(map[string]bool)
+	for _, p := range existingProjects {
+		existingNames[strings.ToLower(p.Name)] = true
+	}
+
+	// 2. Query historical data (last 90 days)
+	now := time.Now()
+	startTime := now.AddDate(0, 0, -90).Unix()
+	endTime := now.Unix()
+
+	// Track discovered projects with their detection sources
+	type discoveredProject struct {
+		name       string
+		gitRepos   []string // repo paths that triggered detection
+		windowApps []string // app names that triggered detection
+	}
+	discovered := make(map[string]*discoveredProject) // lowercase name -> info
+
+	// 3a. Detect from git commits
+	commits, err := s.store.GetGitCommitsByTimeRange(startTime, endTime)
+	if err != nil {
+		log.Printf("AutoDiscoverProjects: failed to get git commits: %v", err)
+	} else {
+		repoPathCache := make(map[int64]string)
+		for _, commit := range commits {
+			// Get repo path
+			repoPath, ok := repoPathCache[commit.RepositoryID]
+			if !ok {
+				repo, err := s.store.GetGitRepository(commit.RepositoryID)
+				if err == nil && repo != nil {
+					repoPath = repo.Path
+				}
+				repoPathCache[commit.RepositoryID] = repoPath
+			}
+
+			if repoPath == "" {
+				continue
+			}
+
+			projectName := s.reports.DetectProjectFromGitRepo(repoPath)
+			if projectName == "" || projectName == "Other" {
+				continue
+			}
+
+			key := strings.ToLower(projectName)
+			if _, exists := discovered[key]; !exists {
+				discovered[key] = &discoveredProject{name: projectName}
+			}
+			// Track the repo that triggered this
+			dp := discovered[key]
+			found := false
+			for _, r := range dp.gitRepos {
+				if r == repoPath {
+					found = true
+					break
+				}
+			}
+			if !found {
+				dp.gitRepos = append(dp.gitRepos, repoPath)
+			}
+		}
+	}
+
+	// 3b. Detect from window focus events
+	focusEvents, err := s.store.GetFocusEventsByTimeRange(startTime, endTime)
+	if err != nil {
+		log.Printf("AutoDiscoverProjects: failed to get focus events: %v", err)
+	} else {
+		for _, evt := range focusEvents {
+			projectName := s.reports.DetectProjectFromWindowTitle(evt.WindowTitle, evt.AppName)
+			if projectName == "" {
+				continue
+			}
+
+			key := strings.ToLower(projectName)
+			if _, exists := discovered[key]; !exists {
+				discovered[key] = &discoveredProject{name: projectName}
+			}
+			// Track the app that triggered this
+			dp := discovered[key]
+			found := false
+			for _, a := range dp.windowApps {
+				if a == evt.AppName {
+					found = true
+					break
+				}
+			}
+			if !found && evt.AppName != "" {
+				dp.windowApps = append(dp.windowApps, evt.AppName)
+			}
+		}
+	}
+
+	// 3c. Detect from browser visits
+	visits, err := s.store.GetBrowserVisitsByTimeRange(startTime, endTime)
+	if err != nil {
+		log.Printf("AutoDiscoverProjects: failed to get browser visits: %v", err)
+	} else {
+		for _, visit := range visits {
+			if !visit.Title.Valid {
+				continue
+			}
+			projectName := s.reports.DetectProjectFromBrowserTitle(visit.Title.String)
+			if projectName == "" {
+				continue
+			}
+
+			key := strings.ToLower(projectName)
+			if _, exists := discovered[key]; !exists {
+				discovered[key] = &discoveredProject{name: projectName}
+			}
+		}
+	}
+
+	// 4. Create projects that don't already exist
+	var created []storage.Project
+	colorIndex := len(existingProjects) % len(projectColors)
+
+	for key, dp := range discovered {
+		// Skip if project with this name already exists
+		if existingNames[key] {
+			continue
+		}
+
+		// Create the project
+		color := projectColors[colorIndex]
+		colorIndex = (colorIndex + 1) % len(projectColors)
+
+		project, err := s.store.CreateProject(dp.name, color, "Auto-discovered from activity data")
+		if err != nil {
+			log.Printf("AutoDiscoverProjects: failed to create project %s: %v", dp.name, err)
+			continue
+		}
+
+		// Create patterns based on what triggered detection
+		for _, repoPath := range dp.gitRepos {
+			repoName := extractRepoName(repoPath)
+			if repoName != "" {
+				s.store.UpsertPattern(project.ID, "git_repo", repoName, "contains", 1.0)
+			}
+		}
+
+		// Note: window title patterns are harder to auto-generate reliably
+		// The hardcoded detection will still work, and users can add patterns manually
+
+		created = append(created, *project)
+		existingNames[key] = true // Prevent duplicates within this run
+	}
+
+	// 5. Refresh pattern cache
+	if len(created) > 0 {
+		s.refreshPatternCache()
+		log.Printf("AutoDiscoverProjects: created %d new projects", len(created))
+	}
+
+	return created, nil
 }
 
 // ============================================================================

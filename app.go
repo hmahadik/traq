@@ -145,11 +145,14 @@ func (a *App) startup(ctx context.Context) {
 		}
 	}()
 
-	// Initialize backfill service (for applying patterns to historical data)
-	a.backfillService = service.NewBackfillService(a.store, a.Projects)
-
 	// Initialize reports service (after timeline, analytics, and projects services)
 	a.Reports = service.NewReportsService(a.store, a.Timeline, a.Analytics, a.Projects)
+
+	// Wire up reports service to projects service (for auto-discovery)
+	a.Projects.SetReportsService(a.Reports)
+
+	// Initialize backfill service (after reports service for detection functions)
+	a.backfillService = service.NewBackfillService(a.store, a.Projects, a.Reports)
 
 	// Initialize inference service from config
 	config, _ := a.Config.GetConfig()
@@ -1502,12 +1505,39 @@ func (a *App) TestIssueWebhook() error {
 // Project Methods (exposed to frontend)
 // ============================================================================
 
-// GetProjects returns all projects.
+// GetProjects returns all projects, auto-discovering if none exist.
 func (a *App) GetProjects() ([]storage.Project, error) {
 	if a.Projects == nil {
 		return nil, nil
 	}
-	return a.Projects.GetProjects()
+
+	projects, err := a.Projects.GetProjects()
+	if err != nil {
+		return nil, err
+	}
+
+	// Auto-discover if no projects exist (cold start)
+	if len(projects) == 0 {
+		_, err := a.Projects.AutoDiscoverProjects()
+		if err != nil {
+			// Log but don't fail - return empty list
+			log.Printf("Auto-discovery failed: %v", err)
+			return projects, nil
+		}
+		// Re-fetch after discovery
+		return a.Projects.GetProjects()
+	}
+
+	return projects, nil
+}
+
+// AutoDiscoverProjects can be called manually to discover new projects.
+// It only creates projects that don't already exist (by name).
+func (a *App) AutoDiscoverProjects() ([]storage.Project, error) {
+	if a.Projects == nil {
+		return nil, fmt.Errorf("projects service not initialized")
+	}
+	return a.Projects.AutoDiscoverProjects()
 }
 
 // GetProject returns a single project by ID.
@@ -1727,6 +1757,30 @@ func (a *App) SetReportIncludeUnassigned(include bool) error {
 		val = "true"
 	}
 	return a.store.SetConfig("reports.include_unassigned", val)
+}
+
+// GetProjectsAutoAssign returns whether new activities should be auto-assigned to projects
+func (a *App) GetProjectsAutoAssign() (bool, error) {
+	if a.store == nil {
+		return false, nil // Default to false
+	}
+	val, err := a.store.GetConfig("projects.auto_assign")
+	if err != nil {
+		return false, nil // Default to false
+	}
+	return val == "true", nil
+}
+
+// SetProjectsAutoAssign updates whether new activities should be auto-assigned to projects
+func (a *App) SetProjectsAutoAssign(enabled bool) error {
+	if a.store == nil {
+		return fmt.Errorf("store not initialized")
+	}
+	val := "false"
+	if enabled {
+		val = "true"
+	}
+	return a.store.SetConfig("projects.auto_assign", val)
 }
 
 // ============================================================================

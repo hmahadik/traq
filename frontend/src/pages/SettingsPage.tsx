@@ -6,7 +6,7 @@ import {
   AISettings,
   CategoriesSettings,
   GeneralSettings,
-  BackfillSettings,
+  ProjectsSettings,
 } from '@/components/settings/sections';
 
 export function SettingsPage() {
@@ -22,7 +22,7 @@ export function SettingsPage() {
             <Route path="ai" element={<AISettings />} />
             <Route path="categories" element={<CategoriesSettings />} />
             <Route path="general" element={<GeneralSettings />} />
-            <Route path="backfill" element={<BackfillSettings />} />
+            <Route path="projects" element={<ProjectsSettings />} />
           </Routes>
         </div>
       </div>
