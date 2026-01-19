@@ -1,6 +1,6 @@
 import { useRef, useEffect, useState, useCallback, useMemo } from 'react';
 import * as d3 from 'd3';
-import { GitCommit, Terminal, Globe, FileText, Coffee, Monitor, Camera, Pencil, Trash2 } from 'lucide-react';
+import { GitCommit, Terminal, Globe, FileText, Coffee, Monitor, Camera, Pencil, Trash2, FolderKanban } from 'lucide-react';
 import type { TimelineGridData } from '@/types/timeline';
 import type { Screenshot } from '@/types/screenshot';
 import type { TimelineFilters } from '../FilterControls';
@@ -8,10 +8,27 @@ import { useEventDropsData } from './useEventDropsData';
 import { EventDropsTooltip } from './EventDropsTooltip';
 import type { EventDot, EventDropType } from './eventDropsTypes';
 
+// Entry block data from EntriesColumn
+interface EntryBlockData {
+  id: number;
+  eventType: string;
+  projectId: number;
+  projectName: string;
+  projectColor: string;
+  appName: string;
+  windowTitle: string;
+  startTime: number;
+  endTime: number;
+  durationSeconds: number;
+  confidence: number;
+  source: string;
+}
+
 interface EventDropsTimelineProps {
   data: TimelineGridData | null | undefined;
   filters: TimelineFilters;
   screenshots?: Screenshot[];
+  entries?: EntryBlockData[];
   rowHeight?: number;
   onEventClick?: (event: EventDot) => void;
   onEventDelete?: (event: EventDot) => void;
@@ -34,12 +51,14 @@ const EVENT_TYPE_ICONS: Record<EventDropType, typeof GitCommit> = {
   file: FileText,
   afk: Coffee,
   screenshot: Camera,
+  projects: FolderKanban,
 };
 
 export function EventDropsTimeline({
   data,
   filters,
   screenshots,
+  entries,
   rowHeight = ROW_HEIGHT,
   onEventClick,
   onEventDelete,
@@ -81,7 +100,7 @@ export function EventDropsTimeline({
   }, [listHeight]);
 
   // Transform data to EventDrops format
-  const eventDropsData = useEventDropsData({ data, filters, screenshots });
+  const eventDropsData = useEventDropsData({ data, filters, screenshots, entries });
 
   // Handle resize drag for the list panel
   useEffect(() => {

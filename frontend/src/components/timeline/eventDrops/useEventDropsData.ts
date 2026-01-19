@@ -9,11 +9,28 @@ import {
 } from './eventDropsTypes';
 import type { TimelineFilters } from '../FilterControls';
 
+// Entry block data from EntriesColumn
+interface EntryBlockData {
+  id: number;
+  eventType: string;
+  projectId: number;
+  projectName: string;
+  projectColor: string;
+  appName: string;
+  windowTitle: string;
+  startTime: number;
+  endTime: number;
+  durationSeconds: number;
+  confidence: number;
+  source: string;
+}
+
 interface UseEventDropsDataOptions {
   data: TimelineGridData | null | undefined;
   filters: TimelineFilters;
   groupBy?: 'app' | 'eventType';
   screenshots?: Screenshot[];
+  entries?: EntryBlockData[];
 }
 
 export function useEventDropsData({
@@ -21,6 +38,7 @@ export function useEventDropsData({
   filters,
   groupBy = 'app',
   screenshots,
+  entries,
 }: UseEventDropsDataOptions): EventDropsData | null {
   return useMemo(() => {
     if (!data) return null;
@@ -220,6 +238,33 @@ export function useEventDropsData({
       }
     }
 
+    // Process project-assigned entries (if provided)
+    if (entries && entries.length > 0) {
+      for (const entry of entries) {
+        const rowName = 'Projects';
+        const dot: EventDot = {
+          id: `project-${entry.eventType}-${entry.id}`,
+          originalId: entry.id,
+          timestamp: new Date(entry.startTime * 1000),
+          type: 'projects',
+          row: rowName,
+          label: `${entry.projectName}: ${entry.appName}`,
+          duration: entry.durationSeconds,
+          color: entry.projectColor || EVENT_TYPE_COLORS.projects,
+          metadata: {
+            projectId: entry.projectId,
+            projectName: entry.projectName,
+            projectColor: entry.projectColor,
+            eventType: entry.eventType,
+            eventId: entry.id,
+            appName: entry.appName,
+            windowTitle: entry.windowTitle,
+          },
+        };
+        addToRow(rowName, dot);
+      }
+    }
+
     // Convert row map to sorted array
     const rows: EventDropsRow[] = Array.from(rowMap.entries())
       .map(([normalizedName, events]) => {
@@ -239,8 +284,12 @@ export function useEventDropsData({
           data: events,
         };
       })
-      // Sort rows: Apps with most events first, then special rows (Git, Shell, etc.)
+      // Sort rows: Projects first, then apps with most events, then special rows (Git, Shell, etc.)
       .sort((a, b) => {
+        // Projects lane always first
+        if (a.name === 'Projects') return -1;
+        if (b.name === 'Projects') return 1;
+
         const specialRows = ['Screenshots', 'Git', 'Shell', 'Browser', 'Files', 'Breaks'];
         const aIsSpecial = specialRows.includes(a.name);
         const bIsSpecial = specialRows.includes(b.name);
@@ -262,5 +311,5 @@ export function useEventDropsData({
       },
       totalEvents: allEvents.length,
     };
-  }, [data, filters, groupBy, screenshots]);
+  }, [data, filters, groupBy, screenshots, entries]);
 }

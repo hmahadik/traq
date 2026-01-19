@@ -1,7 +1,7 @@
 // EventDrops Timeline Types
 // Based on marmelab/EventDrops pattern but adapted for Traq's data structures
 
-export type EventDropType = 'activity' | 'git' | 'shell' | 'browser' | 'file' | 'afk' | 'screenshot';
+export type EventDropType = 'activity' | 'git' | 'shell' | 'browser' | 'file' | 'afk' | 'screenshot' | 'projects';
 
 export interface EventDot {
   id: string; // Unique ID: `${type}-${originalId}`
@@ -41,6 +41,7 @@ export const EVENT_TYPE_COLORS: Record<EventDropType, string> = {
   file: '#f59e0b', // amber-500
   afk: '#f97316', // orange-500
   screenshot: '#ec4899', // pink-500
+  projects: '#6366f1', // indigo-500
 };
 
 // Category colors for activities (hex values for D3)
