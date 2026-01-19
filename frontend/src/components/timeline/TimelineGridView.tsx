@@ -11,10 +11,11 @@ import { FilesColumn } from './FilesColumn';
 import { BrowserColumn } from './BrowserColumn';
 import { ClusterColumn } from './ClusterColumn';
 import { AFKColumn } from './AFKColumn';
+import { EntriesColumn } from './EntriesColumn';
 import { TimelineFilters } from './FilterControls';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { ImageGallery } from '@/components/common/ImageGallery';
-import { useScreenshotsForDate } from '@/api/hooks';
+import { useScreenshotsForDate, useEntriesForDate } from '@/api/hooks';
 import type { Screenshot } from '@/types';
 
 // Event key format: "eventType:id" e.g. "activity:123", "browser:456"
@@ -84,6 +85,9 @@ export const TimelineGridView: React.FC<TimelineGridViewProps> = ({
 
   // Fetch all screenshots for this date
   const { data: allScreenshots } = useScreenshotsForDate(data.date);
+
+  // Fetch entries for the Entries lane
+  const { data: entries } = useEntriesForDate(data.date);
 
   // ImageGallery state
   const [galleryOpen, setGalleryOpen] = useState(false);
@@ -387,6 +391,19 @@ export const TimelineGridView: React.FC<TimelineGridViewProps> = ({
             lassoPreviewKeys={lassoPreviewKeys}
             selectedEventKeys={selectedEventKeys}
           />
+
+          {/* Entries Column - Shows project-assigned activities */}
+          {entries && entries.length > 0 && (
+            <EntriesColumn
+              entries={entries}
+              hours={activeHours}
+              hourHeight={effectiveHourHeight}
+              onEntryClick={(entry) => {
+                // Could open a detail view or similar
+                console.log('Entry clicked:', entry);
+              }}
+            />
+          )}
 
           {/* AFK Column - Shows away-from-keyboard periods */}
           {data.afkBlocks && Object.keys(data.afkBlocks).length > 0 && (
