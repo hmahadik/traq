@@ -1,6 +1,7 @@
 package service
 
 import (
+	"sort"
 	"time"
 
 	"traq/internal/storage"
@@ -104,6 +105,22 @@ type SessionContext struct {
 	GitCommits    []*storage.GitCommit         `json:"gitCommits"`
 	FileEvents    []*storage.FileEvent         `json:"fileEvents"`
 	BrowserVisits []*storage.BrowserVisit      `json:"browserVisits"`
+}
+
+// EntryBlock represents an activity with project assignment for the Entries lane
+type EntryBlock struct {
+	ID              int64   `json:"id"`
+	EventType       string  `json:"eventType"` // 'focus' or 'screenshot'
+	ProjectID       int64   `json:"projectId"`
+	ProjectName     string  `json:"projectName"`
+	ProjectColor    string  `json:"projectColor"`
+	AppName         string  `json:"appName"`
+	WindowTitle     string  `json:"windowTitle"`
+	StartTime       int64   `json:"startTime"`
+	EndTime         int64   `json:"endTime"`
+	DurationSeconds float64 `json:"durationSeconds"`
+	Confidence      float64 `json:"confidence"`
+	Source          string  `json:"source"` // 'user', 'rule', 'ai'
 }
 
 // GetSessionsForDate returns all sessions for a date.
@@ -331,4 +348,78 @@ func (s *TimelineService) GetRecentSessions(limit int) ([]*storage.Session, erro
 		return sessions[len(sessions)-limit:], nil
 	}
 	return sessions, nil
+}
+
+// GetEntriesForDate returns project-assigned activities for the Entries lane
+func (s *TimelineService) GetEntriesForDate(date string) ([]EntryBlock, error) {
+	// Parse date to get time range
+	loc := time.Local
+	t, err := time.ParseInLocation("2006-01-02", date, loc)
+	if err != nil {
+		return nil, err
+	}
+	startOfDay := t.Unix()
+	endOfDay := t.Add(24 * time.Hour).Unix()
+
+	// Get all projects for name/color lookup
+	projects, err := s.store.GetProjects()
+	if err != nil {
+		return nil, err
+	}
+	projectMap := make(map[int64]*storage.Project)
+	for i := range projects {
+		projectMap[projects[i].ID] = &projects[i]
+	}
+
+	// Get focus events with projects (only active ones)
+	focusEvents, err := s.store.GetActiveFocusEventsByTimeRange(startOfDay, endOfDay)
+	if err != nil {
+		return nil, err
+	}
+
+	var entries []EntryBlock
+	for _, fe := range focusEvents {
+		if !fe.ProjectID.Valid || fe.ProjectID.Int64 == 0 {
+			continue // Skip unassigned
+		}
+
+		proj := projectMap[fe.ProjectID.Int64]
+		projectName := "Unknown"
+		projectColor := "#888888"
+		if proj != nil {
+			projectName = proj.Name
+			projectColor = proj.Color
+		}
+
+		confidence := 0.0
+		if fe.ProjectConfidence.Valid {
+			confidence = fe.ProjectConfidence.Float64
+		}
+		source := "user"
+		if fe.ProjectSource.Valid {
+			source = fe.ProjectSource.String
+		}
+
+		entries = append(entries, EntryBlock{
+			ID:              fe.ID,
+			EventType:       "focus",
+			ProjectID:       fe.ProjectID.Int64,
+			ProjectName:     projectName,
+			ProjectColor:    projectColor,
+			AppName:         GetFriendlyAppName(fe.AppName),
+			WindowTitle:     fe.WindowTitle,
+			StartTime:       fe.StartTime,
+			EndTime:         fe.EndTime,
+			DurationSeconds: fe.DurationSeconds,
+			Confidence:      confidence,
+			Source:          source,
+		})
+	}
+
+	// Sort by start time
+	sort.Slice(entries, func(i, j int) bool {
+		return entries[i].StartTime < entries[j].StartTime
+	})
+
+	return entries, nil
 }
