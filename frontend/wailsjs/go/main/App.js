@@ -14,6 +14,10 @@ export function BackfillProjects(arg1, arg2, arg3) {
   return window['go']['main']['App']['BackfillProjects'](arg1, arg2, arg3);
 }
 
+export function BulkAssignProject(arg1) {
+  return window['go']['main']['App']['BulkAssignProject'](arg1);
+}
+
 export function CheckForUpdate() {
   return window['go']['main']['App']['CheckForUpdate']();
 }

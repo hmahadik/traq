@@ -125,7 +125,7 @@ func (s *ProjectAssignmentService) ManualAssign(eventType string, eventID, proje
 	}
 
 	// 2. Extract context from the event
-	ctx, err := s.extractEventContext(eventType, eventID)
+	ctx, err := s.ExtractEventContext(eventType, eventID)
 	if err != nil {
 		log.Printf("Failed to extract event context: %v", err)
 		return nil // Non-fatal, assignment succeeded
@@ -145,8 +145,9 @@ func (s *ProjectAssignmentService) ManualAssign(eventType string, eventID, proje
 	return nil
 }
 
-// extractEventContext gets context from an event for pattern learning.
-func (s *ProjectAssignmentService) extractEventContext(eventType string, eventID int64) (*storage.AssignmentContext, error) {
+// ExtractEventContext gets context from an event for pattern learning.
+// Exported for use by embedding service.
+func (s *ProjectAssignmentService) ExtractEventContext(eventType string, eventID int64) (*storage.AssignmentContext, error) {
 	ctx := &storage.AssignmentContext{}
 
 	switch eventType {

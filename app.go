@@ -1565,6 +1565,48 @@ func (a *App) AssignEventToProject(eventType string, eventID, projectID int64) e
 	return a.Projects.ManualAssign(eventType, eventID, projectID)
 }
 
+// BulkAssignment represents a single assignment in a bulk operation
+type BulkAssignment struct {
+	EventType string `json:"eventType"`
+	EventID   int64  `json:"eventId"`
+	ProjectID int64  `json:"projectId"`
+}
+
+// BulkAssignProject assigns multiple activities to a project
+func (a *App) BulkAssignProject(assignments []BulkAssignment) error {
+	if a.Projects == nil {
+		return fmt.Errorf("projects service not initialized")
+	}
+
+	for _, assign := range assignments {
+		if err := a.Projects.ManualAssign(assign.EventType, assign.EventID, assign.ProjectID); err != nil {
+			return fmt.Errorf("failed to assign %s/%d: %w", assign.EventType, assign.EventID, err)
+		}
+
+		// Generate and store embedding for newly assigned activity
+		ctx, err := a.Projects.ExtractEventContext(assign.EventType, assign.EventID)
+		if err == nil && ctx != nil && a.Embeddings != nil {
+			embCtx := &service.EmbeddingContext{
+				AppName:     ctx.AppName,
+				WindowTitle: ctx.WindowTitle,
+				GitRepo:     ctx.GitRepo,
+				Domain:      ctx.Domain,
+			}
+			embedding := a.Embeddings.GenerateEmbedding(embCtx)
+			contextText := service.BuildContextText(embCtx)
+			contextHash := storage.HashContext(contextText)
+			a.store.SaveEmbedding(assign.EventType, assign.EventID, service.FloatsToBytes(embedding), contextText, contextHash)
+		}
+	}
+
+	// Reload vectors after bulk assignment
+	if a.Embeddings != nil {
+		go a.Embeddings.LoadVectors()
+	}
+
+	return nil
+}
+
 // SuggestProject gets a project suggestion for an event context.
 func (a *App) SuggestProject(ctx *storage.AssignmentContext) *service.AssignmentResult {
 	if a.Projects == nil {

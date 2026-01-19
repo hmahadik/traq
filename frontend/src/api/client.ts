@@ -984,6 +984,12 @@ export const projects = {
     await waitForReady();
     return withRetry(() => App.GetUnassignedEventCount());
   },
+
+  /** Bulk assign multiple activities to a project */
+  bulkAssign: async (assignments: Array<{eventType: string; eventId: number; projectId: number}>) => {
+    await waitForReady();
+    return App.BulkAssignProject(assignments);
+  },
 };
 
 /**

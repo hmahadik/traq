@@ -1182,6 +1182,29 @@ export function useAssignEventToProject() {
 }
 
 /**
+ * Bulk assign multiple events to a project
+ */
+export function useBulkAssignProject() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (assignments: Array<{ eventType: string; eventId: number; projectId: number }>) =>
+      api.projects.bulkAssign(assignments),
+    onSuccess: (_, assignments) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.timeline.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.entries.all });
+      queryClient.invalidateQueries({ queryKey: ['projects'] });
+      toast.success(`${assignments.length} activities assigned`);
+    },
+    onError: (error: unknown) => {
+      console.error('Bulk assign failed:', error);
+      const message = error instanceof Error ? error.message : String(error);
+      toast.error(`Failed to assign activities: ${message}`);
+    },
+  });
+}
+
+/**
  * Get count of unassigned events
  */
 export function useUnassignedEventCount() {

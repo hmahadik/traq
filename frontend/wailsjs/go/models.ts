@@ -129,6 +129,22 @@ export namespace main {
 	        this.category = source["category"];
 	    }
 	}
+	export class BulkAssignment {
+	    eventType: string;
+	    eventId: number;
+	    projectId: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new BulkAssignment(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.eventType = source["eventType"];
+	        this.eventId = source["eventId"];
+	        this.projectId = source["projectId"];
+	    }
+	}
 
 }
 
