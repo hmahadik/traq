@@ -52,6 +52,11 @@ export interface ActivityBlock {
   minuteOffset: number; // Minute within hour (0-59)
   pixelPosition: number; // Vertical position in pixels (0-60)
   pixelHeight: number; // Height in pixels
+  // Project assignment fields
+  projectId?: number;
+  projectColor?: string;
+  projectSource?: string; // 'manual' | 'rule' | 'ai'
+  projectConfidence?: number; // 0-1 confidence score for auto-assignments
 }
 
 export interface SessionSummaryWithPosition {

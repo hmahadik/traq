@@ -1,7 +1,7 @@
 import React from 'react';
 import { ActivityBlock as ActivityBlockType, GRID_CONSTANTS, getAppColors } from '@/types/timeline';
 import { getAppDisplayName } from '@/utils/timelineHelpers';
-import { Clock, Monitor, Image } from 'lucide-react';
+import { Clock, Monitor, Image, AlertCircle } from 'lucide-react';
 import {
   Tooltip,
   TooltipContent,
@@ -49,6 +49,11 @@ export const ActivityBlock: React.FC<ActivityBlockProps> = ({
 
   // Get Timely-style colors for this app
   const colors = getAppColors(appName);
+
+  // Project assignment status
+  const isAssigned = block.projectId != null && block.projectId > 0;
+  const isAutoAssigned = block.projectSource === 'rule' || block.projectSource === 'ai';
+  const isLowConfidence = isAutoAssigned && (block.projectConfidence || 0) < 0.8;
 
   // Get app initials (first 2 letters)
   const getAppInitials = (name: string): string => {
@@ -98,10 +103,15 @@ export const ActivityBlock: React.FC<ActivityBlockProps> = ({
                 : isLassoPreview
                 ? 'ring-2 ring-blue-400/60 ring-offset-1 border-blue-400 bg-blue-500/10'
                 : 'border-black/5 dark:border-white/10'
+            } ${
+              isAssigned
+                ? 'border-l-4'
+                : 'opacity-70 border-l-2 border-l-dashed border-l-gray-400 dark:border-l-gray-500'
             }`}
             style={{
               top: `${absoluteTop}px`,
               height: `${actualHeight}px`,
+              borderLeftColor: isAssigned ? block.projectColor : undefined,
             }}
             data-activity-id={block.id}
             data-event-key={`activity:${block.id}`}
@@ -138,6 +148,19 @@ export const ActivityBlock: React.FC<ActivityBlockProps> = ({
                     </div>
                   )}
                 </div>
+                {/* Low confidence indicator for auto-assigned projects */}
+                {isLowConfidence && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div className="flex-shrink-0">
+                        <AlertCircle className="w-3.5 h-3.5 text-amber-500" />
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="text-xs">
+                      <span>Auto-assigned ({Math.round((block.projectConfidence || 0) * 100)}% confidence)</span>
+                    </TooltipContent>
+                  </Tooltip>
+                )}
               </div>
             )}
           </div>
