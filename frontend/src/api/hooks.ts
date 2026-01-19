@@ -53,6 +53,7 @@ export const queryKeys = {
     topWindows: (date: string, limit: number) => ['analytics', 'topWindows', date, limit] as const,
   },
   timeline: {
+    all: ['timeline'] as const,
     sessions: (date: string) => ['timeline', 'sessions', date] as const,
     screenshots: (sessionId: number, page: number, perPage: number) =>
       ['timeline', 'screenshots', sessionId, page, perPage] as const,
@@ -79,6 +80,17 @@ export const queryKeys = {
     detail: (id: number) => ['screenshots', id] as const,
     image: (id: number) => ['screenshots', 'image', id] as const,
     thumbnail: (id: number) => ['screenshots', 'thumbnail', id] as const,
+  },
+  entries: {
+    all: ['entries'] as const,
+    forDate: (date: string) => [...queryKeys.entries.all, date] as const,
+  },
+  backfill: {
+    all: ['backfill'] as const,
+  },
+  reportConfig: {
+    all: ['reportConfig'] as const,
+    includeUnassigned: () => [...queryKeys.reportConfig.all, 'includeUnassigned'] as const,
   },
 };
 
@@ -1177,5 +1189,116 @@ export function useUnassignedEventCount() {
     queryKey: ['unassigned-events-count'],
     queryFn: () => api.projects.getUnassignedCount(),
     staleTime: 1000 * 60, // 1 minute
+  });
+}
+
+// ============================================================================
+// Entries Hooks
+// ============================================================================
+
+/**
+ * Get all entries (activity blocks) for a specific date
+ */
+export function useEntriesForDate(date: string) {
+  return useQuery({
+    queryKey: queryKeys.entries.forDate(date),
+    queryFn: () => api.entries.getForDate(date),
+    enabled: !!date,
+  });
+}
+
+// ============================================================================
+// Backfill Hooks
+// ============================================================================
+
+/**
+ * Preview what would be assigned by backfill without making changes
+ */
+export function useBackfillPreview() {
+  return useMutation({
+    mutationFn: ({ startDate, endDate, minConfidence }: {
+      startDate: string;
+      endDate: string;
+      minConfidence: number
+    }) => api.backfill.preview(startDate, endDate, minConfidence),
+  });
+}
+
+/**
+ * Run backfill to assign projects to activities
+ */
+export function useBackfillRun() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ startDate, endDate, minConfidence }: {
+      startDate: string;
+      endDate: string;
+      minConfidence: number
+    }) => api.backfill.run(startDate, endDate, minConfidence),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.entries.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.timeline.all });
+    },
+  });
+}
+
+// ============================================================================
+// Activity Ignore/Unignore Hooks
+// ============================================================================
+
+/**
+ * Mark activities as ignored (excluded from reports)
+ */
+export function useIgnoreActivities() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ eventType, ids }: { eventType: string; ids: number[] }) =>
+      api.activities.ignore(eventType, ids),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.entries.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.timeline.all });
+    },
+  });
+}
+
+/**
+ * Unmark activities as ignored (include in reports again)
+ */
+export function useUnignoreActivities() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ eventType, ids }: { eventType: string; ids: number[] }) =>
+      api.activities.unignore(eventType, ids),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.entries.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.timeline.all });
+    },
+  });
+}
+
+// ============================================================================
+// Report Config Hooks
+// ============================================================================
+
+/**
+ * Get whether unassigned activities are included in reports
+ */
+export function useReportIncludeUnassigned() {
+  return useQuery({
+    queryKey: queryKeys.reportConfig.includeUnassigned(),
+    queryFn: () => api.reportConfig.getIncludeUnassigned(),
+  });
+}
+
+/**
+ * Set whether unassigned activities should be included in reports
+ */
+export function useSetReportIncludeUnassigned() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (include: boolean) => api.reportConfig.setIncludeUnassigned(include),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.reportConfig.all });
+    },
   });
 }
