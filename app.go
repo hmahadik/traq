@@ -792,6 +792,15 @@ func (a *App) GenerateReport(timeRange, reportType string, includeScreenshots bo
 	return a.Reports.GenerateReport(timeRange, reportType, includeScreenshots)
 }
 
+// GenerateProjectReport generates a report for a specific project.
+// If projectID is 0, generates a report for all activities.
+func (a *App) GenerateProjectReport(timeRange, reportType string, includeScreenshots bool, projectID int64) (*service.Report, error) {
+	if a.Reports == nil {
+		return nil, nil
+	}
+	return a.Reports.GenerateReportWithFilter(timeRange, reportType, includeScreenshots, projectID)
+}
+
 // GetReport returns a report by ID with full content.
 func (a *App) GetReport(id int64) (*service.Report, error) {
 	if a.Reports == nil {

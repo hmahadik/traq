@@ -365,3 +365,20 @@ func (s *Store) GetProjectActivities(projectID int64, startTime, endTime int64, 
 	}
 	return activities, rows.Err()
 }
+
+// GetFocusEventsByProject returns focus events for a specific project in a time range
+func (s *Store) GetFocusEventsByProject(startTime, endTime int64, projectID int64) ([]*WindowFocusEvent, error) {
+	rows, err := s.db.Query(`
+		SELECT id, window_title, app_name, window_class,
+		       start_time, end_time, duration_seconds, session_id, created_at
+		FROM window_focus_events
+		WHERE start_time <= ? AND end_time > ?
+		  AND project_id = ?
+		ORDER BY start_time ASC`, endTime, startTime, projectID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query focus events by project: %w", err)
+	}
+	defer rows.Close()
+
+	return scanFocusEvents(rows)
+}

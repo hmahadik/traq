@@ -1200,6 +1200,132 @@ func (s *ReportsService) GenerateReport(timeRange, reportType string, includeScr
 	return toServiceReport(storageReport), nil
 }
 
+// GenerateReportWithFilter generates a report filtered by project ID.
+// If projectID is 0, returns all activities (same as GenerateReport).
+func (s *ReportsService) GenerateReportWithFilter(timeRange, reportType string, includeScreenshots bool, projectID int64) (*Report, error) {
+	// If no project filter, use standard report generation
+	if projectID == 0 {
+		return s.GenerateReport(timeRange, reportType, includeScreenshots)
+	}
+
+	// Parse time range
+	tr, err := s.ParseTimeRange(timeRange)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse time range: %w", err)
+	}
+
+	// Get project info for the report title
+	project, _ := s.store.GetProject(projectID)
+	projectName := "Unknown Project"
+	if project != nil {
+		projectName = project.Name
+	}
+
+	// Get filtered focus events
+	focusEvents, err := s.store.GetFocusEventsByProject(tr.Start, tr.End, projectID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get project events: %w", err)
+	}
+
+	// Build a simple project-focused report
+	content := s.buildProjectReport(projectName, tr, focusEvents)
+
+	// Save report
+	storageReport := &storage.Report{
+		Title:      fmt.Sprintf("Project Report: %s (%s)", projectName, tr.Label),
+		TimeRange:  timeRange,
+		ReportType: reportType,
+		Format:     "html",
+		Content:    storage.NullString(content),
+		StartTime:  storage.NullInt64(tr.Start),
+		EndTime:    storage.NullInt64(tr.End),
+	}
+
+	id, err := s.store.SaveReport(storageReport)
+	if err != nil {
+		return nil, err
+	}
+	storageReport.ID = id
+
+	return toServiceReport(storageReport), nil
+}
+
+// buildProjectReport creates an HTML report for a specific project's activities.
+func (s *ReportsService) buildProjectReport(projectName string, tr *TimeRange, events []*storage.WindowFocusEvent) string {
+	var sb strings.Builder
+
+	// Calculate totals
+	var totalMinutes float64
+	appUsage := make(map[string]float64)
+	for _, e := range events {
+		mins := e.DurationSeconds / 60.0
+		totalMinutes += mins
+		appUsage[e.AppName] += mins
+	}
+
+	// Header
+	sb.WriteString(fmt.Sprintf(`<div style="margin-bottom: 24px;">
+		<h1 style="font-size: 1.5rem; font-weight: 700; color: #f1f5f9; margin-bottom: 8px;">📊 %s</h1>
+		<p style="color: #94a3b8; font-size: 0.9rem;">%s to %s</p>
+	</div>`, projectName, tr.StartDate, tr.EndDate))
+
+	// Summary stats
+	sb.WriteString(fmt.Sprintf(`<div style="display: flex; gap: 16px; margin-bottom: 24px;">
+		<div style="background: rgba(99, 102, 241, 0.1); padding: 16px; border-radius: 8px; flex: 1;">
+			<div style="font-size: 2rem; font-weight: 700; color: #6366f1;">%s</div>
+			<div style="color: #94a3b8; font-size: 0.85rem;">Total Time</div>
+		</div>
+		<div style="background: rgba(34, 197, 94, 0.1); padding: 16px; border-radius: 8px; flex: 1;">
+			<div style="font-size: 2rem; font-weight: 700; color: #22c55e;">%d</div>
+			<div style="color: #94a3b8; font-size: 0.85rem;">Activities</div>
+		</div>
+		<div style="background: rgba(249, 115, 22, 0.1); padding: 16px; border-radius: 8px; flex: 1;">
+			<div style="font-size: 2rem; font-weight: 700; color: #f97316;">%d</div>
+			<div style="color: #94a3b8; font-size: 0.85rem;">Apps Used</div>
+		</div>
+	</div>`, formatMinutes(int64(totalMinutes)), len(events), len(appUsage)))
+
+	// App breakdown
+	if len(appUsage) > 0 {
+		sb.WriteString(`<div style="margin-bottom: 24px;">
+			<h2 style="font-size: 1.1rem; font-weight: 600; color: #e2e8f0; margin-bottom: 12px;">📱 App Usage</h2>
+			<div style="background: rgba(30, 41, 59, 0.5); border-radius: 8px; padding: 16px;">`)
+
+		// Sort apps by usage
+		type appTime struct {
+			name    string
+			minutes float64
+		}
+		apps := make([]appTime, 0, len(appUsage))
+		for name, mins := range appUsage {
+			apps = append(apps, appTime{name, mins})
+		}
+		// Sort by minutes descending
+		for i := 0; i < len(apps); i++ {
+			for j := i + 1; j < len(apps); j++ {
+				if apps[j].minutes > apps[i].minutes {
+					apps[i], apps[j] = apps[j], apps[i]
+				}
+			}
+		}
+
+		for _, app := range apps {
+			pct := 0.0
+			if totalMinutes > 0 {
+				pct = (app.minutes / totalMinutes) * 100
+			}
+			sb.WriteString(fmt.Sprintf(`<div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid rgba(51, 65, 85, 0.5);">
+				<span style="color: #e2e8f0;">%s</span>
+				<span style="color: #94a3b8;">%s (%.0f%%)</span>
+			</div>`, app.name, formatMinutes(int64(app.minutes)), pct))
+		}
+
+		sb.WriteString(`</div></div>`)
+	}
+
+	return sb.String()
+}
+
 // generateSummaryReport creates a visual HTML summary report using the unified weekly summary data.
 func (s *ReportsService) generateSummaryReport(tr *TimeRange, includeScreenshots bool) (string, error) {
 	// Use the same data building as the CLI weekly summary
