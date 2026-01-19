@@ -4,7 +4,7 @@ import (
 	"fmt"
 )
 
-const schemaVersion = 9
+const schemaVersion = 10
 
 const schema = `
 -- ============================================================================
@@ -299,6 +299,12 @@ func (s *Store) Migrate() error {
 		// Migration v9: Add project assignment support with learning
 		if err := s.applyMigration9(); err != nil {
 			return fmt.Errorf("failed to apply migration 9: %w", err)
+		}
+	}
+	if currentVersion < 10 {
+		// Migration v10: Add memory_status for activity hiding and report config
+		if err := s.applyMigration10(); err != nil {
+			return fmt.Errorf("failed to apply migration 10: %w", err)
 		}
 	}
 
@@ -722,6 +728,27 @@ func (s *Store) applyMigration9() error {
 	s.db.Exec(`CREATE INDEX IF NOT EXISTS idx_screenshots_project ON screenshots(project_id)`)
 	s.db.Exec(`CREATE INDEX IF NOT EXISTS idx_focus_project ON window_focus_events(project_id)`)
 	s.db.Exec(`CREATE INDEX IF NOT EXISTS idx_git_project ON git_commits(project_id)`)
+
+	return nil
+}
+
+// applyMigration10 adds memory_status column to event tables and report config.
+// - memory_status: 'active' (default) or 'ignored' - used to hide activities from view
+// - reports.include_unassigned config: controls whether unassigned activities appear in reports
+func (s *Store) applyMigration10() error {
+	// 1. Add memory_status column to window_focus_events
+	s.db.Exec(`ALTER TABLE window_focus_events ADD COLUMN memory_status TEXT NOT NULL DEFAULT 'active'`)
+	s.db.Exec(`CREATE INDEX IF NOT EXISTS idx_focus_memory_status ON window_focus_events(memory_status)`)
+
+	// 2. Add memory_status column to screenshots
+	s.db.Exec(`ALTER TABLE screenshots ADD COLUMN memory_status TEXT NOT NULL DEFAULT 'active'`)
+	s.db.Exec(`CREATE INDEX IF NOT EXISTS idx_screenshot_memory_status ON screenshots(memory_status)`)
+
+	// 3. Add default config for report behavior
+	_, err := s.db.Exec(`INSERT OR IGNORE INTO config (key, value) VALUES ('reports.include_unassigned', 'true')`)
+	if err != nil {
+		return fmt.Errorf("failed to insert reports.include_unassigned config: %w", err)
+	}
 
 	return nil
 }
