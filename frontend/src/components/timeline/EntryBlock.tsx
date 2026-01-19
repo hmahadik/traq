@@ -22,15 +22,19 @@ interface EntryBlockData {
 interface EntryBlockProps {
   entry: EntryBlockData;
   hourHeight: number;
+  isSelected?: boolean;
   onClick?: (entry: EntryBlockData) => void;
   onContextMenu?: (entry: EntryBlockData, e: React.MouseEvent) => void;
+  onSelect?: (entry: EntryBlockData, e: React.MouseEvent) => void;
 }
 
 export const EntryBlock: React.FC<EntryBlockProps> = ({
   entry,
   hourHeight,
+  isSelected,
   onClick,
   onContextMenu,
+  onSelect,
 }) => {
   // Calculate position based on time
   const startDate = new Date(entry.startTime * 1000);
@@ -63,7 +67,8 @@ export const EntryBlock: React.FC<EntryBlockProps> = ({
       className={cn(
         'absolute left-1 right-1 rounded px-1.5 py-0.5 cursor-pointer',
         'border-l-4 hover:ring-2 hover:ring-primary/50',
-        'overflow-hidden text-xs'
+        'overflow-hidden text-xs',
+        isSelected && 'ring-2 ring-primary ring-offset-1'
       )}
       style={{
         top: `${topPosition}px`,
@@ -71,7 +76,13 @@ export const EntryBlock: React.FC<EntryBlockProps> = ({
         backgroundColor: `${entry.projectColor}20`,
         borderLeftColor: entry.projectColor,
       }}
-      onClick={() => onClick?.(entry)}
+      onClick={(e) => {
+        if (e.shiftKey || e.ctrlKey || e.metaKey) {
+          onSelect?.(entry, e);
+        } else {
+          onClick?.(entry);
+        }
+      }}
       onContextMenu={(e) => {
         e.preventDefault();
         onContextMenu?.(entry, e);

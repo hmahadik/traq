@@ -23,16 +23,20 @@ interface EntriesColumnProps {
   entries: EntryBlockData[];
   hours: number[];
   hourHeight: number;
+  selectedIds?: Set<string>;
   onEntryClick?: (entry: EntryBlockData) => void;
   onEntryContextMenu?: (entry: EntryBlockData, e: React.MouseEvent) => void;
+  onEntrySelect?: (entry: EntryBlockData, e: React.MouseEvent) => void;
 }
 
 export const EntriesColumn: React.FC<EntriesColumnProps> = ({
   entries,
   hours,
   hourHeight,
+  selectedIds,
   onEntryClick,
   onEntryContextMenu,
+  onEntrySelect,
 }) => {
   // Calculate total time
   const totalSeconds = entries.reduce((sum, e) => sum + e.durationSeconds, 0);
@@ -88,8 +92,10 @@ export const EntriesColumn: React.FC<EntriesColumnProps> = ({
                 key={`${entry.eventType}-${entry.id}`}
                 entry={entry}
                 hourHeight={hourHeight}
+                isSelected={selectedIds?.has(`${entry.eventType}-${entry.id}`)}
                 onClick={onEntryClick}
                 onContextMenu={onEntryContextMenu}
+                onSelect={onEntrySelect}
               />
             ))
           )}
