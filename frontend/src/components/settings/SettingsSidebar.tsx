@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Camera, Database, Sparkles, Tags, Settings2 } from 'lucide-react';
+import { Camera, Database, Sparkles, Tags, Settings2, History } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useVersion } from '@/api/hooks';
 
@@ -9,6 +9,7 @@ const sections = [
   { path: '/settings/ai', label: 'AI', icon: Sparkles },
   { path: '/settings/categories', label: 'Categories', icon: Tags },
   { path: '/settings/general', label: 'General', icon: Settings2 },
+  { path: '/settings/backfill', label: 'Backfill', icon: History },
 ];
 
 export function SettingsSidebar() {
