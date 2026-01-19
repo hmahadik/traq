@@ -4,7 +4,7 @@ import (
 	"fmt"
 )
 
-const schemaVersion = 10
+const schemaVersion = 11
 
 const schema = `
 -- ============================================================================
@@ -305,6 +305,12 @@ func (s *Store) Migrate() error {
 		// Migration v10: Add memory_status for activity hiding and report config
 		if err := s.applyMigration10(); err != nil {
 			return fmt.Errorf("failed to apply migration 10: %w", err)
+		}
+	}
+	if currentVersion < 11 {
+		// Migration v11: Add activity_embeddings table for semantic similarity search
+		if err := s.applyMigration11(); err != nil {
+			return fmt.Errorf("failed to apply migration 11: %w", err)
 		}
 	}
 
@@ -829,6 +835,33 @@ func (s *Store) applyMigration10() error {
 	if err != nil {
 		return fmt.Errorf("failed to insert reports.include_unassigned config: %w", err)
 	}
+
+	return nil
+}
+
+// applyMigration11 creates the activity_embeddings table for semantic similarity search.
+// This table stores vector embeddings for activity context, enabling intelligent project assignment.
+func (s *Store) applyMigration11() error {
+	// Create activity_embeddings table
+	_, err := s.db.Exec(`
+		CREATE TABLE IF NOT EXISTS activity_embeddings (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			event_type TEXT NOT NULL,
+			event_id INTEGER NOT NULL,
+			embedding BLOB NOT NULL,
+			context_text TEXT NOT NULL,
+			context_hash TEXT NOT NULL,
+			created_at INTEGER NOT NULL,
+			UNIQUE(event_type, event_id)
+		)
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to create activity_embeddings table: %w", err)
+	}
+
+	// Create indexes
+	s.db.Exec(`CREATE INDEX IF NOT EXISTS idx_embeddings_event ON activity_embeddings(event_type, event_id)`)
+	s.db.Exec(`CREATE INDEX IF NOT EXISTS idx_embeddings_hash ON activity_embeddings(context_hash)`)
 
 	return nil
 }

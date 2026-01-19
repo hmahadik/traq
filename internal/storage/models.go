@@ -316,3 +316,24 @@ func NullString(s string) sql.NullString {
 func NullInt64(i int64) sql.NullInt64 {
 	return sql.NullInt64{Int64: i, Valid: true}
 }
+
+// ActivityEmbedding stores vector embeddings for activities.
+type ActivityEmbedding struct {
+	ID          int64  `json:"id"`
+	EventType   string `json:"eventType"`
+	EventID     int64  `json:"eventId"`
+	Embedding   []byte `json:"embedding"` // Float32 array as bytes
+	ContextText string `json:"contextText"`
+	ContextHash string `json:"contextHash"`
+	CreatedAt   int64  `json:"createdAt"`
+}
+
+// EmbeddingContext holds the text components for embedding generation.
+type EmbeddingContext struct {
+	AppName     string `json:"appName"`
+	WindowTitle string `json:"windowTitle"`
+	GitRepo     string `json:"gitRepo,omitempty"`
+	GitBranch   string `json:"gitBranch,omitempty"`
+	Domain      string `json:"domain,omitempty"`
+	FilePath    string `json:"filePath,omitempty"`
+}
