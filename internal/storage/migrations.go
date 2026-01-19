@@ -329,6 +329,10 @@ func (s *Store) Migrate() error {
 func (s *Store) repairMissingTables() {
 	// Repair missing columns in projects table (migration 9 may have failed partially)
 	s.repairProjectsTable()
+	// Repair missing columns in window_focus_events table (migrations 9 & 10)
+	s.repairFocusEventsTable()
+	// Repair missing columns in screenshots table (migrations 9 & 10)
+	s.repairScreenshotsTable()
 	// Check and create project_patterns table if missing
 	var count int
 	err := s.db.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='project_patterns'`).Scan(&count)
@@ -392,6 +396,82 @@ func (s *Store) repairProjectsTable() {
 	if err == nil && descCount == 0 {
 		s.db.Exec(`ALTER TABLE projects ADD COLUMN description TEXT`)
 	}
+}
+
+// repairFocusEventsTable adds missing columns to window_focus_events table.
+// This repairs databases where migration 9's or 10's ALTER TABLE statements failed silently.
+func (s *Store) repairFocusEventsTable() {
+	// Check if table exists
+	var tableCount int
+	err := s.db.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='window_focus_events'`).Scan(&tableCount)
+	if err != nil || tableCount == 0 {
+		return
+	}
+
+	// Migration 9 columns
+	var count int
+	err = s.db.QueryRow(`SELECT COUNT(*) FROM pragma_table_info('window_focus_events') WHERE name = 'project_id'`).Scan(&count)
+	if err == nil && count == 0 {
+		s.db.Exec(`ALTER TABLE window_focus_events ADD COLUMN project_id INTEGER REFERENCES projects(id)`)
+	}
+
+	err = s.db.QueryRow(`SELECT COUNT(*) FROM pragma_table_info('window_focus_events') WHERE name = 'project_confidence'`).Scan(&count)
+	if err == nil && count == 0 {
+		s.db.Exec(`ALTER TABLE window_focus_events ADD COLUMN project_confidence REAL DEFAULT 0.0`)
+	}
+
+	err = s.db.QueryRow(`SELECT COUNT(*) FROM pragma_table_info('window_focus_events') WHERE name = 'project_source'`).Scan(&count)
+	if err == nil && count == 0 {
+		s.db.Exec(`ALTER TABLE window_focus_events ADD COLUMN project_source TEXT DEFAULT 'unassigned'`)
+	}
+
+	// Migration 10 column
+	err = s.db.QueryRow(`SELECT COUNT(*) FROM pragma_table_info('window_focus_events') WHERE name = 'memory_status'`).Scan(&count)
+	if err == nil && count == 0 {
+		s.db.Exec(`ALTER TABLE window_focus_events ADD COLUMN memory_status TEXT NOT NULL DEFAULT 'active'`)
+	}
+
+	// Create indexes if missing
+	s.db.Exec(`CREATE INDEX IF NOT EXISTS idx_focus_project ON window_focus_events(project_id)`)
+	s.db.Exec(`CREATE INDEX IF NOT EXISTS idx_focus_memory_status ON window_focus_events(memory_status)`)
+}
+
+// repairScreenshotsTable adds missing columns to screenshots table.
+// This repairs databases where migration 9's or 10's ALTER TABLE statements failed silently.
+func (s *Store) repairScreenshotsTable() {
+	// Check if table exists
+	var tableCount int
+	err := s.db.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='screenshots'`).Scan(&tableCount)
+	if err != nil || tableCount == 0 {
+		return
+	}
+
+	// Migration 9 columns
+	var count int
+	err = s.db.QueryRow(`SELECT COUNT(*) FROM pragma_table_info('screenshots') WHERE name = 'project_id'`).Scan(&count)
+	if err == nil && count == 0 {
+		s.db.Exec(`ALTER TABLE screenshots ADD COLUMN project_id INTEGER REFERENCES projects(id)`)
+	}
+
+	err = s.db.QueryRow(`SELECT COUNT(*) FROM pragma_table_info('screenshots') WHERE name = 'project_confidence'`).Scan(&count)
+	if err == nil && count == 0 {
+		s.db.Exec(`ALTER TABLE screenshots ADD COLUMN project_confidence REAL DEFAULT 0.0`)
+	}
+
+	err = s.db.QueryRow(`SELECT COUNT(*) FROM pragma_table_info('screenshots') WHERE name = 'project_source'`).Scan(&count)
+	if err == nil && count == 0 {
+		s.db.Exec(`ALTER TABLE screenshots ADD COLUMN project_source TEXT DEFAULT 'unassigned'`)
+	}
+
+	// Migration 10 column
+	err = s.db.QueryRow(`SELECT COUNT(*) FROM pragma_table_info('screenshots') WHERE name = 'memory_status'`).Scan(&count)
+	if err == nil && count == 0 {
+		s.db.Exec(`ALTER TABLE screenshots ADD COLUMN memory_status TEXT NOT NULL DEFAULT 'active'`)
+	}
+
+	// Create indexes if missing
+	s.db.Exec(`CREATE INDEX IF NOT EXISTS idx_screenshots_project ON screenshots(project_id)`)
+	s.db.Exec(`CREATE INDEX IF NOT EXISTS idx_screenshot_memory_status ON screenshots(memory_status)`)
 }
 
 // applyMigration2 adds window_class column to screenshots table.

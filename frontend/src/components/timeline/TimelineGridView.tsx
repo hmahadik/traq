@@ -393,17 +393,15 @@ export const TimelineGridView: React.FC<TimelineGridViewProps> = ({
           />
 
           {/* Entries Column - Shows project-assigned activities */}
-          {entries && entries.length > 0 && (
-            <EntriesColumn
-              entries={entries}
-              hours={activeHours}
-              hourHeight={effectiveHourHeight}
-              onEntryClick={(entry) => {
-                // Could open a detail view or similar
-                console.log('Entry clicked:', entry);
-              }}
-            />
-          )}
+          <EntriesColumn
+            entries={entries || []}
+            hours={activeHours}
+            hourHeight={effectiveHourHeight}
+            onEntryClick={(entry) => {
+              // Could open a detail view or similar
+              console.log('Entry clicked:', entry);
+            }}
+          />
 
           {/* AFK Column - Shows away-from-keyboard periods */}
           {data.afkBlocks && Object.keys(data.afkBlocks).length > 0 && (

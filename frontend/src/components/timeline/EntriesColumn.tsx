@@ -75,15 +75,24 @@ export const EntriesColumn: React.FC<EntriesColumnProps> = ({
 
         {/* Entry blocks (absolutely positioned) */}
         <div className="absolute inset-0">
-          {entries.map((entry) => (
-            <EntryBlock
-              key={`${entry.eventType}-${entry.id}`}
-              entry={entry}
-              hourHeight={hourHeight}
-              onClick={onEntryClick}
-              onContextMenu={onEntryContextMenu}
-            />
-          ))}
+          {entries.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-full text-muted-foreground px-2">
+              <FolderKanban className="w-6 h-6 mb-2 opacity-30" />
+              <span className="text-[10px] text-center">
+                Assign activities to projects to see them here
+              </span>
+            </div>
+          ) : (
+            entries.map((entry) => (
+              <EntryBlock
+                key={`${entry.eventType}-${entry.id}`}
+                entry={entry}
+                hourHeight={hourHeight}
+                onClick={onEntryClick}
+                onContextMenu={onEntryContextMenu}
+              />
+            ))
+          )}
         </div>
       </div>
     </div>
