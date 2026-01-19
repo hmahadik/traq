@@ -110,62 +110,6 @@ func (s *Store) GetSummaryBySession(sessionID int64) (*Summary, error) {
 	return sum, nil
 }
 
-// GetSummariesByDateRange retrieves summaries created within a time range.
-func (s *Store) GetSummariesByDateRange(start, end int64) ([]*Summary, error) {
-	rows, err := s.db.Query(`
-		SELECT id, session_id, summary, explanation, confidence, tags,
-		       model_used, inference_time_ms, screenshot_ids, context_json, created_at,
-		       projects
-		FROM summaries
-		WHERE created_at >= ? AND created_at <= ?
-		ORDER BY created_at ASC`, start, end)
-	if err != nil {
-		return nil, fmt.Errorf("failed to query summaries: %w", err)
-	}
-	defer rows.Close()
-
-	return scanSummaries(rows)
-}
-
-// GetRecentSummaries retrieves the most recent N summaries.
-func (s *Store) GetRecentSummaries(limit int) ([]*Summary, error) {
-	rows, err := s.db.Query(`
-		SELECT id, session_id, summary, explanation, confidence, tags,
-		       model_used, inference_time_ms, screenshot_ids, context_json, created_at,
-		       projects
-		FROM summaries
-		ORDER BY created_at DESC
-		LIMIT ?`, limit)
-	if err != nil {
-		return nil, fmt.Errorf("failed to query recent summaries: %w", err)
-	}
-	defer rows.Close()
-
-	return scanSummaries(rows)
-}
-
-// UpdateSummary updates an existing summary.
-func (s *Store) UpdateSummary(sum *Summary) error {
-	tagsJSON := ToJSONString(sum.Tags)
-	screenshotIDsJSON := ToJSONString(sum.ScreenshotIDs)
-	projectsJSON := toProjectsJSON(sum.Projects)
-
-	_, err := s.db.Exec(`
-		UPDATE summaries SET
-			summary = ?, explanation = ?, confidence = ?, tags = ?,
-			model_used = ?, inference_time_ms = ?, screenshot_ids = ?, context_json = ?,
-			projects = ?
-		WHERE id = ?`,
-		sum.Summary, sum.Explanation, sum.Confidence, tagsJSON,
-		sum.ModelUsed, sum.InferenceTimeMs, screenshotIDsJSON, sum.ContextJSON,
-		projectsJSON, sum.ID,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to update summary: %w", err)
-	}
-	return nil
-}
-
 // DeleteSummary deletes a summary by ID.
 func (s *Store) DeleteSummary(id int64) error {
 	// Clear any session references first (sessions.summary_id -> summaries.id)

@@ -2,12 +2,11 @@ import { useState, useCallback, useMemo, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { ChevronLeft, ChevronRight, Calendar, Sparkles, Loader2 } from 'lucide-react';
-import { CalendarWidget, ViewModeSelector, ViewMode } from '@/components/timeline';
+import { CalendarWidget } from '@/components/timeline';
 import {
   useTimelineGridData,
   useCalendarHeatmap,
   useGenerateSummary,
-  useWeekTimelineData,
   useScreenshotsForDate,
   useDeleteActivities,
   useDeleteBrowserVisits,
@@ -17,13 +16,9 @@ import {
   useDeleteAFKEvents,
 } from '@/api/hooks';
 import { TimelineGridView } from '@/components/timeline/TimelineGridView';
-import { TimelineListView, EventKey, parseEventKey, makeEventKey } from '@/components/timeline/TimelineListView';
-import { SplitTimelineView } from '@/components/timeline/SplitTimelineView';
 import { EventDropsTimeline, EventDot } from '@/components/timeline/eventDrops';
 import { ListModeToggle, DisplayMode } from '@/components/timeline/ListModeToggle';
-import { TimelineWeekView, TimelineWeekViewSkeleton } from '@/components/timeline/TimelineWeekView';
 import { DailySummaryCard } from '@/components/timeline/DailySummaryCard';
-import { WeekSummaryCard } from '@/components/timeline/WeekSummaryCard';
 import { BreakdownBar } from '@/components/timeline/BreakdownBar';
 import { TopAppsSection } from '@/components/timeline/TopAppsSection';
 import { TimelinePageSkeleton } from '@/components/timeline/TimelineGridSkeleton';
@@ -34,6 +29,7 @@ import { SessionDetailDrawer } from '@/components/session/SessionDetailDrawer';
 import { SelectionToolbar, SelectionBreakdown } from '@/components/timeline/SelectionToolbar';
 import { ActivityEditDialog } from '@/components/timeline/ActivityEditDialog';
 import { useActivitySelection } from '@/hooks/useActivitySelection';
+import { EventKey, parseEventKey } from '@/utils/eventKeys';
 import type { ActivityBlock } from '@/types/timeline';
 import { toast } from 'sonner';
 
@@ -50,31 +46,8 @@ function addDays(date: Date, days: number): Date {
   return result;
 }
 
-// Get the Monday of the week for a given date
-function getWeekStartDate(date: Date): string {
-  const d = new Date(date);
-  const day = d.getDay();
-  const diff = day === 0 ? -6 : 1 - day; // Monday is day 1, Sunday is day 0
-  d.setDate(d.getDate() + diff);
-  return getDateString(d);
-}
-
-// Format date range for week view header
-function formatWeekRange(startDate: string, endDate: string): string {
-  const start = new Date(startDate + 'T00:00:00');
-  const end = new Date(endDate + 'T00:00:00');
-  const startMonth = start.toLocaleDateString('en-US', { month: 'short' });
-  const endMonth = end.toLocaleDateString('en-US', { month: 'short' });
-
-  if (startMonth === endMonth) {
-    return `${startMonth} ${start.getDate()} - ${end.getDate()}`;
-  }
-  return `${startMonth} ${start.getDate()} - ${endMonth} ${end.getDate()}`;
-}
-
 const FILTER_STORAGE_KEY = 'timeline-filters';
 const ZOOM_STORAGE_KEY = 'timeline-zoom';
-const VIEW_MODE_STORAGE_KEY = 'timeline-view-mode';
 const DISPLAY_MODE_STORAGE_KEY = 'timeline-display-mode';
 
 export function TimelinePage() {
@@ -119,22 +92,11 @@ export function TimelinePage() {
   // Lasso preview keys for all event types (grid view highlighting)
   const [lassoPreviewKeys, setLassoPreviewKeys] = useState<Set<EventKey>>(new Set());
 
-  // View mode state with localStorage persistence
-  const [viewMode, setViewMode] = useState<ViewMode>(() => {
-    try {
-      const stored = localStorage.getItem(VIEW_MODE_STORAGE_KEY);
-      if (stored === 'day' || stored === 'week') return stored;
-    } catch (e) {
-      console.error('Failed to load view mode from localStorage:', e);
-    }
-    return 'day';
-  });
-
-  // Display mode state for day view (grid vs list vs split vs drops)
+  // Display mode state (grid vs drops)
   const [displayMode, setDisplayMode] = useState<DisplayMode>(() => {
     try {
       const stored = localStorage.getItem(DISPLAY_MODE_STORAGE_KEY);
-      if (stored === 'grid' || stored === 'list' || stored === 'split' || stored === 'drops') return stored as DisplayMode;
+      if (stored === 'grid' || stored === 'drops') return stored as DisplayMode;
     } catch (e) {
       console.error('Failed to load display mode from localStorage:', e);
     }
@@ -169,15 +131,6 @@ export function TimelinePage() {
     }
     return DEFAULT_ZOOM;
   });
-
-  // Persist view mode
-  useEffect(() => {
-    try {
-      localStorage.setItem(VIEW_MODE_STORAGE_KEY, viewMode);
-    } catch (e) {
-      console.error('Failed to save view mode to localStorage:', e);
-    }
-  }, [viewMode]);
 
   // Persist display mode
   useEffect(() => {
@@ -219,20 +172,9 @@ export function TimelinePage() {
 
   const dateStr = getDateString(selectedDate);
   const isToday = dateStr === getDateString(new Date());
-  const weekStartDate = useMemo(() => getWeekStartDate(selectedDate), [selectedDate]);
 
-  // Check if we're in the current week
-  const isCurrentWeek = useMemo(() => {
-    const todayWeekStart = getWeekStartDate(new Date());
-    return weekStartDate === todayWeekStart;
-  }, [weekStartDate]);
-
-  // Fetch data based on view mode
-  const { data: gridData, isLoading: gridLoading } = useTimelineGridData(dateStr);
-  const { data: weekData, isLoading: weekLoading } = useWeekTimelineData(
-    weekStartDate,
-    viewMode === 'week'
-  );
+  // Fetch timeline grid data
+  const { data: gridData, isLoading } = useTimelineGridData(dateStr);
   const { data: calendarData, isLoading: calendarLoading } = useCalendarHeatmap(
     selectedDate.getFullYear(),
     selectedDate.getMonth() + 1
@@ -364,14 +306,6 @@ export function TimelinePage() {
     [handleActivityClick]
   );
 
-  // Handle activity selection for list view (needs ordered IDs for shift+click range)
-  const handleListActivitySelect = useCallback(
-    (id: number, event: React.MouseEvent, orderedIds: number[]) => {
-      handleActivityClick(id, event, orderedIds);
-    },
-    [handleActivityClick]
-  );
-
   // Handle double-click to edit activity
   const handleActivityDoubleClick = useCallback((activity: ActivityBlock) => {
     setEditingActivity(activity);
@@ -388,31 +322,6 @@ export function TimelinePage() {
   const handleLassoPreviewKeys = useCallback((keys: string[]) => {
     setLassoPreviewKeys(new Set(keys));
   }, []);
-
-  // Handle event selection for list view (supports all event types)
-  const handleEventSelect = useCallback((key: EventKey, event: React.MouseEvent) => {
-    setSelectedEventKeys((prev) => {
-      const next = new Set(prev);
-      if (event.ctrlKey || event.metaKey) {
-        // Toggle selection
-        if (next.has(key)) {
-          next.delete(key);
-        } else {
-          next.add(key);
-        }
-      } else {
-        // Single selection - clear others and select this one
-        next.clear();
-        next.add(key);
-      }
-      return next;
-    });
-    // Also sync activity selection for backward compatibility
-    const { type, id } = parseEventKey(key);
-    if (type === 'activity') {
-      handleActivityClick(id, event);
-    }
-  }, [handleActivityClick]);
 
   // Compute breakdown from selectedEventKeys
   const selectionBreakdown = useMemo((): SelectionBreakdown => {
@@ -535,33 +444,17 @@ export function TimelinePage() {
     clearAllSelections();
   }, [dateStr, clearAllSelections]);
 
-  // Navigation handlers - adjust based on view mode
+  // Navigation handlers
   const goToPrevious = useCallback(() => {
-    if (viewMode === 'day') {
-      setSelectedDate((d) => addDays(d, -1));
-    } else {
-      setSelectedDate((d) => addDays(d, -7));
-    }
-  }, [viewMode]);
+    setSelectedDate((d) => addDays(d, -1));
+  }, []);
 
   const goToNext = useCallback(() => {
-    if (viewMode === 'day') {
-      if (!isToday) setSelectedDate((d) => addDays(d, 1));
-    } else {
-      // In week mode, check if next week is in the future
-      if (!isCurrentWeek) setSelectedDate((d) => addDays(d, 7));
-    }
-  }, [viewMode, isToday, isCurrentWeek]);
+    if (!isToday) setSelectedDate((d) => addDays(d, 1));
+  }, [isToday]);
 
   const handleDateSelect = useCallback((date: Date) => {
     setSelectedDate(date);
-  }, []);
-
-  // Handle clicking a day in week view - switch to day view for that date
-  const handleWeekDayClick = useCallback((date: string) => {
-    const [year, month, day] = date.split('-').map(Number);
-    setSelectedDate(new Date(year, month - 1, day));
-    setViewMode('day');
   }, []);
 
   const handleSearchNavigateToDate = useCallback((dateString: string) => {
@@ -571,24 +464,14 @@ export function TimelinePage() {
     setShowCalendar(false);
   }, []);
 
-  // Format header based on view mode
-  const formattedDate = viewMode === 'day'
-    ? selectedDate.toLocaleDateString('en-US', {
-        weekday: 'short',
-        month: 'short',
-        day: 'numeric',
-      })
-    : weekData
-      ? formatWeekRange(weekData.startDate, weekData.endDate)
-      : 'Loading...';
+  // Format header date
+  const formattedDate = selectedDate.toLocaleDateString('en-US', {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+  });
 
-  // Determine loading state based on view mode
-  const isLoading = viewMode === 'day' ? gridLoading : weekLoading;
-
-  // Determine if next button should be disabled
-  const isNextDisabled = viewMode === 'day' ? isToday : isCurrentWeek;
-
-  // Keyboard shortcuts for view switching
+  // Keyboard shortcuts for navigation
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Only trigger if not in an input/textarea
@@ -597,218 +480,80 @@ export function TimelinePage() {
       }
 
       switch (e.key.toLowerCase()) {
-        case 'd':
-          setViewMode('day');
-          break;
-        case 'w':
-          setViewMode('week');
-          break;
         case 'arrowleft':
           goToPrevious();
           break;
         case 'arrowright':
-          if (!isNextDisabled) goToNext();
+          if (!isToday) goToNext();
           break;
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [goToPrevious, goToNext, isNextDisabled]);
+  }, [goToPrevious, goToNext, isToday]);
 
-  // Render content based on view mode
+  // Render timeline content
   const renderContent = () => {
     if (isLoading) {
-      return viewMode === 'day' ? <TimelinePageSkeleton /> : <TimelineWeekViewSkeleton />;
+      return <TimelinePageSkeleton />;
     }
 
-    if (viewMode === 'day') {
-      if (!gridData) {
-        return (
-          <div className="flex items-center justify-center h-64 text-muted-foreground">
-            No data available
-          </div>
-        );
-      }
-
+    if (!gridData) {
       return (
-        <>
-          {/* Left Sidebar */}
-          <div className="xl:w-72 xl:flex-shrink-0">
-            <div className="xl:sticky xl:top-0 space-y-3">
-              <DailySummaryCard stats={gridData.dayStats || null} />
-              <BreakdownBar stats={gridData.dayStats || null} />
-              <TopAppsSection topApps={gridData.topApps || []} />
-            </div>
-          </div>
-
-          {/* Main Content */}
-          <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-            {/* Desktop Header */}
-            <div className="hidden xl:flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <ViewModeSelector viewMode={viewMode} onViewModeChange={setViewMode} />
-                <div className="w-px h-6 bg-border mx-1" />
-                <ListModeToggle displayMode={displayMode} onDisplayModeChange={setDisplayMode} />
-                <div className="w-px h-6 bg-border mx-1" />
-                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={goToPrevious}>
-                  <ChevronLeft className="h-4 w-4" />
-                </Button>
-                <span className="text-sm font-medium">{formattedDate}</span>
-                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={goToNext} disabled={isNextDisabled}>
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
-                <div className="flex items-center gap-1 ml-2">
-                  <Button
-                    variant={isToday ? 'secondary' : 'ghost'}
-                    size="sm"
-                    className="h-7 text-xs"
-                    onClick={() => handleDateSelect(new Date())}
-                  >
-                    Today
-                  </Button>
-                  <Button
-                    variant={dateStr === getDateString(addDays(new Date(), -1)) ? 'secondary' : 'ghost'}
-                    size="sm"
-                    className="h-7 text-xs"
-                    onClick={() => handleDateSelect(addDays(new Date(), -1))}
-                  >
-                    Yesterday
-                  </Button>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <FilterControls filters={filters} onFiltersChange={setFilters} />
-                {(displayMode === 'grid' || displayMode === 'split') && <ZoomControls zoom={zoom} onZoomChange={setZoom} />}
-                <GlobalSearch onNavigateToDate={handleSearchNavigateToDate} />
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8"
-                  onClick={() => setShowCalendar(!showCalendar)}
-                >
-                  <Calendar className="h-4 w-4" />
-                </Button>
-                {sessionsWithoutSummaries.length > 0 && (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8"
-                    onClick={handleBatchGenerateSummaries}
-                    disabled={isBatchGenerating}
-                    title={`Generate ${sessionsWithoutSummaries.length} summaries`}
-                  >
-                    {isBatchGenerating ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Sparkles className="h-4 w-4" />
-                    )}
-                  </Button>
-                )}
-              </div>
-            </div>
-
-            {displayMode === 'grid' ? (
-              <TimelineGridView
-                data={gridData}
-                filters={filters}
-                hourHeight={zoom}
-                onSessionClick={handleSessionClick}
-                selectedActivityIds={selectedActivityIds}
-                onActivitySelect={handleActivitySelect}
-                onActivityDoubleClick={handleActivityDoubleClick}
-                lassoRect={lassoRect}
-                onLassoStart={startLasso}
-                onLassoMove={updateLasso}
-                onLassoEnd={endLasso}
-                selectedEventKeys={selectedEventKeys}
-                onLassoEndWithKeys={handleLassoEndWithKeys}
-                lassoPreviewIds={lassoPreviewIds}
-                onLassoPreview={setLassoPreviewIds}
-                lassoPreviewKeys={lassoPreviewKeys}
-                onLassoPreviewKeys={handleLassoPreviewKeys}
-              />
-            ) : displayMode === 'list' ? (
-              <TimelineListView
-                data={gridData}
-                filters={filters}
-                onSessionClick={handleSessionClick}
-                selectedActivityIds={selectedActivityIds}
-                onActivitySelect={handleListActivitySelect}
-                onActivityDoubleClick={handleActivityDoubleClick}
-                selectedEventKeys={selectedEventKeys}
-                onEventSelect={handleEventSelect}
-              />
-            ) : displayMode === 'drops' ? (
-              /* EventDrops view - D3-based horizontal timeline */
-              <EventDropsTimeline
-                data={gridData}
-                filters={filters}
-                screenshots={screenshotsData}
-                onEventDelete={handleEventDropDelete}
-                onEventEdit={handleEventDropEdit}
-                onViewScreenshot={handleEventDropViewScreenshot}
-              />
-            ) : (
-              /* Split view - Grid and List side by side with synchronized scrolling */
-              <SplitTimelineView
-                data={gridData}
-                filters={filters}
-                hourHeight={zoom}
-                onSessionClick={handleSessionClick}
-                selectedActivityIds={selectedActivityIds}
-                onActivitySelect={handleActivitySelect}
-                onActivityDoubleClick={handleActivityDoubleClick}
-                lassoRect={lassoRect}
-                onLassoStart={startLasso}
-                onLassoMove={updateLasso}
-                onLassoEnd={endLasso}
-                onListActivitySelect={handleListActivitySelect}
-                lassoPreviewIds={lassoPreviewIds}
-                onLassoPreview={setLassoPreviewIds}
-              />
-            )}
-          </div>
-        </>
+        <div className="flex items-center justify-center h-64 text-muted-foreground">
+          No data available
+        </div>
       );
     }
 
-    // Week view
     return (
       <>
-        {/* Left Sidebar for Week View */}
+        {/* Left Sidebar */}
         <div className="xl:w-72 xl:flex-shrink-0">
           <div className="xl:sticky xl:top-0 space-y-3">
-            <WeekSummaryCard stats={weekData?.weekStats || null} />
+            <DailySummaryCard stats={gridData.dayStats || null} />
+            <BreakdownBar stats={gridData.dayStats || null} />
+            <TopAppsSection topApps={gridData.topApps || []} />
           </div>
         </div>
 
-        {/* Main Content - Week Grid */}
+        {/* Main Content */}
         <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
           {/* Desktop Header */}
           <div className="hidden xl:flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
-              <ViewModeSelector viewMode={viewMode} onViewModeChange={setViewMode} />
+              <ListModeToggle displayMode={displayMode} onDisplayModeChange={setDisplayMode} />
               <div className="w-px h-6 bg-border mx-1" />
               <Button variant="ghost" size="icon" className="h-8 w-8" onClick={goToPrevious}>
                 <ChevronLeft className="h-4 w-4" />
               </Button>
               <span className="text-sm font-medium">{formattedDate}</span>
-              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={goToNext} disabled={isNextDisabled}>
+              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={goToNext} disabled={isToday}>
                 <ChevronRight className="h-4 w-4" />
               </Button>
               <div className="flex items-center gap-1 ml-2">
                 <Button
-                  variant={isCurrentWeek ? 'secondary' : 'ghost'}
+                  variant={isToday ? 'secondary' : 'ghost'}
                   size="sm"
                   className="h-7 text-xs"
                   onClick={() => handleDateSelect(new Date())}
                 >
-                  This Week
+                  Today
+                </Button>
+                <Button
+                  variant={dateStr === getDateString(addDays(new Date(), -1)) ? 'secondary' : 'ghost'}
+                  size="sm"
+                  className="h-7 text-xs"
+                  onClick={() => handleDateSelect(addDays(new Date(), -1))}
+                >
+                  Yesterday
                 </Button>
               </div>
             </div>
             <div className="flex items-center gap-2">
+              <FilterControls filters={filters} onFiltersChange={setFilters} />
+              {displayMode === 'grid' && <ZoomControls zoom={zoom} onZoomChange={setZoom} />}
               <GlobalSearch onNavigateToDate={handleSearchNavigateToDate} />
               <Button
                 variant="ghost"
@@ -818,10 +563,55 @@ export function TimelinePage() {
               >
                 <Calendar className="h-4 w-4" />
               </Button>
+              {sessionsWithoutSummaries.length > 0 && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={handleBatchGenerateSummaries}
+                  disabled={isBatchGenerating}
+                  title={`Generate ${sessionsWithoutSummaries.length} summaries`}
+                >
+                  {isBatchGenerating ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Sparkles className="h-4 w-4" />
+                  )}
+                </Button>
+              )}
             </div>
           </div>
 
-          <TimelineWeekView data={weekData || null} onDayClick={handleWeekDayClick} />
+          {displayMode === 'grid' ? (
+            <TimelineGridView
+              data={gridData}
+              filters={filters}
+              hourHeight={zoom}
+              onSessionClick={handleSessionClick}
+              selectedActivityIds={selectedActivityIds}
+              onActivitySelect={handleActivitySelect}
+              onActivityDoubleClick={handleActivityDoubleClick}
+              lassoRect={lassoRect}
+              onLassoStart={startLasso}
+              onLassoMove={updateLasso}
+              onLassoEnd={endLasso}
+              selectedEventKeys={selectedEventKeys}
+              onLassoEndWithKeys={handleLassoEndWithKeys}
+              lassoPreviewIds={lassoPreviewIds}
+              onLassoPreview={setLassoPreviewIds}
+              lassoPreviewKeys={lassoPreviewKeys}
+              onLassoPreviewKeys={handleLassoPreviewKeys}
+            />
+          ) : (
+            <EventDropsTimeline
+              data={gridData}
+              filters={filters}
+              screenshots={screenshotsData}
+              onEventDelete={handleEventDropDelete}
+              onEventEdit={handleEventDropEdit}
+              onViewScreenshot={handleEventDropViewScreenshot}
+            />
+          )}
         </div>
       </>
     );
@@ -832,23 +622,18 @@ export function TimelinePage() {
       {/* Mobile Header */}
       <div className="xl:hidden flex items-center justify-between gap-2 flex-wrap">
         <div className="flex items-center gap-2">
-          <ViewModeSelector viewMode={viewMode} onViewModeChange={setViewMode} />
-          {viewMode === 'day' && <ListModeToggle displayMode={displayMode} onDisplayModeChange={setDisplayMode} />}
+          <ListModeToggle displayMode={displayMode} onDisplayModeChange={setDisplayMode} />
           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={goToPrevious}>
             <ChevronLeft className="h-4 w-4" />
           </Button>
           <span className="text-sm font-medium min-w-[100px] text-center">{formattedDate}</span>
-          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={goToNext} disabled={isNextDisabled}>
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={goToNext} disabled={isToday}>
             <ChevronRight className="h-4 w-4" />
           </Button>
         </div>
         <div className="flex items-center gap-2">
-          {viewMode === 'day' && (
-            <>
-              <FilterControls filters={filters} onFiltersChange={setFilters} />
-              {(displayMode === 'grid' || displayMode === 'split') && <ZoomControls zoom={zoom} onZoomChange={setZoom} />}
-            </>
-          )}
+          <FilterControls filters={filters} onFiltersChange={setFilters} />
+          {displayMode === 'grid' && <ZoomControls zoom={zoom} onZoomChange={setZoom} />}
           <GlobalSearch onNavigateToDate={handleSearchNavigateToDate} />
           <Button
             variant="ghost"
@@ -858,7 +643,7 @@ export function TimelinePage() {
           >
             <Calendar className="h-4 w-4" />
           </Button>
-          {viewMode === 'day' && sessionsWithoutSummaries.length > 0 && (
+          {sessionsWithoutSummaries.length > 0 && (
             <Button
               variant="ghost"
               size="icon"
@@ -887,23 +672,21 @@ export function TimelinePage() {
       />
 
       {/* Activity Selection Toolbar */}
-      {viewMode === 'day' && (
-        <SelectionToolbar
-          selectedCount={selectedEventKeys.size > 0 ? selectedEventKeys.size : selectedCount}
-          onDelete={handleDeleteSelected}
-          onEdit={handleEditSelected}
-          onClear={clearAllSelections}
-          isDeleting={
-            deleteActivities.isPending ||
-            deleteBrowserVisits.isPending ||
-            deleteGitCommits.isPending ||
-            deleteShellCommands.isPending ||
-            deleteFileEvents.isPending ||
-            deleteAFKEvents.isPending
-          }
-          breakdown={selectedEventKeys.size > 0 ? selectionBreakdown : (selectedCount > 0 ? { activity: selectedCount } : undefined)}
-        />
-      )}
+      <SelectionToolbar
+        selectedCount={selectedEventKeys.size > 0 ? selectedEventKeys.size : selectedCount}
+        onDelete={handleDeleteSelected}
+        onEdit={handleEditSelected}
+        onClear={clearAllSelections}
+        isDeleting={
+          deleteActivities.isPending ||
+          deleteBrowserVisits.isPending ||
+          deleteGitCommits.isPending ||
+          deleteShellCommands.isPending ||
+          deleteFileEvents.isPending ||
+          deleteAFKEvents.isPending
+        }
+        breakdown={selectedEventKeys.size > 0 ? selectionBreakdown : (selectedCount > 0 ? { activity: selectedCount } : undefined)}
+      />
 
       {/* Activity Edit Dialog */}
       <ActivityEditDialog

@@ -80,24 +80,6 @@ func (s *Store) GetProject(id int64) (*Project, error) {
 	return &p, nil
 }
 
-// GetProjectByName returns a project by name.
-func (s *Store) GetProjectByName(name string) (*Project, error) {
-	var p Project
-	err := s.db.QueryRow(`
-		SELECT id, name, COALESCE(color, '#6366f1'), COALESCE(description, ''),
-		       COALESCE(detection_patterns, ''), is_manual, created_at
-		FROM projects WHERE name = ?
-	`, name).Scan(&p.ID, &p.Name, &p.Color, &p.Description,
-		&p.DetectionPatterns, &p.IsManual, &p.CreatedAt)
-	if err != nil {
-		if err == sql.ErrNoRows {
-			return nil, nil
-		}
-		return nil, fmt.Errorf("failed to get project by name: %w", err)
-	}
-	return &p, nil
-}
-
 // UpdateProject updates a project.
 func (s *Store) UpdateProject(id int64, name, color, description string) error {
 	_, err := s.db.Exec(`
@@ -214,22 +196,6 @@ func (s *Store) UpsertPattern(projectID int64, patternType, patternValue, matchT
 	return nil
 }
 
-// UpdatePatternWeight updates a pattern's weight.
-func (s *Store) UpdatePatternWeight(patternID int64, newWeight float64) error {
-	// Clamp weight between 0.1 and 2.0
-	if newWeight < 0.1 {
-		newWeight = 0.1
-	}
-	if newWeight > 2.0 {
-		newWeight = 2.0
-	}
-	_, err := s.db.Exec(`UPDATE project_patterns SET weight = ? WHERE id = ?`, newWeight, patternID)
-	if err != nil {
-		return fmt.Errorf("failed to update pattern weight: %w", err)
-	}
-	return nil
-}
-
 // DeletePattern deletes a pattern.
 func (s *Store) DeletePattern(patternID int64) error {
 	_, err := s.db.Exec(`DELETE FROM project_patterns WHERE id = ?`, patternID)
@@ -254,55 +220,6 @@ func (s *Store) AddAssignmentExample(projectID int64, eventType string, eventID 
 		return fmt.Errorf("failed to add assignment example: %w", err)
 	}
 	return nil
-}
-
-// GetRecentAssignmentExamples returns recent examples for few-shot learning.
-func (s *Store) GetRecentAssignmentExamples(limit int) ([]AssignmentExample, error) {
-	rows, err := s.db.Query(`
-		SELECT ae.id, ae.project_id, ae.event_type, ae.event_id, ae.context_json, ae.created_at
-		FROM assignment_examples ae
-		ORDER BY ae.created_at DESC
-		LIMIT ?
-	`, limit)
-	if err != nil {
-		return nil, fmt.Errorf("failed to query assignment examples: %w", err)
-	}
-	defer rows.Close()
-
-	var examples []AssignmentExample
-	for rows.Next() {
-		var e AssignmentExample
-		if err := rows.Scan(&e.ID, &e.ProjectID, &e.EventType, &e.EventID, &e.ContextJSON, &e.CreatedAt); err != nil {
-			return nil, fmt.Errorf("failed to scan assignment example: %w", err)
-		}
-		examples = append(examples, e)
-	}
-	return examples, nil
-}
-
-// GetAssignmentExamplesForProject returns examples for a specific project.
-func (s *Store) GetAssignmentExamplesForProject(projectID int64, limit int) ([]AssignmentExample, error) {
-	rows, err := s.db.Query(`
-		SELECT id, project_id, event_type, event_id, context_json, created_at
-		FROM assignment_examples
-		WHERE project_id = ?
-		ORDER BY created_at DESC
-		LIMIT ?
-	`, projectID, limit)
-	if err != nil {
-		return nil, fmt.Errorf("failed to query project examples: %w", err)
-	}
-	defer rows.Close()
-
-	var examples []AssignmentExample
-	for rows.Next() {
-		var e AssignmentExample
-		if err := rows.Scan(&e.ID, &e.ProjectID, &e.EventType, &e.EventID, &e.ContextJSON, &e.CreatedAt); err != nil {
-			return nil, fmt.Errorf("failed to scan assignment example: %w", err)
-		}
-		examples = append(examples, e)
-	}
-	return examples, nil
 }
 
 // ============================================================================

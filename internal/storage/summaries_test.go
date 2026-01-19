@@ -103,59 +103,6 @@ func TestGetSummaryBySession_NotFound(t *testing.T) {
 	}
 }
 
-func TestGetRecentSummaries(t *testing.T) {
-	store, cleanup := testStore(t)
-	defer cleanup()
-
-	// Create multiple summaries
-	for i := 0; i < 5; i++ {
-		sum := &Summary{
-			Summary:   "Summary " + string(rune('A'+i)),
-			ModelUsed: "test-model",
-		}
-		store.SaveSummary(sum)
-	}
-
-	// Get recent 3
-	summaries, err := store.GetRecentSummaries(3)
-	if err != nil {
-		t.Fatalf("failed to get recent summaries: %v", err)
-	}
-	if len(summaries) != 3 {
-		t.Errorf("got %d summaries, want 3", len(summaries))
-	}
-}
-
-func TestUpdateSummary(t *testing.T) {
-	store, cleanup := testStore(t)
-	defer cleanup()
-
-	sum := &Summary{
-		Summary:   "Original",
-		ModelUsed: "test-model",
-		Tags:      []string{"original"},
-	}
-	id, _ := store.SaveSummary(sum)
-
-	// Update
-	sum.ID = id
-	sum.Summary = "Updated"
-	sum.Tags = []string{"updated", "new"}
-	err := store.UpdateSummary(sum)
-	if err != nil {
-		t.Fatalf("failed to update summary: %v", err)
-	}
-
-	// Verify
-	updated, _ := store.GetSummary(id)
-	if updated.Summary != "Updated" {
-		t.Errorf("got Summary=%s, want 'Updated'", updated.Summary)
-	}
-	if len(updated.Tags) != 2 {
-		t.Errorf("got %d tags, want 2", len(updated.Tags))
-	}
-}
-
 func TestDeleteSummary(t *testing.T) {
 	store, cleanup := testStore(t)
 	defer cleanup()
@@ -203,29 +150,6 @@ func TestCountSummaries(t *testing.T) {
 	}
 	if count != 3 {
 		t.Errorf("expected 3, got %d", count)
-	}
-}
-
-func TestGetSummariesByDateRange(t *testing.T) {
-	store, cleanup := testStore(t)
-	defer cleanup()
-
-	// Create summaries (created_at is set automatically)
-	for i := 0; i < 3; i++ {
-		sum := &Summary{
-			Summary:   "Test",
-			ModelUsed: "model",
-		}
-		store.SaveSummary(sum)
-	}
-
-	now := time.Now().Unix()
-	summaries, err := store.GetSummariesByDateRange(now-60, now+60)
-	if err != nil {
-		t.Fatalf("failed to get summaries by date range: %v", err)
-	}
-	if len(summaries) != 3 {
-		t.Errorf("got %d summaries, want 3", len(summaries))
 	}
 }
 

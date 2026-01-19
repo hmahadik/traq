@@ -100,21 +100,6 @@ func (s *Store) GetCurrentSession() (*Session, error) {
 	return sess, nil
 }
 
-// GetSessionsByDateRange retrieves sessions that overlap with the given time range.
-func (s *Store) GetSessionsByDateRange(start, end int64) ([]*Session, error) {
-	rows, err := s.db.Query(`
-		SELECT id, start_time, end_time, duration_seconds, screenshot_count, summary_id, created_at
-		FROM sessions
-		WHERE start_time <= ? AND (end_time >= ? OR end_time IS NULL)
-		ORDER BY start_time ASC`, end, start)
-	if err != nil {
-		return nil, fmt.Errorf("failed to query sessions: %w", err)
-	}
-	defer rows.Close()
-
-	return scanSessions(rows)
-}
-
 // GetSessionsForDate retrieves all sessions for a specific date.
 func (s *Store) GetSessionsForDate(year, month, day int) ([]*Session, error) {
 	dateStr := fmt.Sprintf("%04d-%02d-%02d", year, month, day)
@@ -223,22 +208,6 @@ func (s *Store) DeleteSession(id int64) error {
 	}
 
 	return nil
-}
-
-// GetSessionsWithoutSummary retrieves sessions that don't have a summary yet.
-func (s *Store) GetSessionsWithoutSummary(limit int) ([]*Session, error) {
-	rows, err := s.db.Query(`
-		SELECT id, start_time, end_time, duration_seconds, screenshot_count, summary_id, created_at
-		FROM sessions
-		WHERE summary_id IS NULL AND end_time IS NOT NULL AND screenshot_count > 0
-		ORDER BY start_time DESC
-		LIMIT ?`, limit)
-	if err != nil {
-		return nil, fmt.Errorf("failed to query sessions without summary: %w", err)
-	}
-	defer rows.Close()
-
-	return scanSessions(rows)
 }
 
 // CountSessions returns the total number of sessions.

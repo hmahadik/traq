@@ -227,19 +227,6 @@ func (s *Store) DeleteFocusEvents(ids []int64) error {
 	return nil
 }
 
-// SetFocusEventStatus updates the memory status of a focus event.
-// Valid statuses: 'active', 'ignored'
-func (s *Store) SetFocusEventStatus(id int64, status string) error {
-	if status != "active" && status != "ignored" {
-		return fmt.Errorf("invalid status: %s", status)
-	}
-	_, err := s.db.Exec(
-		"UPDATE window_focus_events SET memory_status = ? WHERE id = ?",
-		status, id,
-	)
-	return err
-}
-
 // SetFocusEventsStatus updates status for multiple focus events.
 func (s *Store) SetFocusEventsStatus(ids []int64, status string) error {
 	if status != "active" && status != "ignored" {

@@ -164,44 +164,6 @@ func TestGetRecentSessions(t *testing.T) {
 	}
 }
 
-func TestGetSessionsWithoutSummary(t *testing.T) {
-	store, cleanup := testStore(t)
-	defer cleanup()
-
-	// Create a completed session with screenshots but no summary
-	now := time.Now().Unix()
-	id, err := store.CreateSession(now - 3600)
-	if err != nil {
-		t.Fatalf("failed to create session: %v", err)
-	}
-
-	// Add a screenshot to the session
-	sc := &Screenshot{
-		Timestamp: now - 1800,
-		Filepath:  "/test/screenshot.webp",
-		SessionID: NullInt64(id),
-	}
-	_, err = store.SaveScreenshot(sc)
-	if err != nil {
-		t.Fatalf("failed to save screenshot: %v", err)
-	}
-
-	// End the session
-	err = store.EndSession(id, now)
-	if err != nil {
-		t.Fatalf("failed to end session: %v", err)
-	}
-
-	// Should find the session without summary
-	sessions, err := store.GetSessionsWithoutSummary(10)
-	if err != nil {
-		t.Fatalf("failed to get sessions without summary: %v", err)
-	}
-	if len(sessions) != 1 {
-		t.Errorf("got %d sessions, want 1", len(sessions))
-	}
-}
-
 func TestCountSessions(t *testing.T) {
 	store, cleanup := testStore(t)
 	defer cleanup()

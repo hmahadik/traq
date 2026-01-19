@@ -179,43 +179,6 @@ func TestGetScreenshotsBySession(t *testing.T) {
 	}
 }
 
-func TestGetLatestScreenshot(t *testing.T) {
-	store, cleanup := testStore(t)
-	defer cleanup()
-
-	// No screenshots
-	latest, err := store.GetLatestScreenshot()
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if latest != nil {
-		t.Error("expected nil when no screenshots exist")
-	}
-
-	// Add screenshots
-	now := time.Now().Unix()
-	for i := 0; i < 3; i++ {
-		sc := &Screenshot{
-			Timestamp: now + int64(i*60),
-			Filepath:  "/test/screenshot.webp",
-			DHash:     "d:hash" + string(rune('0'+i)),
-		}
-		store.SaveScreenshot(sc)
-	}
-
-	// Get latest
-	latest, err = store.GetLatestScreenshot()
-	if err != nil {
-		t.Fatalf("failed to get latest screenshot: %v", err)
-	}
-	if latest == nil {
-		t.Fatal("expected to find latest screenshot")
-	}
-	if latest.Timestamp != now+120 {
-		t.Errorf("got timestamp %d, want %d", latest.Timestamp, now+120)
-	}
-}
-
 func TestDeleteScreenshot(t *testing.T) {
 	store, cleanup := testStore(t)
 	defer cleanup()

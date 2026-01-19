@@ -285,13 +285,6 @@ func (s *UpdateService) HasPendingUpdate() bool {
 	return s.updatePending
 }
 
-// GetPendingUpdateInfo returns info about the pending update.
-func (s *UpdateService) GetPendingUpdateInfo() *UpdateInfo {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	return s.pendingInfo
-}
-
 // ApplyPendingUpdate applies a staged update by replacing the binary.
 // This should be called early in startup, before the app fully initializes.
 // Returns true if an update was applied and the app should restart.
