@@ -17,6 +17,8 @@ import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { ImageGallery } from '@/components/common/ImageGallery';
 import { useScreenshotsForDate, useEntriesForDate } from '@/api/hooks';
 import type { Screenshot } from '@/types';
+import { useActivitySelection } from './useActivitySelection';
+import { AssignmentToolbar } from './AssignmentToolbar';
 
 // Event key format: "eventType:id" e.g. "activity:123", "browser:456"
 type EventKey = string;
@@ -88,6 +90,18 @@ export const TimelineGridView: React.FC<TimelineGridViewProps> = ({
 
   // Fetch entries for the Entries lane
   const { data: entries } = useEntriesForDate(data.date);
+
+  // Activity selection for project assignment
+  const {
+    selectedActivities,
+    toggleSelection,
+    clearSelection,
+  } = useActivitySelection();
+
+  // Create a Set for efficient lookup
+  const selectedEntryIds = new Set(
+    selectedActivities.map(a => `${a.eventType}-${a.eventId}`)
+  );
 
   // ImageGallery state
   const [galleryOpen, setGalleryOpen] = useState(false);
@@ -397,9 +411,17 @@ export const TimelineGridView: React.FC<TimelineGridViewProps> = ({
             entries={entries || []}
             hours={activeHours}
             hourHeight={effectiveHourHeight}
+            selectedIds={selectedEntryIds}
             onEntryClick={(entry) => {
               // Could open a detail view or similar
               console.log('Entry clicked:', entry);
+            }}
+            onEntrySelect={(entry) => {
+              toggleSelection({
+                eventType: entry.eventType,
+                eventId: entry.id,
+                projectId: entry.projectId,
+              });
             }}
           />
 
@@ -529,6 +551,12 @@ export const TimelineGridView: React.FC<TimelineGridViewProps> = ({
           }}
         />
       )}
+
+      {/* Assignment toolbar for bulk project assignment */}
+      <AssignmentToolbar
+        selectedActivities={selectedActivities}
+        onClearSelection={clearSelection}
+      />
     </div>
   );
 };
