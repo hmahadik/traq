@@ -402,6 +402,23 @@ export const reports = {
 };
 
 /**
+ * Report Config API - Settings for report generation
+ */
+export const reportConfig = {
+  /** Get whether unassigned activities are included in reports */
+  getIncludeUnassigned: async (): Promise<boolean> => {
+    await waitForReady();
+    return withRetry(() => App.GetReportIncludeUnassigned());
+  },
+
+  /** Set whether unassigned activities should be included in reports */
+  setIncludeUnassigned: async (include: boolean): Promise<void> => {
+    await waitForReady();
+    return App.SetReportIncludeUnassigned(include);
+  },
+};
+
+/**
  * Config API
  */
 export const config = {
@@ -563,6 +580,34 @@ export const screenshots = {
 };
 
 /**
+ * Entries API - Activity entries for a date (focus events, browser visits, git commits, etc.)
+ */
+export const entries = {
+  /** Get all entries (activity blocks) for a specific date */
+  getForDate: async (date: string) => {
+    await waitForReady();
+    return withRetry(() => App.GetEntriesForDate(date));
+  },
+};
+
+/**
+ * Backfill API - Batch project assignment based on learned patterns
+ */
+export const backfill = {
+  /** Preview what would be assigned without making changes */
+  preview: async (startDate: string, endDate: string, minConfidence: number) => {
+    await waitForReady();
+    return withRetry(() => App.PreviewBackfill(startDate, endDate, minConfidence));
+  },
+
+  /** Run backfill to assign projects to activities */
+  run: async (startDate: string, endDate: string, minConfidence: number) => {
+    await waitForReady();
+    return withRetry(() => App.BackfillProjects(startDate, endDate, minConfidence));
+  },
+};
+
+/**
  * Activities API - Window focus events (ActivityBlocks)
  */
 export const activities = {
@@ -594,6 +639,18 @@ export const activities = {
   deleteMany: async (ids: number[]) => {
     await waitForReady();
     return App.DeleteFocusEvents(ids);
+  },
+
+  /** Mark activities as ignored (excluded from reports) */
+  ignore: async (eventType: string, ids: number[]) => {
+    await waitForReady();
+    return App.IgnoreActivities(eventType, ids);
+  },
+
+  /** Unmark activities as ignored (include in reports again) */
+  unignore: async (eventType: string, ids: number[]) => {
+    await waitForReady();
+    return App.UnignoreActivities(eventType, ids);
   },
 };
 
@@ -992,8 +1049,11 @@ export const api = {
   analytics,
   timeline,
   reports,
+  reportConfig,
   config,
   screenshots,
+  entries,
+  backfill,
   activities,
   events,
   system,
