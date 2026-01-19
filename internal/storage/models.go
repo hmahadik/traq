@@ -78,6 +78,7 @@ type WindowFocusEvent struct {
 	ProjectID         sql.NullInt64   `json:"projectId"`
 	ProjectConfidence sql.NullFloat64 `json:"projectConfidence"`
 	ProjectSource     sql.NullString  `json:"projectSource"` // 'unassigned', 'user', 'rule', 'ai'
+	MemoryStatus      string          `json:"memoryStatus"`  // 'active' or 'ignored'
 	CreatedAt         int64           `json:"createdAt"`
 }
 

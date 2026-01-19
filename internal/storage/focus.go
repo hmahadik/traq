@@ -3,6 +3,7 @@ package storage
 import (
 	"database/sql"
 	"fmt"
+	"strings"
 )
 
 // SaveFocusEvent saves a window focus event.
@@ -224,6 +225,77 @@ func (s *Store) DeleteFocusEvents(ids []int64) error {
 		return fmt.Errorf("no focus events found to delete")
 	}
 	return nil
+}
+
+// SetFocusEventStatus updates the memory status of a focus event.
+// Valid statuses: 'active', 'ignored'
+func (s *Store) SetFocusEventStatus(id int64, status string) error {
+	if status != "active" && status != "ignored" {
+		return fmt.Errorf("invalid status: %s", status)
+	}
+	_, err := s.db.Exec(
+		"UPDATE window_focus_events SET memory_status = ? WHERE id = ?",
+		status, id,
+	)
+	return err
+}
+
+// SetFocusEventsStatus updates status for multiple focus events.
+func (s *Store) SetFocusEventsStatus(ids []int64, status string) error {
+	if status != "active" && status != "ignored" {
+		return fmt.Errorf("invalid status: %s", status)
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+
+	placeholders := make([]string, len(ids))
+	args := make([]interface{}, len(ids)+1)
+	args[0] = status
+	for i, id := range ids {
+		placeholders[i] = "?"
+		args[i+1] = id
+	}
+
+	query := fmt.Sprintf(
+		"UPDATE window_focus_events SET memory_status = ? WHERE id IN (%s)",
+		strings.Join(placeholders, ","),
+	)
+	_, err := s.db.Exec(query, args...)
+	return err
+}
+
+// GetActiveFocusEventsByTimeRange returns focus events excluding ignored ones.
+func (s *Store) GetActiveFocusEventsByTimeRange(startTime, endTime int64) ([]*WindowFocusEvent, error) {
+	rows, err := s.db.Query(`
+		SELECT id, window_title, app_name, window_class, start_time, end_time,
+		       duration_seconds, session_id, project_id, project_confidence, project_source,
+		       memory_status
+		FROM window_focus_events
+		WHERE start_time < ? AND end_time > ?
+		  AND memory_status = 'active'
+		ORDER BY start_time
+	`, endTime, startTime)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query active focus events: %w", err)
+	}
+	defer rows.Close()
+
+	var events []*WindowFocusEvent
+	for rows.Next() {
+		e := &WindowFocusEvent{}
+		err := rows.Scan(
+			&e.ID, &e.WindowTitle, &e.AppName, &e.WindowClass,
+			&e.StartTime, &e.EndTime, &e.DurationSeconds, &e.SessionID,
+			&e.ProjectID, &e.ProjectConfidence, &e.ProjectSource,
+			&e.MemoryStatus,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan active focus event: %w", err)
+		}
+		events = append(events, e)
+	}
+	return events, rows.Err()
 }
 
 func scanFocusEvents(rows *sql.Rows) ([]*WindowFocusEvent, error) {
