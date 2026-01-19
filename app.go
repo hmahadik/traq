@@ -1641,6 +1641,16 @@ func (a *App) GetUnassignedEventCount() (int, error) {
 	return a.store.GetUnassignedEventCount()
 }
 
+// GetAssignmentMetrics returns accuracy metrics for the past week.
+func (a *App) GetAssignmentMetrics() (*storage.AssignmentMetrics, error) {
+	if a.store == nil {
+		return nil, nil
+	}
+	now := time.Now()
+	weekAgo := now.AddDate(0, 0, -7)
+	return a.store.GetAssignmentMetrics(weekAgo.Unix(), now.Unix())
+}
+
 // ============================================================================
 // Entries and Backfill Methods (exposed to frontend)
 // ============================================================================
