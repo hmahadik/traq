@@ -311,3 +311,57 @@ func (s *Store) GetProjectStats(projectID int64) (*ProjectStats, error) {
 
 	return &stats, nil
 }
+
+// ============================================================================
+// Project Activities Query
+// ============================================================================
+
+// ProjectActivity represents an activity assigned to a project
+type ProjectActivity struct {
+	EventType       string  `json:"eventType"`
+	EventID         int64   `json:"eventId"`
+	AppName         string  `json:"appName"`
+	WindowTitle     string  `json:"windowTitle"`
+	StartTime       int64   `json:"startTime"`
+	DurationSeconds float64 `json:"durationSeconds"`
+	Confidence      float64 `json:"confidence"`
+	Source          string  `json:"source"`
+}
+
+// GetProjectActivities returns activities assigned to a project
+func (s *Store) GetProjectActivities(projectID int64, startTime, endTime int64, limit int) ([]ProjectActivity, error) {
+	query := `
+		SELECT
+			'focus' as event_type,
+			id,
+			app_name,
+			window_title,
+			start_time,
+			duration_seconds,
+			COALESCE(project_confidence, 0) as confidence,
+			COALESCE(project_source, 'unknown') as source
+		FROM window_focus_events
+		WHERE project_id = ?
+		  AND start_time >= ? AND start_time <= ?
+		ORDER BY start_time DESC
+		LIMIT ?
+	`
+
+	rows, err := s.db.Query(query, projectID, startTime, endTime, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var activities []ProjectActivity
+	for rows.Next() {
+		var a ProjectActivity
+		err := rows.Scan(&a.EventType, &a.EventID, &a.AppName, &a.WindowTitle,
+			&a.StartTime, &a.DurationSeconds, &a.Confidence, &a.Source)
+		if err != nil {
+			return nil, err
+		}
+		activities = append(activities, a)
+	}
+	return activities, rows.Err()
+}

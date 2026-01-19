@@ -1541,6 +1541,15 @@ func (a *App) GetProjectStats(projectID int64) (*storage.ProjectStats, error) {
 	return a.Projects.GetProjectStats(projectID)
 }
 
+// GetProjectActivities returns activities for a project in a time range.
+func (a *App) GetProjectActivities(projectID int64, startDate, endDate string) ([]storage.ProjectActivity, error) {
+	start, _ := time.ParseInLocation("2006-01-02", startDate, time.Local)
+	end, _ := time.ParseInLocation("2006-01-02", endDate, time.Local)
+	end = end.Add(24 * time.Hour) // Include full end day
+
+	return a.store.GetProjectActivities(projectID, start.Unix(), end.Unix(), 500)
+}
+
 // GetProjectPatterns returns learned patterns for a project.
 func (a *App) GetProjectPatterns(projectID int64) ([]storage.ProjectPattern, error) {
 	if a.Projects == nil {
