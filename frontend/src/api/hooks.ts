@@ -330,8 +330,10 @@ export function useGenerateReport() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ timeRange, reportType, includeScreenshots }: { timeRange: string; reportType: string; includeScreenshots: boolean }) =>
-      api.reports.generateReport(timeRange, reportType, includeScreenshots),
+    mutationFn: ({ timeRange, reportType, includeScreenshots, projectId = 0 }: { timeRange: string; reportType: string; includeScreenshots: boolean; projectId?: number }) =>
+      projectId > 0
+        ? api.reports.generateWithFilter(timeRange, reportType, includeScreenshots, projectId)
+        : api.reports.generateReport(timeRange, reportType, includeScreenshots),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.reports.history() });
     },

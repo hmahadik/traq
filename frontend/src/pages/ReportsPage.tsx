@@ -11,6 +11,13 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
   TimeRangeSelector,
   ReportTypeSelector,
   ReportPreview,
@@ -21,9 +28,10 @@ import {
   useExportReport,
   useDeleteReport,
   useParseTimeRange,
+  useProjects,
 } from '@/api/hooks';
 import { api } from '@/api/client';
-import { Loader2, Sparkles, ImageIcon, History, Trash2 } from 'lucide-react';
+import { Loader2, Sparkles, ImageIcon, History, Trash2, FolderKanban } from 'lucide-react';
 import { formatDate } from '@/lib/utils';
 import type { Report, ReportMeta } from '@/types';
 import { useDateContext } from '@/contexts';
@@ -66,15 +74,18 @@ export function ReportsPage() {
   const [reportType, setReportType] = useState<'summary' | 'detailed' | 'standup'>('summary');
   const [includeScreenshots, setIncludeScreenshots] = useState(false);
   const [generatedReport, setGeneratedReport] = useState<Report | undefined>();
+  const [selectedProjectId, setSelectedProjectId] = useState<string>('all');
 
   const { data: history } = useReportHistory();
+  const { data: projects } = useProjects();
   const { data: parsedRange } = useParseTimeRange(timeRange);
   const generateReport = useGenerateReport();
   const exportReport = useExportReport();
   const deleteReport = useDeleteReport();
 
   const handleGenerate = async () => {
-    const result = await generateReport.mutateAsync({ timeRange, reportType, includeScreenshots });
+    const projectId = selectedProjectId === 'all' ? 0 : parseInt(selectedProjectId, 10);
+    const result = await generateReport.mutateAsync({ timeRange, reportType, includeScreenshots, projectId });
     setGeneratedReport(result);
   };
 
@@ -200,6 +211,33 @@ export function ReportsPage() {
           />
 
           <ReportTypeSelector value={reportType} onChange={setReportType} />
+
+          {/* Project filter */}
+          <div className="space-y-2">
+            <label className="text-sm font-medium flex items-center gap-1.5">
+              <FolderKanban className="h-3.5 w-3.5 text-muted-foreground" />
+              Project Filter
+            </label>
+            <Select value={selectedProjectId} onValueChange={setSelectedProjectId}>
+              <SelectTrigger>
+                <SelectValue placeholder="All projects" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All projects (combined)</SelectItem>
+                {projects?.map(project => (
+                  <SelectItem key={project.id} value={String(project.id)}>
+                    <div className="flex items-center gap-2">
+                      <div
+                        className="w-3 h-3 rounded-full"
+                        style={{ backgroundColor: project.color }}
+                      />
+                      {project.name}
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
 
           {/* Generate section */}
           <div className="space-y-3">

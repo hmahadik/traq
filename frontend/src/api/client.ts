@@ -364,6 +364,12 @@ export const reports = {
     return withRetry(() => App.GenerateReport(timeRange, reportType, _includeScreenshots));
   },
 
+  generateWithFilter: async (timeRange: string, reportType: string, includeScreenshots: boolean, projectId: number) => {
+    if (isMockMode()) return mockData.generateReport(timeRange, reportType);
+    await waitForReady();
+    return withRetry(() => App.GenerateProjectReport(timeRange, reportType, includeScreenshots, projectId));
+  },
+
   getReport: async (id: number) => {
     if (isMockMode()) return mockData.generateReport('today', 'summary');
     await waitForReady();
