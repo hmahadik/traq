@@ -298,6 +298,39 @@ func (s *Store) GetActiveFocusEventsByTimeRange(startTime, endTime int64) ([]*Wi
 	return events, rows.Err()
 }
 
+// GetFocusEventsForBackfill retrieves focus events with project assignment info for backfill.
+// Unlike GetActiveFocusEventsByTimeRange, this includes all events regardless of memory_status.
+func (s *Store) GetFocusEventsForBackfill(startTime, endTime int64) ([]*WindowFocusEvent, error) {
+	rows, err := s.db.Query(`
+		SELECT id, window_title, app_name, window_class, start_time, end_time,
+		       duration_seconds, session_id, project_id, project_confidence, project_source,
+		       COALESCE(memory_status, 'active')
+		FROM window_focus_events
+		WHERE start_time < ? AND end_time > ?
+		ORDER BY start_time
+	`, endTime, startTime)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query focus events for backfill: %w", err)
+	}
+	defer rows.Close()
+
+	var events []*WindowFocusEvent
+	for rows.Next() {
+		e := &WindowFocusEvent{}
+		err := rows.Scan(
+			&e.ID, &e.WindowTitle, &e.AppName, &e.WindowClass,
+			&e.StartTime, &e.EndTime, &e.DurationSeconds, &e.SessionID,
+			&e.ProjectID, &e.ProjectConfidence, &e.ProjectSource,
+			&e.MemoryStatus,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan focus event for backfill: %w", err)
+		}
+		events = append(events, e)
+	}
+	return events, rows.Err()
+}
+
 func scanFocusEvents(rows *sql.Rows) ([]*WindowFocusEvent, error) {
 	var events []*WindowFocusEvent
 	for rows.Next() {
