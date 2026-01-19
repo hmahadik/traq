@@ -3,6 +3,7 @@ package storage
 import (
 	"database/sql"
 	"fmt"
+	"strings"
 )
 
 // SaveScreenshot saves a screenshot to the database.
@@ -193,4 +194,42 @@ func scanScreenshots(rows *sql.Rows) ([]*Screenshot, error) {
 		screenshots = append(screenshots, sc)
 	}
 	return screenshots, rows.Err()
+}
+
+// SetScreenshotStatus updates the memory status of a screenshot.
+// Valid statuses: 'active', 'ignored'
+func (s *Store) SetScreenshotStatus(id int64, status string) error {
+	if status != "active" && status != "ignored" {
+		return fmt.Errorf("invalid status: %s", status)
+	}
+	_, err := s.db.Exec(
+		"UPDATE screenshots SET memory_status = ? WHERE id = ?",
+		status, id,
+	)
+	return err
+}
+
+// SetScreenshotsStatus updates status for multiple screenshots.
+func (s *Store) SetScreenshotsStatus(ids []int64, status string) error {
+	if status != "active" && status != "ignored" {
+		return fmt.Errorf("invalid status: %s", status)
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+
+	placeholders := make([]string, len(ids))
+	args := make([]interface{}, len(ids)+1)
+	args[0] = status
+	for i, id := range ids {
+		placeholders[i] = "?"
+		args[i+1] = id
+	}
+
+	query := fmt.Sprintf(
+		"UPDATE screenshots SET memory_status = ? WHERE id IN (%s)",
+		strings.Join(placeholders, ","),
+	)
+	_, err := s.db.Exec(query, args...)
+	return err
 }

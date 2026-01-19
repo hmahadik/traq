@@ -2664,6 +2664,7 @@ export namespace storage {
 	    projectId: sql.NullInt64;
 	    projectConfidence: sql.NullFloat64;
 	    projectSource: sql.NullString;
+	    memoryStatus: string;
 	    createdAt: number;
 	
 	    static createFrom(source: any = {}) {
@@ -2691,6 +2692,7 @@ export namespace storage {
 	        this.projectId = this.convertValues(source["projectId"], sql.NullInt64);
 	        this.projectConfidence = this.convertValues(source["projectConfidence"], sql.NullFloat64);
 	        this.projectSource = this.convertValues(source["projectSource"], sql.NullString);
+	        this.memoryStatus = source["memoryStatus"];
 	        this.createdAt = source["createdAt"];
 	    }
 	
@@ -2882,6 +2884,7 @@ export namespace storage {
 	    projectId: sql.NullInt64;
 	    projectConfidence: sql.NullFloat64;
 	    projectSource: sql.NullString;
+	    memoryStatus: string;
 	    createdAt: number;
 	
 	    static createFrom(source: any = {}) {
@@ -2901,6 +2904,7 @@ export namespace storage {
 	        this.projectId = this.convertValues(source["projectId"], sql.NullInt64);
 	        this.projectConfidence = this.convertValues(source["projectConfidence"], sql.NullFloat64);
 	        this.projectSource = this.convertValues(source["projectSource"], sql.NullString);
+	        this.memoryStatus = source["memoryStatus"];
 	        this.createdAt = source["createdAt"];
 	    }
 	
