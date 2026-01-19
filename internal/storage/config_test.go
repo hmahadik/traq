@@ -67,11 +67,18 @@ func TestGetAllConfig(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to get all config: %v", err)
 	}
-	if len(configs) != 3 {
-		t.Errorf("expected 3 configs, got %d", len(configs))
+	// Check that our configs exist (migrations may add default configs)
+	if len(configs) < 3 {
+		t.Errorf("expected at least 3 configs, got %d", len(configs))
 	}
 	if configs["key1"] != "value1" {
-		t.Errorf("expected key1=value1")
+		t.Errorf("expected key1=value1, got %s", configs["key1"])
+	}
+	if configs["key2"] != "value2" {
+		t.Errorf("expected key2=value2, got %s", configs["key2"])
+	}
+	if configs["key3"] != "value3" {
+		t.Errorf("expected key3=value3, got %s", configs["key3"])
 	}
 }
 
