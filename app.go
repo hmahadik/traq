@@ -45,6 +45,7 @@ type App struct {
 	Issues      *service.IssueService
 	Update      *service.UpdateService
 	Projects    *service.ProjectAssignmentService
+	Embeddings  *service.EmbeddingService
 
 	// Inference engine
 	inference *inference.Service
@@ -134,6 +135,15 @@ func (a *App) startup(ctx context.Context) {
 	// Initialize projects service (for project assignment and learning)
 	// Must be before Reports since Reports uses it for pattern matching
 	a.Projects = service.NewProjectAssignmentService(a.store)
+
+	// Initialize embedding service (for semantic similarity-based project assignment)
+	a.Embeddings = service.NewEmbeddingService(a.store)
+	// Load existing labeled vectors in background
+	go func() {
+		if err := a.Embeddings.LoadVectors(); err != nil {
+			log.Printf("Failed to load embedding vectors: %v", err)
+		}
+	}()
 
 	// Initialize backfill service (for applying patterns to historical data)
 	a.backfillService = service.NewBackfillService(a.store, a.Projects)
