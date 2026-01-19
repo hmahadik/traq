@@ -4,6 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ProjectActivitiesTab } from '@/components/projects/ProjectActivitiesTab';
 import {
   Dialog,
   DialogContent,
@@ -88,8 +90,6 @@ function ProjectCard({
   onDelete: () => void;
   onDeletePattern: (patternId: number) => void;
 }) {
-  const [showPatterns, setShowPatterns] = useState(false);
-
   return (
     <Card className="relative">
       <CardHeader className="pb-2">
@@ -114,38 +114,47 @@ function ProjectCard({
           <CardDescription className="mt-1">{project.description}</CardDescription>
         )}
       </CardHeader>
-      <CardContent className="space-y-3">
-        {/* Stats */}
-        {stats && (
-          <div className="flex gap-4 text-sm">
-            <div className="flex items-center gap-1 text-muted-foreground">
-              <Clock className="h-4 w-4" />
-              <span>{formatMinutes(stats.totalMinutes)}</span>
-            </div>
-            <div className="flex items-center gap-1 text-muted-foreground">
-              <FileCode className="h-4 w-4" />
-              <span>{stats.focusEventCount} events</span>
-            </div>
-            <div className="flex items-center gap-1 text-muted-foreground">
-              <GitCommit className="h-4 w-4" />
-              <span>{stats.gitCommitCount} commits</span>
-            </div>
-          </div>
-        )}
+      <CardContent>
+        <Tabs defaultValue="overview">
+          <TabsList className="mb-3">
+            <TabsTrigger value="overview">Overview</TabsTrigger>
+            <TabsTrigger value="activities">Activities</TabsTrigger>
+            <TabsTrigger value="patterns">Patterns</TabsTrigger>
+          </TabsList>
 
-        {/* Patterns */}
-        {patterns && patterns.length > 0 && (
-          <div>
-            <button
-              className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-1"
-              onClick={() => setShowPatterns(!showPatterns)}
-            >
-              <Sparkles className="h-4 w-4" />
-              {patterns.length} learned patterns
-              {showPatterns ? ' (hide)' : ' (show)'}
-            </button>
-            {showPatterns && (
-              <div className="mt-2 flex flex-wrap gap-1">
+          <TabsContent value="overview" className="space-y-3 mt-0">
+            {/* Stats */}
+            {stats && (
+              <div className="flex gap-4 text-sm">
+                <div className="flex items-center gap-1 text-muted-foreground">
+                  <Clock className="h-4 w-4" />
+                  <span>{formatMinutes(stats.totalMinutes)}</span>
+                </div>
+                <div className="flex items-center gap-1 text-muted-foreground">
+                  <FileCode className="h-4 w-4" />
+                  <span>{stats.focusEventCount} events</span>
+                </div>
+                <div className="flex items-center gap-1 text-muted-foreground">
+                  <GitCommit className="h-4 w-4" />
+                  <span>{stats.gitCommitCount} commits</span>
+                </div>
+              </div>
+            )}
+            {patterns && patterns.length > 0 && (
+              <div className="text-sm text-muted-foreground flex items-center gap-1">
+                <Sparkles className="h-4 w-4" />
+                {patterns.length} learned patterns
+              </div>
+            )}
+          </TabsContent>
+
+          <TabsContent value="activities" className="mt-0">
+            <ProjectActivitiesTab project={project} />
+          </TabsContent>
+
+          <TabsContent value="patterns" className="mt-0">
+            {patterns && patterns.length > 0 ? (
+              <div className="flex flex-wrap gap-1">
                 {patterns.map((p) => (
                   <Badge
                     key={p.id}
@@ -163,9 +172,13 @@ function ProjectCard({
                   </Badge>
                 ))}
               </div>
+            ) : (
+              <div className="text-sm text-muted-foreground text-center py-4">
+                No patterns learned yet. Assign activities to help Traq learn.
+              </div>
             )}
-          </div>
-        )}
+          </TabsContent>
+        </Tabs>
       </CardContent>
     </Card>
   );

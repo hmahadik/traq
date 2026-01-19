@@ -1076,6 +1076,17 @@ export function useProjectPatterns(id: number) {
 }
 
 /**
+ * Get activities assigned to a project
+ */
+export function useProjectActivities(projectId: number, startDate: string, endDate: string) {
+  return useQuery({
+    queryKey: ['projects', projectId, 'activities', startDate, endDate],
+    queryFn: () => api.projects.getActivities(projectId, startDate, endDate),
+    enabled: !!projectId,
+  });
+}
+
+/**
  * Create a new project
  */
 export function useCreateProject() {

@@ -967,6 +967,13 @@ export const projects = {
     return result || [];
   },
 
+  /** Get activities assigned to a project */
+  getActivities: async (projectId: number, startDate: string, endDate: string) => {
+    await waitForReady();
+    const result = await withRetry(() => App.GetProjectActivities(projectId, startDate, endDate));
+    return result || [];
+  },
+
   /** Delete a learned pattern */
   deletePattern: async (patternId: number) => {
     await waitForReady();
