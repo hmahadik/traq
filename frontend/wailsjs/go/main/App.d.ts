@@ -10,6 +10,8 @@ export function AddTagToSession(arg1:number,arg2:string):Promise<void>;
 
 export function AssignEventToProject(arg1:string,arg2:number,arg3:number):Promise<void>;
 
+export function BackfillProjects(arg1:string,arg2:string,arg3:number):Promise<service.BackfillResult>;
+
 export function CheckForUpdate():Promise<service.UpdateInfo>;
 
 export function CreateProject(arg1:string,arg2:string,arg3:string):Promise<storage.Project>;
@@ -108,6 +110,8 @@ export function GetDataDir():Promise<string>;
 
 export function GetDataSourceStats(arg1:number,arg2:number):Promise<service.DataSourceStats>;
 
+export function GetEntriesForDate(arg1:string):Promise<Array<service.EntryBlock>>;
+
 export function GetFileAllowedExtensions():Promise<Array<string>>;
 
 export function GetFocusDistribution(arg1:string):Promise<Array<service.HourlyFocus>>;
@@ -147,6 +151,8 @@ export function GetRecentSessions(arg1:number):Promise<Array<storage.Session>>;
 export function GetReport(arg1:number):Promise<service.Report>;
 
 export function GetReportHistory():Promise<Array<service.ReportMeta>>;
+
+export function GetReportIncludeUnassigned():Promise<boolean>;
 
 export function GetScreenshot(arg1:number):Promise<storage.Screenshot>;
 
@@ -198,6 +204,8 @@ export function GetWeeklyStats(arg1:string):Promise<service.WeeklyStats>;
 
 export function GetYearlyStats(arg1:number):Promise<service.YearlyStats>;
 
+export function IgnoreActivities(arg1:string,arg2:Array<number>):Promise<void>;
+
 export function IsReady():Promise<boolean>;
 
 export function ListHierarchicalSummaries(arg1:string,arg2:number):Promise<Array<storage.HierarchicalSummary>>;
@@ -211,6 +219,8 @@ export function OptimizeDatabase():Promise<number>;
 export function ParseTimeRange(arg1:string):Promise<service.TimeRange>;
 
 export function PauseCapture():Promise<void>;
+
+export function PreviewBackfill(arg1:string,arg2:string,arg3:number):Promise<service.BackfillResult>;
 
 export function RegenerateSummary(arg1:number):Promise<storage.Summary>;
 
@@ -234,6 +244,8 @@ export function SetAppTimelineCategory(arg1:string,arg2:string):Promise<void>;
 
 export function SetFileAllowedExtensions(arg1:Array<string>):Promise<void>;
 
+export function SetReportIncludeUnassigned(arg1:boolean):Promise<void>;
+
 export function SetTagsForSession(arg1:number,arg2:Array<string>):Promise<void>;
 
 export function StartTracking():Promise<void>;
@@ -245,6 +257,8 @@ export function SuggestProject(arg1:storage.AssignmentContext):Promise<service.A
 export function TestIssueWebhook():Promise<void>;
 
 export function TriggerUpdate():Promise<void>;
+
+export function UnignoreActivities(arg1:string,arg2:Array<number>):Promise<void>;
 
 export function UnregisterGitRepository(arg1:number):Promise<void>;
 

@@ -284,6 +284,24 @@ export namespace service {
 	        this.reason = source["reason"];
 	    }
 	}
+	export class BackfillResult {
+	    totalProcessed: number;
+	    autoAssigned: number;
+	    alreadyAssigned: number;
+	    noMatch: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new BackfillResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.totalProcessed = source["totalProcessed"];
+	        this.autoAssigned = source["autoAssigned"];
+	        this.alreadyAssigned = source["alreadyAssigned"];
+	        this.noMatch = source["noMatch"];
+	    }
+	}
 	export class BrowserConfig {
 	    enabled: boolean;
 	    browsers: string[];
@@ -1206,6 +1224,40 @@ export namespace service {
 		}
 	}
 	
+	export class EntryBlock {
+	    id: number;
+	    eventType: string;
+	    projectId: number;
+	    projectName: string;
+	    projectColor: string;
+	    appName: string;
+	    windowTitle: string;
+	    startTime: number;
+	    endTime: number;
+	    durationSeconds: number;
+	    confidence: number;
+	    source: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new EntryBlock(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.eventType = source["eventType"];
+	        this.projectId = source["projectId"];
+	        this.projectName = source["projectName"];
+	        this.projectColor = source["projectColor"];
+	        this.appName = source["appName"];
+	        this.windowTitle = source["windowTitle"];
+	        this.startTime = source["startTime"];
+	        this.endTime = source["endTime"];
+	        this.durationSeconds = source["durationSeconds"];
+	        this.confidence = source["confidence"];
+	        this.source = source["source"];
+	    }
+	}
 	export class FileEventDisplay {
 	    id: number;
 	    timestamp: number;

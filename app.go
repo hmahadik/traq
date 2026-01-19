@@ -48,6 +48,9 @@ type App struct {
 
 	// Inference engine
 	inference *inference.Service
+
+	// Backfill service for applying patterns to historical data
+	backfillService *service.BackfillService
 }
 
 // NewApp creates a new App application struct
@@ -131,6 +134,9 @@ func (a *App) startup(ctx context.Context) {
 	// Initialize projects service (for project assignment and learning)
 	// Must be before Reports since Reports uses it for pattern matching
 	a.Projects = service.NewProjectAssignmentService(a.store)
+
+	// Initialize backfill service (for applying patterns to historical data)
+	a.backfillService = service.NewBackfillService(a.store, a.Projects)
 
 	// Initialize reports service (after timeline, analytics, and projects services)
 	a.Reports = service.NewReportsService(a.store, a.Timeline, a.Analytics, a.Projects)
@@ -1563,6 +1569,84 @@ func (a *App) GetUnassignedEventCount() (int, error) {
 		return 0, nil
 	}
 	return a.store.GetUnassignedEventCount()
+}
+
+// ============================================================================
+// Entries and Backfill Methods (exposed to frontend)
+// ============================================================================
+
+// GetEntriesForDate returns project-assigned activities for the Entries lane
+func (a *App) GetEntriesForDate(date string) ([]service.EntryBlock, error) {
+	if a.Timeline == nil {
+		return nil, nil
+	}
+	return a.Timeline.GetEntriesForDate(date)
+}
+
+// BackfillProjects applies project patterns to historical unassigned activities
+func (a *App) BackfillProjects(startDate, endDate string, minConfidence float64) (*service.BackfillResult, error) {
+	if a.backfillService == nil {
+		return nil, fmt.Errorf("backfill service not initialized")
+	}
+	return a.backfillService.BackfillProjects(startDate, endDate, minConfidence)
+}
+
+// PreviewBackfill shows what would be assigned without committing
+func (a *App) PreviewBackfill(startDate, endDate string, minConfidence float64) (*service.BackfillResult, error) {
+	if a.backfillService == nil {
+		return nil, fmt.Errorf("backfill service not initialized")
+	}
+	return a.backfillService.PreviewBackfill(startDate, endDate, minConfidence)
+}
+
+// IgnoreActivities marks activities as ignored (hidden from view)
+func (a *App) IgnoreActivities(eventType string, ids []int64) error {
+	if a.store == nil {
+		return fmt.Errorf("store not initialized")
+	}
+	if eventType == "focus" {
+		return a.store.SetFocusEventsStatus(ids, "ignored")
+	} else if eventType == "screenshot" {
+		return a.store.SetScreenshotsStatus(ids, "ignored")
+	}
+	return fmt.Errorf("unknown event type: %s", eventType)
+}
+
+// UnignoreActivities restores ignored activities to active
+func (a *App) UnignoreActivities(eventType string, ids []int64) error {
+	if a.store == nil {
+		return fmt.Errorf("store not initialized")
+	}
+	if eventType == "focus" {
+		return a.store.SetFocusEventsStatus(ids, "active")
+	} else if eventType == "screenshot" {
+		return a.store.SetScreenshotsStatus(ids, "active")
+	}
+	return fmt.Errorf("unknown event type: %s", eventType)
+}
+
+// GetReportIncludeUnassigned returns the report config setting
+func (a *App) GetReportIncludeUnassigned() (bool, error) {
+	if a.store == nil {
+		return true, nil // Default to true
+	}
+	val, err := a.store.GetConfig("reports.include_unassigned")
+	if err != nil {
+		return true, nil // Default to true
+	}
+	return val == "true", nil
+}
+
+// SetReportIncludeUnassigned updates the report config setting
+func (a *App) SetReportIncludeUnassigned(include bool) error {
+	if a.store == nil {
+		return fmt.Errorf("store not initialized")
+	}
+	val := "false"
+	if include {
+		val = "true"
+	}
+	return a.store.SetConfig("reports.include_unassigned", val)
 }
 
 // ============================================================================

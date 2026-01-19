@@ -10,6 +10,10 @@ export function AssignEventToProject(arg1, arg2, arg3) {
   return window['go']['main']['App']['AssignEventToProject'](arg1, arg2, arg3);
 }
 
+export function BackfillProjects(arg1, arg2, arg3) {
+  return window['go']['main']['App']['BackfillProjects'](arg1, arg2, arg3);
+}
+
 export function CheckForUpdate() {
   return window['go']['main']['App']['CheckForUpdate']();
 }
@@ -206,6 +210,10 @@ export function GetDataSourceStats(arg1, arg2) {
   return window['go']['main']['App']['GetDataSourceStats'](arg1, arg2);
 }
 
+export function GetEntriesForDate(arg1) {
+  return window['go']['main']['App']['GetEntriesForDate'](arg1);
+}
+
 export function GetFileAllowedExtensions() {
   return window['go']['main']['App']['GetFileAllowedExtensions']();
 }
@@ -284,6 +292,10 @@ export function GetReport(arg1) {
 
 export function GetReportHistory() {
   return window['go']['main']['App']['GetReportHistory']();
+}
+
+export function GetReportIncludeUnassigned() {
+  return window['go']['main']['App']['GetReportIncludeUnassigned']();
 }
 
 export function GetScreenshot(arg1) {
@@ -386,6 +398,10 @@ export function GetYearlyStats(arg1) {
   return window['go']['main']['App']['GetYearlyStats'](arg1);
 }
 
+export function IgnoreActivities(arg1, arg2) {
+  return window['go']['main']['App']['IgnoreActivities'](arg1, arg2);
+}
+
 export function IsReady() {
   return window['go']['main']['App']['IsReady']();
 }
@@ -412,6 +428,10 @@ export function ParseTimeRange(arg1) {
 
 export function PauseCapture() {
   return window['go']['main']['App']['PauseCapture']();
+}
+
+export function PreviewBackfill(arg1, arg2, arg3) {
+  return window['go']['main']['App']['PreviewBackfill'](arg1, arg2, arg3);
 }
 
 export function RegenerateSummary(arg1) {
@@ -458,6 +478,10 @@ export function SetFileAllowedExtensions(arg1) {
   return window['go']['main']['App']['SetFileAllowedExtensions'](arg1);
 }
 
+export function SetReportIncludeUnassigned(arg1) {
+  return window['go']['main']['App']['SetReportIncludeUnassigned'](arg1);
+}
+
 export function SetTagsForSession(arg1, arg2) {
   return window['go']['main']['App']['SetTagsForSession'](arg1, arg2);
 }
@@ -480,6 +504,10 @@ export function TestIssueWebhook() {
 
 export function TriggerUpdate() {
   return window['go']['main']['App']['TriggerUpdate']();
+}
+
+export function UnignoreActivities(arg1, arg2) {
+  return window['go']['main']['App']['UnignoreActivities'](arg1, arg2);
 }
 
 export function UnregisterGitRepository(arg1) {
