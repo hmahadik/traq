@@ -2,6 +2,7 @@ package service
 
 import (
 	"fmt"
+	"hash/fnv"
 	"math"
 	"strings"
 	"sync"
@@ -86,6 +87,74 @@ func BuildContextText(ctx *EmbeddingContext) string {
 	}
 
 	return strings.Join(parts, " ")
+}
+
+// GenerateEmbedding creates an embedding for the given context
+// NOTE: This is a placeholder using hash-based pseudo-embeddings.
+// TODO: Replace with ONNX model (all-MiniLM-L6-v2) for real semantic embeddings
+func (s *EmbeddingService) GenerateEmbedding(ctx *EmbeddingContext) []float32 {
+	text := BuildContextText(ctx)
+	return generatePseudoEmbedding(text, 384)
+}
+
+// generatePseudoEmbedding creates a deterministic pseudo-embedding from text.
+// This is NOT a real embedding - just a placeholder that provides some signal
+// based on word presence and n-grams.
+func generatePseudoEmbedding(text string, dims int) []float32 {
+	embedding := make([]float32, dims)
+
+	if text == "" || dims == 0 {
+		return embedding
+	}
+
+	// Use FNV hash for deterministic values
+	h := fnv.New64a()
+
+	// Generate embeddings from words for some semantic signal
+	words := strings.Fields(strings.ToLower(text))
+	for _, word := range words {
+		h.Reset()
+		h.Write([]byte(word))
+		hash := h.Sum64()
+
+		// Distribute word influence across multiple dimensions
+		for j := 0; j < 8; j++ {
+			// Use modulo on unsigned hash to ensure positive index
+			idx := int(hash % uint64(dims))
+			hash = hash*31 + uint64(j) // Scramble for next iteration
+			val := float32((hash>>8)&0xFF) / 255.0
+			embedding[idx] += val - 0.5
+		}
+	}
+
+	// Add bigram features for better similarity
+	for i := 0; i < len(words)-1; i++ {
+		bigram := words[i] + " " + words[i+1]
+		h.Reset()
+		h.Write([]byte(bigram))
+		hash := h.Sum64()
+
+		for j := 0; j < 4; j++ {
+			idx := int(hash % uint64(dims))
+			hash = hash*31 + uint64(j)
+			val := float32((hash>>8)&0xFF) / 255.0
+			embedding[idx] += (val - 0.5) * 0.5 // Lower weight for bigrams
+		}
+	}
+
+	// Normalize to unit vector
+	var norm float32
+	for _, v := range embedding {
+		norm += v * v
+	}
+	if norm > 0 {
+		norm = float32(math.Sqrt(float64(norm)))
+		for i := range embedding {
+			embedding[i] /= norm
+		}
+	}
+
+	return embedding
 }
 
 // CosineSimilarity calculates cosine similarity between two vectors

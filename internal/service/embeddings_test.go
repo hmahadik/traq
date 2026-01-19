@@ -131,3 +131,67 @@ func TestBytesToFloats_Invalid(t *testing.T) {
 		t.Error("Expected nil for invalid byte length")
 	}
 }
+
+func TestGenerateEmbedding(t *testing.T) {
+	svc := &EmbeddingService{}
+
+	ctx := &EmbeddingContext{
+		AppName:     "code",
+		WindowTitle: "main.go - traq",
+	}
+
+	embedding := svc.GenerateEmbedding(ctx)
+	if len(embedding) != 384 {
+		t.Errorf("Expected 384-dim embedding, got %d", len(embedding))
+	}
+
+	// Same context should produce same embedding (deterministic)
+	embedding2 := svc.GenerateEmbedding(ctx)
+	if CosineSimilarity(embedding, embedding2) < 0.99 {
+		t.Error("Expected deterministic embeddings for same context")
+	}
+
+	// Different context should produce different embedding
+	ctx2 := &EmbeddingContext{
+		AppName:     "firefox",
+		WindowTitle: "Google Search",
+	}
+	embedding3 := svc.GenerateEmbedding(ctx2)
+	sim := CosineSimilarity(embedding, embedding3)
+	if sim > 0.99 {
+		t.Errorf("Expected different embeddings for different context, got similarity %f", sim)
+	}
+}
+
+func TestGenerateEmbedding_SimilarContexts(t *testing.T) {
+	svc := &EmbeddingService{}
+
+	// Similar contexts should have higher similarity than dissimilar ones
+	ctx1 := &EmbeddingContext{
+		AppName:     "code",
+		WindowTitle: "main.go - traq",
+		GitRepo:     "traq",
+	}
+	ctx2 := &EmbeddingContext{
+		AppName:     "code",
+		WindowTitle: "app.go - traq",
+		GitRepo:     "traq",
+	}
+	ctx3 := &EmbeddingContext{
+		AppName:     "firefox",
+		WindowTitle: "YouTube",
+		Domain:      "youtube.com",
+	}
+
+	emb1 := svc.GenerateEmbedding(ctx1)
+	emb2 := svc.GenerateEmbedding(ctx2)
+	emb3 := svc.GenerateEmbedding(ctx3)
+
+	sim12 := CosineSimilarity(emb1, emb2) // Similar: both code/traq
+	sim13 := CosineSimilarity(emb1, emb3) // Different: code vs firefox
+
+	// Similar contexts should have higher similarity
+	if sim12 <= sim13 {
+		t.Errorf("Expected similar contexts to have higher similarity: sim12=%f, sim13=%f", sim12, sim13)
+	}
+}
