@@ -318,3 +318,34 @@ export interface TimelineListEvent {
   timestamp: number; // Unix timestamp for sorting
   data: ActivityBlock | SessionSummaryWithPosition | GitEventDisplay | ShellEventDisplay | FileEventDisplay | BrowserEventDisplay | AFKBlock;
 }
+
+// List View item for display
+export interface TimelineListItem {
+  id: string; // Unique: `${type}-${originalId}`
+  type: TimelineEventType;
+  timestamp: number;
+  endTime?: number;
+  duration?: number;
+  appName?: string;
+  title: string;
+  subtitle?: string;
+  project?: {
+    id: number;
+    name: string;
+    color: string;
+  };
+  summary?: string;
+  category?: CategoryType;
+}
+
+export interface ListViewSort {
+  column: 'time' | 'duration' | 'app' | 'title' | 'project';
+  direction: 'asc' | 'desc';
+}
+
+export interface ListViewFilter {
+  search?: string;
+  apps?: string[];
+  projects?: number[];
+  types?: TimelineEventType[];
+}
