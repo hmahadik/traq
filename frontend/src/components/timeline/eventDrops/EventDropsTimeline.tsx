@@ -41,6 +41,9 @@ const MARGIN = { top: 50, right: 30, bottom: 30, left: 160 };
 const ROW_HEIGHT = 32; // Fixed height for each swim lane
 const DOT_RADIUS = 5;
 const DOT_HOVER_RADIUS = 8;
+const BAR_HEIGHT = 14; // Height of duration bars
+const BAR_MIN_DURATION = 10; // Minimum duration (seconds) to render as bar
+const BAR_MIN_PIXELS = 6; // Minimum pixel width to render as bar
 
 // Icon map for event list
 const EVENT_TYPE_ICONS: Record<EventDropType, typeof GitCommit> = {
@@ -283,6 +286,15 @@ export function EventDropsTimeline({
         svg.selectAll<SVGCircleElement, EventDot>('.event-dot')
           .attr('cx', (d) => newXScale(d.timestamp));
 
+        // Update bars
+        svg.selectAll<SVGRectElement, EventDot>('.event-bar')
+          .attr('x', (d) => newXScale(d.timestamp))
+          .attr('width', (d) => {
+            const startTime = d.timestamp.getTime();
+            const endTime = startTime + ((d.duration || 0) * 1000);
+            return Math.max(BAR_MIN_PIXELS, newXScale(new Date(endTime)) - newXScale(d.timestamp));
+          });
+
         // Update now line if exists
         svg.select('.now-line')
           .attr('x1', (d: any) => newXScale(d))
@@ -362,9 +374,27 @@ export function EventDropsTimeline({
     // Flatten all events for rendering
     const allEvents = rows.flatMap((row) => row.data);
 
-    // Create dots
+    // Helper to determine if event should render as bar vs dot
+    const shouldRenderAsBar = (
+      event: EventDot,
+      scale: d3.ScaleTime<number, number>
+    ): boolean => {
+      if (!event.duration || event.duration < BAR_MIN_DURATION) return false;
+
+      const startTime = event.timestamp.getTime();
+      const endTime = startTime + (event.duration * 1000);
+      const pixelWidth = scale(new Date(endTime)) - scale(event.timestamp);
+
+      return pixelWidth >= BAR_MIN_PIXELS;
+    };
+
+    // Split events into dots and bars based on duration
+    const dotEvents = allEvents.filter((e) => !shouldRenderAsBar(e, xScale));
+    const barEvents = allEvents.filter((e) => shouldRenderAsBar(e, xScale));
+
+    // Create dots for brief/instant events
     dotsGroup.selectAll('.event-dot')
-      .data(allEvents, (d) => (d as EventDot).id)
+      .data(dotEvents, (d) => (d as EventDot).id)
       .join('circle')
       .attr('class', 'event-dot')
       .attr('cx', (d) => xScale(d.timestamp))
@@ -397,6 +427,62 @@ export function EventDropsTimeline({
           .transition()
           .duration(100)
           .attr('r', DOT_RADIUS);
+
+        // Delay hiding to allow mouse to move to tooltip
+        hideTooltipTimeoutRef.current = setTimeout(() => {
+          if (!isTooltipHovered) {
+            setHoveredEvent(null);
+            setTooltipPosition(null);
+          }
+        }, 150);
+      })
+      .on('click', function (_, d) {
+        onEventClick?.(d);
+      });
+
+    // Create bars (pills) for duration events
+    dotsGroup.selectAll('.event-bar')
+      .data(barEvents, (d) => (d as EventDot).id)
+      .join('rect')
+      .attr('class', 'event-bar')
+      .attr('x', (d) => xScale(d.timestamp))
+      .attr('y', (d) => (yScale(d.row) || 0) + (yScale.bandwidth() - BAR_HEIGHT) / 2)
+      .attr('width', (d) => {
+        const startTime = d.timestamp.getTime();
+        const endTime = startTime + ((d.duration || 0) * 1000);
+        return Math.max(BAR_MIN_PIXELS, xScale(new Date(endTime)) - xScale(d.timestamp));
+      })
+      .attr('height', BAR_HEIGHT)
+      .attr('rx', BAR_HEIGHT / 2)
+      .attr('ry', BAR_HEIGHT / 2)
+      .attr('fill', (d) => d.color)
+      .attr('fill-opacity', 0.7)
+      .attr('stroke', (d) => d.color)
+      .attr('stroke-width', 1.5)
+      .style('cursor', 'pointer')
+      .on('mouseenter', function (event, d) {
+        // Clear any pending hide timeout
+        if (hideTooltipTimeoutRef.current) {
+          clearTimeout(hideTooltipTimeoutRef.current);
+          hideTooltipTimeoutRef.current = null;
+        }
+
+        d3.select(this)
+          .transition()
+          .duration(100)
+          .attr('fill-opacity', 0.9);
+
+        setHoveredEvent(d);
+        setTooltipPosition({ x: event.clientX, y: event.clientY });
+      })
+      .on('mousemove', function (event) {
+        setTooltipPosition({ x: event.clientX, y: event.clientY });
+      })
+      .on('mouseleave', function () {
+        d3.select(this)
+          .transition()
+          .duration(100)
+          .attr('fill-opacity', 0.7);
 
         // Delay hiding to allow mouse to move to tooltip
         hideTooltipTimeoutRef.current = setTimeout(() => {
