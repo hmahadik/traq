@@ -76,7 +76,10 @@ type Config struct {
 
 // TimelineConfig contains timeline display settings.
 type TimelineConfig struct {
-	MinActivityDurationSeconds int `json:"minActivityDurationSeconds"` // Filter activities shorter than this (0 = show all)
+	MinActivityDurationSeconds int    `json:"minActivityDurationSeconds"` // Filter activities shorter than this (0 = show all)
+	TitleDisplay               string `json:"titleDisplay"`               // "full", "app_only", "minimal"
+	AppGrouping                bool   `json:"appGrouping"`                // Merge consecutive same-app activities
+	ContinuityMergeSeconds     int    `json:"continuityMergeSeconds"`     // Merge across brief switches (0, 30, 60, 120)
 }
 
 // UpdateConfig contains auto-update settings.
@@ -369,6 +372,17 @@ func (s *ConfigService) GetConfig() (*Config, error) {
 			config.Timeline.MinActivityDurationSeconds = v
 		}
 	}
+	if val, err := s.store.GetConfig("timeline.titleDisplay"); err == nil && val != "" {
+		config.Timeline.TitleDisplay = val
+	}
+	if val, err := s.store.GetConfig("timeline.appGrouping"); err == nil {
+		config.Timeline.AppGrouping = val == "true"
+	}
+	if val, err := s.store.GetConfig("timeline.continuityMergeSeconds"); err == nil {
+		if v, e := strconv.Atoi(val); e == nil {
+			config.Timeline.ContinuityMergeSeconds = v
+		}
+	}
 
 	// System settings - only override if explicitly set in database
 	if val, err := s.store.GetConfig("system.startOnLogin"); err == nil && val != "" {
@@ -519,6 +533,9 @@ func mapToStorageKey(frontendKey string) string {
 
 		// Timeline settings
 		"timeline.minActivityDurationSeconds": "timeline.minActivityDurationSeconds",
+		"timeline.titleDisplay":               "timeline.titleDisplay",
+		"timeline.appGrouping":                "timeline.appGrouping",
+		"timeline.continuityMergeSeconds":     "timeline.continuityMergeSeconds",
 	}
 
 	if storageKey, ok := keyMap[frontendKey]; ok {
@@ -795,6 +812,9 @@ func (s *ConfigService) getDefaultUpdateConfig() *UpdateConfig {
 
 func (s *ConfigService) getDefaultTimelineConfig() *TimelineConfig {
 	return &TimelineConfig{
-		MinActivityDurationSeconds: 0, // Default: show all activities (no filtering)
+		MinActivityDurationSeconds: 0,      // Default: show all activities (no filtering)
+		TitleDisplay:               "full", // Default: show full window titles
+		AppGrouping:                false,  // Default: don't merge consecutive same-app activities
+		ContinuityMergeSeconds:     0,      // Default: don't merge across brief switches
 	}
 }

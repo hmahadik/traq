@@ -11,6 +11,9 @@ export interface Config {
 
 export interface TimelineConfig {
   minActivityDurationSeconds: number; // Filter activities shorter than this (0 = show all)
+  titleDisplay: 'full' | 'app_only' | 'minimal';
+  appGrouping: boolean;
+  continuityMergeSeconds: number;
 }
 
 export interface IssuesConfig {
