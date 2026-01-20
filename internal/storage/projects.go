@@ -232,7 +232,8 @@ func (s *Store) SetEventProject(eventType string, eventID, projectID int64, conf
 	switch eventType {
 	case "screenshot":
 		query = `UPDATE screenshots SET project_id = ?, project_confidence = ?, project_source = ? WHERE id = ?`
-	case "focus":
+	case "focus", "activity":
+		// "activity" is the frontend name for focus events
 		query = `UPDATE window_focus_events SET project_id = ?, project_confidence = ?, project_source = ? WHERE id = ?`
 	case "git":
 		query = `UPDATE git_commits SET project_id = ?, project_confidence = ?, project_source = ? WHERE id = ?`

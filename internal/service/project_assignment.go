@@ -363,8 +363,8 @@ func (s *ProjectAssignmentService) ExtractEventContext(eventType string, eventID
 			ctx.Domain = extractDomain(ctx.URL)
 		}
 
-	case "focus":
-		// Query focus event directly
+	case "focus", "activity":
+		// "activity" is the frontend name for focus events
 		var windowTitle, appName string
 		err := s.store.DB().QueryRow(`
 			SELECT window_title, app_name FROM window_focus_events WHERE id = ?
