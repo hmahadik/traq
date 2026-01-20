@@ -8,7 +8,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 
-interface AFKColumnProps {
+interface BreaksColumnProps {
   afkBlocks: Record<number, AFKBlock[]>;
   hours: number[];
   hourHeight?: number;
@@ -19,7 +19,7 @@ interface AFKColumnProps {
 // Header height for column headers (matches the header in HourColumn/AppColumn)
 const HEADER_HEIGHT_PX = 44;
 
-export const AFKColumn: React.FC<AFKColumnProps> = ({ afkBlocks, hours, hourHeight, lassoPreviewKeys, selectedEventKeys }) => {
+export const BreaksColumn: React.FC<BreaksColumnProps> = ({ afkBlocks, hours, hourHeight, lassoPreviewKeys, selectedEventKeys }) => {
   const effectiveHourHeight = hourHeight || GRID_CONSTANTS.HOUR_HEIGHT_PX;
 
   // Format duration
@@ -55,7 +55,7 @@ export const AFKColumn: React.FC<AFKColumnProps> = ({ afkBlocks, hours, hourHeig
       case 'manual':
         return 'Manual';
       default:
-        return 'AFK';
+        return 'Break';
     }
   };
 
@@ -67,7 +67,7 @@ export const AFKColumn: React.FC<AFKColumnProps> = ({ afkBlocks, hours, hourHeig
           <div className="w-5 h-5 rounded bg-slate-400 flex items-center justify-center flex-shrink-0">
             <Coffee className="w-3 h-3 text-white" />
           </div>
-          <span className="text-xs font-medium text-foreground truncate">AFK</span>
+          <span className="text-xs font-medium text-foreground truncate">Breaks</span>
         </div>
       </div>
 
@@ -117,7 +117,7 @@ export const AFKColumn: React.FC<AFKColumnProps> = ({ afkBlocks, hours, hourHeig
                       }}
                       data-event-key={`afk:${block.id}`}
                       role="button"
-                      aria-label={`AFK period: ${getTriggerLabel(block.triggerType)} from ${formatTime(block.startTime)} for ${formatDuration(block.durationSeconds)}`}
+                      aria-label={`Break: ${getTriggerLabel(block.triggerType)} from ${formatTime(block.startTime)} for ${formatDuration(block.durationSeconds)}`}
                     >
                       {/* AFK indicator - only show icon if block is tall enough */}
                       {actualHeight >= 18 && (
@@ -134,7 +134,7 @@ export const AFKColumn: React.FC<AFKColumnProps> = ({ afkBlocks, hours, hourHeig
                         <div className="w-6 h-6 rounded bg-slate-400 flex items-center justify-center">
                           <Coffee className="w-3.5 h-3.5 text-white" />
                         </div>
-                        <span className="font-semibold text-sm">Away From Keyboard</span>
+                        <span className="font-semibold text-sm">Break</span>
                       </div>
 
                       {/* Trigger type */}

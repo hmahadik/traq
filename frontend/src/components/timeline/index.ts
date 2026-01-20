@@ -5,4 +5,4 @@ export { SessionCardWithThumbnails } from './SessionCardWithThumbnails';
 export { CalendarWidget } from './CalendarWidget';
 export { TimelineTags } from './TimelineTags';
 export { TimelineFilters, type TimePeriod, getTimePeriodRange } from './TimelineFilters';
-export { AFKColumn } from './AFKColumn';
+export { BreaksColumn } from './BreaksColumn';

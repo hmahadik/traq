@@ -8,7 +8,7 @@ import { GitColumn } from './GitColumn';
 import { ShellColumn } from './ShellColumn';
 import { FilesColumn } from './FilesColumn';
 import { BrowserColumn } from './BrowserColumn';
-import { AFKColumn } from './AFKColumn';
+import { BreaksColumn } from './BreaksColumn';
 import { ProjectsColumn } from './ProjectsColumn';
 import { TimelineFilters } from './FilterControls';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
@@ -423,9 +423,9 @@ export const TimelineGridView: React.FC<TimelineGridViewProps> = ({
             }}
           />
 
-          {/* AFK Column - Shows away-from-keyboard periods */}
+          {/* Breaks Column - Shows break/away periods */}
           {data.afkBlocks && Object.keys(data.afkBlocks).length > 0 && (
-            <AFKColumn
+            <BreaksColumn
               afkBlocks={data.afkBlocks}
               hours={activeHours}
               hourHeight={effectiveHourHeight}
