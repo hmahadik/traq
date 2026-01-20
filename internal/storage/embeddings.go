@@ -83,3 +83,36 @@ func HashContext(contextText string) string {
 	hash := sha256.Sum256([]byte(contextText))
 	return hex.EncodeToString(hash[:])
 }
+
+// ActivityRecord holds basic activity info for backfill
+type ActivityRecord struct {
+	ID          int64
+	AppName     string
+	WindowTitle string
+}
+
+// GetActivitiesWithoutEmbeddings returns activities that don't have embeddings
+func (s *Store) GetActivitiesWithoutEmbeddings(since time.Time) ([]ActivityRecord, error) {
+	rows, err := s.db.Query(`
+		SELECT s.id, COALESCE(s.app_name, ''), COALESCE(s.window_title, '')
+		FROM screenshots s
+		LEFT JOIN activity_embeddings e ON e.event_type = 'screenshot' AND e.event_id = s.id
+		WHERE s.captured_at >= ? AND e.id IS NULL
+		ORDER BY s.captured_at
+		LIMIT 10000
+	`, since.Unix())
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var results []ActivityRecord
+	for rows.Next() {
+		var act ActivityRecord
+		if err := rows.Scan(&act.ID, &act.AppName, &act.WindowTitle); err != nil {
+			return nil, err
+		}
+		results = append(results, act)
+	}
+	return results, rows.Err()
+}
