@@ -951,9 +951,6 @@ export const mockData = {
       }],
     };
 
-    // Activity clusters
-    const activityClusters: Record<number, any[]> = {};
-
     return {
       date,
       dayStats,
@@ -976,7 +973,6 @@ export const mockData = {
       fileEvents,
       browserEvents,
       afkBlocks,
-      activityClusters,
     };
   },
 };

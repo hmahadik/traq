@@ -1,5 +1,4 @@
 import React, { useMemo, useState, useEffect, useCallback } from 'react';
-import { Network } from 'lucide-react';
 import { TimelineGridData, GRID_CONSTANTS, ActivityBlock as ActivityBlockType, SessionSummaryWithPosition } from '@/types/timeline';
 import { HourColumn } from './HourColumn';
 import { AISummaryColumn } from './AISummaryColumn';
@@ -9,7 +8,6 @@ import { GitColumn } from './GitColumn';
 import { ShellColumn } from './ShellColumn';
 import { FilesColumn } from './FilesColumn';
 import { BrowserColumn } from './BrowserColumn';
-import { ClusterColumn } from './ClusterColumn';
 import { AFKColumn } from './AFKColumn';
 import { EntriesColumn } from './EntriesColumn';
 import { TimelineFilters } from './FilterControls';
@@ -434,42 +432,6 @@ export const TimelineGridView: React.FC<TimelineGridViewProps> = ({
               lassoPreviewKeys={lassoPreviewKeys}
               selectedEventKeys={selectedEventKeys}
             />
-          )}
-
-          {/* Activity Clusters Column - Shows related events grouped by temporal proximity */}
-          {data.activityClusters && Object.keys(data.activityClusters).length > 0 && (
-            <div
-              className="relative border-r border-border"
-              style={{ minWidth: '100px' }}
-            >
-              {/* Column header - Fixed height */}
-              <div className="sticky top-0 z-10 bg-card border-b border-border px-2 h-11 flex items-center">
-                <div className="flex items-center gap-1.5 w-full min-w-0">
-                  <div className="w-5 h-5 rounded bg-amber-500 flex items-center justify-center flex-shrink-0">
-                    <Network className="w-3 h-3 text-white" />
-                  </div>
-                  <span className="text-xs font-medium text-foreground truncate">Clusters</span>
-                </div>
-              </div>
-
-              {/* Hour blocks */}
-              {activeHours.map((hour, index) => {
-                const clusters = data.activityClusters?.[hour] || [];
-                return (
-                  <div
-                    key={hour}
-                    className={`relative border-b border-gray-100 dark:border-gray-800 ${
-                      index % 2 === 0 ? 'bg-card' : 'bg-muted/30'
-                    }`}
-                    style={{ height: `${effectiveHourHeight}px` }}
-                  >
-                    {clusters.length > 0 && (
-                      <ClusterColumn clusters={clusters} hourHeight={effectiveHourHeight} lassoPreviewKeys={lassoPreviewKeys} selectedEventKeys={selectedEventKeys} />
-                    )}
-                  </div>
-                );
-              })}
-            </div>
           )}
 
           {/* Screenshot Column */}
