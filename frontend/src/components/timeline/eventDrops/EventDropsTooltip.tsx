@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { GitCommit, Terminal, Globe, FileText, Coffee, Monitor, Camera, Trash2, Pencil } from 'lucide-react';
+import { GitCommit, Terminal, Globe, FileText, Coffee, Monitor, Camera, Trash2, Pencil, FolderKanban } from 'lucide-react';
 import type { EventDot, EventDropType } from './eventDropsTypes';
 
 interface EventDropsTooltipProps {
@@ -20,6 +20,7 @@ const EVENT_TYPE_ICONS: Record<EventDropType, typeof GitCommit> = {
   file: FileText,
   afk: Coffee,
   screenshot: Camera,
+  projects: FolderKanban,
 };
 
 const EVENT_TYPE_LABELS: Record<EventDropType, string> = {
@@ -30,6 +31,7 @@ const EVENT_TYPE_LABELS: Record<EventDropType, string> = {
   file: 'File Event',
   afk: 'Break',
   screenshot: 'Screenshot',
+  projects: 'Project',
 };
 
 function formatTime(date: Date): string {
