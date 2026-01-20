@@ -14,6 +14,7 @@ require (
 	github.com/kbinani/screenshot v0.0.0-20250624051815-089614a94018
 	github.com/mattn/go-sqlite3 v1.14.33
 	github.com/wailsapp/wails/v2 v2.11.0
+	github.com/yalue/onnxruntime_go v1.25.0
 )
 
 require (
