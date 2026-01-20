@@ -34,6 +34,33 @@ func (s *ConfigService) SetDaemon(daemon *tracker.Daemon) {
 	s.daemon = daemon
 }
 
+// SyncAutoStart ensures the system autostart state matches the config.
+// This should be called on app startup to handle cases where:
+// - Fresh install with default config (startOnLogin=true) but no .desktop file
+// - Config was changed while app wasn't running
+func (s *ConfigService) SyncAutoStart() error {
+	config, err := s.GetConfig()
+	if err != nil {
+		return fmt.Errorf("failed to get config: %w", err)
+	}
+
+	// Check current system state
+	systemEnabled, err := s.platform.IsAutoStartEnabled()
+	if err != nil {
+		return fmt.Errorf("failed to check autostart state: %w", err)
+	}
+
+	// Sync if config and system state don't match
+	configEnabled := config.System.StartOnLogin
+	if systemEnabled != configEnabled {
+		if err := s.platform.SetAutoStart(configEnabled); err != nil {
+			return fmt.Errorf("failed to sync autostart: %w", err)
+		}
+	}
+
+	return nil
+}
+
 // Config represents the full application configuration.
 type Config struct {
 	Capture     *CaptureConfig     `json:"capture"`
@@ -327,6 +354,11 @@ func (s *ConfigService) GetConfig() (*Config, error) {
 		if v, e := strconv.Atoi(val); e == nil {
 			config.Update.AFKRestartMinutes = v
 		}
+	}
+
+	// System settings - only override if explicitly set in database
+	if val, err := s.store.GetConfig("system.startOnLogin"); err == nil && val != "" {
+		config.System.StartOnLogin = val == "true"
 	}
 
 	return config, nil

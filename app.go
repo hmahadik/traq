@@ -177,6 +177,11 @@ func (a *App) startup(ctx context.Context) {
 		}
 	}
 
+	// Sync autostart state with system (creates .desktop file on Linux if needed)
+	if err := a.Config.SyncAutoStart(); err != nil {
+		log.Printf("Failed to sync autostart state: %v", err)
+	}
+
 	// Wire up update callbacks to daemon for AFK-triggered auto-restart
 	if a.daemon != nil {
 		a.daemon.SetUpdateCallbacks(
