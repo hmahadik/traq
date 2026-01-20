@@ -68,3 +68,7 @@ traq
 
 # Git worktrees
 .worktrees/
+
+# ONNX model files (too large for git, download separately)
+assets/models/*.onnx
+assets/models/tokenizer.json
