@@ -576,7 +576,16 @@ func (a *App) GetTimelineGridData(date string) (result *service.TimelineGridData
 	if a == nil || !a.ready || a.Timeline == nil {
 		return nil, nil
 	}
-	return a.Timeline.GetTimelineGridData(date)
+
+	// Get noise cancellation setting from config
+	minDuration := 0
+	if a.Config != nil {
+		if config, err := a.Config.GetConfig(); err == nil && config.Timeline != nil {
+			minDuration = config.Timeline.MinActivityDurationSeconds
+		}
+	}
+
+	return a.Timeline.GetTimelineGridDataWithOptions(date, minDuration)
 }
 
 // GetWeekTimelineData returns aggregated data for week view.

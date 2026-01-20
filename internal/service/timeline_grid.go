@@ -217,7 +217,15 @@ type WeekSummaryStats struct {
 }
 
 // GetTimelineGridData retrieves all data needed for the v3 timeline grid view.
+// GetTimelineGridData returns all data for the v3 timeline grid view.
+// Deprecated: Use GetTimelineGridDataWithOptions instead.
 func (s *TimelineService) GetTimelineGridData(date string) (*TimelineGridData, error) {
+	return s.GetTimelineGridDataWithOptions(date, 0)
+}
+
+// GetTimelineGridDataWithOptions returns timeline grid data with configurable filtering.
+// minDurationSeconds filters out activities shorter than the specified duration (0 = no filter).
+func (s *TimelineService) GetTimelineGridDataWithOptions(date string, minDurationSeconds int) (*TimelineGridData, error) {
 	// Parse date to local timezone day boundaries
 	t, err := time.ParseInLocation("2006-01-02", date, time.Local)
 	if err != nil {
@@ -231,6 +239,18 @@ func (s *TimelineService) GetTimelineGridData(date string) (*TimelineGridData, e
 	focusEvents, err := s.store.GetFocusEventsByTimeRange(dayStart.Unix(), dayEnd.Unix())
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch focus events: %w", err)
+	}
+
+	// Apply noise cancellation filter: remove activities shorter than minDurationSeconds
+	if minDurationSeconds > 0 {
+		var filtered []*storage.WindowFocusEvent
+		minDuration := float64(minDurationSeconds)
+		for _, event := range focusEvents {
+			if event.DurationSeconds >= minDuration {
+				filtered = append(filtered, event)
+			}
+		}
+		focusEvents = filtered
 	}
 
 	// Fetch top apps

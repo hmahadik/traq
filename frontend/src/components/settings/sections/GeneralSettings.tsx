@@ -1,4 +1,4 @@
-import { Database, FolderOpen, Image, Sparkles } from 'lucide-react';
+import { Database, FolderOpen, Image, Sparkles, Clock } from 'lucide-react';
 import { toast } from 'sonner';
 import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
@@ -87,6 +87,44 @@ export function GeneralSettings() {
             </SelectContent>
           </Select>
         </SettingsRow>
+      </SettingsCard>
+
+      <SettingsCard title="Timeline">
+        <SettingsRow
+          label="Noise Cancellation"
+          description="Filter out brief window switches to reduce visual clutter"
+        >
+          <Select
+            value={String(config.timeline?.minActivityDurationSeconds || 0)}
+            onValueChange={(value) =>
+              updateConfig.mutate({
+                timeline: {
+                  ...config.timeline,
+                  minActivityDurationSeconds: parseInt(value, 10),
+                },
+              })
+            }
+          >
+            <SelectTrigger className="w-32">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="0">Off</SelectItem>
+              <SelectItem value="5">5 seconds</SelectItem>
+              <SelectItem value="10">10 seconds</SelectItem>
+              <SelectItem value="30">30 seconds</SelectItem>
+              <SelectItem value="60">1 minute</SelectItem>
+              <SelectItem value="120">2 minutes</SelectItem>
+            </SelectContent>
+          </Select>
+        </SettingsRow>
+        <div className="rounded-lg bg-muted/50 p-3 flex items-start gap-2">
+          <Clock className="h-4 w-4 mt-0.5 text-muted-foreground" />
+          <p className="text-xs text-muted-foreground">
+            When enabled, activities shorter than the threshold will be hidden from the timeline.
+            This helps focus on meaningful work blocks rather than brief context switches.
+          </p>
+        </div>
       </SettingsCard>
 
       <SettingsCard title="Behavior">

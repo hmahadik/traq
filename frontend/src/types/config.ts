@@ -6,6 +6,11 @@ export interface Config {
   ui: UIConfig;
   system: SystemConfig;
   issues?: IssuesConfig;
+  timeline?: TimelineConfig;
+}
+
+export interface TimelineConfig {
+  minActivityDurationSeconds: number; // Filter activities shorter than this (0 = show all)
 }
 
 export interface IssuesConfig {

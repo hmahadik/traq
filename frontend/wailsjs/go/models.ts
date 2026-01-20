@@ -589,6 +589,18 @@ export namespace service {
 	        this.sitesVisitedPercent = source["sitesVisitedPercent"];
 	    }
 	}
+	export class TimelineConfig {
+	    minActivityDurationSeconds: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new TimelineConfig(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.minActivityDurationSeconds = source["minActivityDurationSeconds"];
+	    }
+	}
 	export class UpdateConfig {
 	    autoUpdate: boolean;
 	    checkIntervalHours: number;
@@ -834,6 +846,7 @@ export namespace service {
 	    system?: SystemConfig;
 	    issues?: IssuesConfig;
 	    update?: UpdateConfig;
+	    timeline?: TimelineConfig;
 	
 	    static createFrom(source: any = {}) {
 	        return new Config(source);
@@ -849,6 +862,7 @@ export namespace service {
 	        this.system = this.convertValues(source["system"], SystemConfig);
 	        this.issues = this.convertValues(source["issues"], IssuesConfig);
 	        this.update = this.convertValues(source["update"], UpdateConfig);
+	        this.timeline = this.convertValues(source["timeline"], TimelineConfig);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -1926,6 +1940,7 @@ export namespace service {
 	        this.label = source["label"];
 	    }
 	}
+	
 	export class TopApp {
 	    appName: string;
 	    duration: number;

@@ -8,6 +8,7 @@ import {
   useCalendarHeatmap,
   useGenerateSummary,
   useScreenshotsForDate,
+  useEntriesForDate,
   useDeleteActivities,
   useDeleteBrowserVisits,
   useDeleteGitCommits,
@@ -183,6 +184,8 @@ export function TimelinePage() {
   const { data: screenshotsData } = useScreenshotsForDate(dateStr, {
     enabled: displayMode === 'drops',
   });
+  // Fetch entries (project-assigned activities) for EventDrops view
+  const { data: entriesData } = useEntriesForDate(dateStr);
   const generateSummary = useGenerateSummary();
 
   const sessionsWithoutSummaries = useMemo(() => {
@@ -607,6 +610,7 @@ export function TimelinePage() {
               data={gridData}
               filters={filters}
               screenshots={screenshotsData}
+              entries={entriesData}
               onEventDelete={handleEventDropDelete}
               onEventEdit={handleEventDropEdit}
               onViewScreenshot={handleEventDropViewScreenshot}

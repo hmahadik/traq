@@ -71,6 +71,12 @@ type Config struct {
 	System      *SystemConfig      `json:"system"`
 	Issues      *IssuesConfig      `json:"issues"`
 	Update      *UpdateConfig      `json:"update"`
+	Timeline    *TimelineConfig    `json:"timeline"`
+}
+
+// TimelineConfig contains timeline display settings.
+type TimelineConfig struct {
+	MinActivityDurationSeconds int `json:"minActivityDurationSeconds"` // Filter activities shorter than this (0 = show all)
 }
 
 // UpdateConfig contains auto-update settings.
@@ -210,6 +216,7 @@ func (s *ConfigService) GetConfig() (*Config, error) {
 		UI:          s.getDefaultUIConfig(),
 		System:      s.getDefaultSystemConfig(),
 		Update:      s.getDefaultUpdateConfig(),
+		Timeline:    s.getDefaultTimelineConfig(),
 	}
 
 	// Load from database
@@ -353,6 +360,13 @@ func (s *ConfigService) GetConfig() (*Config, error) {
 	if val, err := s.store.GetConfig("update.afkRestartMinutes"); err == nil {
 		if v, e := strconv.Atoi(val); e == nil {
 			config.Update.AFKRestartMinutes = v
+		}
+	}
+
+	// Timeline settings
+	if val, err := s.store.GetConfig("timeline.minActivityDurationSeconds"); err == nil {
+		if v, e := strconv.Atoi(val); e == nil {
+			config.Timeline.MinActivityDurationSeconds = v
 		}
 	}
 
@@ -502,6 +516,9 @@ func mapToStorageKey(frontendKey string) string {
 		"update.autoUpdate":         "update.autoUpdate",
 		"update.checkIntervalHours": "update.checkIntervalHours",
 		"update.afkRestartMinutes":  "update.afkRestartMinutes",
+
+		// Timeline settings
+		"timeline.minActivityDurationSeconds": "timeline.minActivityDurationSeconds",
 	}
 
 	if storageKey, ok := keyMap[frontendKey]; ok {
@@ -773,5 +790,11 @@ func (s *ConfigService) getDefaultUpdateConfig() *UpdateConfig {
 		AutoUpdate:         true,
 		CheckIntervalHours: 5,
 		AFKRestartMinutes:  10,
+	}
+}
+
+func (s *ConfigService) getDefaultTimelineConfig() *TimelineConfig {
+	return &TimelineConfig{
+		MinActivityDurationSeconds: 0, // Default: show all activities (no filtering)
 	}
 }
