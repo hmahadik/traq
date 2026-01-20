@@ -76,10 +76,11 @@ type Config struct {
 
 // TimelineConfig contains timeline display settings.
 type TimelineConfig struct {
-	MinActivityDurationSeconds int    `json:"minActivityDurationSeconds"` // Filter activities shorter than this (0 = show all)
-	TitleDisplay               string `json:"titleDisplay"`               // "full", "app_only", "minimal"
-	AppGrouping                bool   `json:"appGrouping"`                // Merge consecutive same-app activities
-	ContinuityMergeSeconds     int    `json:"continuityMergeSeconds"`     // Merge across brief switches (0, 30, 60, 120)
+	MinActivityDurationSeconds int      `json:"minActivityDurationSeconds"` // Filter activities shorter than this (0 = show all)
+	TitleDisplay               string   `json:"titleDisplay"`               // "full", "app_only", "minimal"
+	AppGrouping                bool     `json:"appGrouping"`                // Merge consecutive same-app activities
+	ContinuityMergeSeconds     int      `json:"continuityMergeSeconds"`     // Merge across brief switches (0, 30, 60, 120)
+	VisibleColumns             []string `json:"visibleColumns"`             // Column IDs to show in timeline
 }
 
 // UpdateConfig contains auto-update settings.
@@ -383,6 +384,9 @@ func (s *ConfigService) GetConfig() (*Config, error) {
 			config.Timeline.ContinuityMergeSeconds = v
 		}
 	}
+	if val, err := s.store.GetConfig("timeline.visibleColumns"); err == nil && val != "" {
+		json.Unmarshal([]byte(val), &config.Timeline.VisibleColumns)
+	}
 
 	// System settings - only override if explicitly set in database
 	if val, err := s.store.GetConfig("system.startOnLogin"); err == nil && val != "" {
@@ -536,6 +540,7 @@ func mapToStorageKey(frontendKey string) string {
 		"timeline.titleDisplay":               "timeline.titleDisplay",
 		"timeline.appGrouping":                "timeline.appGrouping",
 		"timeline.continuityMergeSeconds":     "timeline.continuityMergeSeconds",
+		"timeline.visibleColumns":             "timeline.visibleColumns",
 	}
 
 	if storageKey, ok := keyMap[frontendKey]; ok {
@@ -816,5 +821,6 @@ func (s *ConfigService) getDefaultTimelineConfig() *TimelineConfig {
 		TitleDisplay:               "full", // Default: show full window titles
 		AppGrouping:                false,  // Default: don't merge consecutive same-app activities
 		ContinuityMergeSeconds:     0,      // Default: don't merge across brief switches
+		VisibleColumns:             []string{"time", "activities", "summary", "projects", "screenshots", "breaks"},
 	}
 }

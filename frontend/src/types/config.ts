@@ -14,6 +14,7 @@ export interface TimelineConfig {
   titleDisplay: 'full' | 'app_only' | 'minimal';
   appGrouping: boolean;
   continuityMergeSeconds: number;
+  visibleColumns: string[]; // Column IDs to show in timeline
 }
 
 export interface IssuesConfig {
