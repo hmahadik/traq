@@ -1,6 +1,7 @@
 import { Database, FolderOpen, Image, Sparkles, Clock } from 'lucide-react';
 import { toast } from 'sonner';
 import { Switch } from '@/components/ui/switch';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
 import {
   Select,
@@ -21,6 +22,19 @@ import {
 import { formatBytes } from '@/lib/utils';
 import { SettingsCard } from '../SettingsCard';
 import { SettingsRow } from '../SettingsRow';
+
+const AVAILABLE_COLUMNS = [
+  { id: 'time', label: 'Time' },
+  { id: 'activities', label: 'Activities' },
+  { id: 'summary', label: 'AI Summary' },
+  { id: 'projects', label: 'Projects' },
+  { id: 'screenshots', label: 'Screenshots' },
+  { id: 'breaks', label: 'Breaks' },
+  { id: 'git', label: 'Git' },
+  { id: 'shell', label: 'Shell' },
+  { id: 'files', label: 'Files' },
+  { id: 'browser', label: 'Browser' },
+];
 
 export function GeneralSettings() {
   const { data: config, isLoading } = useConfig();
@@ -175,6 +189,30 @@ export function GeneralSettings() {
               <SelectItem value="120">2 min</SelectItem>
             </SelectContent>
           </Select>
+        </SettingsRow>
+        <SettingsRow
+          label="Visible Columns"
+          description="Choose which columns to show in the timeline"
+        >
+          <div className="flex flex-wrap gap-2">
+            {AVAILABLE_COLUMNS.map((col) => (
+              <label key={col.id} className="flex items-center gap-1.5 cursor-pointer">
+                <Checkbox
+                  checked={config.timeline?.visibleColumns?.includes(col.id) ?? true}
+                  onCheckedChange={(checked) => {
+                    const current = config.timeline?.visibleColumns || AVAILABLE_COLUMNS.map(c => c.id);
+                    const next = checked
+                      ? [...current, col.id]
+                      : current.filter(c => c !== col.id);
+                    updateConfig.mutate({
+                      timeline: { ...config.timeline, visibleColumns: next },
+                    });
+                  }}
+                />
+                <span className="text-sm">{col.label}</span>
+              </label>
+            ))}
+          </div>
         </SettingsRow>
         <div className="rounded-lg bg-muted/50 p-3 flex items-start gap-2">
           <Clock className="h-4 w-4 mt-0.5 text-muted-foreground" />
