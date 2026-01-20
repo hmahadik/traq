@@ -8,7 +8,7 @@ import { useEventDropsData } from './useEventDropsData';
 import { EventDropsTooltip } from './EventDropsTooltip';
 import type { EventDot, EventDropType } from './eventDropsTypes';
 
-// Entry block data from EntriesColumn
+// Entry block data from ProjectsColumn
 interface EntryBlockData {
   id: number;
   eventType: string;

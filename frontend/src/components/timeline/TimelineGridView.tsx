@@ -9,7 +9,7 @@ import { ShellColumn } from './ShellColumn';
 import { FilesColumn } from './FilesColumn';
 import { BrowserColumn } from './BrowserColumn';
 import { AFKColumn } from './AFKColumn';
-import { EntriesColumn } from './EntriesColumn';
+import { ProjectsColumn } from './ProjectsColumn';
 import { TimelineFilters } from './FilterControls';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { ImageGallery } from '@/components/common/ImageGallery';
@@ -404,8 +404,8 @@ export const TimelineGridView: React.FC<TimelineGridViewProps> = ({
             selectedEventKeys={selectedEventKeys}
           />
 
-          {/* Entries Column - Shows project-assigned activities */}
-          <EntriesColumn
+          {/* Projects Column - Shows project-assigned activities */}
+          <ProjectsColumn
             entries={entries || []}
             hours={activeHours}
             hourHeight={effectiveHourHeight}

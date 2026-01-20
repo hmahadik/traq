@@ -19,7 +19,7 @@ interface EntryBlockData {
   source: string;
 }
 
-interface EntriesColumnProps {
+interface ProjectsColumnProps {
   entries: EntryBlockData[];
   hours: number[];
   hourHeight: number;
@@ -29,7 +29,7 @@ interface EntriesColumnProps {
   onEntrySelect?: (entry: EntryBlockData, e: React.MouseEvent) => void;
 }
 
-export const EntriesColumn: React.FC<EntriesColumnProps> = ({
+export const ProjectsColumn: React.FC<ProjectsColumnProps> = ({
   entries,
   hours,
   hourHeight,
@@ -58,7 +58,7 @@ export const EntriesColumn: React.FC<EntriesColumnProps> = ({
           <div className="w-5 h-5 rounded bg-emerald-500 flex items-center justify-center flex-shrink-0">
             <FolderKanban className="w-3 h-3 text-white" />
           </div>
-          <span className="text-xs font-medium text-foreground">Entries</span>
+          <span className="text-xs font-medium text-foreground">Projects</span>
           <Badge variant="secondary" className="ml-auto text-[10px]">
             {formatDuration(totalSeconds)}
           </Badge>

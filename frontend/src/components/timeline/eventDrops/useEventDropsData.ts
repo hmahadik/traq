@@ -9,7 +9,7 @@ import {
 } from './eventDropsTypes';
 import type { TimelineFilters } from '../FilterControls';
 
-// Entry block data from EntriesColumn
+// Entry block data from ProjectsColumn
 interface EntryBlockData {
   id: number;
   eventType: string;
