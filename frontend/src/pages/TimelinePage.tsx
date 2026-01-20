@@ -31,6 +31,8 @@ import { ZoomControls, ZoomLevel, DEFAULT_ZOOM, ZOOM_LEVELS } from '@/components
 import { SessionDetailDrawer } from '@/components/session/SessionDetailDrawer';
 import { SelectionToolbar, SelectionBreakdown } from '@/components/timeline/SelectionToolbar';
 import { ActivityEditDialog } from '@/components/timeline/ActivityEditDialog';
+import { BulkActionsToolbar } from '@/components/timeline/BulkActionsToolbar';
+import { ProjectAssignDialog } from '@/components/timeline/ProjectAssignDialog';
 import { useActivitySelection } from '@/hooks/useActivitySelection';
 import { EventKey, parseEventKey } from '@/utils/eventKeys';
 import type { ActivityBlock } from '@/types/timeline';
@@ -80,6 +82,9 @@ export function TimelinePage() {
   // Activity edit dialog state
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editingActivity, setEditingActivity] = useState<ActivityBlock | null>(null);
+
+  // Project assignment dialog state
+  const [showAssignDialog, setShowAssignDialog] = useState(false);
 
   // Delete mutations for all event types
   const deleteActivities = useDeleteActivities();
@@ -448,6 +453,21 @@ export function TimelinePage() {
     }
   }, [selectedActivityIds, gridData]);
 
+  // Bulk action handlers
+  const handleAssignProject = useCallback((_keys: EventKey[]) => {
+    setShowAssignDialog(true);
+  }, []);
+
+  const handleMerge = useCallback((_keys: EventKey[]) => {
+    // TODO: Implement merge
+    toast.info('Merge functionality coming soon');
+  }, []);
+
+  const handleAcceptDrafts = useCallback((_keys: EventKey[]) => {
+    // TODO: Implement draft acceptance
+    toast.info('Accept drafts functionality coming soon');
+  }, []);
+
   // Clear selection when date changes
   useEffect(() => {
     clearAllSelections();
@@ -749,22 +769,17 @@ export function TimelinePage() {
         sessionId={selectedSessionId}
       />
 
-      {/* Activity Selection Toolbar */}
-      <SelectionToolbar
-        selectedCount={selectedEventKeys.size > 0 ? selectedEventKeys.size : selectedCount}
-        onDelete={handleDeleteSelected}
-        onEdit={handleEditSelected}
-        onClear={clearAllSelections}
-        isDeleting={
-          deleteActivities.isPending ||
-          deleteBrowserVisits.isPending ||
-          deleteGitCommits.isPending ||
-          deleteShellCommands.isPending ||
-          deleteFileEvents.isPending ||
-          deleteAFKEvents.isPending
-        }
-        breakdown={selectedEventKeys.size > 0 ? selectionBreakdown : (selectedCount > 0 ? { activity: selectedCount } : undefined)}
-      />
+      {/* Activity Selection Toolbar - only show for legacy activity-only selection */}
+      {selectedEventKeys.size === 0 && (
+        <SelectionToolbar
+          selectedCount={selectedCount}
+          onDelete={handleDeleteSelected}
+          onEdit={handleEditSelected}
+          onClear={clearAllSelections}
+          isDeleting={deleteActivities.isPending}
+          breakdown={selectedCount > 0 ? { activity: selectedCount } : undefined}
+        />
+      )}
 
       {/* Activity Edit Dialog */}
       <ActivityEditDialog
@@ -774,6 +789,24 @@ export function TimelinePage() {
           setEditDialogOpen(open);
           if (!open) setEditingActivity(null);
         }}
+      />
+
+      {/* Bulk Actions Toolbar */}
+      <BulkActionsToolbar
+        selectedKeys={selectedEventKeys}
+        onClear={clearAllSelections}
+        onAssignProject={handleAssignProject}
+        onMerge={handleMerge}
+        onDelete={handleDeleteSelected}
+        onAcceptDrafts={handleAcceptDrafts}
+      />
+
+      {/* Project Assignment Dialog */}
+      <ProjectAssignDialog
+        open={showAssignDialog}
+        onOpenChange={setShowAssignDialog}
+        activityKeys={Array.from(selectedEventKeys)}
+        onComplete={clearAllSelections}
       />
 
       {showCalendar && (

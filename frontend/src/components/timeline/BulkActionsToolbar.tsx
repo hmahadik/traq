@@ -1,4 +1,3 @@
-import { useSelection } from './SelectionContext';
 import { Button } from '@/components/ui/button';
 import {
   FolderPlus,
@@ -10,6 +9,8 @@ import {
 import type { EventKey } from '@/utils/eventKeys';
 
 interface BulkActionsToolbarProps {
+  selectedKeys: Set<EventKey>; // From parent, not context
+  onClear: () => void; // From parent
   onAssignProject: (keys: EventKey[]) => void;
   onMerge: (keys: EventKey[]) => void;
   onDelete: (keys: EventKey[]) => void;
@@ -17,13 +18,13 @@ interface BulkActionsToolbarProps {
 }
 
 export function BulkActionsToolbar({
+  selectedKeys,
+  onClear,
   onAssignProject,
   onMerge,
   onDelete,
   onAcceptDrafts,
 }: BulkActionsToolbarProps) {
-  const { selectedKeys, clear } = useSelection();
-
   if (selectedKeys.size === 0) return null;
 
   const keys = Array.from(selectedKeys);
@@ -78,7 +79,7 @@ export function BulkActionsToolbar({
         <Button
           variant="ghost"
           size="sm"
-          onClick={clear}
+          onClick={onClear}
           aria-label="Clear selection"
         >
           <X className="h-4 w-4" />
