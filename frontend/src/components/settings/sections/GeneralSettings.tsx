@@ -118,6 +118,64 @@ export function GeneralSettings() {
             </SelectContent>
           </Select>
         </SettingsRow>
+        <SettingsRow
+          label="Activity Detail Level"
+          description="How much information to show in activity blocks"
+        >
+          <Select
+            value={config.timeline?.titleDisplay || 'full'}
+            onValueChange={(value) =>
+              updateConfig.mutate({
+                timeline: { ...config.timeline, titleDisplay: value as 'full' | 'app_only' | 'minimal' },
+              })
+            }
+          >
+            <SelectTrigger className="w-36">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="full">Full Detail</SelectItem>
+              <SelectItem value="app_only">App Only</SelectItem>
+              <SelectItem value="minimal">Minimal</SelectItem>
+            </SelectContent>
+          </Select>
+        </SettingsRow>
+        <SettingsRow
+          label="App Grouping"
+          description="Merge consecutive activities from the same app"
+        >
+          <Switch
+            checked={config.timeline?.appGrouping || false}
+            onCheckedChange={(checked) =>
+              updateConfig.mutate({
+                timeline: { ...config.timeline, appGrouping: checked },
+              })
+            }
+          />
+        </SettingsRow>
+        <SettingsRow
+          label="Continuity Threshold"
+          description="Merge activities separated by brief context switches"
+        >
+          <Select
+            value={String(config.timeline?.continuityMergeSeconds || 0)}
+            onValueChange={(value) =>
+              updateConfig.mutate({
+                timeline: { ...config.timeline, continuityMergeSeconds: parseInt(value, 10) },
+              })
+            }
+          >
+            <SelectTrigger className="w-24">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="0">Off</SelectItem>
+              <SelectItem value="30">30s</SelectItem>
+              <SelectItem value="60">60s</SelectItem>
+              <SelectItem value="120">2 min</SelectItem>
+            </SelectContent>
+          </Select>
+        </SettingsRow>
         <div className="rounded-lg bg-muted/50 p-3 flex items-start gap-2">
           <Clock className="h-4 w-4 mt-0.5 text-muted-foreground" />
           <p className="text-xs text-muted-foreground">
