@@ -154,6 +154,48 @@ type AFKBlock struct {
 	PixelHeight     float64 `json:"pixelHeight"`  // Height in pixels
 }
 
+// TimelineOptions configures timeline data generation.
+type TimelineOptions struct {
+	MinDurationSeconds     int  // Filter out activities shorter than this duration (0 = no filter)
+	AppGrouping            bool // Whether to merge consecutive same-app activities
+	ContinuityMergeSeconds int  // Maximum gap in seconds between activities to still merge them
+}
+
+// groupConsecutiveActivities merges consecutive activities from the same app.
+// gapTolerance is the maximum gap in seconds between activities to still merge them.
+func groupConsecutiveActivities(blocks []ActivityBlock, gapTolerance int) []ActivityBlock {
+	if len(blocks) <= 1 {
+		return blocks
+	}
+
+	// Sort by start time
+	sort.Slice(blocks, func(i, j int) bool {
+		return blocks[i].StartTime < blocks[j].StartTime
+	})
+
+	grouped := make([]ActivityBlock, 0, len(blocks))
+	current := blocks[0]
+
+	for i := 1; i < len(blocks); i++ {
+		next := blocks[i]
+		gap := next.StartTime - current.EndTime
+
+		if next.AppName == current.AppName && gap <= int64(gapTolerance) {
+			// Merge into current
+			current.EndTime = next.EndTime
+			current.DurationSeconds = float64(current.EndTime - current.StartTime)
+			// Recalculate pixel height: 1 pixel per second, 60 pixels per hour
+			current.PixelHeight = current.DurationSeconds / 60.0
+		} else {
+			grouped = append(grouped, current)
+			current = next
+		}
+	}
+	grouped = append(grouped, current)
+
+	return grouped
+}
+
 // ============================================================================
 // Week View Types
 // ============================================================================
@@ -202,12 +244,14 @@ type WeekSummaryStats struct {
 // GetTimelineGridData returns all data for the v3 timeline grid view.
 // Deprecated: Use GetTimelineGridDataWithOptions instead.
 func (s *TimelineService) GetTimelineGridData(date string) (*TimelineGridData, error) {
-	return s.GetTimelineGridDataWithOptions(date, 0)
+	return s.GetTimelineGridDataWithOptions(date, TimelineOptions{})
 }
 
 // GetTimelineGridDataWithOptions returns timeline grid data with configurable filtering.
-// minDurationSeconds filters out activities shorter than the specified duration (0 = no filter).
-func (s *TimelineService) GetTimelineGridDataWithOptions(date string, minDurationSeconds int) (*TimelineGridData, error) {
+// opts.MinDurationSeconds filters out activities shorter than the specified duration (0 = no filter).
+// opts.AppGrouping enables merging consecutive same-app activities.
+// opts.ContinuityMergeSeconds sets the maximum gap for merging when AppGrouping is enabled.
+func (s *TimelineService) GetTimelineGridDataWithOptions(date string, opts TimelineOptions) (*TimelineGridData, error) {
 	// Parse date to local timezone day boundaries
 	t, err := time.ParseInLocation("2006-01-02", date, time.Local)
 	if err != nil {
@@ -223,10 +267,10 @@ func (s *TimelineService) GetTimelineGridDataWithOptions(date string, minDuratio
 		return nil, fmt.Errorf("failed to fetch focus events: %w", err)
 	}
 
-	// Apply noise cancellation filter: remove activities shorter than minDurationSeconds
-	if minDurationSeconds > 0 {
+	// Apply noise cancellation filter: remove activities shorter than MinDurationSeconds
+	if opts.MinDurationSeconds > 0 {
 		var filtered []*storage.WindowFocusEvent
-		minDuration := float64(minDurationSeconds)
+		minDuration := float64(opts.MinDurationSeconds)
 		for _, event := range focusEvents {
 			if event.DurationSeconds >= minDuration {
 				filtered = append(filtered, event)
@@ -340,6 +384,15 @@ func (s *TimelineService) GetTimelineGridDataWithOptions(date string, minDuratio
 			hourlyGrid[hour] = make(map[string][]ActivityBlock)
 		}
 		hourlyGrid[hour][friendlyName] = append(hourlyGrid[hour][friendlyName], block)
+	}
+
+	// Apply app grouping if enabled
+	if opts.AppGrouping {
+		for hour, apps := range hourlyGrid {
+			for app, blocks := range apps {
+				hourlyGrid[hour][app] = groupConsecutiveActivities(blocks, opts.ContinuityMergeSeconds)
+			}
+		}
 	}
 
 	// Build top apps list with categories (use friendly names)

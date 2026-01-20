@@ -577,15 +577,17 @@ func (a *App) GetTimelineGridData(date string) (result *service.TimelineGridData
 		return nil, nil
 	}
 
-	// Get noise cancellation setting from config
-	minDuration := 0
+	// Get timeline display settings from config
+	opts := service.TimelineOptions{}
 	if a.Config != nil {
 		if config, err := a.Config.GetConfig(); err == nil && config.Timeline != nil {
-			minDuration = config.Timeline.MinActivityDurationSeconds
+			opts.MinDurationSeconds = config.Timeline.MinActivityDurationSeconds
+			opts.AppGrouping = config.Timeline.AppGrouping
+			opts.ContinuityMergeSeconds = config.Timeline.ContinuityMergeSeconds
 		}
 	}
 
-	return a.Timeline.GetTimelineGridDataWithOptions(date, minDuration)
+	return a.Timeline.GetTimelineGridDataWithOptions(date, opts)
 }
 
 // GetWeekTimelineData returns aggregated data for week view.
