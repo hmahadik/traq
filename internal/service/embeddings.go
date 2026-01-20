@@ -23,6 +23,7 @@ type EmbeddingContext struct {
 // EmbeddingService handles embedding generation and similarity search
 type EmbeddingService struct {
 	store *storage.Store
+	onnx  *ONNXEmbeddingService // Real embeddings if available
 
 	// In-memory vector index
 	vectors   []LabeledVector
@@ -50,9 +51,11 @@ type SimilarityResult struct {
 }
 
 // NewEmbeddingService creates a new embedding service
-func NewEmbeddingService(store *storage.Store) *EmbeddingService {
+// Pass nil for onnx to use pseudo-embeddings only
+func NewEmbeddingService(store *storage.Store, onnx *ONNXEmbeddingService) *EmbeddingService {
 	svc := &EmbeddingService{
 		store:   store,
+		onnx:    onnx,
 		vectors: make([]LabeledVector, 0),
 	}
 	return svc
@@ -90,10 +93,20 @@ func BuildContextText(ctx *EmbeddingContext) string {
 }
 
 // GenerateEmbedding creates an embedding for the given context
-// NOTE: This is a placeholder using hash-based pseudo-embeddings.
-// TODO: Replace with ONNX model (all-MiniLM-L6-v2) for real semantic embeddings
+// Uses ONNX if available, falls back to pseudo-embeddings
 func (s *EmbeddingService) GenerateEmbedding(ctx *EmbeddingContext) []float32 {
 	text := BuildContextText(ctx)
+
+	// Use ONNX if available and ready
+	if s.onnx != nil && s.onnx.IsReady() {
+		embedding, err := s.onnx.GenerateEmbedding(text)
+		if err == nil {
+			return embedding
+		}
+		// Fall through to pseudo-embedding on error
+	}
+
+	// Fallback to pseudo-embeddings
 	return generatePseudoEmbedding(text, 384)
 }
 

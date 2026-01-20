@@ -137,7 +137,7 @@ func (a *App) startup(ctx context.Context) {
 	a.Projects = service.NewProjectAssignmentService(a.store)
 
 	// Initialize embedding service (for semantic similarity-based project assignment)
-	a.Embeddings = service.NewEmbeddingService(a.store)
+	a.Embeddings = service.NewEmbeddingService(a.store, nil) // ONNX optional, nil for now
 	// Load existing labeled vectors in background
 	go func() {
 		if err := a.Embeddings.LoadVectors(); err != nil {
