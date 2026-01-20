@@ -1,7 +1,9 @@
 import { useState, useCallback, useMemo, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { ChevronLeft, ChevronRight, Calendar, Sparkles, Loader2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Calendar, Sparkles, Loader2, PanelRight, PanelRightClose } from 'lucide-react';
+import { SplitPanel } from '@/components/common/SplitPanel';
+import { TimelineListView } from '@/components/timeline/TimelineListView';
 import { CalendarWidget } from '@/components/timeline';
 import {
   useTimelineGridData,
@@ -92,6 +94,10 @@ export function TimelinePage() {
 
   // Lasso preview keys for all event types (grid view highlighting)
   const [lassoPreviewKeys, setLassoPreviewKeys] = useState<Set<EventKey>>(new Set());
+
+  // List panel state
+  const [showListPanel, setShowListPanel] = useState(true);
+  const [listSelectedIds, setListSelectedIds] = useState<Set<string>>(new Set());
 
   // Display mode state (grid vs drops)
   const [displayMode, setDisplayMode] = useState<DisplayMode>(() => {
@@ -562,6 +568,15 @@ export function TimelinePage() {
                 variant="ghost"
                 size="icon"
                 className="h-8 w-8"
+                onClick={() => setShowListPanel(!showListPanel)}
+                title={showListPanel ? "Hide list" : "Show list"}
+              >
+                {showListPanel ? <PanelRightClose className="h-4 w-4" /> : <PanelRight className="h-4 w-4" />}
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
                 onClick={() => setShowCalendar(!showCalendar)}
               >
                 <Calendar className="h-4 w-4" />
@@ -585,36 +600,86 @@ export function TimelinePage() {
             </div>
           </div>
 
-          {displayMode === 'grid' ? (
-            <TimelineGridView
-              data={gridData}
-              filters={filters}
-              hourHeight={zoom}
-              onSessionClick={handleSessionClick}
-              selectedActivityIds={selectedActivityIds}
-              onActivitySelect={handleActivitySelect}
-              onActivityDoubleClick={handleActivityDoubleClick}
-              lassoRect={lassoRect}
-              onLassoStart={startLasso}
-              onLassoMove={updateLasso}
-              onLassoEnd={endLasso}
-              selectedEventKeys={selectedEventKeys}
-              onLassoEndWithKeys={handleLassoEndWithKeys}
-              lassoPreviewIds={lassoPreviewIds}
-              onLassoPreview={setLassoPreviewIds}
-              lassoPreviewKeys={lassoPreviewKeys}
-              onLassoPreviewKeys={handleLassoPreviewKeys}
+          {showListPanel ? (
+            <SplitPanel
+              direction="horizontal"
+              defaultSize={70}
+              minSize={30}
+              maxSize={90}
+              storageKey="timeline-split-size"
+              left={
+                displayMode === 'grid' ? (
+                  <TimelineGridView
+                    data={gridData}
+                    filters={filters}
+                    hourHeight={zoom}
+                    onSessionClick={handleSessionClick}
+                    selectedActivityIds={selectedActivityIds}
+                    onActivitySelect={handleActivitySelect}
+                    onActivityDoubleClick={handleActivityDoubleClick}
+                    lassoRect={lassoRect}
+                    onLassoStart={startLasso}
+                    onLassoMove={updateLasso}
+                    onLassoEnd={endLasso}
+                    selectedEventKeys={selectedEventKeys}
+                    onLassoEndWithKeys={handleLassoEndWithKeys}
+                    lassoPreviewIds={lassoPreviewIds}
+                    onLassoPreview={setLassoPreviewIds}
+                    lassoPreviewKeys={lassoPreviewKeys}
+                    onLassoPreviewKeys={handleLassoPreviewKeys}
+                  />
+                ) : (
+                  <EventDropsTimeline
+                    data={gridData}
+                    filters={filters}
+                    screenshots={screenshotsData}
+                    entries={entriesData}
+                    onEventDelete={handleEventDropDelete}
+                    onEventEdit={handleEventDropEdit}
+                    onViewScreenshot={handleEventDropViewScreenshot}
+                  />
+                )
+              }
+              right={
+                <TimelineListView
+                  data={gridData}
+                  selectedIds={listSelectedIds}
+                  onSelectionChange={setListSelectedIds}
+                />
+              }
             />
           ) : (
-            <EventDropsTimeline
-              data={gridData}
-              filters={filters}
-              screenshots={screenshotsData}
-              entries={entriesData}
-              onEventDelete={handleEventDropDelete}
-              onEventEdit={handleEventDropEdit}
-              onViewScreenshot={handleEventDropViewScreenshot}
-            />
+            displayMode === 'grid' ? (
+              <TimelineGridView
+                data={gridData}
+                filters={filters}
+                hourHeight={zoom}
+                onSessionClick={handleSessionClick}
+                selectedActivityIds={selectedActivityIds}
+                onActivitySelect={handleActivitySelect}
+                onActivityDoubleClick={handleActivityDoubleClick}
+                lassoRect={lassoRect}
+                onLassoStart={startLasso}
+                onLassoMove={updateLasso}
+                onLassoEnd={endLasso}
+                selectedEventKeys={selectedEventKeys}
+                onLassoEndWithKeys={handleLassoEndWithKeys}
+                lassoPreviewIds={lassoPreviewIds}
+                onLassoPreview={setLassoPreviewIds}
+                lassoPreviewKeys={lassoPreviewKeys}
+                onLassoPreviewKeys={handleLassoPreviewKeys}
+              />
+            ) : (
+              <EventDropsTimeline
+                data={gridData}
+                filters={filters}
+                screenshots={screenshotsData}
+                entries={entriesData}
+                onEventDelete={handleEventDropDelete}
+                onEventEdit={handleEventDropEdit}
+                onViewScreenshot={handleEventDropViewScreenshot}
+              />
+            )
           )}
         </div>
       </>
@@ -639,6 +704,15 @@ export function TimelinePage() {
           <FilterControls filters={filters} onFiltersChange={setFilters} />
           {displayMode === 'grid' && <ZoomControls zoom={zoom} onZoomChange={setZoom} />}
           <GlobalSearch onNavigateToDate={handleSearchNavigateToDate} />
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            onClick={() => setShowListPanel(!showListPanel)}
+            title={showListPanel ? "Hide list" : "Show list"}
+          >
+            {showListPanel ? <PanelRightClose className="h-4 w-4" /> : <PanelRight className="h-4 w-4" />}
+          </Button>
           <Button
             variant="ghost"
             size="icon"
