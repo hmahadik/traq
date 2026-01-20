@@ -240,8 +240,9 @@ export function EventDropsTimeline({
     yScale.bandwidth = () => rowHeight;
 
     // Create zoom behavior
+    // Extended zoom range: 0.5x = 48 hours visible, 48x = ~30 min visible
     const zoom = d3.zoom<SVGSVGElement, unknown>()
-      .scaleExtent([1, 20])
+      .scaleExtent([0.5, 48])
       .translateExtent([[MARGIN.left, 0], [width - MARGIN.right, height]])
       .extent([[MARGIN.left, 0], [width - MARGIN.right, height]])
       .on('zoom', (event) => {
@@ -665,6 +666,24 @@ export function EventDropsTimeline({
     return `${start} - ${end}`;
   }, [visibleTimeRange, eventDropsData]);
 
+  // Calculate visible duration for zoom indicator
+  const visibleDurationLabel = useMemo(() => {
+    const range = visibleTimeRange || eventDropsData?.timeRange;
+    if (!range) return null;
+    const durationMs = range.end.getTime() - range.start.getTime();
+    const durationHours = durationMs / (1000 * 60 * 60);
+
+    if (durationHours >= 24) {
+      return `${Math.round(durationHours)}h`;
+    } else if (durationHours >= 1) {
+      const hours = Math.floor(durationHours);
+      const minutes = Math.round((durationHours - hours) * 60);
+      return minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`;
+    } else {
+      return `${Math.round(durationHours * 60)}m`;
+    }
+  }, [visibleTimeRange, eventDropsData]);
+
   return (
     <div className="relative w-full h-full flex flex-col">
       {/* Top half: Timeline visualization */}
@@ -677,9 +696,9 @@ export function EventDropsTimeline({
           >
             Reset Zoom
           </button>
-          {currentZoom.k > 1 && (
+          {currentZoom.k !== 1 && visibleDurationLabel && (
             <span className="px-2 py-1 text-xs bg-muted rounded text-muted-foreground">
-              {Math.round(currentZoom.k * 100)}%
+              {visibleDurationLabel} visible
             </span>
           )}
         </div>
