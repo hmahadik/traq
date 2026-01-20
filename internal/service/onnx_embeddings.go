@@ -2,6 +2,7 @@ package service
 
 import (
 	"fmt"
+	"math"
 	"sync"
 
 	ort "github.com/yalue/onnxruntime_go"
@@ -16,11 +17,14 @@ import (
 // The model outputs 384-dimensional embeddings, same as our pseudo-embeddings,
 // so it's a drop-in replacement for GenerateEmbedding.
 type ONNXEmbeddingService struct {
-	modelPath   string
-	libraryPath string
-	mu          sync.Mutex
-	ready       bool
-	session     *ort.DynamicAdvancedSession
+	modelPath     string
+	tokenizerPath string
+	libraryPath   string
+	mu            sync.Mutex
+	ready         bool
+	session       *ort.DynamicAdvancedSession
+	tokenizer     *Tokenizer
+	maxSeqLen     int
 }
 
 // ONNXConfig holds configuration for the ONNX embedding service
@@ -28,11 +32,17 @@ type ONNXConfig struct {
 	// ModelPath is the path to the ONNX model file (all-MiniLM-L6-v2.onnx)
 	ModelPath string
 
+	// TokenizerPath is the path to the tokenizer.json file
+	TokenizerPath string
+
 	// LibraryPath is the path to the ONNX Runtime shared library
 	// On Linux: libonnxruntime.so.1.x.x
 	// On macOS: libonnxruntime.dylib
 	// On Windows: onnxruntime.dll
 	LibraryPath string
+
+	// MaxSequenceLength is the maximum token sequence length (default 256)
+	MaxSequenceLength int
 }
 
 // NewONNXEmbeddingService creates a new ONNX embedding service.
@@ -44,11 +54,21 @@ func NewONNXEmbeddingService(config ONNXConfig) (*ONNXEmbeddingService, error) {
 	if config.ModelPath == "" {
 		return nil, fmt.Errorf("model path is required")
 	}
+	if config.TokenizerPath == "" {
+		return nil, fmt.Errorf("tokenizer path is required")
+	}
+
+	maxSeqLen := config.MaxSequenceLength
+	if maxSeqLen <= 0 {
+		maxSeqLen = 256 // Default for all-MiniLM-L6-v2
+	}
 
 	return &ONNXEmbeddingService{
-		modelPath:   config.ModelPath,
-		libraryPath: config.LibraryPath,
-		ready:       false,
+		modelPath:     config.ModelPath,
+		tokenizerPath: config.TokenizerPath,
+		libraryPath:   config.LibraryPath,
+		maxSeqLen:     maxSeqLen,
+		ready:         false,
 	}, nil
 }
 
@@ -62,6 +82,13 @@ func (s *ONNXEmbeddingService) Initialize() error {
 		return nil
 	}
 
+	// Load tokenizer
+	tokenizer, err := NewTokenizer(s.tokenizerPath, s.maxSeqLen)
+	if err != nil {
+		return fmt.Errorf("failed to load tokenizer: %w", err)
+	}
+	s.tokenizer = tokenizer
+
 	// Set the shared library path if provided
 	if s.libraryPath != "" {
 		ort.SetSharedLibraryPath(s.libraryPath)
@@ -72,17 +99,30 @@ func (s *ONNXEmbeddingService) Initialize() error {
 		return fmt.Errorf("failed to initialize ONNX Runtime: %w", err)
 	}
 
-	// TODO: Load the model and create session
-	// This will be implemented in the next task (2.2)
-	//
-	// The model expects:
-	// - input_ids: int64 tensor [batch_size, sequence_length]
-	// - attention_mask: int64 tensor [batch_size, sequence_length]
-	// - token_type_ids: int64 tensor [batch_size, sequence_length] (optional)
-	//
-	// The model outputs:
-	// - last_hidden_state: float32 tensor [batch_size, sequence_length, 384]
-	// - We'll mean-pool this to get [batch_size, 384] embeddings
+	// Create session options
+	options, err := ort.NewSessionOptions()
+	if err != nil {
+		return fmt.Errorf("failed to create session options: %w", err)
+	}
+	defer options.Destroy()
+
+	// Define input and output names for all-MiniLM-L6-v2
+	// The model expects: input_ids, attention_mask, token_type_ids
+	// The model outputs: last_hidden_state (we mean-pool this) or sentence_embedding
+	inputNames := []string{"input_ids", "attention_mask", "token_type_ids"}
+	outputNames := []string{"last_hidden_state"}
+
+	// Create session
+	session, err := ort.NewDynamicAdvancedSession(
+		s.modelPath,
+		inputNames,
+		outputNames,
+		options,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to create ONNX session: %w", err)
+	}
+	s.session = session
 
 	s.ready = true
 	return nil
@@ -118,9 +158,7 @@ func (s *ONNXEmbeddingService) IsReady() bool {
 }
 
 // GenerateEmbedding creates a 384-dimensional embedding for the given text.
-// This is a placeholder that will be implemented in task 2.2.
-//
-// For now, it falls back to the pseudo-embedding generator.
+// Uses the all-MiniLM-L6-v2 model for semantic embeddings.
 func (s *ONNXEmbeddingService) GenerateEmbedding(text string) ([]float32, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -129,15 +167,100 @@ func (s *ONNXEmbeddingService) GenerateEmbedding(text string) ([]float32, error)
 		return nil, fmt.Errorf("ONNX service not initialized")
 	}
 
-	// TODO: Implement actual ONNX inference in task 2.2
-	// 1. Tokenize text using the model's tokenizer
-	// 2. Create input tensors (input_ids, attention_mask)
-	// 3. Run inference
-	// 4. Mean-pool the output to get embeddings
-	// 5. Normalize to unit vector
+	// 1. Tokenize text
+	inputIDs, attentionMask := s.tokenizer.Encode(text)
 
-	// For now, return placeholder
-	return nil, fmt.Errorf("ONNX inference not yet implemented")
+	// 2. Create token_type_ids (all zeros for single-sentence encoding)
+	tokenTypeIDs := make([]int64, s.maxSeqLen)
+
+	// 3. Create input tensors [1, maxSeqLen] (batch size 1)
+	shape := ort.NewShape(1, int64(s.maxSeqLen))
+
+	inputIDsTensor, err := ort.NewTensor(shape, inputIDs)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create input_ids tensor: %w", err)
+	}
+	defer inputIDsTensor.Destroy()
+
+	attentionMaskTensor, err := ort.NewTensor(shape, attentionMask)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create attention_mask tensor: %w", err)
+	}
+	defer attentionMaskTensor.Destroy()
+
+	tokenTypeIDsTensor, err := ort.NewTensor(shape, tokenTypeIDs)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create token_type_ids tensor: %w", err)
+	}
+	defer tokenTypeIDsTensor.Destroy()
+
+	// 4. Create output tensor for last_hidden_state [1, maxSeqLen, 384]
+	outputShape := ort.NewShape(1, int64(s.maxSeqLen), 384)
+	outputTensor, err := ort.NewEmptyTensor[float32](outputShape)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create output tensor: %w", err)
+	}
+	defer outputTensor.Destroy()
+
+	// 5. Run inference
+	inputs := []ort.Value{inputIDsTensor, attentionMaskTensor, tokenTypeIDsTensor}
+	outputs := []ort.Value{outputTensor}
+
+	if err := s.session.Run(inputs, outputs); err != nil {
+		return nil, fmt.Errorf("ONNX inference failed: %w", err)
+	}
+
+	// 6. Mean-pool the output using attention mask
+	// last_hidden_state is [1, seq_len, 384], we want [384]
+	outputData := outputTensor.GetData()
+	expectedLen := s.maxSeqLen * 384
+	if len(outputData) != expectedLen {
+		return nil, fmt.Errorf("unexpected output shape: got %d elements, expected %d", len(outputData), expectedLen)
+	}
+	embedding := meanPoolWithMask(outputData, attentionMask, s.maxSeqLen, 384)
+
+	// 7. Normalize to unit vector
+	normalizeVector(embedding)
+
+	return embedding, nil
+}
+
+// meanPoolWithMask computes mean pooling over sequence length, considering only
+// tokens where attention_mask is 1.
+func meanPoolWithMask(data []float32, attentionMask []int64, seqLen, hiddenSize int) []float32 {
+	embedding := make([]float32, hiddenSize)
+	count := float32(0)
+
+	for i := 0; i < seqLen; i++ {
+		if attentionMask[i] == 1 {
+			for j := 0; j < hiddenSize; j++ {
+				embedding[j] += data[i*hiddenSize+j]
+			}
+			count++
+		}
+	}
+
+	if count > 0 {
+		for j := 0; j < hiddenSize; j++ {
+			embedding[j] /= count
+		}
+	}
+
+	return embedding
+}
+
+// normalizeVector normalizes a vector to unit length (L2 normalization)
+func normalizeVector(v []float32) {
+	var sumSq float64
+	for _, val := range v {
+		sumSq += float64(val) * float64(val)
+	}
+	norm := float32(math.Sqrt(sumSq))
+	if norm > 0 {
+		for i := range v {
+			v[i] /= norm
+		}
+	}
 }
 
 // EmbeddingDimension returns the dimension of embeddings produced by this service.
