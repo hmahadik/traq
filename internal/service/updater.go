@@ -446,16 +446,27 @@ func copyFile(src, dst string) error {
 }
 
 // isNewerVersion returns true if version a is newer than version b.
-// Handles semver-style versions (e.g., "1.2.3", "2.0.0").
+// Handles semver-style versions including pre-release (e.g., "2.0.0-beta.22").
 func isNewerVersion(a, b string) bool {
 	// Handle "dev" version - always consider releases newer than dev
 	if b == "dev" || b == "" {
 		return true
 	}
 
-	// Simple semver comparison
-	partsA := strings.Split(a, ".")
-	partsB := strings.Split(b, ".")
+	// Split version and pre-release parts (e.g., "2.0.0-beta.22" -> "2.0.0", "beta.22")
+	splitVersion := func(v string) (string, string) {
+		if idx := strings.Index(v, "-"); idx != -1 {
+			return v[:idx], v[idx+1:]
+		}
+		return v, ""
+	}
+
+	mainA, preA := splitVersion(a)
+	mainB, preB := splitVersion(b)
+
+	// Compare main version parts
+	partsA := strings.Split(mainA, ".")
+	partsB := strings.Split(mainB, ".")
 
 	// Pad to same length
 	for len(partsA) < 3 {
@@ -478,5 +489,30 @@ func isNewerVersion(a, b string) bool {
 		}
 	}
 
-	return false // Equal versions
+	// Main versions are equal, compare pre-release
+	// No pre-release is considered newer than any pre-release (2.0.0 > 2.0.0-beta.X)
+	if preA == "" && preB != "" {
+		return true
+	}
+	if preA != "" && preB == "" {
+		return false
+	}
+	if preA == "" && preB == "" {
+		return false // Identical versions
+	}
+
+	// Both have pre-release, compare them (e.g., beta.23 vs beta.22)
+	// Extract numeric suffix
+	extractNum := func(pre string) int {
+		// Find last numeric part (e.g., "beta.22" -> 22)
+		parts := strings.Split(pre, ".")
+		if len(parts) > 0 {
+			var num int
+			fmt.Sscanf(parts[len(parts)-1], "%d", &num)
+			return num
+		}
+		return 0
+	}
+
+	return extractNum(preA) > extractNum(preB)
 }
