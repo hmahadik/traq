@@ -32,6 +32,7 @@ interface UseEventDropsDataOptions {
   groupBy?: 'app' | 'eventType';
   screenshots?: Screenshot[];
   entries?: EntryBlockData[];
+  collapseActivityRows?: boolean; // Merge all activity events into single "In Focus" row
 }
 
 export function useEventDropsData({
@@ -40,6 +41,7 @@ export function useEventDropsData({
   groupBy = 'app',
   screenshots,
   entries,
+  collapseActivityRows = false,
 }: UseEventDropsDataOptions): EventDropsData | null {
   return useMemo(() => {
     if (!data) return null;
@@ -92,15 +94,22 @@ export function useEventDropsData({
     };
 
     // Process activity blocks (always shown)
+    // When collapseActivityRows is true, merge all into single "In Focus" row
     if (filters.showScreenshots) {
       for (const [, hourApps] of Object.entries(data.hourlyGrid)) {
         for (const [appName, activities] of Object.entries(hourApps)) {
           for (const activity of activities) {
-            const rowName = groupBy === 'app' ? appName : 'Activities';
-            const color =
-              groupBy === 'app'
+            // When collapsed, all activities go to "In Focus" row
+            // When expanded, each app gets its own row (or 'Activities' if groupBy='eventType')
+            const rowName = collapseActivityRows
+              ? 'In Focus'
+              : (groupBy === 'app' ? appName : 'Activities');
+
+            const color = collapseActivityRows
+              ? '#22c55e' // green-500 for merged "In Focus"
+              : (groupBy === 'app'
                 ? getAppHexColor(appName)
-                : CATEGORY_HEX_COLORS[activity.category] || CATEGORY_HEX_COLORS.other;
+                : CATEGORY_HEX_COLORS[activity.category] || CATEGORY_HEX_COLORS.other);
 
             const event: EventDot = {
               id: makeEventKey('activity', activity.id),
@@ -202,20 +211,82 @@ export function useEventDropsData({
       }
     }
 
-    // Process AFK blocks (shown as events too, but in their own row)
-    for (const [, hourBlocks] of Object.entries(data.afkBlocks)) {
-      for (const block of hourBlocks) {
-        const rowName = 'Breaks';
+    // Process Activity periods (inverse of AFK blocks) - show when user was active
+    if (data.dayStats?.daySpan) {
+      const dayStart = data.dayStats.daySpan.startTime;
+      const dayEnd = data.dayStats.daySpan.endTime;
+
+      // Collect and sort all AFK blocks
+      const allAfkBlocks = Object.values(data.afkBlocks)
+        .flat()
+        .sort((a, b) => a.startTime - b.startTime);
+
+      // Calculate activity periods as gaps between AFK periods
+      let currentStart = dayStart;
+      let activityId = 0;
+
+      for (const afk of allAfkBlocks) {
+        // If there's a gap before this AFK period, that's an activity period
+        if (afk.startTime > currentStart) {
+          const activityEnd = afk.startTime;
+          const durationSeconds = activityEnd - currentStart;
+
+          // Only include if duration is at least 60 seconds
+          if (durationSeconds >= 60) {
+            const rowName = 'Activity';
+            const dot: EventDot = {
+              id: `activity-${activityId}`,
+              originalId: activityId,
+              timestamp: new Date(currentStart * 1000),
+              type: 'activity',
+              row: rowName,
+              label: `Active (${Math.round(durationSeconds / 60)}m)`,
+              duration: durationSeconds,
+              color: '#22c55e', // green-500 for activity
+              metadata: { startTime: currentStart, endTime: activityEnd, durationSeconds },
+            };
+            addToRow(rowName, dot);
+            activityId++;
+          }
+        }
+        // Move past this AFK period
+        currentStart = Math.max(currentStart, afk.endTime);
+      }
+
+      // Add final activity period after last AFK
+      if (currentStart < dayEnd) {
+        const durationSeconds = dayEnd - currentStart;
+        if (durationSeconds >= 60) {
+          const rowName = 'Activity';
+          const dot: EventDot = {
+            id: `activity-${activityId}`,
+            originalId: activityId,
+            timestamp: new Date(currentStart * 1000),
+            type: 'activity',
+            row: rowName,
+            label: `Active (${Math.round(durationSeconds / 60)}m)`,
+            duration: durationSeconds,
+            color: '#22c55e',
+            metadata: { startTime: currentStart, endTime: dayEnd, durationSeconds },
+          };
+          addToRow(rowName, dot);
+        }
+      }
+
+      // If no AFK blocks, the entire day span is active
+      if (allAfkBlocks.length === 0) {
+        const durationSeconds = dayEnd - dayStart;
+        const rowName = 'Activity';
         const dot: EventDot = {
-          id: makeEventKey('afk', block.id),
-          originalId: block.id,
-          timestamp: new Date(block.startTime * 1000),
-          type: 'afk',
+          id: 'activity-0',
+          originalId: 0,
+          timestamp: new Date(dayStart * 1000),
+          type: 'activity',
           row: rowName,
-          label: `Break (${Math.round(block.durationSeconds / 60)}m)`,
-          duration: block.durationSeconds,
-          color: EVENT_TYPE_COLORS.afk,
-          metadata: block,
+          label: `Active (${Math.round(durationSeconds / 60)}m)`,
+          duration: durationSeconds,
+          color: '#22c55e',
+          metadata: { startTime: dayStart, endTime: dayEnd, durationSeconds },
         };
         addToRow(rowName, dot);
       }
@@ -338,13 +409,17 @@ export function useEventDropsData({
           data: events,
         };
       })
-      // Sort rows: Projects first, then apps with most events, then special rows (Git, Shell, etc.)
+      // Sort rows: Projects first, then In Focus (if collapsed), then apps with most events, then special rows
       .sort((a, b) => {
         // Projects lane always first
         if (a.name === 'Projects') return -1;
         if (b.name === 'Projects') return 1;
 
-        const specialRows = ['Screenshots', 'Git', 'Shell', 'Browser', 'Files', 'Breaks'];
+        // In Focus (collapsed activity) comes second
+        if (a.name === 'In Focus') return -1;
+        if (b.name === 'In Focus') return 1;
+
+        const specialRows = ['Screenshots', 'Git', 'Shell', 'Browser', 'Files', 'Activity'];
         const aIsSpecial = specialRows.includes(a.name);
         const bIsSpecial = specialRows.includes(b.name);
 
@@ -365,5 +440,5 @@ export function useEventDropsData({
       },
       totalEvents: allEvents.length,
     };
-  }, [data, filters, groupBy, screenshots, entries]);
+  }, [data, filters, groupBy, screenshots, entries, collapseActivityRows]);
 }

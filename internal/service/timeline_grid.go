@@ -858,7 +858,7 @@ func (s *TimelineService) calculateDayStats(focusEvents []*storage.WindowFocusEv
 		breakdown[category] += event.DurationSeconds
 	}
 
-	// Count and categorize breaks (based on v1 logic: gaps between 3min and 2hr)
+	// Count and categorize breaks (based on v1 logic: gaps between 1min and 2hr)
 	// Sort events by start time for gap detection
 	sortedEvents := make([]*storage.WindowFocusEvent, 0, len(focusEvents))
 	for _, event := range focusEvents {
@@ -870,8 +870,8 @@ func (s *TimelineService) calculateDayStats(focusEvents []*storage.WindowFocusEv
 		return sortedEvents[i].StartTime < sortedEvents[j].StartTime
 	})
 
-	// Calculate breaks between sessions
-	const minBreakSeconds = 180   // 3 minutes
+	// Calculate breaks between sessions (v1 logic: gaps 1min-2hr are breaks)
+	const minBreakSeconds = 60    // 1 minute (matches v1)
 	const maxBreakSeconds = 7200  // 2 hours
 
 	var breakCount int
@@ -943,6 +943,56 @@ func (s *TimelineService) calculateDayStats(focusEvents []*storage.WindowFocusEv
 			StartTime: firstActivity,
 			EndTime:   lastActivity,
 			SpanHours: spanSeconds / 3600.0,
+		}
+
+		// Recalculate totalSeconds as daySpan - AFK duration (matches v1 logic)
+		// This is more accurate than summing focus events which can overlap
+		var totalAFKWithinSpan float64
+		for _, afk := range afkEvents {
+			if !afk.EndTime.Valid {
+				continue
+			}
+			afkStart := afk.StartTime
+			afkEnd := afk.EndTime.Int64
+
+			// Clip AFK to day span
+			if afkStart < firstActivity {
+				afkStart = firstActivity
+			}
+			if afkEnd > lastActivity {
+				afkEnd = lastActivity
+			}
+
+			// Only count if AFK falls within span
+			if afkStart < afkEnd {
+				totalAFKWithinSpan += float64(afkEnd - afkStart)
+			}
+		}
+
+		// Active time = span - AFK time within span
+		totalSeconds = spanSeconds - totalAFKWithinSpan
+		if totalSeconds < 0 {
+			totalSeconds = 0
+		}
+
+		// Recalculate category breakdown percentages based on new total
+		// Keep the relative proportions but scale to new total
+		categoryTotal := breakdown["focus"] + breakdown["meetings"] + breakdown["comms"] + breakdown["other"]
+		if categoryTotal > 0 && totalSeconds > 0 {
+			scale := totalSeconds / categoryTotal
+			for cat := range breakdown {
+				if cat != "breaks" {
+					breakdown[cat] *= scale
+				}
+			}
+		}
+
+		// Recalculate breakdown percentages
+		totalSecondsWithBreaks = totalSeconds + breakDuration
+		if totalSecondsWithBreaks > 0 {
+			for category, seconds := range breakdown {
+				breakdownPercent[category] = (seconds / totalSecondsWithBreaks) * 100.0
+			}
 		}
 	}
 
