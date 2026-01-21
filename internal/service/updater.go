@@ -204,11 +204,11 @@ func (s *UpdateService) findAssetURL(assets []GitHubAsset) string {
 
 	switch runtime.GOOS {
 	case "linux":
-		expectedName = "traq-linux-amd64"
+		expectedName = "traq-linux-amd64.AppImage"
 	case "darwin":
 		expectedName = "traq-macos-universal.zip"
 	case "windows":
-		expectedName = "traq-windows-amd64.exe"
+		expectedName = "traq-windows-amd64-installer.exe"
 	default:
 		return ""
 	}
