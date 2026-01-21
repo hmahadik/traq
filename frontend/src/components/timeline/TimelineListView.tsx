@@ -164,7 +164,7 @@ export function TimelineListView({
               }}
               onDoubleClick={() => onItemDoubleClick?.(item)}
               className={cn(
-                'flex items-center border-b text-sm cursor-pointer select-none',
+                'flex items-center border-b text-xs cursor-pointer select-none',
                 selectedIds.has(item.id)
                   ? 'bg-primary/10 ring-1 ring-inset ring-primary/30'
                   : 'hover:bg-muted/50'

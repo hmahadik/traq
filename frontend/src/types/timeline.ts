@@ -76,6 +76,10 @@ export interface SessionSummaryWithPosition {
   hasFiles: boolean;
   hasBrowser: boolean;
 
+  // Draft mode fields
+  isDraft: boolean; // True if this is an AI draft pending approval
+  draftStatus: 'none' | 'pending' | 'accepted' | 'rejected';
+
   // Position data for grid
   hourOffset: number; // Starting hour
   minuteOffset: number; // Starting minute within hour
@@ -249,6 +253,24 @@ export const GRID_CONSTANTS = {
   MIN_SESSION_HEIGHT_PX: 16, // Increased minimum
   MAX_APP_COLUMNS: 5, // Limit app columns to reduce scrolling
 } as const;
+
+// Column visibility configuration
+export type ColumnId = 'time' | 'activities' | 'summary' | 'projects' | 'screenshots' | 'breaks' | 'git' | 'shell' | 'files' | 'browser';
+
+export const AVAILABLE_COLUMNS: { id: ColumnId; label: string }[] = [
+  { id: 'time', label: 'Time' },
+  { id: 'activities', label: 'Activities' },
+  { id: 'summary', label: 'AI Summary' },
+  { id: 'projects', label: 'Projects' },
+  { id: 'screenshots', label: 'Screenshots' },
+  { id: 'breaks', label: 'Activity' },
+  { id: 'git', label: 'Git' },
+  { id: 'shell', label: 'Shell' },
+  { id: 'files', label: 'Files' },
+  { id: 'browser', label: 'Browser' },
+];
+
+export const DEFAULT_VISIBLE_COLUMNS: ColumnId[] = AVAILABLE_COLUMNS.map(c => c.id);
 
 // Timely-style pastel colors for activity blocks
 // Maps normalized app name patterns to colors (with dark mode support)

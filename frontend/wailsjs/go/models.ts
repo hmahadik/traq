@@ -192,6 +192,22 @@ export namespace service {
 	        this.minSessionMinutes = source["minSessionMinutes"];
 	    }
 	}
+	export class AIConfig {
+	    summaryMode: string;
+	    summaryChunkMinutes: number;
+	    assignmentMode: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new AIConfig(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.summaryMode = source["summaryMode"];
+	        this.summaryChunkMinutes = source["summaryChunkMinutes"];
+	        this.assignmentMode = source["assignmentMode"];
+	    }
+	}
 	export class ActivityBlock {
 	    id: number;
 	    windowTitle: string;
@@ -555,6 +571,10 @@ export namespace service {
 	}
 	export class TimelineConfig {
 	    minActivityDurationSeconds: number;
+	    titleDisplay: string;
+	    appGrouping: boolean;
+	    continuityMergeSeconds: number;
+	    visibleColumns: string[];
 	
 	    static createFrom(source: any = {}) {
 	        return new TimelineConfig(source);
@@ -563,6 +583,10 @@ export namespace service {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.minActivityDurationSeconds = source["minActivityDurationSeconds"];
+	        this.titleDisplay = source["titleDisplay"];
+	        this.appGrouping = source["appGrouping"];
+	        this.continuityMergeSeconds = source["continuityMergeSeconds"];
+	        this.visibleColumns = source["visibleColumns"];
 	    }
 	}
 	export class UpdateConfig {
@@ -811,6 +835,7 @@ export namespace service {
 	    issues?: IssuesConfig;
 	    update?: UpdateConfig;
 	    timeline?: TimelineConfig;
+	    ai?: AIConfig;
 	
 	    static createFrom(source: any = {}) {
 	        return new Config(source);
@@ -827,6 +852,7 @@ export namespace service {
 	        this.issues = this.convertValues(source["issues"], IssuesConfig);
 	        this.update = this.convertValues(source["update"], UpdateConfig);
 	        this.timeline = this.convertValues(source["timeline"], TimelineConfig);
+	        this.ai = this.convertValues(source["ai"], AIConfig);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -1496,6 +1522,28 @@ export namespace service {
 	        this.productivePercentage = source["productivePercentage"];
 	    }
 	}
+	export class ProjectUsage {
+	    projectId: number;
+	    projectName: string;
+	    projectColor: string;
+	    durationSeconds: number;
+	    percentage: number;
+	    focusCount: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new ProjectUsage(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.projectId = source["projectId"];
+	        this.projectName = source["projectName"];
+	        this.projectColor = source["projectColor"];
+	        this.durationSeconds = source["durationSeconds"];
+	        this.percentage = source["percentage"];
+	        this.focusCount = source["focusCount"];
+	    }
+	}
 	
 	export class Report {
 	    id: number;
@@ -1731,6 +1779,8 @@ export namespace service {
 	    hasGit: boolean;
 	    hasFiles: boolean;
 	    hasBrowser: boolean;
+	    isDraft: boolean;
+	    draftStatus: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new SessionSummary(source);
@@ -1753,6 +1803,8 @@ export namespace service {
 	        this.hasGit = source["hasGit"];
 	        this.hasFiles = source["hasFiles"];
 	        this.hasBrowser = source["hasBrowser"];
+	        this.isDraft = source["isDraft"];
+	        this.draftStatus = source["draftStatus"];
 	    }
 	}
 	export class SessionSummaryWithPosition {
@@ -1771,6 +1823,8 @@ export namespace service {
 	    hasGit: boolean;
 	    hasFiles: boolean;
 	    hasBrowser: boolean;
+	    isDraft: boolean;
+	    draftStatus: string;
 	    hourOffset: number;
 	    minuteOffset: number;
 	    pixelPosition: number;
@@ -1798,6 +1852,8 @@ export namespace service {
 	        this.hasGit = source["hasGit"];
 	        this.hasFiles = source["hasFiles"];
 	        this.hasBrowser = source["hasBrowser"];
+	        this.isDraft = source["isDraft"];
+	        this.draftStatus = source["draftStatus"];
 	        this.hourOffset = source["hourOffset"];
 	        this.minuteOffset = source["minuteOffset"];
 	        this.pixelPosition = source["pixelPosition"];

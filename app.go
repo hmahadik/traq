@@ -46,6 +46,7 @@ type App struct {
 	Update      *service.UpdateService
 	Projects    *service.ProjectAssignmentService
 	Embeddings  *service.EmbeddingService
+	Draft       *service.DraftService
 
 	// Inference engine
 	inference *inference.Service
@@ -161,6 +162,9 @@ func (a *App) startup(ctx context.Context) {
 
 	// Initialize summary service
 	a.Summary = service.NewSummaryService(a.store, a.inference)
+
+	// Initialize draft service (for AI draft approval workflow)
+	a.Draft = service.NewDraftService(a.store)
 
 	// Initialize issues service (for crash/manual reporting)
 	a.Issues = service.NewIssueService(a.store, Version)
@@ -479,6 +483,14 @@ func (a *App) GetAppUsage(start, end int64) ([]*service.AppUsage, error) {
 		return nil, nil
 	}
 	return a.Analytics.GetAppUsage(start, end)
+}
+
+// GetProjectUsage returns project usage for a time range.
+func (a *App) GetProjectUsage(start, end int64) ([]*service.ProjectUsage, error) {
+	if a.Analytics == nil {
+		return nil, nil
+	}
+	return a.Analytics.GetProjectUsage(start, end)
 }
 
 // GetHourlyActivity returns hourly activity for a date.
@@ -918,6 +930,50 @@ func (a *App) GetSummaryBySession(sessionID int64) (*storage.Summary, error) {
 		return nil, nil
 	}
 	return a.Summary.GetSummaryBySession(sessionID)
+}
+
+// ============================================================================
+// Draft Methods (exposed to frontend)
+// ============================================================================
+
+// AcceptSummaryDraft marks a summary draft as accepted.
+func (a *App) AcceptSummaryDraft(summaryID int64) error {
+	if a.Draft == nil {
+		return fmt.Errorf("draft service not initialized")
+	}
+	return a.Draft.AcceptSummaryDraft(summaryID)
+}
+
+// RejectSummaryDraft marks a summary draft as rejected.
+func (a *App) RejectSummaryDraft(summaryID int64) error {
+	if a.Draft == nil {
+		return fmt.Errorf("draft service not initialized")
+	}
+	return a.Draft.RejectSummaryDraft(summaryID)
+}
+
+// AcceptAssignmentDraft marks a project assignment draft as accepted.
+func (a *App) AcceptAssignmentDraft(activityID int64) error {
+	if a.Draft == nil {
+		return fmt.Errorf("draft service not initialized")
+	}
+	return a.Draft.AcceptAssignmentDraft(activityID)
+}
+
+// RejectAssignmentDraft marks a project assignment draft as rejected.
+func (a *App) RejectAssignmentDraft(activityID int64) error {
+	if a.Draft == nil {
+		return fmt.Errorf("draft service not initialized")
+	}
+	return a.Draft.RejectAssignmentDraft(activityID)
+}
+
+// BulkAcceptDrafts accepts multiple drafts at once.
+func (a *App) BulkAcceptDrafts(summaryIDs, assignmentIDs []int64) error {
+	if a.Draft == nil {
+		return fmt.Errorf("draft service not initialized")
+	}
+	return a.Draft.BulkAcceptDrafts(summaryIDs, assignmentIDs)
 }
 
 // ============================================================================

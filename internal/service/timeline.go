@@ -34,6 +34,8 @@ type SessionSummary struct {
 	HasGit          bool     `json:"hasGit"`
 	HasFiles        bool     `json:"hasFiles"`
 	HasBrowser      bool     `json:"hasBrowser"`
+	IsDraft         bool     `json:"isDraft"`     // True if this is an AI draft pending approval
+	DraftStatus     string   `json:"draftStatus"` // 'none', 'pending', 'accepted', 'rejected'
 }
 
 // ScreenshotDisplay is the service-layer type for screenshots with friendly app names.

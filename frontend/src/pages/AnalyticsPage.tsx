@@ -9,6 +9,8 @@ import {
   ActivityChart,
   AppUsageChart,
   AppUsageTable,
+  ProjectUsageChart,
+  ProjectUsageTable,
   WeeklyAnalytics,
   MonthlyAnalytics,
   YearlyAnalytics,
@@ -19,6 +21,7 @@ import {
   useHourlyActivity,
   useAppUsage,
   useAppUsageRange,
+  useProjectUsage,
   useWeeklyStats,
   useMonthlyStats,
   useYearlyStats,
@@ -130,6 +133,7 @@ export function AnalyticsPage() {
   const { data: stats, isLoading: statsLoading } = useDailyStats(dateStr, true); // Enable comparison
   const { data: hourlyActivity, isLoading: hourlyLoading } = useHourlyActivity(dateStr);
   const { data: appUsage, isLoading: appUsageLoading } = useAppUsage(dateStr);
+  const { data: projectUsage, isLoading: projectUsageLoading } = useProjectUsage(dateStr);
 
   // Week view data
   const { data: weeklyStats, isLoading: weeklyStatsLoading } = useWeeklyStats(weekStartStr);
@@ -265,6 +269,11 @@ export function AnalyticsPage() {
           <StatsGrid className="grid gap-4 grid-cols-1 lg:grid-cols-2 2xl:grid-cols-4" stats={stats} isLoading={statsLoading} />
 
           <ActivityChart data={hourlyActivity} isLoading={hourlyLoading} />
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <ProjectUsageChart data={projectUsage} isLoading={projectUsageLoading} />
+            <ProjectUsageTable data={projectUsage} isLoading={projectUsageLoading} />
+          </div>
 
           <div className="grid gap-4 md:grid-cols-2">
             <AppUsageChart data={appUsage} isLoading={appUsageLoading} />

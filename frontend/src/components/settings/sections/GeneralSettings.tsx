@@ -1,4 +1,5 @@
 import { Database, FolderOpen, Image, Sparkles, Clock } from 'lucide-react';
+import { AVAILABLE_COLUMNS } from '@/types/timeline';
 import { toast } from 'sonner';
 import { Switch } from '@/components/ui/switch';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -22,19 +23,6 @@ import {
 import { formatBytes } from '@/lib/utils';
 import { SettingsCard } from '../SettingsCard';
 import { SettingsRow } from '../SettingsRow';
-
-const AVAILABLE_COLUMNS = [
-  { id: 'time', label: 'Time' },
-  { id: 'activities', label: 'Activities' },
-  { id: 'summary', label: 'AI Summary' },
-  { id: 'projects', label: 'Projects' },
-  { id: 'screenshots', label: 'Screenshots' },
-  { id: 'breaks', label: 'Breaks' },
-  { id: 'git', label: 'Git' },
-  { id: 'shell', label: 'Shell' },
-  { id: 'files', label: 'Files' },
-  { id: 'browser', label: 'Browser' },
-];
 
 export function GeneralSettings() {
   const { data: config, isLoading } = useConfig();

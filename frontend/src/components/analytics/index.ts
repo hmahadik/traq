@@ -4,6 +4,8 @@ export { AppUsageChart } from './AppUsageChart';
 export { HeatmapChart } from './HeatmapChart';
 export { DataSourcesPanel } from './DataSourcesPanel';
 export { AppUsageTable } from './AppUsageTable';
+export { ProjectUsageChart } from './ProjectUsageChart';
+export { ProjectUsageTable } from './ProjectUsageTable';
 export { ProductivityScoreCard } from './ProductivityScoreCard';
 export { FocusDistributionChart } from './FocusDistributionChart';
 export { ActivityTagsChart } from './ActivityTagsChart';

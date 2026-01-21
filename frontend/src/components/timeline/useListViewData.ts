@@ -6,6 +6,7 @@ import {
   ListViewSort,
   ListViewFilter,
 } from '@/types/timeline';
+import { makeEventKey } from '@/utils/eventKeys';
 
 export function useListViewData(
   data: TimelineGridData | undefined,
@@ -22,7 +23,7 @@ export function useListViewData(
       Object.entries(apps).forEach(([_appName, blocks]) => {
         blocks.forEach((block) => {
           items.push({
-            id: `activity-${block.id}`,
+            id: makeEventKey('activity', block.id),
             type: 'activity',
             timestamp: block.startTime,
             endTime: block.endTime,
@@ -44,7 +45,7 @@ export function useListViewData(
     // Convert git events
     Object.values(data.gitEvents).flat().forEach((evt) => {
       items.push({
-        id: `git-${evt.id}`,
+        id: makeEventKey('git', evt.id),
         type: 'git',
         timestamp: evt.timestamp,
         title: evt.messageSubject,
@@ -56,7 +57,7 @@ export function useListViewData(
     // Convert shell events
     Object.values(data.shellEvents).flat().forEach((evt) => {
       items.push({
-        id: `shell-${evt.id}`,
+        id: makeEventKey('shell', evt.id),
         type: 'shell',
         timestamp: evt.timestamp,
         duration: evt.durationSeconds,
@@ -69,7 +70,7 @@ export function useListViewData(
     // Convert file events
     Object.values(data.fileEvents).flat().forEach((evt) => {
       items.push({
-        id: `file-${evt.id}`,
+        id: makeEventKey('file', evt.id),
         type: 'file',
         timestamp: evt.timestamp,
         title: evt.fileName,
@@ -81,7 +82,7 @@ export function useListViewData(
     // Convert browser events
     Object.values(data.browserEvents).flat().forEach((evt) => {
       items.push({
-        id: `browser-${evt.id}`,
+        id: makeEventKey('browser', evt.id),
         type: 'browser',
         timestamp: evt.timestamp,
         duration: evt.visitDurationSeconds,

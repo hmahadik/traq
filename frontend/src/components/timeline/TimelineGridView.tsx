@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useEffect, useCallback } from 'react';
-import { TimelineGridData, GRID_CONSTANTS, ActivityBlock as ActivityBlockType, SessionSummaryWithPosition } from '@/types/timeline';
+import { TimelineGridData, GRID_CONSTANTS, ActivityBlock as ActivityBlockType, SessionSummaryWithPosition, DEFAULT_VISIBLE_COLUMNS } from '@/types/timeline';
 import { HourColumn } from './HourColumn';
 import { AISummaryColumn } from './AISummaryColumn';
 import { ScreenshotColumn } from './ScreenshotColumn';
@@ -9,11 +9,12 @@ import { ShellColumn } from './ShellColumn';
 import { FilesColumn } from './FilesColumn';
 import { BrowserColumn } from './BrowserColumn';
 import { BreaksColumn } from './BreaksColumn';
+import { ActivityColumn } from './ActivityColumn';
 import { ProjectsColumn } from './ProjectsColumn';
 import { TimelineFilters } from './FilterControls';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { ImageGallery } from '@/components/common/ImageGallery';
-import { useScreenshotsForDate, useEntriesForDate } from '@/api/hooks';
+import { useScreenshotsForDate, useEntriesForDate, useConfig } from '@/api/hooks';
 import type { Screenshot } from '@/types';
 import { useActivitySelection } from './useActivitySelection';
 import { AssignmentToolbar } from './AssignmentToolbar';
@@ -88,6 +89,10 @@ export const TimelineGridView: React.FC<TimelineGridViewProps> = ({
 
   // Fetch entries for the Entries lane
   const { data: entries } = useEntriesForDate(data.date);
+
+  // Get column visibility settings from config
+  const { data: config } = useConfig();
+  const visibleColumns = config?.timeline?.visibleColumns || DEFAULT_VISIBLE_COLUMNS;
 
   // Activity selection for project assignment
   const {
@@ -392,41 +397,48 @@ export const TimelineGridView: React.FC<TimelineGridViewProps> = ({
       <ScrollArea className="h-full w-full" type="always">
         <div className="flex min-w-full relative" style={{ height: `${gridHeight}px`, minWidth: 'max-content' }}>
           {/* Hour Column (Sticky) */}
-          <HourColumn hours={activeHours} hourHeight={effectiveHourHeight} />
+          {visibleColumns.includes('time') && (
+            <HourColumn hours={activeHours} hourHeight={effectiveHourHeight} />
+          )}
 
           {/* AI Summary Column (Sticky) */}
-          <AISummaryColumn
-            sessionSummaries={sessionSummaries}
-            hours={activeHours}
-            onSessionClick={handleSessionClick}
-            hourHeight={effectiveHourHeight}
-            lassoPreviewKeys={lassoPreviewKeys}
-            selectedEventKeys={selectedEventKeys}
-          />
+          {visibleColumns.includes('summary') && (
+            <AISummaryColumn
+              sessionSummaries={sessionSummaries}
+              hours={activeHours}
+              onSessionClick={handleSessionClick}
+              hourHeight={effectiveHourHeight}
+              lassoPreviewKeys={lassoPreviewKeys}
+              selectedEventKeys={selectedEventKeys}
+            />
+          )}
 
           {/* Projects Column - Shows project-assigned activities */}
-          <ProjectsColumn
-            entries={entries || []}
-            hours={activeHours}
-            hourHeight={effectiveHourHeight}
-            selectedIds={selectedEntryIds}
-            onEntryClick={(entry) => {
-              // Could open a detail view or similar
-              console.log('Entry clicked:', entry);
-            }}
-            onEntrySelect={(entry) => {
-              toggleSelection({
-                eventType: entry.eventType,
-                eventId: entry.id,
-                projectId: entry.projectId,
-              });
-            }}
-          />
+          {visibleColumns.includes('projects') && (
+            <ProjectsColumn
+              entries={entries || []}
+              hours={activeHours}
+              hourHeight={effectiveHourHeight}
+              selectedIds={selectedEntryIds}
+              onEntryClick={(entry) => {
+                // Could open a detail view or similar
+                console.log('Entry clicked:', entry);
+              }}
+              onEntrySelect={(entry) => {
+                toggleSelection({
+                  eventType: entry.eventType,
+                  eventId: entry.id,
+                  projectId: entry.projectId,
+                });
+              }}
+            />
+          )}
 
-          {/* Breaks Column - Shows break/away periods */}
-          {data.afkBlocks && Object.keys(data.afkBlocks).length > 0 && (
-            <BreaksColumn
+          {/* Activity Column - Shows active (non-AFK) periods */}
+          {visibleColumns.includes('breaks') && data.afkBlocks && (
+            <ActivityColumn
               afkBlocks={data.afkBlocks}
+              dayStats={data.dayStats}
               hours={activeHours}
               hourHeight={effectiveHourHeight}
               lassoPreviewKeys={lassoPreviewKeys}
@@ -435,32 +447,32 @@ export const TimelineGridView: React.FC<TimelineGridViewProps> = ({
           )}
 
           {/* Screenshot Column */}
-          {activeFilters.showScreenshots && (
+          {visibleColumns.includes('screenshots') && activeFilters.showScreenshots && (
             <ScreenshotColumn date={data.date} hours={activeHours} hourHeight={effectiveHourHeight} />
           )}
 
           {/* Git Column */}
-          {activeFilters.showGit && (
+          {visibleColumns.includes('git') && activeFilters.showGit && (
             <GitColumn gitEvents={data.gitEvents || {}} hours={activeHours} hourHeight={effectiveHourHeight} lassoPreviewKeys={lassoPreviewKeys} selectedEventKeys={selectedEventKeys} />
           )}
 
           {/* Shell Column */}
-          {activeFilters.showShell && (
+          {visibleColumns.includes('shell') && activeFilters.showShell && (
             <ShellColumn shellEvents={data.shellEvents || {}} hours={activeHours} hourHeight={effectiveHourHeight} lassoPreviewKeys={lassoPreviewKeys} selectedEventKeys={selectedEventKeys} />
           )}
 
           {/* Files Column */}
-          {activeFilters.showFiles && (
+          {visibleColumns.includes('files') && activeFilters.showFiles && (
             <FilesColumn fileEvents={data.fileEvents || {}} hours={activeHours} hourHeight={effectiveHourHeight} lassoPreviewKeys={lassoPreviewKeys} selectedEventKeys={selectedEventKeys} />
           )}
 
           {/* Browser Column */}
-          {activeFilters.showBrowser && (
+          {visibleColumns.includes('browser') && activeFilters.showBrowser && (
             <BrowserColumn browserEvents={data.browserEvents || {}} hours={activeHours} hourHeight={effectiveHourHeight} lassoPreviewKeys={lassoPreviewKeys} selectedEventKeys={selectedEventKeys} />
           )}
 
           {/* App Columns (Scrollable) */}
-          {appColumns.map((column) => (
+          {visibleColumns.includes('activities') && appColumns.map((column) => (
             <AppColumn
               key={column.appName}
               appName={column.appName}

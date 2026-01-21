@@ -282,6 +282,83 @@ export function AISettings() {
           )}
         </SettingsCard>
       )}
+
+      <SettingsCard title="AI Behavior" description="Control how AI features work">
+        <SettingsRow
+          label="AI Summaries"
+          description="How AI-generated summaries are handled"
+        >
+          <Select
+            value={config.ai?.summaryMode || 'drafts'}
+            onValueChange={(value) =>
+              updateConfig.mutate({
+                ai: { ...config.ai, summaryMode: value as 'auto_accept' | 'drafts' | 'off' },
+              })
+            }
+          >
+            <SelectTrigger className="w-36">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="auto_accept">Auto-accept</SelectItem>
+              <SelectItem value="drafts">Show as drafts</SelectItem>
+              <SelectItem value="off">Off</SelectItem>
+            </SelectContent>
+          </Select>
+        </SettingsRow>
+
+        <SettingsRow
+          label="Summary Chunk Size"
+          description="Time period for each AI summary"
+        >
+          <Select
+            value={String(config.ai?.summaryChunkMinutes || 15)}
+            onValueChange={(value) =>
+              updateConfig.mutate({
+                ai: { ...config.ai, summaryChunkMinutes: parseInt(value, 10) },
+              })
+            }
+          >
+            <SelectTrigger className="w-24">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="15">15 min</SelectItem>
+              <SelectItem value="30">30 min</SelectItem>
+              <SelectItem value="60">1 hour</SelectItem>
+            </SelectContent>
+          </Select>
+        </SettingsRow>
+
+        <SettingsRow
+          label="Project Assignment"
+          description="How auto-assigned projects are handled"
+        >
+          <Select
+            value={config.ai?.assignmentMode || 'drafts'}
+            onValueChange={(value) =>
+              updateConfig.mutate({
+                ai: { ...config.ai, assignmentMode: value as 'auto_accept' | 'drafts' | 'off' },
+              })
+            }
+          >
+            <SelectTrigger className="w-36">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="auto_accept">Auto-accept</SelectItem>
+              <SelectItem value="drafts">Show as drafts</SelectItem>
+              <SelectItem value="off">Off</SelectItem>
+            </SelectContent>
+          </Select>
+        </SettingsRow>
+
+        <div className="rounded-lg bg-muted/50 p-3 text-xs text-muted-foreground">
+          <strong>Drafts mode:</strong> AI suggestions appear with a visual indicator and
+          require your approval before being committed. This gives you full control over
+          AI-generated content.
+        </div>
+      </SettingsCard>
     </div>
   );
 }

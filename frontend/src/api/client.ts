@@ -202,6 +202,12 @@ export const analytics = {
     return withRetry(() => App.GetAppUsage(start, end));
   },
 
+  getProjectUsage: async (start: number, end: number) => {
+    if (isMockMode()) return [];
+    await waitForReady();
+    return withRetry(() => App.GetProjectUsage(start, end));
+  },
+
   getHourlyActivity: async (date: string) => {
     if (isMockMode()) return mockData.getHourlyActivity(date);
     await waitForReady();
@@ -781,6 +787,41 @@ export const summaries = {
 };
 
 /**
+ * Drafts API - AI draft acceptance/rejection workflow
+ */
+export const drafts = {
+  /** Accept a summary draft, marking it as finalized */
+  acceptSummary: async (summaryId: number): Promise<void> => {
+    await waitForReady();
+    await App.AcceptSummaryDraft(summaryId);
+  },
+
+  /** Reject a summary draft */
+  rejectSummary: async (summaryId: number): Promise<void> => {
+    await waitForReady();
+    await App.RejectSummaryDraft(summaryId);
+  },
+
+  /** Accept a project assignment draft */
+  acceptAssignment: async (activityId: number): Promise<void> => {
+    await waitForReady();
+    await App.AcceptAssignmentDraft(activityId);
+  },
+
+  /** Reject a project assignment draft */
+  rejectAssignment: async (activityId: number): Promise<void> => {
+    await waitForReady();
+    await App.RejectAssignmentDraft(activityId);
+  },
+
+  /** Bulk accept multiple drafts at once */
+  bulkAccept: async (summaryIds: number[], assignmentIds: number[]): Promise<void> => {
+    await waitForReady();
+    await App.BulkAcceptDrafts(summaryIds, assignmentIds);
+  },
+};
+
+/**
  * Git Repository API - Manage tracked git repositories
  */
 export interface GitRepository {
@@ -1095,6 +1136,7 @@ export const api = {
   events,
   system,
   summaries,
+  drafts,
   git,
   fileWatch,
   tags,

@@ -15,7 +15,7 @@ export function AppLayout() {
           <Sidebar />
           {/* Main content - offset by sidebar width on desktop */}
           <main className="lg:pl-[88px] h-screen flex flex-col">
-            <div className="flex-1 px-4 sm:px-6 py-6 min-h-0 overflow-hidden">
+            <div className="flex-1 px-4 sm:px-6 py-6 min-h-0 overflow-y-auto">
               <Outlet />
             </div>
           </main>

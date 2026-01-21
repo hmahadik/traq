@@ -4,7 +4,7 @@ import (
 	"fmt"
 )
 
-const schemaVersion = 11
+const schemaVersion = 12
 
 const schema = `
 -- ============================================================================
@@ -313,6 +313,12 @@ func (s *Store) Migrate() error {
 			return fmt.Errorf("failed to apply migration 11: %w", err)
 		}
 	}
+	if currentVersion < 12 {
+		// Migration v12: Add draft fields for AI summary approval workflow
+		if err := s.applyMigration12(); err != nil {
+			return fmt.Errorf("failed to apply migration 12: %w", err)
+		}
+	}
 
 	// Record schema version
 	if currentVersion == 0 {
@@ -335,8 +341,10 @@ func (s *Store) Migrate() error {
 func (s *Store) repairMissingTables() {
 	// Repair missing columns in projects table (migration 9 may have failed partially)
 	s.repairProjectsTable()
-	// Repair missing columns in window_focus_events table (migrations 9 & 10)
+	// Repair missing columns in window_focus_events table (migrations 9, 10 & 12)
 	s.repairFocusEventsTable()
+	// Repair missing columns in summaries table (migration 12)
+	s.repairSummariesTable()
 	// Repair missing columns in screenshots table (migrations 9 & 10)
 	s.repairScreenshotsTable()
 	// Check and create project_patterns table if missing
@@ -437,9 +445,21 @@ func (s *Store) repairFocusEventsTable() {
 		s.db.Exec(`ALTER TABLE window_focus_events ADD COLUMN memory_status TEXT NOT NULL DEFAULT 'active'`)
 	}
 
+	// Migration 12 columns
+	err = s.db.QueryRow(`SELECT COUNT(*) FROM pragma_table_info('window_focus_events') WHERE name = 'is_draft'`).Scan(&count)
+	if err == nil && count == 0 {
+		s.db.Exec(`ALTER TABLE window_focus_events ADD COLUMN is_draft INTEGER DEFAULT 0`)
+	}
+
+	err = s.db.QueryRow(`SELECT COUNT(*) FROM pragma_table_info('window_focus_events') WHERE name = 'draft_status'`).Scan(&count)
+	if err == nil && count == 0 {
+		s.db.Exec(`ALTER TABLE window_focus_events ADD COLUMN draft_status TEXT DEFAULT 'none'`)
+	}
+
 	// Create indexes if missing
 	s.db.Exec(`CREATE INDEX IF NOT EXISTS idx_focus_project ON window_focus_events(project_id)`)
 	s.db.Exec(`CREATE INDEX IF NOT EXISTS idx_focus_memory_status ON window_focus_events(memory_status)`)
+	s.db.Exec(`CREATE INDEX IF NOT EXISTS idx_focus_draft ON window_focus_events(is_draft)`)
 }
 
 // repairScreenshotsTable adds missing columns to screenshots table.
@@ -478,6 +498,32 @@ func (s *Store) repairScreenshotsTable() {
 	// Create indexes if missing
 	s.db.Exec(`CREATE INDEX IF NOT EXISTS idx_screenshots_project ON screenshots(project_id)`)
 	s.db.Exec(`CREATE INDEX IF NOT EXISTS idx_screenshot_memory_status ON screenshots(memory_status)`)
+}
+
+// repairSummariesTable adds missing columns to summaries table.
+// This repairs databases where migration 12's ALTER TABLE statements failed silently.
+func (s *Store) repairSummariesTable() {
+	// Check if table exists
+	var tableCount int
+	err := s.db.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='summaries'`).Scan(&tableCount)
+	if err != nil || tableCount == 0 {
+		return
+	}
+
+	// Migration 12 columns
+	var count int
+	err = s.db.QueryRow(`SELECT COUNT(*) FROM pragma_table_info('summaries') WHERE name = 'is_draft'`).Scan(&count)
+	if err == nil && count == 0 {
+		s.db.Exec(`ALTER TABLE summaries ADD COLUMN is_draft INTEGER DEFAULT 0`)
+	}
+
+	err = s.db.QueryRow(`SELECT COUNT(*) FROM pragma_table_info('summaries') WHERE name = 'draft_status'`).Scan(&count)
+	if err == nil && count == 0 {
+		s.db.Exec(`ALTER TABLE summaries ADD COLUMN draft_status TEXT DEFAULT 'none'`)
+	}
+
+	// Create index if missing
+	s.db.Exec(`CREATE INDEX IF NOT EXISTS idx_summaries_draft ON summaries(is_draft)`)
 }
 
 // applyMigration2 adds window_class column to screenshots table.
@@ -862,6 +908,26 @@ func (s *Store) applyMigration11() error {
 	// Create indexes
 	s.db.Exec(`CREATE INDEX IF NOT EXISTS idx_embeddings_event ON activity_embeddings(event_type, event_id)`)
 	s.db.Exec(`CREATE INDEX IF NOT EXISTS idx_embeddings_hash ON activity_embeddings(context_hash)`)
+
+	return nil
+}
+
+// applyMigration12 adds draft fields for AI summary approval workflow.
+// - is_draft: 0 = committed, 1 = draft (pending user approval)
+// - draft_status: 'none' | 'pending' | 'accepted' | 'rejected'
+// Applied to summaries table for AI-generated session summaries.
+func (s *Store) applyMigration12() error {
+	// 1. Add draft fields to summaries table
+	s.db.Exec(`ALTER TABLE summaries ADD COLUMN is_draft INTEGER DEFAULT 0`)
+	s.db.Exec(`ALTER TABLE summaries ADD COLUMN draft_status TEXT DEFAULT 'none'`)
+
+	// 2. Add draft fields to window_focus_events for project assignment drafts
+	s.db.Exec(`ALTER TABLE window_focus_events ADD COLUMN is_draft INTEGER DEFAULT 0`)
+	s.db.Exec(`ALTER TABLE window_focus_events ADD COLUMN draft_status TEXT DEFAULT 'none'`)
+
+	// 3. Create indexes for efficient draft queries
+	s.db.Exec(`CREATE INDEX IF NOT EXISTS idx_summaries_draft ON summaries(is_draft)`)
+	s.db.Exec(`CREATE INDEX IF NOT EXISTS idx_focus_draft ON window_focus_events(is_draft)`)
 
 	return nil
 }

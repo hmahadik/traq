@@ -213,3 +213,35 @@ func scanSummaries(rows *sql.Rows) ([]*Summary, error) {
 	}
 	return summaries, rows.Err()
 }
+
+// UpdateSummaryDraftStatus updates the draft status of a summary.
+func (s *Store) UpdateSummaryDraftStatus(summaryID int64, isDraft bool, status string) error {
+	isDraftInt := 0
+	if isDraft {
+		isDraftInt = 1
+	}
+	_, err := s.db.Exec(
+		"UPDATE summaries SET is_draft = ?, draft_status = ? WHERE id = ?",
+		isDraftInt, status, summaryID,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to update summary draft status: %w", err)
+	}
+	return nil
+}
+
+// UpdateFocusEventDraftStatus updates the draft status of a window focus event.
+func (s *Store) UpdateFocusEventDraftStatus(activityID int64, isDraft bool, status string) error {
+	isDraftInt := 0
+	if isDraft {
+		isDraftInt = 1
+	}
+	_, err := s.db.Exec(
+		"UPDATE window_focus_events SET is_draft = ?, draft_status = ? WHERE id = ?",
+		isDraftInt, status, activityID,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to update focus event draft status: %w", err)
+	}
+	return nil
+}

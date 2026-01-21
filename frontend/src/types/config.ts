@@ -7,6 +7,13 @@ export interface Config {
   system: SystemConfig;
   issues?: IssuesConfig;
   timeline?: TimelineConfig;
+  ai?: AIConfig;
+}
+
+export interface AIConfig {
+  summaryMode: 'auto_accept' | 'drafts' | 'off';
+  summaryChunkMinutes: number;
+  assignmentMode: 'auto_accept' | 'drafts' | 'off';
 }
 
 export interface TimelineConfig {

@@ -1,6 +1,6 @@
 import { useRef, useEffect, useState, useCallback, useMemo } from 'react';
 import * as d3 from 'd3';
-import { GitCommit, Terminal, Globe, FileText, Coffee, Monitor, Camera, Pencil, Trash2, FolderKanban } from 'lucide-react';
+import { GitCommit, Terminal, Globe, FileText, Coffee, Monitor, Camera, Pencil, Trash2, FolderKanban, ChevronDown, ChevronRight, Eye } from 'lucide-react';
 import type { TimelineGridData } from '@/types/timeline';
 import type { Screenshot } from '@/types/screenshot';
 import type { TimelineFilters } from '../FilterControls';
@@ -100,6 +100,14 @@ export function EventDropsTimeline({
   });
   const [isResizing, setIsResizing] = useState(false);
   const resizeStartRef = useRef<{ startY: number; startHeight: number } | null>(null);
+  const [collapseActivityRows, setCollapseActivityRows] = useState(() => {
+    try {
+      const stored = localStorage.getItem('eventdrops-collapse-activity');
+      return stored === 'true';
+    } catch {
+      return true; // Default to collapsed
+    }
+  });
 
   // Persist list height to localStorage
   useEffect(() => {
@@ -110,8 +118,17 @@ export function EventDropsTimeline({
     }
   }, [listHeight]);
 
+  // Persist collapse state to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem('eventdrops-collapse-activity', collapseActivityRows.toString());
+    } catch {
+      // Ignore localStorage errors
+    }
+  }, [collapseActivityRows]);
+
   // Transform data to EventDrops format
-  const eventDropsData = useEventDropsData({ data, filters, screenshots, entries });
+  const eventDropsData = useEventDropsData({ data, filters, screenshots, entries, collapseActivityRows });
 
   // Handle resize drag for the list panel
   useEffect(() => {
@@ -739,8 +756,27 @@ export function EventDropsTimeline({
     <div className="relative w-full h-full flex flex-col">
       {/* Top half: Timeline visualization */}
       <div className="relative flex-1 min-h-[200px]">
-        {/* Zoom controls */}
+        {/* Controls */}
         <div className="absolute top-2 right-2 z-10 flex gap-1">
+          {/* Toggle collapse activity lanes */}
+          <button
+            onClick={() => setCollapseActivityRows(!collapseActivityRows)}
+            className="px-2 py-1 text-xs bg-muted hover:bg-muted/80 rounded text-muted-foreground flex items-center gap-1"
+            title={collapseActivityRows ? 'Expand app lanes' : 'Collapse to In Focus'}
+          >
+            {collapseActivityRows ? (
+              <>
+                <ChevronRight className="h-3 w-3" />
+                <Eye className="h-3 w-3" />
+              </>
+            ) : (
+              <>
+                <ChevronDown className="h-3 w-3" />
+                <Eye className="h-3 w-3" />
+              </>
+            )}
+            {collapseActivityRows ? 'Expand Apps' : 'In Focus'}
+          </button>
           <button
             onClick={handleResetZoom}
             className="px-2 py-1 text-xs bg-muted hover:bg-muted/80 rounded text-muted-foreground"

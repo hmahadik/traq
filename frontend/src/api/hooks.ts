@@ -44,6 +44,7 @@ export const queryKeys = {
     yearly: (year: number) => ['analytics', 'yearly', year] as const,
     calendar: (year: number, month: number) => ['analytics', 'calendar', year, month] as const,
     appUsage: (start: number, end: number) => ['analytics', 'appUsage', start, end] as const,
+    projectUsage: (start: number, end: number) => ['analytics', 'projectUsage', start, end] as const,
     hourly: (date: string) => ['analytics', 'hourly', date] as const,
     heatmap: () => ['analytics', 'heatmap'] as const,
     dataSources: (start: number, end: number) => ['analytics', 'dataSources', start, end] as const,
@@ -165,6 +166,23 @@ export function useAppUsage(date: string) {
   return useQuery({
     queryKey: queryKeys.analytics.appUsage(start, end),
     queryFn: () => api.analytics.getAppUsage(start, end),
+    staleTime: 60_000,
+  });
+}
+
+export function useProjectUsageRange(start: number, end: number) {
+  return useQuery({
+    queryKey: queryKeys.analytics.projectUsage(start, end),
+    queryFn: () => api.analytics.getProjectUsage(start, end),
+    staleTime: 60_000,
+  });
+}
+
+export function useProjectUsage(date: string) {
+  const { start, end } = getDateRange(date);
+  return useQuery({
+    queryKey: queryKeys.analytics.projectUsage(start, end),
+    queryFn: () => api.analytics.getProjectUsage(start, end),
     staleTime: 60_000,
   });
 }
@@ -690,6 +708,115 @@ export function useDeleteSummary() {
       console.error('Delete summary failed:', error);
       const message = error instanceof Error ? error.message : String(error);
       toast.error(`Failed to delete summary: ${message}`);
+    },
+  });
+}
+
+// ============================================================================
+// Draft Hooks (AI draft acceptance/rejection workflow)
+// ============================================================================
+
+/**
+ * Accept a summary draft, marking it as finalized
+ */
+export function useAcceptSummaryDraft() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (summaryId: number) => api.drafts.acceptSummary(summaryId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['timeline'] });
+      toast.success('Summary accepted');
+    },
+    onError: (error: unknown) => {
+      console.error('Accept summary draft failed:', error);
+      const message = error instanceof Error ? error.message : String(error);
+      toast.error(`Failed to accept summary: ${message}`);
+    },
+  });
+}
+
+/**
+ * Reject a summary draft
+ */
+export function useRejectSummaryDraft() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (summaryId: number) => api.drafts.rejectSummary(summaryId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['timeline'] });
+      toast.success('Summary rejected');
+    },
+    onError: (error: unknown) => {
+      console.error('Reject summary draft failed:', error);
+      const message = error instanceof Error ? error.message : String(error);
+      toast.error(`Failed to reject summary: ${message}`);
+    },
+  });
+}
+
+/**
+ * Accept a project assignment draft
+ */
+export function useAcceptAssignmentDraft() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (activityId: number) => api.drafts.acceptAssignment(activityId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['timeline'] });
+      queryClient.invalidateQueries({ queryKey: ['entries'] });
+      toast.success('Assignment accepted');
+    },
+    onError: (error: unknown) => {
+      console.error('Accept assignment draft failed:', error);
+      const message = error instanceof Error ? error.message : String(error);
+      toast.error(`Failed to accept assignment: ${message}`);
+    },
+  });
+}
+
+/**
+ * Reject a project assignment draft
+ */
+export function useRejectAssignmentDraft() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (activityId: number) => api.drafts.rejectAssignment(activityId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['timeline'] });
+      queryClient.invalidateQueries({ queryKey: ['entries'] });
+      toast.success('Assignment rejected');
+    },
+    onError: (error: unknown) => {
+      console.error('Reject assignment draft failed:', error);
+      const message = error instanceof Error ? error.message : String(error);
+      toast.error(`Failed to reject assignment: ${message}`);
+    },
+  });
+}
+
+/**
+ * Bulk accept multiple drafts at once
+ */
+export function useBulkAcceptDrafts() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ summaryIds, assignmentIds }: { summaryIds: number[]; assignmentIds: number[] }) =>
+      api.drafts.bulkAccept(summaryIds, assignmentIds),
+    onSuccess: (_, { summaryIds, assignmentIds }) => {
+      queryClient.invalidateQueries({ queryKey: ['timeline'] });
+      queryClient.invalidateQueries({ queryKey: ['entries'] });
+      const total = summaryIds.length + assignmentIds.length;
+      toast.success(`${total} drafts accepted`);
+    },
+    onError: (error: unknown) => {
+      console.error('Bulk accept drafts failed:', error);
+      const message = error instanceof Error ? error.message : String(error);
+      toast.error(`Failed to accept drafts: ${message}`);
     },
   });
 }

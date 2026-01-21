@@ -112,6 +112,16 @@ type AppUsage struct {
 	FocusCount      int64   `json:"focusCount"`
 }
 
+// ProjectUsage represents usage statistics for a project.
+type ProjectUsage struct {
+	ProjectID       int64   `json:"projectId"`
+	ProjectName     string  `json:"projectName"`
+	ProjectColor    string  `json:"projectColor"`
+	DurationSeconds float64 `json:"durationSeconds"`
+	Percentage      float64 `json:"percentage"`
+	FocusCount      int64   `json:"focusCount"`
+}
+
 // HourlyActivity represents activity for an hour.
 type HourlyActivity struct {
 	Hour            int   `json:"hour"`
@@ -632,6 +642,78 @@ func (s *AnalyticsService) GetAppUsage(start, end int64) ([]*AppUsage, error) {
 	apps := s.sortAppUsageWithCounts(appDurations, appCounts)
 
 	return apps, nil
+}
+
+// GetProjectUsage returns project usage for a time range.
+func (s *AnalyticsService) GetProjectUsage(start, end int64) ([]*ProjectUsage, error) {
+	// Use GetActiveFocusEventsByTimeRange which includes project_id columns
+	focusEvents, err := s.store.GetActiveFocusEventsByTimeRange(start, end)
+	if err != nil {
+		return nil, err
+	}
+
+	// Get all projects for name/color lookup
+	projects, err := s.store.GetProjects()
+	if err != nil {
+		return nil, err
+	}
+	projectMap := make(map[int64]storage.Project)
+	for _, p := range projects {
+		projectMap[p.ID] = p
+	}
+
+	// Aggregate by project
+	projectDurations := make(map[int64]float64)
+	projectCounts := make(map[int64]int64)
+	var totalDuration float64
+
+	for _, evt := range focusEvents {
+		projectID := int64(0)
+		if evt.ProjectID.Valid {
+			projectID = evt.ProjectID.Int64
+		}
+		projectDurations[projectID] += evt.DurationSeconds
+		projectCounts[projectID]++
+		totalDuration += evt.DurationSeconds
+	}
+
+	// Build result slice
+	var result []*ProjectUsage
+	for projectID, duration := range projectDurations {
+		usage := &ProjectUsage{
+			ProjectID:       projectID,
+			DurationSeconds: duration,
+			FocusCount:      projectCounts[projectID],
+		}
+
+		if projectID == 0 {
+			usage.ProjectName = "Unassigned"
+			usage.ProjectColor = "#6b7280" // gray-500
+		} else if p, ok := projectMap[projectID]; ok {
+			usage.ProjectName = p.Name
+			usage.ProjectColor = p.Color
+		} else {
+			usage.ProjectName = "Unknown"
+			usage.ProjectColor = "#6b7280"
+		}
+
+		if totalDuration > 0 {
+			usage.Percentage = (duration / totalDuration) * 100
+		}
+
+		result = append(result, usage)
+	}
+
+	// Sort by duration descending
+	for i := 0; i < len(result)-1; i++ {
+		for j := i + 1; j < len(result); j++ {
+			if result[j].DurationSeconds > result[i].DurationSeconds {
+				result[i], result[j] = result[j], result[i]
+			}
+		}
+	}
+
+	return result, nil
 }
 
 // GetHourlyActivity returns hourly activity breakdown for a date.

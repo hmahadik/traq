@@ -2,12 +2,14 @@ import React, { useMemo } from 'react';
 import { Sparkles } from 'lucide-react';
 import { SessionSummaryWithPosition, GRID_CONSTANTS, getAppColors } from '@/types/timeline';
 import { snapTo15Minutes } from '@/utils/timelineHelpers';
+import { cn } from '@/lib/utils';
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { DraftBadge } from './DraftBadge';
 
 interface AISummaryColumnProps {
   sessionSummaries: SessionSummaryWithPosition[];
@@ -157,9 +159,14 @@ export const AISummaryColumn: React.FC<AISummaryColumnProps> = ({
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <div
-                      className={`absolute left-1 right-1 rounded-md bg-card border border-border border-l-4 ${borderClass} shadow-sm hover:shadow-md transition-shadow cursor-pointer overflow-hidden ${
-                        isHighlighted ? 'ring-2 ring-blue-400 ring-offset-1' : ''
-                      }`}
+                      className={cn(
+                        'absolute left-1 right-1 rounded-md bg-card border border-l-4 shadow-sm hover:shadow-md transition-shadow cursor-pointer overflow-hidden',
+                        borderClass,
+                        isHighlighted ? 'ring-2 ring-blue-400 ring-offset-1' : '',
+                        session.isDraft
+                          ? 'border-dashed border-amber-400/50 bg-amber-50/50 dark:bg-amber-950/50'
+                          : 'border-border'
+                      )}
                       style={{
                         top: `${absoluteTop}px`,
                         height: `${actualHeight}px`,
@@ -167,8 +174,11 @@ export const AISummaryColumn: React.FC<AISummaryColumnProps> = ({
                       data-event-key={`session:${session.id}`}
                       onClick={() => onSessionClick?.(session)}
                       role="button"
-                      aria-label={`Session from ${formatTime(session.startTime)} - ${session.summary || 'No summary'}`}
+                      aria-label={`Session from ${formatTime(session.startTime)} - ${session.summary || 'No summary'}${session.isDraft ? ' (Draft)' : ''}`}
                     >
+                      {session.isDraft && (
+                        <DraftBadge className="absolute top-1 right-1 z-10" />
+                      )}
                       <div className="p-2.5 h-full flex flex-col">
                         {showTime && (
                           <div className="text-[11px] text-muted-foreground font-medium mb-1">

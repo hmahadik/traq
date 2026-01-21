@@ -6,6 +6,10 @@ import {main} from '../models';
 import {inference} from '../models';
 import {tracker} from '../models';
 
+export function AcceptAssignmentDraft(arg1:number):Promise<void>;
+
+export function AcceptSummaryDraft(arg1:number):Promise<void>;
+
 export function AddTagToSession(arg1:number,arg2:string):Promise<void>;
 
 export function AssignEventToProject(arg1:string,arg2:number,arg3:number):Promise<void>;
@@ -13,6 +17,8 @@ export function AssignEventToProject(arg1:string,arg2:number,arg3:number):Promis
 export function AutoDiscoverProjects():Promise<Array<storage.Project>>;
 
 export function BackfillProjects(arg1:string,arg2:string,arg3:number):Promise<service.BackfillResult>;
+
+export function BulkAcceptDrafts(arg1:Array<number>,arg2:Array<number>):Promise<void>;
 
 export function BulkAssignProject(arg1:Array<main.BulkAssignment>):Promise<void>;
 
@@ -154,6 +160,8 @@ export function GetProjectPatterns(arg1:number):Promise<Array<storage.ProjectPat
 
 export function GetProjectStats(arg1:number):Promise<storage.ProjectStats>;
 
+export function GetProjectUsage(arg1:number,arg2:number):Promise<Array<service.ProjectUsage>>;
+
 export function GetProjects():Promise<Array<storage.Project>>;
 
 export function GetProjectsAutoAssign():Promise<boolean>;
@@ -237,6 +245,10 @@ export function PreviewBackfill(arg1:string,arg2:string,arg3:number):Promise<ser
 export function RegenerateSummary(arg1:number):Promise<storage.Summary>;
 
 export function RegisterGitRepository(arg1:string):Promise<storage.GitRepository>;
+
+export function RejectAssignmentDraft(arg1:number):Promise<void>;
+
+export function RejectSummaryDraft(arg1:number):Promise<void>;
 
 export function RemoveTagFromSession(arg1:number,arg2:string):Promise<void>;
 

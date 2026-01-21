@@ -72,6 +72,7 @@ type Config struct {
 	Issues      *IssuesConfig      `json:"issues"`
 	Update      *UpdateConfig      `json:"update"`
 	Timeline    *TimelineConfig    `json:"timeline"`
+	AI          *AIConfig          `json:"ai"`
 }
 
 // TimelineConfig contains timeline display settings.
@@ -81,6 +82,13 @@ type TimelineConfig struct {
 	AppGrouping                bool     `json:"appGrouping"`                // Merge consecutive same-app activities
 	ContinuityMergeSeconds     int      `json:"continuityMergeSeconds"`     // Merge across brief switches (0, 30, 60, 120)
 	VisibleColumns             []string `json:"visibleColumns"`             // Column IDs to show in timeline
+}
+
+// AIConfig contains AI behavior settings for drafts and approval workflow.
+type AIConfig struct {
+	SummaryMode         string `json:"summaryMode"`         // "auto_accept", "drafts", "off"
+	SummaryChunkMinutes int    `json:"summaryChunkMinutes"` // 15, 30, 60
+	AssignmentMode      string `json:"assignmentMode"`      // "auto_accept", "drafts", "off"
 }
 
 // UpdateConfig contains auto-update settings.
@@ -221,6 +229,7 @@ func (s *ConfigService) GetConfig() (*Config, error) {
 		System:      s.getDefaultSystemConfig(),
 		Update:      s.getDefaultUpdateConfig(),
 		Timeline:    s.getDefaultTimelineConfig(),
+		AI:          s.getDefaultAIConfig(),
 	}
 
 	// Load from database
@@ -388,6 +397,19 @@ func (s *ConfigService) GetConfig() (*Config, error) {
 		json.Unmarshal([]byte(val), &config.Timeline.VisibleColumns)
 	}
 
+	// AI settings
+	if val, err := s.store.GetConfig("ai.summaryMode"); err == nil && val != "" {
+		config.AI.SummaryMode = val
+	}
+	if val, err := s.store.GetConfig("ai.summaryChunkMinutes"); err == nil {
+		if v, e := strconv.Atoi(val); e == nil {
+			config.AI.SummaryChunkMinutes = v
+		}
+	}
+	if val, err := s.store.GetConfig("ai.assignmentMode"); err == nil && val != "" {
+		config.AI.AssignmentMode = val
+	}
+
 	// System settings - only override if explicitly set in database
 	if val, err := s.store.GetConfig("system.startOnLogin"); err == nil && val != "" {
 		config.System.StartOnLogin = val == "true"
@@ -541,6 +563,11 @@ func mapToStorageKey(frontendKey string) string {
 		"timeline.appGrouping":                "timeline.appGrouping",
 		"timeline.continuityMergeSeconds":     "timeline.continuityMergeSeconds",
 		"timeline.visibleColumns":             "timeline.visibleColumns",
+
+		// AI settings
+		"ai.summaryMode":         "ai.summaryMode",
+		"ai.summaryChunkMinutes": "ai.summaryChunkMinutes",
+		"ai.assignmentMode":      "ai.assignmentMode",
 	}
 
 	if storageKey, ok := keyMap[frontendKey]; ok {
@@ -822,5 +849,13 @@ func (s *ConfigService) getDefaultTimelineConfig() *TimelineConfig {
 		AppGrouping:                false,  // Default: don't merge consecutive same-app activities
 		ContinuityMergeSeconds:     0,      // Default: don't merge across brief switches
 		VisibleColumns:             []string{"time", "activities", "summary", "projects", "screenshots", "breaks"},
+	}
+}
+
+func (s *ConfigService) getDefaultAIConfig() *AIConfig {
+	return &AIConfig{
+		SummaryMode:         "drafts", // Default: require approval for AI summaries
+		SummaryChunkMinutes: 15,       // Default: summarize in 15-minute chunks
+		AssignmentMode:      "drafts", // Default: require approval for project assignments
 	}
 }
