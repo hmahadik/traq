@@ -362,7 +362,7 @@ func (s *ConfigService) GetConfig() (*Config, error) {
 	}
 
 	// Update settings
-	if val, err := s.store.GetConfig("update.autoUpdate"); err == nil {
+	if val, err := s.store.GetConfig("update.autoUpdate"); err == nil && val != "" {
 		config.Update.AutoUpdate = val == "true"
 	}
 	if val, err := s.store.GetConfig("update.checkIntervalHours"); err == nil {
