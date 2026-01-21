@@ -1211,6 +1211,8 @@ export namespace service {
 	    breakCount: number;
 	    breakDuration: number;
 	    longestFocus: number;
+	    longestFocusStart: number;
+	    longestFocusEnd: number;
 	    timeSinceLastBreak: number;
 	    daySpan?: DaySpan;
 	    breakdown: Record<string, number>;
@@ -1227,6 +1229,8 @@ export namespace service {
 	        this.breakCount = source["breakCount"];
 	        this.breakDuration = source["breakDuration"];
 	        this.longestFocus = source["longestFocus"];
+	        this.longestFocusStart = source["longestFocusStart"];
+	        this.longestFocusEnd = source["longestFocusEnd"];
 	        this.timeSinceLastBreak = source["timeSinceLastBreak"];
 	        this.daySpan = this.convertValues(source["daySpan"], DaySpan);
 	        this.breakdown = source["breakdown"];

@@ -1,14 +1,20 @@
 import React from 'react';
 import { DayStats } from '@/types/timeline';
 
+interface TimeRange {
+  start: number; // Unix timestamp
+  end: number; // Unix timestamp
+}
+
 interface DailySummaryCardProps {
   stats: DayStats | null;
+  onHighlightTimeRange?: (range: TimeRange | null) => void;
 }
 
 // Standard workday in seconds (8 hours)
 const WORKDAY_SECONDS = 8 * 60 * 60;
 
-export const DailySummaryCard: React.FC<DailySummaryCardProps> = ({ stats }) => {
+export const DailySummaryCard: React.FC<DailySummaryCardProps> = ({ stats, onHighlightTimeRange }) => {
   if (!stats) {
     return (
       <div className="text-center text-muted-foreground py-4">No activity today</div>
@@ -79,8 +85,26 @@ export const DailySummaryCard: React.FC<DailySummaryCardProps> = ({ stats }) => 
 
       {/* Focus Metrics Row */}
       <div className="grid grid-cols-2 gap-4">
-        {/* Longest Focus */}
-        <div>
+        {/* Longest Focus - Interactive */}
+        <div
+          className={`${stats.longestFocusStart && stats.longestFocusEnd && onHighlightTimeRange ? 'cursor-pointer hover:bg-muted/50 -mx-2 px-2 -my-1 py-1 rounded transition-colors' : ''}`}
+          onMouseEnter={() => {
+            if (stats.longestFocusStart && stats.longestFocusEnd && onHighlightTimeRange) {
+              onHighlightTimeRange({ start: stats.longestFocusStart, end: stats.longestFocusEnd });
+            }
+          }}
+          onMouseLeave={() => {
+            if (onHighlightTimeRange) {
+              onHighlightTimeRange(null);
+            }
+          }}
+          onClick={() => {
+            if (stats.longestFocusStart && stats.longestFocusEnd && onHighlightTimeRange) {
+              onHighlightTimeRange({ start: stats.longestFocusStart, end: stats.longestFocusEnd });
+            }
+          }}
+          title={stats.longestFocusStart && stats.longestFocusEnd ? `${formatTime(stats.longestFocusStart)} - ${formatTime(stats.longestFocusEnd)}` : undefined}
+        >
           <div className="text-xs text-muted-foreground uppercase tracking-wide mb-0.5">Longest Focus</div>
           <div className="text-lg font-semibold">{formatDuration(stats.longestFocus)}</div>
         </div>

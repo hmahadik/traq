@@ -30,6 +30,8 @@ type DayStats struct {
 	BreakCount         int                       `json:"breakCount"`
 	BreakDuration      float64                   `json:"breakDuration"`      // Total AFK seconds
 	LongestFocus       float64                   `json:"longestFocus"`       // Longest continuous focus seconds
+	LongestFocusStart  int64                     `json:"longestFocusStart"`  // Unix timestamp of longest focus start
+	LongestFocusEnd    int64                     `json:"longestFocusEnd"`    // Unix timestamp of longest focus end
 	TimeSinceLastBreak float64                   `json:"timeSinceLastBreak"` // Seconds since last break ended (-1 if no breaks)
 	DaySpan            *DaySpan                  `json:"daySpan"`            // First to last activity time
 	Breakdown          map[string]float64        `json:"breakdown"`          // category -> seconds
@@ -396,14 +398,30 @@ func (s *TimelineService) GetTimelineGridDataWithOptions(date string, opts Timel
 	}
 
 	// Build top apps list with categories (use friendly names)
-	topApps := make([]TopApp, 0, len(topAppsData))
+	// Deduplicate by friendly name - different raw names may map to same friendly name
+	topAppsByFriendly := make(map[string]*TopApp)
 	for _, app := range topAppsData {
-		topApps = append(topApps, TopApp{
-			AppName:  GetFriendlyAppName(app.AppName),
-			Duration: app.Duration,
-			Category: categories[app.AppName],
-		})
+		friendlyName := GetFriendlyAppName(app.AppName)
+		if existing, ok := topAppsByFriendly[friendlyName]; ok {
+			// Merge durations for same friendly name
+			existing.Duration += app.Duration
+		} else {
+			topAppsByFriendly[friendlyName] = &TopApp{
+				AppName:  friendlyName,
+				Duration: app.Duration,
+				Category: categories[app.AppName],
+			}
+		}
 	}
+
+	// Convert back to slice and sort by duration
+	topApps := make([]TopApp, 0, len(topAppsByFriendly))
+	for _, app := range topAppsByFriendly {
+		topApps = append(topApps, *app)
+	}
+	sort.Slice(topApps, func(i, j int) bool {
+		return topApps[i].Duration > topApps[j].Duration
+	})
 
 	// Fetch sessions for the day
 	sessions, err := s.GetSessionsForDate(date)
@@ -897,39 +915,38 @@ func (s *TimelineService) calculateDayStats(focusEvents []*storage.WindowFocusEv
 		}
 	}
 
-	// Calculate longest continuous focus session (using only non-AFK events)
+	// Calculate longest continuous focus period (v1 logic: longest non-AFK time)
+	// This is category-agnostic - any activity counts, only gaps > 5 min reset the streak
 	longestFocus := 0.0
+	var longestFocusStart, longestFocusEnd int64
 	currentFocus := 0.0
+	var currentFocusStart int64
 	var lastEndTime int64
 
 	for _, event := range sortedEvents {
-		// Skip events during AFK (already filtered in sortedEvents, but double-check)
+		// Skip events during AFK
 		if isOverlappingAFK(event.StartTime, event.EndTime) {
 			currentFocus = 0
+			currentFocusStart = 0
 			lastEndTime = 0
 			continue
 		}
 
-		category := categories[event.AppName]
-
-		// Only count "focus" category for longest focus calculation
-		if category == "focus" {
-			// Check if this continues the previous focus session (gap < 5 minutes)
-			if lastEndTime > 0 && event.StartTime-lastEndTime < 300 {
-				currentFocus += event.DurationSeconds
-			} else {
-				currentFocus = event.DurationSeconds
-			}
-
-			if currentFocus > longestFocus {
-				longestFocus = currentFocus
-			}
-			lastEndTime = event.EndTime
+		// Check if this continues the previous focus period (gap < 5 minutes)
+		if lastEndTime > 0 && event.StartTime-lastEndTime < 300 {
+			currentFocus += event.DurationSeconds
 		} else {
-			// Non-focus activity breaks the focus streak
-			currentFocus = 0
-			lastEndTime = 0
+			// Gap > 5 minutes = reset counter, start new focus period
+			currentFocus = event.DurationSeconds
+			currentFocusStart = event.StartTime
 		}
+
+		if currentFocus > longestFocus {
+			longestFocus = currentFocus
+			longestFocusStart = currentFocusStart
+			longestFocusEnd = event.EndTime
+		}
+		lastEndTime = event.EndTime
 	}
 
 	// Calculate day span (first to last activity, excluding AFK)
@@ -1028,6 +1045,8 @@ func (s *TimelineService) calculateDayStats(focusEvents []*storage.WindowFocusEv
 		BreakCount:         breakCount,
 		BreakDuration:      breakDuration,
 		LongestFocus:       longestFocus,
+		LongestFocusStart:  longestFocusStart,
+		LongestFocusEnd:    longestFocusEnd,
 		TimeSinceLastBreak: timeSinceLastBreak,
 		DaySpan:            daySpan,
 		Breakdown:          breakdown,

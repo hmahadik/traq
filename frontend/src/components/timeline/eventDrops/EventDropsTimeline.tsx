@@ -2,12 +2,15 @@ import { useRef, useEffect, useState, useCallback, useMemo } from 'react';
 import * as d3 from 'd3';
 import { GitCommit, Terminal, Globe, FileText, Coffee, Monitor, Camera, Pencil, Trash2, FolderKanban, ChevronDown, ChevronRight, Eye } from 'lucide-react';
 import type { TimelineGridData } from '@/types/timeline';
-import type { Screenshot } from '@/types/screenshot';
+import type { Screenshot as ScreenshotType } from '@/types/screenshot';
 import type { TimelineFilters } from '../FilterControls';
 import { useEventDropsData } from './useEventDropsData';
 import { EventDropsTooltip } from './EventDropsTooltip';
 import type { EventDot, EventDropType } from './eventDropsTypes';
 import type { EventKey } from '@/utils/eventKeys';
+import { Screenshot } from '@/components/common/Screenshot';
+import { ImageGallery } from '@/components/common/ImageGallery';
+import { api } from '@/api/client';
 
 // Entry block data from ProjectsColumn
 interface EntryBlockData {
@@ -28,7 +31,7 @@ interface EntryBlockData {
 interface EventDropsTimelineProps {
   data: TimelineGridData | null | undefined;
   filters: TimelineFilters;
-  screenshots?: Screenshot[];
+  screenshots?: ScreenshotType[];
   entries?: EntryBlockData[];
   rowHeight?: number;
   hideEmbeddedList?: boolean; // Hide bottom list when used with side panel
@@ -82,10 +85,14 @@ export function EventDropsTimeline({
   const [dimensions, setDimensions] = useState({ width: 800, height: 400 });
   const [hoveredEvent, setHoveredEvent] = useState<EventDot | null>(null);
   const [tooltipPosition, setTooltipPosition] = useState<{ x: number; y: number } | null>(null);
-  const [isTooltipHovered, setIsTooltipHovered] = useState(false);
+  const isTooltipHoveredRef = useRef(false);
   const hideTooltipTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [currentZoom, setCurrentZoom] = useState<d3.ZoomTransform>(d3.zoomIdentity);
   const [visibleTimeRange, setVisibleTimeRange] = useState<{ start: Date; end: Date } | null>(null);
+  const [playheadTimestamp, setPlayheadTimestamp] = useState<Date | null>(null);
+  // Gallery state for fullscreen screenshot viewer
+  const [galleryOpen, setGalleryOpen] = useState(false);
+  const [galleryIndex, setGalleryIndex] = useState(0);
   const [listHeight, setListHeight] = useState(() => {
     try {
       const stored = localStorage.getItem('eventdrops-list-height');
@@ -98,7 +105,20 @@ export function EventDropsTimeline({
     }
     return 200;
   });
+  const [filmstripHeight, setFilmstripHeight] = useState(() => {
+    try {
+      const stored = localStorage.getItem('eventdrops-filmstrip-height');
+      if (stored) {
+        const parsed = parseInt(stored, 10);
+        if (!isNaN(parsed) && parsed >= 48 && parsed <= 200) return parsed;
+      }
+    } catch (e) {
+      // Ignore localStorage errors
+    }
+    return 64; // Default height for filmstrip
+  });
   const [isResizing, setIsResizing] = useState(false);
+  const [resizingTarget, setResizingTarget] = useState<'list' | 'filmstrip' | null>(null);
   const resizeStartRef = useRef<{ startY: number; startHeight: number } | null>(null);
   const [collapseActivityRows, setCollapseActivityRows] = useState(() => {
     try {
@@ -106,6 +126,22 @@ export function EventDropsTimeline({
       return stored === 'true';
     } catch {
       return true; // Default to collapsed
+    }
+  });
+  const [filmstripCollapsed, setFilmstripCollapsed] = useState(() => {
+    try {
+      const stored = localStorage.getItem('eventdrops-filmstrip-collapsed');
+      return stored === 'true';
+    } catch {
+      return false;
+    }
+  });
+  const [listCollapsed, setListCollapsed] = useState(() => {
+    try {
+      const stored = localStorage.getItem('eventdrops-list-collapsed');
+      return stored === 'true';
+    } catch {
+      return false;
     }
   });
 
@@ -117,6 +153,33 @@ export function EventDropsTimeline({
       // Ignore localStorage errors
     }
   }, [listHeight]);
+
+  // Persist filmstrip height to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem('eventdrops-filmstrip-height', filmstripHeight.toString());
+    } catch (e) {
+      // Ignore localStorage errors
+    }
+  }, [filmstripHeight]);
+
+  // Persist filmstrip collapsed state
+  useEffect(() => {
+    try {
+      localStorage.setItem('eventdrops-filmstrip-collapsed', filmstripCollapsed.toString());
+    } catch (e) {
+      // Ignore localStorage errors
+    }
+  }, [filmstripCollapsed]);
+
+  // Persist list collapsed state
+  useEffect(() => {
+    try {
+      localStorage.setItem('eventdrops-list-collapsed', listCollapsed.toString());
+    } catch (e) {
+      // Ignore localStorage errors
+    }
+  }, [listCollapsed]);
 
   // Persist collapse state to localStorage
   useEffect(() => {
@@ -130,34 +193,51 @@ export function EventDropsTimeline({
   // Transform data to EventDrops format
   const eventDropsData = useEventDropsData({ data, filters, screenshots, entries, collapseActivityRows });
 
-  // Handle resize drag for the list panel
+  // Handle resize drag for both filmstrip and list panels
   useEffect(() => {
     let rafId: number | null = null;
     let pendingHeight: number | null = null;
 
     const handleMouseMove = (e: MouseEvent) => {
-      if (!isResizing || !resizeStartRef.current) return;
+      if (!isResizing || !resizeStartRef.current || !resizingTarget) return;
 
-      // Calculate delta from start position (dragging UP = positive delta = bigger height)
-      const deltaY = resizeStartRef.current.startY - e.clientY;
-      const newHeight = Math.max(100, Math.min(500, resizeStartRef.current.startHeight + deltaY));
-
-      // Store pending height and schedule RAF if not already scheduled
-      pendingHeight = newHeight;
-      if (rafId === null) {
-        rafId = requestAnimationFrame(() => {
-          if (pendingHeight !== null) {
-            setListHeight(pendingHeight);
-          }
-          rafId = null;
-        });
+      if (resizingTarget === 'filmstrip') {
+        // Filmstrip: dragging DOWN = positive delta = bigger height
+        const deltaY = e.clientY - resizeStartRef.current.startY;
+        const newHeight = Math.max(48, Math.min(200, resizeStartRef.current.startHeight + deltaY));
+        pendingHeight = newHeight;
+        if (rafId === null) {
+          rafId = requestAnimationFrame(() => {
+            if (pendingHeight !== null) {
+              setFilmstripHeight(pendingHeight);
+            }
+            rafId = null;
+          });
+        }
+      } else {
+        // List: dragging UP = positive delta = bigger height
+        const deltaY = resizeStartRef.current.startY - e.clientY;
+        const newHeight = Math.max(100, Math.min(500, resizeStartRef.current.startHeight + deltaY));
+        pendingHeight = newHeight;
+        if (rafId === null) {
+          rafId = requestAnimationFrame(() => {
+            if (pendingHeight !== null) {
+              setListHeight(pendingHeight);
+            }
+            rafId = null;
+          });
+        }
       }
     };
 
     const handleMouseUp = () => {
       // Apply final height immediately
       if (pendingHeight !== null) {
-        setListHeight(pendingHeight);
+        if (resizingTarget === 'filmstrip') {
+          setFilmstripHeight(pendingHeight);
+        } else {
+          setListHeight(pendingHeight);
+        }
       }
       if (rafId !== null) {
         cancelAnimationFrame(rafId);
@@ -165,6 +245,7 @@ export function EventDropsTimeline({
       }
       resizeStartRef.current = null;
       setIsResizing(false);
+      setResizingTarget(null);
     };
 
     if (isResizing) {
@@ -183,7 +264,7 @@ export function EventDropsTimeline({
       document.body.style.cursor = '';
       document.body.style.userSelect = '';
     };
-  }, [isResizing]);
+  }, [isResizing, resizingTarget]);
 
   // Get computed colors from CSS - handles HSL format used by shadcn/ui
   const getComputedColor = useCallback((cssVar: string, fallback: string): string => {
@@ -264,12 +345,20 @@ export function EventDropsTimeline({
     };
     yScale.bandwidth = () => rowHeight;
 
+    // Calculate the center X position for the playhead
+    const chartCenterX = MARGIN.left + (width - MARGIN.left - MARGIN.right) / 2;
+
     // Create zoom behavior
     // Extended zoom range: 0.5x = 48 hours visible, 48x = ~30 min visible
     const zoom = d3.zoom<SVGSVGElement, unknown>()
       .scaleExtent([0.5, 48])
       .translateExtent([[MARGIN.left, 0], [width - MARGIN.right, height]])
       .extent([[MARGIN.left, 0], [width - MARGIN.right, height]])
+      // Center zoom on the playhead (center of chart) instead of mouse position
+      .wheelDelta((event) => {
+        // Standard wheel delta calculation
+        return -event.deltaY * (event.deltaMode === 1 ? 0.05 : event.deltaMode ? 1 : 0.002);
+      })
       .on('zoom', (event) => {
         const transform = event.transform;
         setCurrentZoom(transform);
@@ -281,6 +370,10 @@ export function EventDropsTimeline({
         const visibleStart = newXScale.invert(MARGIN.left);
         const visibleEnd = newXScale.invert(width - MARGIN.right);
         setVisibleTimeRange({ start: visibleStart, end: visibleEnd });
+
+        // Calculate playhead timestamp (center of visible area)
+        const centerTimestamp = newXScale.invert(chartCenterX);
+        setPlayheadTimestamp(centerTimestamp);
 
         // Update x-axis
         const xAxisGroup = svg.select<SVGGElement>('.x-axis');
@@ -332,6 +425,20 @@ export function EventDropsTimeline({
 
     // Apply zoom to SVG
     svg.call(zoom);
+
+    // Override wheel behavior to zoom centered on playhead instead of mouse position
+    svg.on('wheel.zoom', function(event: WheelEvent) {
+      event.preventDefault();
+      const direction = event.deltaY > 0 ? 0.9 : 1.1; // Zoom out or in
+      const svgNode = svg.node();
+      if (svgNode) {
+        svg.transition().duration(50).call(
+          zoom.scaleBy as any,
+          direction,
+          [chartCenterX, height / 2] // Zoom centered on playhead
+        );
+      }
+    });
 
     // Create main group for zoomable content
     const chartGroup = svg.append('g').attr('class', 'chart-group');
@@ -469,7 +576,7 @@ export function EventDropsTimeline({
 
         // Delay hiding to allow mouse to move to tooltip
         hideTooltipTimeoutRef.current = setTimeout(() => {
-          if (!isTooltipHovered) {
+          if (!isTooltipHoveredRef.current) {
             setHoveredEvent(null);
             setTooltipPosition(null);
           }
@@ -540,7 +647,7 @@ export function EventDropsTimeline({
 
         // Delay hiding to allow mouse to move to tooltip
         hideTooltipTimeoutRef.current = setTimeout(() => {
-          if (!isTooltipHovered) {
+          if (!isTooltipHoveredRef.current) {
             setHoveredEvent(null);
             setTooltipPosition(null);
           }
@@ -654,6 +761,31 @@ export function EventDropsTimeline({
         .text('NOW');
     }
 
+    // Add fixed playhead line (stays at center regardless of zoom/pan)
+    const playheadGroup = svg.append('g').attr('class', 'playhead-group');
+
+    // Playhead line
+    playheadGroup.append('line')
+      .attr('class', 'playhead-line')
+      .attr('x1', chartCenterX)
+      .attr('x2', chartCenterX)
+      .attr('y1', MARGIN.top)
+      .attr('y2', height - MARGIN.bottom)
+      .attr('stroke', '#3b82f6') // Blue color
+      .attr('stroke-width', 2)
+      .attr('pointer-events', 'none');
+
+    // Playhead triangle marker at top
+    playheadGroup.append('polygon')
+      .attr('class', 'playhead-marker')
+      .attr('points', `${chartCenterX - 6},${MARGIN.top - 2} ${chartCenterX + 6},${MARGIN.top - 2} ${chartCenterX},${MARGIN.top + 6}`)
+      .attr('fill', '#3b82f6')
+      .attr('pointer-events', 'none');
+
+    // Initialize playhead timestamp to center of day
+    const initialCenterTime = xScale.invert(chartCenterX);
+    setPlayheadTimestamp(initialCenterTime);
+
     // Zoom instructions
     svg.append('text')
       .attr('x', width - 10)
@@ -664,7 +796,7 @@ export function EventDropsTimeline({
       .attr('opacity', 0.7)
       .text('Scroll to zoom • Drag to pan');
 
-  }, [eventDropsData, dimensions, onEventClick, getComputedColor, isTooltipHovered, selectedEventKeys, onSelectionChange]);
+  }, [eventDropsData, dimensions, onEventClick, getComputedColor, selectedEventKeys, onSelectionChange]);
 
   // Reset zoom handler
   const handleResetZoom = useCallback(() => {
@@ -673,13 +805,15 @@ export function EventDropsTimeline({
       d3.zoom<SVGSVGElement, unknown>().transform as any,
       d3.zoomIdentity
     );
-    // Reset visible time range to full day
+    // Reset visible time range and playhead to full day center
     if (eventDropsData) {
       setVisibleTimeRange(eventDropsData.timeRange);
+      const centerTime = new Date((eventDropsData.timeRange.start.getTime() + eventDropsData.timeRange.end.getTime()) / 2);
+      setPlayheadTimestamp(centerTime);
     }
   }, [eventDropsData]);
 
-  // Filter events by visible time range for the list view
+  // Filter events by visible time range for the list view, sorted from playhead forward
   const visibleEvents = useMemo(() => {
     if (!eventDropsData) return [];
 
@@ -693,9 +827,21 @@ export function EventDropsTimeline({
       return time >= range.start.getTime() && time <= range.end.getTime();
     });
 
-    // Sort by timestamp
-    return filtered.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
-  }, [eventDropsData, visibleTimeRange]);
+    // Sort events so that the one at/after playhead comes first, then chronological from there
+    const playheadTime = playheadTimestamp?.getTime() || range.start.getTime();
+
+    // Split into events before and after playhead
+    const beforePlayhead = filtered
+      .filter(e => e.timestamp.getTime() < playheadTime)
+      .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime()); // Reverse chronological
+
+    const afterPlayhead = filtered
+      .filter(e => e.timestamp.getTime() >= playheadTime)
+      .sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime()); // Chronological
+
+    // Show events from playhead forward first, then earlier events
+    return [...afterPlayhead, ...beforePlayhead];
+  }, [eventDropsData, visibleTimeRange, playheadTimestamp]);
 
   // Format time for list display
   const formatEventTime = (date: Date) => {
@@ -734,6 +880,66 @@ export function EventDropsTimeline({
     return `${start} - ${end}`;
   }, [visibleTimeRange, eventDropsData]);
 
+  // Get screenshots in visible range for filmstrip, sorted by timestamp
+  const filmstripScreenshots = useMemo(() => {
+    if (!screenshots || screenshots.length === 0 || !visibleTimeRange) return [];
+
+    const startTime = visibleTimeRange.start.getTime() / 1000;
+    const endTime = visibleTimeRange.end.getTime() / 1000;
+
+    return screenshots
+      .filter(ss => ss.timestamp >= startTime && ss.timestamp <= endTime)
+      .sort((a, b) => a.timestamp - b.timestamp);
+  }, [screenshots, visibleTimeRange]);
+
+  // Find index of screenshot closest to playhead in the filmstrip
+  const playheadScreenshotIndex = useMemo(() => {
+    if (filmstripScreenshots.length === 0 || !playheadTimestamp) return -1;
+
+    const playheadTime = playheadTimestamp.getTime() / 1000;
+    let closestIndex = 0;
+    let minDiff = Math.abs(filmstripScreenshots[0].timestamp - playheadTime);
+
+    filmstripScreenshots.forEach((ss, index) => {
+      const diff = Math.abs(ss.timestamp - playheadTime);
+      if (diff < minDiff) {
+        minDiff = diff;
+        closestIndex = index;
+      }
+    });
+
+    return closestIndex;
+  }, [filmstripScreenshots, playheadTimestamp]);
+
+  // Handle filmstrip thumbnail click - open gallery at that index
+  const handleFilmstripClick = useCallback((index: number) => {
+    setGalleryIndex(index);
+    setGalleryOpen(true);
+  }, []);
+
+  // Prefetch thumbnails for filmstrip screenshots around playhead for snappy loading
+  useEffect(() => {
+    if (filmstripScreenshots.length === 0 || playheadScreenshotIndex < 0) return;
+
+    // Prefetch 5 screenshots before and after playhead
+    const prefetchRange = 5;
+    const startIdx = Math.max(0, playheadScreenshotIndex - prefetchRange);
+    const endIdx = Math.min(filmstripScreenshots.length, playheadScreenshotIndex + prefetchRange + 1);
+
+    for (let i = startIdx; i < endIdx; i++) {
+      const ss = filmstripScreenshots[i];
+      if (ss?.id) {
+        // Prefetch thumbnail
+        api.screenshots.getThumbnail(ss.id).then((url) => {
+          const img = new Image();
+          img.src = url;
+        }).catch(() => {
+          // Silent fail for prefetch
+        });
+      }
+    }
+  }, [filmstripScreenshots, playheadScreenshotIndex]);
+
   // Calculate visible duration for zoom indicator
   const visibleDurationLabel = useMemo(() => {
     const range = visibleTimeRange || eventDropsData?.timeRange;
@@ -754,7 +960,142 @@ export function EventDropsTimeline({
 
   return (
     <div className="relative w-full h-full flex flex-col">
-      {/* Top half: Timeline visualization */}
+      {/* Filmstrip - horizontal strip of screenshots centered on playhead */}
+      {filmstripScreenshots.length > 0 && (
+        <div className="flex-shrink-0 border-b border-border bg-muted/20">
+          {/* Filmstrip header - collapsible */}
+          <div
+            className="flex items-center gap-2 px-2 py-1 cursor-pointer hover:bg-muted/30"
+            onClick={() => setFilmstripCollapsed(!filmstripCollapsed)}
+          >
+            {filmstripCollapsed ? (
+              <ChevronRight className="h-3 w-3 text-muted-foreground" />
+            ) : (
+              <ChevronDown className="h-3 w-3 text-muted-foreground" />
+            )}
+            <Camera className="h-3 w-3 text-muted-foreground" />
+            <span className="text-xs font-medium text-muted-foreground">Screenshots</span>
+            <span className="text-xs text-muted-foreground/70">({filmstripScreenshots.length})</span>
+          </div>
+
+          {/* Filmstrip content - centered on playhead screenshot */}
+          {!filmstripCollapsed && (
+            <>
+              {/* Playhead info - positioned to align with chart center */}
+              <div className="relative h-10">
+                {playheadScreenshotIndex >= 0 && filmstripScreenshots[playheadScreenshotIndex] && (
+                  <div
+                    className="absolute flex flex-col items-center"
+                    style={{
+                      left: MARGIN.left + (dimensions.width - MARGIN.left - MARGIN.right) / 2,
+                      transform: 'translateX(-50%)',
+                    }}
+                  >
+                    <div className="flex items-center gap-1">
+                      <div className="w-2 h-2 bg-blue-500 rounded-full" />
+                      <span className="text-xs text-blue-400 font-medium">
+                        {playheadTimestamp && formatEventTime(playheadTimestamp)}
+                      </span>
+                    </div>
+                    <span className="text-xs text-muted-foreground truncate max-w-[200px]">
+                      {(() => {
+                        const ss = filmstripScreenshots[playheadScreenshotIndex];
+                        const appName = typeof ss.appName === 'object' ? ss.appName?.String : ss.appName;
+                        return appName || 'Unknown';
+                      })()}
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {/* Screenshot strip - centered with playhead screenshot in middle */}
+              <div
+                className="relative overflow-hidden"
+                style={{ height: filmstripHeight }}
+              >
+                {/*
+                  Center the strip so the playhead screenshot aligns with the chart's playhead line.
+                  The chart center X = MARGIN.left + (chartWidth / 2).
+                  We calculate an offset to translate the strip so the playhead screenshot's center
+                  lands at that X position.
+                */}
+                {(() => {
+                  const thumbnailWidth = filmstripHeight * (16 / 9);
+                  const gap = 4; // gap-1 = 4px
+                  // For a screenshot at playheadScreenshotIndex, its center is at:
+                  // x = playheadScreenshotIndex * (thumbnailWidth + gap) + thumbnailWidth / 2
+                  // We want that to align with the chart center, so we offset by:
+                  // chartCenterOffsetFromLeft - playheadScreenshotCenter
+                  // Since we don't know container width in CSS, we use a simple approach:
+                  // Position the strip so screenshot 0's left edge would be at chartCenterX - (playheadIndex * itemWidth + thumbnailWidth/2)
+                  const itemWidth = thumbnailWidth + gap;
+                  const playheadScreenshotCenter = playheadScreenshotIndex * itemWidth + thumbnailWidth / 2;
+
+                  return (
+                    <div
+                      className="flex items-center gap-1 absolute"
+                      style={{
+                        height: filmstripHeight,
+                        // Position so that when we translate, the playhead screenshot lands at chart center
+                        // We use left: 50% of the chart area (accounting for margins)
+                        // Then shift left by the distance from strip start to playhead screenshot center
+                        left: MARGIN.left,
+                        // Transform: move to center of chart area, then back by playhead screenshot position
+                        transform: `translateX(calc((${dimensions.width - MARGIN.left - MARGIN.right}px / 2) - ${playheadScreenshotCenter}px))`,
+                      }}
+                    >
+                      {filmstripScreenshots.map((ss, index) => {
+                        const isAtPlayhead = index === playheadScreenshotIndex;
+                        return (
+                          <div
+                            key={ss.id}
+                            className={`flex-shrink-0 cursor-pointer transition-all h-full ${
+                              isAtPlayhead
+                                ? 'ring-2 ring-blue-500 ring-offset-1 ring-offset-background z-10'
+                                : 'opacity-60 hover:opacity-100'
+                            }`}
+                            onClick={() => handleFilmstripClick(index)}
+                            title={`${formatEventTime(new Date(ss.timestamp * 1000))} - ${
+                              typeof ss.appName === 'object' ? ss.appName?.String : ss.appName || 'Unknown'
+                            }`}
+                          >
+                            <Screenshot
+                              screenshot={ss}
+                              size="thumbnail"
+                              showOverlay={false}
+                              className="!w-auto h-full rounded"
+                            />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
+
+                {/* Center indicator line aligned with playhead - at chart center */}
+                <div
+                  className="absolute top-0 bottom-0 w-0.5 bg-blue-500/50 pointer-events-none"
+                  style={{ left: MARGIN.left + (dimensions.width - MARGIN.left - MARGIN.right) / 2 }}
+                />
+              </div>
+
+              {/* Filmstrip resize handle */}
+              <div
+                className="h-2 bg-border hover:bg-primary/50 cursor-ns-resize flex items-center justify-center group"
+                onMouseDown={(e) => {
+                  resizeStartRef.current = { startY: e.clientY, startHeight: filmstripHeight };
+                  setResizingTarget('filmstrip');
+                  setIsResizing(true);
+                }}
+              >
+                <div className="w-12 h-1 bg-muted-foreground/30 group-hover:bg-primary/50 rounded-full" />
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* Timeline visualization */}
       <div className="relative flex-1 min-h-[200px]">
         {/* Controls */}
         <div className="absolute top-2 right-2 z-10 flex gap-1">
@@ -801,51 +1142,69 @@ export function EventDropsTimeline({
         </div>
       </div>
 
-      {/* Resize handle - only show when embedded list is visible */}
-      {!hideEmbeddedList && (
-        <div
-          ref={resizeHandleRef}
-          className="h-2 bg-border hover:bg-primary/50 cursor-ns-resize flex items-center justify-center group"
-          onMouseDown={(e) => {
-            resizeStartRef.current = { startY: e.clientY, startHeight: listHeight };
-            setIsResizing(true);
-          }}
-        >
-          <div className="w-12 h-1 bg-muted-foreground/30 group-hover:bg-primary/50 rounded-full" />
-        </div>
-      )}
-
       {/* Bottom half: Event list - only show when not using side panel */}
       {!hideEmbeddedList && (
-      <div className="bg-background/50" style={{ height: listHeight }}>
-        {/* List header */}
-        <div className="px-4 py-2 border-b border-border flex items-center justify-between">
+      <div className="flex-shrink-0 border-t border-border bg-background/50">
+        {/* List header - clickable to collapse */}
+        <div
+          className="px-4 py-2 flex items-center justify-between cursor-pointer hover:bg-muted/30"
+          onClick={() => setListCollapsed(!listCollapsed)}
+        >
           <div className="flex items-center gap-2">
+            {listCollapsed ? (
+              <ChevronRight className="h-3 w-3 text-muted-foreground" />
+            ) : (
+              <ChevronDown className="h-3 w-3 text-muted-foreground" />
+            )}
             <span className="text-sm font-medium text-foreground">Events</span>
             <span className="text-xs text-muted-foreground">
               ({visibleEvents.length} in view)
             </span>
+            {playheadTimestamp && (
+              <span className="text-xs text-blue-400 flex items-center gap-1">
+                <span className="w-2 h-2 bg-blue-500 rounded-full" />
+                {formatEventTime(playheadTimestamp)}
+              </span>
+            )}
           </div>
           <span className="text-xs text-muted-foreground">{timeRangeDisplay}</span>
         </div>
 
-        {/* Event list */}
-        <div className="overflow-y-auto" style={{ height: listHeight - 40 }}>
+        {/* List content - only show when not collapsed */}
+        {!listCollapsed && (
+          <>
+            {/* Resize handle */}
+            <div
+              ref={resizeHandleRef}
+              className="h-2 bg-border hover:bg-primary/50 cursor-ns-resize flex items-center justify-center group"
+              onMouseDown={(e) => {
+                e.stopPropagation();
+                resizeStartRef.current = { startY: e.clientY, startHeight: listHeight };
+                setResizingTarget('list');
+                setIsResizing(true);
+              }}
+            >
+              <div className="w-12 h-1 bg-muted-foreground/30 group-hover:bg-primary/50 rounded-full" />
+            </div>
+
+            {/* Event list */}
+            <div className="overflow-y-auto" style={{ height: listHeight }}>
           {visibleEvents.length === 0 ? (
             <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
               No events in visible range
             </div>
           ) : (
             <div className="divide-y divide-border">
-              {visibleEvents.slice(0, 100).map((event) => {
+              {visibleEvents.slice(0, 100).map((event, index) => {
                 const Icon = EVENT_TYPE_ICONS[event.type];
                 const duration = formatDuration(event.duration);
                 const canEdit = event.type === 'activity';
                 const canDelete = event.type !== 'screenshot';
+                const isAtPlayhead = index === 0; // First item is at playhead
                 return (
                   <div
                     key={event.id}
-                    className="px-4 py-2 hover:bg-muted/50 flex items-center gap-3 group"
+                    className={`px-4 py-2 hover:bg-muted/50 flex items-center gap-3 group ${isAtPlayhead ? 'bg-blue-500/10 border-l-2 border-l-blue-500' : ''}`}
                   >
                     {/* Icon */}
                     <div
@@ -914,7 +1273,9 @@ export function EventDropsTimeline({
               )}
             </div>
           )}
-        </div>
+            </div>
+          </>
+        )}
       </div>
       )}
 
@@ -929,13 +1290,21 @@ export function EventDropsTimeline({
             clearTimeout(hideTooltipTimeoutRef.current);
             hideTooltipTimeoutRef.current = null;
           }
-          setIsTooltipHovered(true);
+          isTooltipHoveredRef.current = true;
         }}
         onMouseLeave={() => {
-          setIsTooltipHovered(false);
+          isTooltipHoveredRef.current = false;
           setHoveredEvent(null);
           setTooltipPosition(null);
         }}
+      />
+
+      {/* Fullscreen image gallery */}
+      <ImageGallery
+        screenshots={filmstripScreenshots}
+        initialIndex={galleryIndex}
+        open={galleryOpen}
+        onOpenChange={setGalleryOpen}
       />
     </div>
   );

@@ -18,22 +18,17 @@ import {
   useDeleteFileEvents,
   useDeleteAFKEvents,
 } from '@/api/hooks';
-import { TimelineGridView } from '@/components/timeline/TimelineGridView';
 import { EventDropsTimeline, EventDot } from '@/components/timeline/eventDrops';
-import { ListModeToggle, DisplayMode } from '@/components/timeline/ListModeToggle';
 import { DailySummaryCard } from '@/components/timeline/DailySummaryCard';
 import { BreakdownBar } from '@/components/timeline/BreakdownBar';
 import { TopAppsSection } from '@/components/timeline/TopAppsSection';
 import { TimelinePageSkeleton } from '@/components/timeline/TimelineGridSkeleton';
 import { FilterControls, TimelineFilters } from '@/components/timeline/FilterControls';
 import { GlobalSearch } from '@/components/timeline/GlobalSearch';
-import { ZoomControls, ZoomLevel, DEFAULT_ZOOM, ZOOM_LEVELS } from '@/components/timeline/ZoomControls';
 import { SessionDetailDrawer } from '@/components/session/SessionDetailDrawer';
-import { SelectionToolbar, SelectionBreakdown } from '@/components/timeline/SelectionToolbar';
 import { ActivityEditDialog } from '@/components/timeline/ActivityEditDialog';
 import { BulkActionsToolbar } from '@/components/timeline/BulkActionsToolbar';
 import { ProjectAssignDialog } from '@/components/timeline/ProjectAssignDialog';
-import { useActivitySelection } from '@/hooks/useActivitySelection';
 import { EventKey, parseEventKey } from '@/utils/eventKeys';
 import type { ActivityBlock } from '@/types/timeline';
 import { toast } from 'sonner';
@@ -52,8 +47,6 @@ function addDays(date: Date, days: number): Date {
 }
 
 const FILTER_STORAGE_KEY = 'timeline-filters';
-const ZOOM_STORAGE_KEY = 'timeline-zoom';
-const DISPLAY_MODE_STORAGE_KEY = 'timeline-display-mode';
 
 export function TimelinePage() {
   const location = useLocation();
@@ -64,20 +57,6 @@ export function TimelinePage() {
   // Session detail drawer state
   const [sessionDrawerOpen, setSessionDrawerOpen] = useState(false);
   const [selectedSessionId, setSelectedSessionId] = useState<number | null>(null);
-
-  // Activity selection state
-  const {
-    selectedIds: selectedActivityIds,
-    selectedCount,
-    clearSelection,
-    handleClick: handleActivityClick,
-    lassoRect,
-    startLasso,
-    updateLasso,
-    endLasso,
-    lassoPreviewIds,
-    setLassoPreviewIds,
-  } = useActivitySelection();
 
   // Activity edit dialog state
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -98,26 +77,12 @@ export function TimelinePage() {
   const [selectedEventKeys, setSelectedEventKeys] = useState<Set<EventKey>>(new Set());
 
   // Track where selection originated from - affects list filtering behavior
-  // When selection comes from 'visualization' (grid/drops), list filters to selected items
+  // When selection comes from 'visualization' (drops), list filters to selected items
   // When selection comes from 'list', list does NOT filter (allows multi-select)
   const [selectionSource, setSelectionSource] = useState<'visualization' | 'list' | null>(null);
 
-  // Lasso preview keys for all event types (grid view highlighting)
-  const [lassoPreviewKeys, setLassoPreviewKeys] = useState<Set<EventKey>>(new Set());
-
   // List panel state
   const [showListPanel, setShowListPanel] = useState(true);
-
-  // Display mode state (grid vs drops)
-  const [displayMode, setDisplayMode] = useState<DisplayMode>(() => {
-    try {
-      const stored = localStorage.getItem(DISPLAY_MODE_STORAGE_KEY);
-      if (stored === 'grid' || stored === 'drops') return stored as DisplayMode;
-    } catch (e) {
-      console.error('Failed to load display mode from localStorage:', e);
-    }
-    return 'grid';
-  });
 
   const [filters, setFilters] = useState<TimelineFilters>(() => {
     try {
@@ -135,28 +100,6 @@ export function TimelinePage() {
     };
   });
 
-  const [zoom, setZoom] = useState<ZoomLevel>(() => {
-    try {
-      const stored = localStorage.getItem(ZOOM_STORAGE_KEY);
-      if (stored) {
-        const parsed = parseInt(stored, 10);
-        if (ZOOM_LEVELS.includes(parsed as ZoomLevel)) return parsed as ZoomLevel;
-      }
-    } catch (e) {
-      console.error('Failed to load zoom from localStorage:', e);
-    }
-    return DEFAULT_ZOOM;
-  });
-
-  // Persist display mode
-  useEffect(() => {
-    try {
-      localStorage.setItem(DISPLAY_MODE_STORAGE_KEY, displayMode);
-    } catch (e) {
-      console.error('Failed to save display mode to localStorage:', e);
-    }
-  }, [displayMode]);
-
   useEffect(() => {
     try {
       localStorage.setItem(FILTER_STORAGE_KEY, JSON.stringify(filters));
@@ -164,14 +107,6 @@ export function TimelinePage() {
       console.error('Failed to save filters to localStorage:', e);
     }
   }, [filters]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(ZOOM_STORAGE_KEY, zoom.toString());
-    } catch (e) {
-      console.error('Failed to save zoom to localStorage:', e);
-    }
-  }, [zoom]);
 
   // Check URL params for sessionId to open drawer
   useEffect(() => {
@@ -195,10 +130,8 @@ export function TimelinePage() {
     selectedDate.getFullYear(),
     selectedDate.getMonth() + 1
   );
-  // Fetch screenshots for EventDrops view
-  const { data: screenshotsData } = useScreenshotsForDate(dateStr, {
-    enabled: displayMode === 'drops',
-  });
+  // Fetch screenshots for drops timeline
+  const { data: screenshotsData } = useScreenshotsForDate(dateStr);
   // Fetch entries (project-assigned activities) for EventDrops view
   const { data: entriesData } = useEntriesForDate(dateStr);
   const generateSummary = useGenerateSummary();
@@ -234,12 +167,6 @@ export function TimelinePage() {
       toast.warning(`Generated ${successCount} summaries, ${errorCount} failed`);
     }
   }, [sessionsWithoutSummaries, isBatchGenerating, generateSummary]);
-
-  // Handle session click - open drawer
-  const handleSessionClick = useCallback((sessionId: number) => {
-    setSelectedSessionId(sessionId);
-    setSessionDrawerOpen(true);
-  }, []);
 
   // Handle EventDrops event delete
   const handleEventDropDelete = useCallback((event: EventDot) => {
@@ -316,32 +243,6 @@ export function TimelinePage() {
     }
   }, []);
 
-  // Handle activity selection (for grid view - simple click)
-  const handleActivitySelect = useCallback(
-    (id: number, event: React.MouseEvent) => {
-      handleActivityClick(id, event);
-    },
-    [handleActivityClick]
-  );
-
-  // Handle double-click to edit activity
-  const handleActivityDoubleClick = useCallback((activity: ActivityBlock) => {
-    setEditingActivity(activity);
-    setEditDialogOpen(true);
-  }, []);
-
-  // Handle lasso end with EventKeys (selects all event types in grid view)
-  const handleLassoEndWithKeys = useCallback((keys: string[]) => {
-    setSelectedEventKeys(new Set(keys));
-    setSelectionSource('visualization');
-    setLassoPreviewKeys(new Set());
-  }, []);
-
-  // Handle lasso preview with EventKeys (highlights all event types during drag)
-  const handleLassoPreviewKeys = useCallback((keys: string[]) => {
-    setLassoPreviewKeys(new Set(keys));
-  }, []);
-
   // Handle selection change from drops visualization
   const handleDropsSelectionChange = useCallback((keys: Set<EventKey>) => {
     setSelectedEventKeys(keys);
@@ -354,40 +255,10 @@ export function TimelinePage() {
     setSelectionSource(keys.size > 0 ? 'list' : null);
   }, []);
 
-  // Compute breakdown from selectedEventKeys
-  const selectionBreakdown = useMemo((): SelectionBreakdown => {
-    const breakdown: SelectionBreakdown = {};
-    selectedEventKeys.forEach((key) => {
-      const { type } = parseEventKey(key);
-      switch (type) {
-        case 'activity':
-          breakdown.activity = (breakdown.activity || 0) + 1;
-          break;
-        case 'browser':
-          breakdown.browser = (breakdown.browser || 0) + 1;
-          break;
-        case 'git':
-          breakdown.git = (breakdown.git || 0) + 1;
-          break;
-        case 'shell':
-          breakdown.shell = (breakdown.shell || 0) + 1;
-          break;
-        case 'file':
-          breakdown.file = (breakdown.file || 0) + 1;
-          break;
-        case 'afk':
-          breakdown.afk = (breakdown.afk || 0) + 1;
-          break;
-      }
-    });
-    return breakdown;
-  }, [selectedEventKeys]);
-
-  // Clear all selections (both activity-specific and event-generic)
+  // Clear all selections
   const clearAllSelections = useCallback(() => {
-    clearSelection();
     setSelectedEventKeys(new Set());
-  }, [clearSelection]);
+  }, []);
 
   // Handle bulk delete - supports all event types
   const handleDeleteSelected = useCallback(async () => {
@@ -398,15 +269,6 @@ export function TimelinePage() {
       if (!byType[type]) byType[type] = [];
       byType[type].push(id);
     });
-
-    // Also include activity IDs from grid selection (for backwards compatibility)
-    if (selectedActivityIds.size > 0 && !byType['activity']) {
-      byType['activity'] = Array.from(selectedActivityIds);
-    } else if (selectedActivityIds.size > 0 && byType['activity']) {
-      // Merge, avoiding duplicates
-      const activitySet = new Set([...byType['activity'], ...Array.from(selectedActivityIds)]);
-      byType['activity'] = Array.from(activitySet);
-    }
 
     const totalCount = Object.values(byType).reduce((sum, ids) => sum + ids.length, 0);
     if (totalCount === 0) return;
@@ -442,7 +304,6 @@ export function TimelinePage() {
     }
   }, [
     selectedEventKeys,
-    selectedActivityIds,
     deleteActivities,
     deleteBrowserVisits,
     deleteGitCommits,
@@ -451,24 +312,6 @@ export function TimelinePage() {
     deleteAFKEvents,
     clearAllSelections,
   ]);
-
-  // Handle edit from selection toolbar (for single selection)
-  const handleEditSelected = useCallback(() => {
-    if (selectedActivityIds.size !== 1 || !gridData) return;
-
-    const selectedId = Array.from(selectedActivityIds)[0];
-    // Find the activity in the grid data
-    for (const hourActivities of Object.values(gridData.hourlyGrid)) {
-      for (const appActivities of Object.values(hourActivities)) {
-        const activity = appActivities.find((a) => a.id === selectedId);
-        if (activity) {
-          setEditingActivity(activity);
-          setEditDialogOpen(true);
-          return;
-        }
-      }
-    }
-  }, [selectedActivityIds, gridData]);
 
   // Bulk action handlers
   const handleAssignProject = useCallback((_keys: EventKey[]) => {
@@ -569,8 +412,6 @@ export function TimelinePage() {
           {/* Desktop Header */}
           <div className="hidden xl:flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
-              <ListModeToggle displayMode={displayMode} onDisplayModeChange={setDisplayMode} />
-              <div className="w-px h-6 bg-border mx-1" />
               <Button variant="ghost" size="icon" className="h-8 w-8" onClick={goToPrevious}>
                 <ChevronLeft className="h-4 w-4" />
               </Button>
@@ -599,7 +440,6 @@ export function TimelinePage() {
             </div>
             <div className="flex items-center gap-2">
               <FilterControls filters={filters} onFiltersChange={setFilters} />
-              {displayMode === 'grid' && <ZoomControls zoom={zoom} onZoomChange={setZoom} />}
               <GlobalSearch onNavigateToDate={handleSearchNavigateToDate} />
               <Button
                 variant="ghost"
@@ -645,40 +485,18 @@ export function TimelinePage() {
               maxSize={85}
               storageKey="timeline-vertical-split-size"
               left={
-                displayMode === 'grid' ? (
-                  <TimelineGridView
-                    data={gridData}
-                    filters={filters}
-                    hourHeight={zoom}
-                    onSessionClick={handleSessionClick}
-                    selectedActivityIds={selectedActivityIds}
-                    onActivitySelect={handleActivitySelect}
-                    onActivityDoubleClick={handleActivityDoubleClick}
-                    lassoRect={lassoRect}
-                    onLassoStart={startLasso}
-                    onLassoMove={updateLasso}
-                    onLassoEnd={endLasso}
-                    selectedEventKeys={selectedEventKeys}
-                    onLassoEndWithKeys={handleLassoEndWithKeys}
-                    lassoPreviewIds={lassoPreviewIds}
-                    onLassoPreview={setLassoPreviewIds}
-                    lassoPreviewKeys={lassoPreviewKeys}
-                    onLassoPreviewKeys={handleLassoPreviewKeys}
-                  />
-                ) : (
-                  <EventDropsTimeline
-                    data={gridData}
-                    filters={filters}
-                    screenshots={screenshotsData}
-                    entries={entriesData}
-                    hideEmbeddedList={true}
-                    selectedEventKeys={selectedEventKeys}
-                    onSelectionChange={handleDropsSelectionChange}
-                    onEventDelete={handleEventDropDelete}
-                    onEventEdit={handleEventDropEdit}
-                    onViewScreenshot={handleEventDropViewScreenshot}
-                  />
-                )
+                <EventDropsTimeline
+                  data={gridData}
+                  filters={filters}
+                  screenshots={screenshotsData}
+                  entries={entriesData}
+                  hideEmbeddedList={true}
+                  selectedEventKeys={selectedEventKeys}
+                  onSelectionChange={handleDropsSelectionChange}
+                  onEventDelete={handleEventDropDelete}
+                  onEventEdit={handleEventDropEdit}
+                  onViewScreenshot={handleEventDropViewScreenshot}
+                />
               }
               right={
                 <TimelineListView
@@ -690,39 +508,17 @@ export function TimelinePage() {
               }
             />
           ) : (
-            displayMode === 'grid' ? (
-              <TimelineGridView
-                data={gridData}
-                filters={filters}
-                hourHeight={zoom}
-                onSessionClick={handleSessionClick}
-                selectedActivityIds={selectedActivityIds}
-                onActivitySelect={handleActivitySelect}
-                onActivityDoubleClick={handleActivityDoubleClick}
-                lassoRect={lassoRect}
-                onLassoStart={startLasso}
-                onLassoMove={updateLasso}
-                onLassoEnd={endLasso}
-                selectedEventKeys={selectedEventKeys}
-                onLassoEndWithKeys={handleLassoEndWithKeys}
-                lassoPreviewIds={lassoPreviewIds}
-                onLassoPreview={setLassoPreviewIds}
-                lassoPreviewKeys={lassoPreviewKeys}
-                onLassoPreviewKeys={handleLassoPreviewKeys}
-              />
-            ) : (
-              <EventDropsTimeline
-                data={gridData}
-                filters={filters}
-                screenshots={screenshotsData}
-                entries={entriesData}
-                selectedEventKeys={selectedEventKeys}
-                onSelectionChange={handleDropsSelectionChange}
-                onEventDelete={handleEventDropDelete}
-                onEventEdit={handleEventDropEdit}
-                onViewScreenshot={handleEventDropViewScreenshot}
-              />
-            )
+            <EventDropsTimeline
+              data={gridData}
+              filters={filters}
+              screenshots={screenshotsData}
+              entries={entriesData}
+              selectedEventKeys={selectedEventKeys}
+              onSelectionChange={handleDropsSelectionChange}
+              onEventDelete={handleEventDropDelete}
+              onEventEdit={handleEventDropEdit}
+              onViewScreenshot={handleEventDropViewScreenshot}
+            />
           )}
         </div>
       </>
@@ -734,7 +530,6 @@ export function TimelinePage() {
       {/* Mobile Header */}
       <div className="xl:hidden flex items-center justify-between gap-2 flex-wrap">
         <div className="flex items-center gap-2">
-          <ListModeToggle displayMode={displayMode} onDisplayModeChange={setDisplayMode} />
           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={goToPrevious}>
             <ChevronLeft className="h-4 w-4" />
           </Button>
@@ -745,7 +540,6 @@ export function TimelinePage() {
         </div>
         <div className="flex items-center gap-2">
           <FilterControls filters={filters} onFiltersChange={setFilters} />
-          {displayMode === 'grid' && <ZoomControls zoom={zoom} onZoomChange={setZoom} />}
           <GlobalSearch onNavigateToDate={handleSearchNavigateToDate} />
           <Button
             variant="ghost"
@@ -791,18 +585,6 @@ export function TimelinePage() {
         onOpenChange={setSessionDrawerOpen}
         sessionId={selectedSessionId}
       />
-
-      {/* Activity Selection Toolbar - only show for legacy activity-only selection */}
-      {selectedEventKeys.size === 0 && (
-        <SelectionToolbar
-          selectedCount={selectedCount}
-          onDelete={handleDeleteSelected}
-          onEdit={handleEditSelected}
-          onClear={clearAllSelections}
-          isDeleting={deleteActivities.isPending}
-          breakdown={selectedCount > 0 ? { activity: selectedCount } : undefined}
-        />
-      )}
 
       {/* Activity Edit Dialog */}
       <ActivityEditDialog
