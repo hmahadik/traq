@@ -1,13 +1,15 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { useProjects, useBulkAssignProject } from '@/api/hooks';
 import { cn } from '@/lib/utils';
+import { parseEventKey } from '@/utils/eventKeys';
 
 interface ProjectAssignDialogProps {
   open: boolean;
@@ -15,6 +17,9 @@ interface ProjectAssignDialogProps {
   activityKeys: string[]; // Event keys in format "type:id"
   onComplete: () => void;
 }
+
+// Supported event types for project assignment
+const ASSIGNABLE_EVENT_TYPES = ['activity', 'focus'];
 
 export function ProjectAssignDialog({
   open,
@@ -26,11 +31,34 @@ export function ProjectAssignDialog({
   const assignMutation = useBulkAssignProject();
   const [selectedProject, setSelectedProject] = useState<number | null>(null);
 
+  // Filter to only assignable events and count skipped
+  const { assignableKeys, skippedCount, skippedTypes } = useMemo(() => {
+    const assignable: string[] = [];
+    const skippedTypesSet = new Set<string>();
+    let skipped = 0;
+
+    for (const key of activityKeys) {
+      const { type } = parseEventKey(key);
+      if (ASSIGNABLE_EVENT_TYPES.includes(type)) {
+        assignable.push(key);
+      } else {
+        skipped++;
+        skippedTypesSet.add(type);
+      }
+    }
+
+    return {
+      assignableKeys: assignable,
+      skippedCount: skipped,
+      skippedTypes: Array.from(skippedTypesSet),
+    };
+  }, [activityKeys]);
+
   const handleAssign = async () => {
-    if (!selectedProject || activityKeys.length === 0) return;
+    if (!selectedProject || assignableKeys.length === 0) return;
 
     // Parse event keys to assignments array with validation
-    const assignments = activityKeys
+    const assignments = assignableKeys
       .map(key => {
         const parts = key.split(':');
         if (parts.length < 2) return null;
@@ -57,11 +85,48 @@ export function ProjectAssignDialog({
     }
   };
 
+  // No assignable items - show error state
+  if (assignableKeys.length === 0 && activityKeys.length > 0) {
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Cannot Assign to Project</DialogTitle>
+            <DialogDescription>
+              Project assignment is only available for activity events.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="my-4 p-3 rounded bg-muted text-sm">
+            <p className="text-muted-foreground">
+              Selected items ({activityKeys.length}): {skippedTypes.join(', ')} events
+            </p>
+            <p className="mt-2">
+              Only <strong>activity</strong> events can be assigned to projects.
+              Try selecting activity blocks in the timeline.
+            </p>
+          </div>
+
+          <div className="flex justify-end">
+            <Button variant="outline" onClick={() => onOpenChange(false)}>
+              Close
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Assign to Project</DialogTitle>
+          {skippedCount > 0 && (
+            <DialogDescription>
+              {skippedCount} {skippedCount === 1 ? 'item' : 'items'} skipped ({skippedTypes.join(', ')}) — only activities can be assigned.
+            </DialogDescription>
+          )}
         </DialogHeader>
 
         <div className="space-y-2 my-4 max-h-64 overflow-y-auto">
@@ -98,11 +163,11 @@ export function ProjectAssignDialog({
           </Button>
           <Button
             onClick={handleAssign}
-            disabled={!selectedProject || assignMutation.isPending}
+            disabled={!selectedProject || assignMutation.isPending || assignableKeys.length === 0}
           >
             {assignMutation.isPending
               ? 'Assigning...'
-              : `Assign ${activityKeys.length} item${activityKeys.length !== 1 ? 's' : ''}`}
+              : `Assign ${assignableKeys.length} activit${assignableKeys.length !== 1 ? 'ies' : 'y'}`}
           </Button>
         </div>
       </DialogContent>

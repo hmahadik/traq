@@ -7,6 +7,7 @@ import type { TimelineFilters } from '../FilterControls';
 import { useEventDropsData } from './useEventDropsData';
 import { EventDropsTooltip } from './EventDropsTooltip';
 import type { EventDot, EventDropType } from './eventDropsTypes';
+import type { EventKey } from '@/utils/eventKeys';
 
 // Entry block data from ProjectsColumn
 interface EntryBlockData {
@@ -30,6 +31,10 @@ interface EventDropsTimelineProps {
   screenshots?: Screenshot[];
   entries?: EntryBlockData[];
   rowHeight?: number;
+  hideEmbeddedList?: boolean; // Hide bottom list when used with side panel
+  // Selection props
+  selectedEventKeys?: Set<EventKey>;
+  onSelectionChange?: (keys: Set<EventKey>) => void;
   onEventClick?: (event: EventDot) => void;
   onEventDelete?: (event: EventDot) => void;
   onEventEdit?: (event: EventDot) => void;
@@ -63,6 +68,9 @@ export function EventDropsTimeline({
   screenshots,
   entries,
   rowHeight = ROW_HEIGHT,
+  hideEmbeddedList = false,
+  selectedEventKeys,
+  onSelectionChange,
   onEventClick,
   onEventDelete,
   onEventEdit,
@@ -393,6 +401,19 @@ export function EventDropsTimeline({
     const dotEvents = allEvents.filter((e) => !shouldRenderAsBar(e, xScale));
     const barEvents = allEvents.filter((e) => shouldRenderAsBar(e, xScale));
 
+    // Helper to check if event is selected
+    const isSelected = (d: EventDot) => selectedEventKeys?.has(d.id) || false;
+
+    // Helper to get darker stroke color
+    const getDarkerColor = (color: string) => {
+      // Simple darkening by reducing brightness
+      const c = d3.color(color);
+      if (c) {
+        return c.darker(0.5).toString();
+      }
+      return color;
+    };
+
     // Create dots for brief/instant events
     dotsGroup.selectAll('.event-dot')
       .data(dotEvents, (d) => (d as EventDot).id)
@@ -402,8 +423,8 @@ export function EventDropsTimeline({
       .attr('cy', (d) => (yScale(d.row) || 0) + yScale.bandwidth() / 2)
       .attr('r', DOT_RADIUS)
       .attr('fill', (d) => d.color)
-      .attr('stroke', (d) => d.color)
-      .attr('stroke-width', 1.5)
+      .attr('stroke', (d) => isSelected(d) ? '#fff' : getDarkerColor(d.color))
+      .attr('stroke-width', (d) => isSelected(d) ? 2.5 : 1.5)
       .style('cursor', 'pointer')
       .on('mouseenter', function (event, d) {
         // Clear any pending hide timeout
@@ -437,29 +458,44 @@ export function EventDropsTimeline({
           }
         }, 150);
       })
-      .on('click', function (_, d) {
+      .on('click', function (event, d) {
+        event.stopPropagation();
+        // Toggle selection
+        if (onSelectionChange) {
+          const newSelection = new Set(selectedEventKeys || []);
+          if (newSelection.has(d.id)) {
+            newSelection.delete(d.id);
+          } else {
+            // If not holding shift/ctrl, clear and select just this one
+            if (!event.shiftKey && !event.ctrlKey && !event.metaKey) {
+              newSelection.clear();
+            }
+            newSelection.add(d.id);
+          }
+          onSelectionChange(newSelection);
+        }
         onEventClick?.(d);
       });
 
-    // Create bars (pills) for duration events
+    // Create bars (pills) for duration events - same height as dots for consistency
     dotsGroup.selectAll('.event-bar')
       .data(barEvents, (d) => (d as EventDot).id)
       .join('rect')
       .attr('class', 'event-bar')
       .attr('x', (d) => xScale(d.timestamp))
-      .attr('y', (d) => (yScale(d.row) || 0) + (yScale.bandwidth() - BAR_HEIGHT) / 2)
+      .attr('y', (d) => (yScale(d.row) || 0) + yScale.bandwidth() / 2 - DOT_RADIUS)
       .attr('width', (d) => {
         const startTime = d.timestamp.getTime();
         const endTime = startTime + ((d.duration || 0) * 1000);
         return Math.max(BAR_MIN_PIXELS, xScale(new Date(endTime)) - xScale(d.timestamp));
       })
-      .attr('height', BAR_HEIGHT)
-      .attr('rx', BAR_HEIGHT / 2)
-      .attr('ry', BAR_HEIGHT / 2)
+      .attr('height', DOT_RADIUS * 2)
+      .attr('rx', DOT_RADIUS)
+      .attr('ry', DOT_RADIUS)
       .attr('fill', (d) => d.color)
       .attr('fill-opacity', 0.7)
-      .attr('stroke', (d) => d.color)
-      .attr('stroke-width', 1.5)
+      .attr('stroke', (d) => isSelected(d) ? '#fff' : getDarkerColor(d.color))
+      .attr('stroke-width', (d) => isSelected(d) ? 2.5 : 1.5)
       .style('cursor', 'pointer')
       .on('mouseenter', function (event, d) {
         // Clear any pending hide timeout
@@ -493,7 +529,22 @@ export function EventDropsTimeline({
           }
         }, 150);
       })
-      .on('click', function (_, d) {
+      .on('click', function (event, d) {
+        event.stopPropagation();
+        // Toggle selection
+        if (onSelectionChange) {
+          const newSelection = new Set(selectedEventKeys || []);
+          if (newSelection.has(d.id)) {
+            newSelection.delete(d.id);
+          } else {
+            // If not holding shift/ctrl, clear and select just this one
+            if (!event.shiftKey && !event.ctrlKey && !event.metaKey) {
+              newSelection.clear();
+            }
+            newSelection.add(d.id);
+          }
+          onSelectionChange(newSelection);
+        }
         onEventClick?.(d);
       });
 
@@ -596,7 +647,7 @@ export function EventDropsTimeline({
       .attr('opacity', 0.7)
       .text('Scroll to zoom • Drag to pan');
 
-  }, [eventDropsData, dimensions, onEventClick, getComputedColor, isTooltipHovered]);
+  }, [eventDropsData, dimensions, onEventClick, getComputedColor, isTooltipHovered, selectedEventKeys, onSelectionChange]);
 
   // Reset zoom handler
   const handleResetZoom = useCallback(() => {
@@ -714,19 +765,22 @@ export function EventDropsTimeline({
         </div>
       </div>
 
-      {/* Resize handle */}
-      <div
-        ref={resizeHandleRef}
-        className="h-2 bg-border hover:bg-primary/50 cursor-ns-resize flex items-center justify-center group"
-        onMouseDown={(e) => {
-          resizeStartRef.current = { startY: e.clientY, startHeight: listHeight };
-          setIsResizing(true);
-        }}
-      >
-        <div className="w-12 h-1 bg-muted-foreground/30 group-hover:bg-primary/50 rounded-full" />
-      </div>
+      {/* Resize handle - only show when embedded list is visible */}
+      {!hideEmbeddedList && (
+        <div
+          ref={resizeHandleRef}
+          className="h-2 bg-border hover:bg-primary/50 cursor-ns-resize flex items-center justify-center group"
+          onMouseDown={(e) => {
+            resizeStartRef.current = { startY: e.clientY, startHeight: listHeight };
+            setIsResizing(true);
+          }}
+        >
+          <div className="w-12 h-1 bg-muted-foreground/30 group-hover:bg-primary/50 rounded-full" />
+        </div>
+      )}
 
-      {/* Bottom half: Event list */}
+      {/* Bottom half: Event list - only show when not using side panel */}
+      {!hideEmbeddedList && (
       <div className="bg-background/50" style={{ height: listHeight }}>
         {/* List header */}
         <div className="px-4 py-2 border-b border-border flex items-center justify-between">
@@ -826,6 +880,7 @@ export function EventDropsTimeline({
           )}
         </div>
       </div>
+      )}
 
       <EventDropsTooltip
         event={hoveredEvent}

@@ -6,17 +6,22 @@ import {
   ListViewSort,
   ListViewFilter,
 } from '@/types/timeline';
+import type { EventKey } from '@/utils/eventKeys';
 import { useListViewData } from './useListViewData';
 import { Input } from '@/components/ui/input';
 import { cn, formatDuration } from '@/lib/utils';
-import { ChevronUp, ChevronDown, Search } from 'lucide-react';
+import { ChevronUp, ChevronDown, Search, Filter } from 'lucide-react';
 
 interface TimelineListViewProps {
   data?: TimelineGridData;
-  selectedIds: Set<string>;
-  onSelectionChange: (ids: Set<string>) => void;
+  selectedIds: Set<EventKey>;
+  onSelectionChange: (ids: Set<EventKey>) => void;
   onItemClick?: (item: TimelineListItem) => void;
   onItemDoubleClick?: (item: TimelineListItem) => void;
+  // Where the selection came from - affects filtering behavior
+  // 'visualization' = filter list to show selected only
+  // 'list' or null = show all items (user is selecting within list)
+  selectionSource?: 'visualization' | 'list' | null;
 }
 
 export function TimelineListView({
@@ -25,12 +30,19 @@ export function TimelineListView({
   onSelectionChange,
   onItemClick,
   onItemDoubleClick,
+  selectionSource,
 }: TimelineListViewProps) {
   const [sort, setSort] = useState<ListViewSort>({ column: 'time', direction: 'asc' });
   const [filter, setFilter] = useState<ListViewFilter>({});
   const lastSelectedIndex = useRef<number | null>(null);
 
-  const items = useListViewData(data, sort, filter);
+  const allItems = useListViewData(data, sort, filter);
+
+  // Filter list to show selected only when selection came from visualization (grid/drops)
+  const shouldFilter = selectionSource === 'visualization' && selectedIds.size > 0;
+  const items = shouldFilter
+    ? allItems.filter(item => selectedIds.has(item.id))
+    : allItems;
 
   const toggleSort = (column: ListViewSort['column']) => {
     setSort(prev => ({
@@ -95,8 +107,19 @@ export function TimelineListView({
         <button onClick={selectNone} className="text-xs text-muted-foreground hover:text-foreground">
           Clear
         </button>
+        {shouldFilter && (
+          <span className="flex items-center gap-1 text-xs px-2 py-1 rounded bg-primary/10 text-primary">
+            <Filter className="h-3 w-3" />
+            Filtered to selection
+          </span>
+        )}
         <span className="text-xs text-muted-foreground">
-          {selectedIds.size} selected / {items.length} items
+          {selectedIds.size > 0
+            ? shouldFilter
+              ? `${items.length} of ${selectedIds.size} selected`
+              : `${selectedIds.size} selected / ${allItems.length} total`
+            : `${items.length} items`
+          }
         </span>
       </div>
 
@@ -124,7 +147,12 @@ export function TimelineListView({
       <div className="flex-1 overflow-auto">
         {items.length === 0 ? (
           <div className="flex items-center justify-center h-32 text-muted-foreground text-sm">
-            {filter.search ? 'No items match your search' : 'No activity data'}
+            {filter.search
+              ? 'No items match your search'
+              : shouldFilter
+              ? 'No matching items in selection'
+              : 'No activity data'
+            }
           </div>
         ) : (
           items.map((item, index) => (
@@ -136,7 +164,7 @@ export function TimelineListView({
               }}
               onDoubleClick={() => onItemDoubleClick?.(item)}
               className={cn(
-                'flex items-center border-b text-sm cursor-pointer',
+                'flex items-center border-b text-sm cursor-pointer select-none',
                 selectedIds.has(item.id)
                   ? 'bg-primary/10 ring-1 ring-inset ring-primary/30'
                   : 'hover:bg-muted/50'

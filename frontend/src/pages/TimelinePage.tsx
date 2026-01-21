@@ -97,12 +97,16 @@ export function TimelinePage() {
   // State for multi-type event selection (works in both grid and list views)
   const [selectedEventKeys, setSelectedEventKeys] = useState<Set<EventKey>>(new Set());
 
+  // Track where selection originated from - affects list filtering behavior
+  // When selection comes from 'visualization' (grid/drops), list filters to selected items
+  // When selection comes from 'list', list does NOT filter (allows multi-select)
+  const [selectionSource, setSelectionSource] = useState<'visualization' | 'list' | null>(null);
+
   // Lasso preview keys for all event types (grid view highlighting)
   const [lassoPreviewKeys, setLassoPreviewKeys] = useState<Set<EventKey>>(new Set());
 
   // List panel state
   const [showListPanel, setShowListPanel] = useState(true);
-  const [listSelectedIds, setListSelectedIds] = useState<Set<string>>(new Set());
 
   // Display mode state (grid vs drops)
   const [displayMode, setDisplayMode] = useState<DisplayMode>(() => {
@@ -329,12 +333,25 @@ export function TimelinePage() {
   // Handle lasso end with EventKeys (selects all event types in grid view)
   const handleLassoEndWithKeys = useCallback((keys: string[]) => {
     setSelectedEventKeys(new Set(keys));
+    setSelectionSource('visualization');
     setLassoPreviewKeys(new Set());
   }, []);
 
   // Handle lasso preview with EventKeys (highlights all event types during drag)
   const handleLassoPreviewKeys = useCallback((keys: string[]) => {
     setLassoPreviewKeys(new Set(keys));
+  }, []);
+
+  // Handle selection change from drops visualization
+  const handleDropsSelectionChange = useCallback((keys: Set<EventKey>) => {
+    setSelectedEventKeys(keys);
+    setSelectionSource(keys.size > 0 ? 'visualization' : null);
+  }, []);
+
+  // Handle selection change from list view
+  const handleListSelectionChange = useCallback((keys: Set<EventKey>) => {
+    setSelectedEventKeys(keys);
+    setSelectionSource(keys.size > 0 ? 'list' : null);
   }, []);
 
   // Compute breakdown from selectedEventKeys
@@ -622,11 +639,11 @@ export function TimelinePage() {
 
           {showListPanel ? (
             <SplitPanel
-              direction="horizontal"
-              defaultSize={70}
+              direction="vertical"
+              defaultSize={65}
               minSize={30}
-              maxSize={90}
-              storageKey="timeline-split-size"
+              maxSize={85}
+              storageKey="timeline-vertical-split-size"
               left={
                 displayMode === 'grid' ? (
                   <TimelineGridView
@@ -654,6 +671,9 @@ export function TimelinePage() {
                     filters={filters}
                     screenshots={screenshotsData}
                     entries={entriesData}
+                    hideEmbeddedList={true}
+                    selectedEventKeys={selectedEventKeys}
+                    onSelectionChange={handleDropsSelectionChange}
                     onEventDelete={handleEventDropDelete}
                     onEventEdit={handleEventDropEdit}
                     onViewScreenshot={handleEventDropViewScreenshot}
@@ -663,8 +683,9 @@ export function TimelinePage() {
               right={
                 <TimelineListView
                   data={gridData}
-                  selectedIds={listSelectedIds}
-                  onSelectionChange={setListSelectedIds}
+                  selectedIds={selectedEventKeys}
+                  onSelectionChange={handleListSelectionChange}
+                  selectionSource={selectionSource}
                 />
               }
             />
@@ -695,6 +716,8 @@ export function TimelinePage() {
                 filters={filters}
                 screenshots={screenshotsData}
                 entries={entriesData}
+                selectedEventKeys={selectedEventKeys}
+                onSelectionChange={handleDropsSelectionChange}
                 onEventDelete={handleEventDropDelete}
                 onEventEdit={handleEventDropEdit}
                 onViewScreenshot={handleEventDropViewScreenshot}

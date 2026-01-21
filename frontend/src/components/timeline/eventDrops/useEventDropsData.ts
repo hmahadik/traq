@@ -8,6 +8,7 @@ import {
   getAppHexColor,
 } from './eventDropsTypes';
 import type { TimelineFilters } from '../FilterControls';
+import { makeEventKey } from '@/utils/eventKeys';
 
 // Entry block data from ProjectsColumn
 interface EntryBlockData {
@@ -102,7 +103,7 @@ export function useEventDropsData({
                 : CATEGORY_HEX_COLORS[activity.category] || CATEGORY_HEX_COLORS.other;
 
             const event: EventDot = {
-              id: `activity-${activity.id}`,
+              id: makeEventKey('activity', activity.id),
               originalId: activity.id,
               timestamp: new Date(activity.startTime * 1000),
               type: 'activity',
@@ -125,7 +126,7 @@ export function useEventDropsData({
         for (const event of hourEvents) {
           const rowName = groupBy === 'app' ? 'Git' : 'Git';
           const dot: EventDot = {
-            id: `git-${event.id}`,
+            id: makeEventKey('git', event.id),
             originalId: event.id,
             timestamp: new Date(event.timestamp * 1000),
             type: 'git',
@@ -145,7 +146,7 @@ export function useEventDropsData({
         for (const event of hourEvents) {
           const rowName = groupBy === 'app' ? 'Shell' : 'Shell';
           const dot: EventDot = {
-            id: `shell-${event.id}`,
+            id: makeEventKey('shell', event.id),
             originalId: event.id,
             timestamp: new Date(event.timestamp * 1000),
             type: 'shell',
@@ -166,7 +167,7 @@ export function useEventDropsData({
         for (const event of hourEvents) {
           const rowName = groupBy === 'app' ? event.browser || 'Browser' : 'Browser';
           const dot: EventDot = {
-            id: `browser-${event.id}`,
+            id: makeEventKey('browser', event.id),
             originalId: event.id,
             timestamp: new Date(event.timestamp * 1000),
             type: 'browser',
@@ -187,7 +188,7 @@ export function useEventDropsData({
         for (const event of hourEvents) {
           const rowName = groupBy === 'app' ? 'Files' : 'Files';
           const dot: EventDot = {
-            id: `file-${event.id}`,
+            id: makeEventKey('file', event.id),
             originalId: event.id,
             timestamp: new Date(event.timestamp * 1000),
             type: 'file',
@@ -206,7 +207,7 @@ export function useEventDropsData({
       for (const block of hourBlocks) {
         const rowName = 'Breaks';
         const dot: EventDot = {
-          id: `afk-${block.id}`,
+          id: makeEventKey('afk', block.id),
           originalId: block.id,
           timestamp: new Date(block.startTime * 1000),
           type: 'afk',
@@ -225,7 +226,7 @@ export function useEventDropsData({
       for (const screenshot of screenshots) {
         const rowName = 'Screenshots';
         const dot: EventDot = {
-          id: `screenshot-${screenshot.id}`,
+          id: makeEventKey('screenshot', screenshot.id),
           originalId: screenshot.id,
           timestamp: new Date(screenshot.timestamp * 1000),
           type: 'screenshot',
@@ -238,30 +239,83 @@ export function useEventDropsData({
       }
     }
 
-    // Process project-assigned entries (if provided)
+    // Process project-assigned entries (if provided) with continuity grouping
     if (entries && entries.length > 0) {
+      // Group entries by projectId for continuity merging
+      const entriesByProject = new Map<number, EntryBlockData[]>();
       for (const entry of entries) {
-        const rowName = 'Projects';
-        const dot: EventDot = {
-          id: `project-${entry.eventType}-${entry.id}`,
-          originalId: entry.id,
-          timestamp: new Date(entry.startTime * 1000),
-          type: 'projects',
-          row: rowName,
-          label: `${entry.projectName}: ${entry.appName}`,
-          duration: entry.durationSeconds,
-          color: entry.projectColor || EVENT_TYPE_COLORS.projects,
-          metadata: {
-            projectId: entry.projectId,
-            projectName: entry.projectName,
-            projectColor: entry.projectColor,
-            eventType: entry.eventType,
-            eventId: entry.id,
-            appName: entry.appName,
-            windowTitle: entry.windowTitle,
-          },
-        };
-        addToRow(rowName, dot);
+        if (!entriesByProject.has(entry.projectId)) {
+          entriesByProject.set(entry.projectId, []);
+        }
+        entriesByProject.get(entry.projectId)!.push(entry);
+      }
+
+      // Merge consecutive entries for each project (within 5 minute gap)
+      const GAP_THRESHOLD = 5 * 60; // 5 minutes in seconds
+
+      for (const [projectId, projectEntries] of entriesByProject) {
+        // Sort by start time
+        projectEntries.sort((a, b) => a.startTime - b.startTime);
+
+        // Merge consecutive entries
+        const mergedEntries: {
+          startTime: number;
+          endTime: number;
+          projectName: string;
+          projectColor: string;
+          apps: Set<string>;
+          entryIds: number[];
+        }[] = [];
+
+        for (const entry of projectEntries) {
+          const lastMerged = mergedEntries[mergedEntries.length - 1];
+
+          // Check if this entry should be merged with the previous one
+          if (lastMerged && entry.startTime <= lastMerged.endTime + GAP_THRESHOLD) {
+            // Extend the merged entry
+            lastMerged.endTime = Math.max(lastMerged.endTime, entry.endTime);
+            lastMerged.apps.add(entry.appName);
+            lastMerged.entryIds.push(entry.id);
+          } else {
+            // Start a new merged entry
+            mergedEntries.push({
+              startTime: entry.startTime,
+              endTime: entry.endTime,
+              projectName: entry.projectName,
+              projectColor: entry.projectColor,
+              apps: new Set([entry.appName]),
+              entryIds: [entry.id],
+            });
+          }
+        }
+
+        // Create EventDots from merged entries
+        for (const merged of mergedEntries) {
+          const rowName = 'Projects';
+          const duration = merged.endTime - merged.startTime;
+          const appList = Array.from(merged.apps).slice(0, 3).join(', ');
+          const moreApps = merged.apps.size > 3 ? ` +${merged.apps.size - 3} more` : '';
+
+          const dot: EventDot = {
+            id: `project-merged-${projectId}-${merged.startTime}`,
+            originalId: merged.entryIds[0], // Use first entry's ID
+            timestamp: new Date(merged.startTime * 1000),
+            type: 'projects',
+            row: rowName,
+            label: `${merged.projectName}: ${appList}${moreApps}`,
+            duration: duration,
+            color: merged.projectColor || EVENT_TYPE_COLORS.projects,
+            metadata: {
+              projectId: projectId,
+              projectName: merged.projectName,
+              projectColor: merged.projectColor,
+              eventType: 'merged',
+              entryIds: merged.entryIds,
+              apps: Array.from(merged.apps),
+            },
+          };
+          addToRow(rowName, dot);
+        }
       }
     }
 
