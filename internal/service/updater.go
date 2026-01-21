@@ -313,15 +313,20 @@ func ApplyPendingUpdate(dataDir string) (bool, error) {
 	}
 
 	// Get current executable path
-	exe, err := os.Executable()
-	if err != nil {
-		return false, err
-	}
-
-	// Resolve symlinks to get the real path
-	exe, err = filepath.EvalSymlinks(exe)
-	if err != nil {
-		return false, err
+	// For AppImage, use APPIMAGE env var which points to the actual .AppImage file
+	exe := os.Getenv("APPIMAGE")
+	if exe == "" {
+		// Not running as AppImage, use regular executable path
+		var err error
+		exe, err = os.Executable()
+		if err != nil {
+			return false, err
+		}
+		// Resolve symlinks to get the real path
+		exe, err = filepath.EvalSymlinks(exe)
+		if err != nil {
+			return false, err
+		}
 	}
 
 	// Create backup of current binary
