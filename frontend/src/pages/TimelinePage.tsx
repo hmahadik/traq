@@ -6,10 +6,8 @@ import { SplitPanel } from '@/components/common/SplitPanel';
 import { TimelineListView } from '@/components/timeline/TimelineListView';
 import { CalendarWidget } from '@/components/timeline';
 import {
-  useTimelineGridData,
   useCalendarHeatmap,
   useGenerateSummary,
-  useScreenshotsForDate,
   useEntriesForDate,
   useDeleteActivities,
   useDeleteBrowserVisits,
@@ -18,6 +16,7 @@ import {
   useDeleteFileEvents,
   useDeleteAFKEvents,
 } from '@/api/hooks';
+import { useMultiDayTimeline } from '@/hooks/useMultiDayTimeline';
 import { EventDropsTimeline, EventDot } from '@/components/timeline/eventDrops';
 import { DailySummaryCard } from '@/components/timeline/DailySummaryCard';
 import { BreakdownBar } from '@/components/timeline/BreakdownBar';
@@ -124,14 +123,26 @@ export function TimelinePage() {
   const dateStr = getDateString(selectedDate);
   const isToday = dateStr === getDateString(new Date());
 
-  // Fetch timeline grid data
-  const { data: gridData, isLoading } = useTimelineGridData(dateStr);
+  // Multi-day timeline data
+  const {
+    loadedDays,
+    timeRange,
+    allScreenshots,
+    centerDate,
+    isLoadingAny,
+    updateCenterFromPlayhead,
+    setCenterDate,
+  } = useMultiDayTimeline(dateStr);
+
+  // Get the center day's grid data for sidebar stats
+  const centerDayData = loadedDays.get(centerDate);
+  const gridData = centerDayData?.gridData ?? null;
+  const isLoading = isLoadingAny && !gridData;
+
   const { data: calendarData, isLoading: calendarLoading } = useCalendarHeatmap(
     selectedDate.getFullYear(),
     selectedDate.getMonth() + 1
   );
-  // Fetch screenshots for drops timeline
-  const { data: screenshotsData } = useScreenshotsForDate(dateStr);
   // Fetch entries (project-assigned activities) for EventDrops view
   const { data: entriesData } = useEntriesForDate(dateStr);
   const generateSummary = useGenerateSummary();
@@ -353,12 +364,16 @@ export function TimelinePage() {
     setShowCalendar(false);
   }, []);
 
-  // Format header date
-  const formattedDate = selectedDate.toLocaleDateString('en-US', {
-    weekday: 'short',
-    month: 'short',
-    day: 'numeric',
-  });
+  // Format header date based on centerDate (follows playhead)
+  const formattedDate = useMemo(() => {
+    const [year, month, day] = centerDate.split('-').map(Number);
+    const date = new Date(year, month - 1, day);
+    return date.toLocaleDateString('en-US', {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+    });
+  }, [centerDate]);
 
   // Keyboard shortcuts for navigation
   useEffect(() => {
@@ -488,7 +503,7 @@ export function TimelinePage() {
                 <EventDropsTimeline
                   data={gridData}
                   filters={filters}
-                  screenshots={screenshotsData}
+                  screenshots={allScreenshots}
                   entries={entriesData}
                   hideEmbeddedList={true}
                   selectedEventKeys={selectedEventKeys}
@@ -496,6 +511,9 @@ export function TimelinePage() {
                   onEventDelete={handleEventDropDelete}
                   onEventEdit={handleEventDropEdit}
                   onViewScreenshot={handleEventDropViewScreenshot}
+                  loadedDays={loadedDays}
+                  multiDayTimeRange={timeRange}
+                  onPlayheadChange={updateCenterFromPlayhead}
                 />
               }
               right={
@@ -511,13 +529,16 @@ export function TimelinePage() {
             <EventDropsTimeline
               data={gridData}
               filters={filters}
-              screenshots={screenshotsData}
+              screenshots={allScreenshots}
               entries={entriesData}
               selectedEventKeys={selectedEventKeys}
               onSelectionChange={handleDropsSelectionChange}
               onEventDelete={handleEventDropDelete}
               onEventEdit={handleEventDropEdit}
               onViewScreenshot={handleEventDropViewScreenshot}
+              loadedDays={loadedDays}
+              multiDayTimeRange={timeRange}
+              onPlayheadChange={updateCenterFromPlayhead}
             />
           )}
         </div>
