@@ -5,8 +5,10 @@ import type { TimelineGridData } from '@/types/timeline';
 import type { Screenshot as ScreenshotType } from '@/types/screenshot';
 import type { TimelineFilters } from '../FilterControls';
 import { useEventDropsData } from './useEventDropsData';
+import { useMultiDayEventDropsData } from './useMultiDayEventDropsData';
 import { EventDropsTooltip } from './EventDropsTooltip';
 import type { EventDot, EventDropType } from './eventDropsTypes';
+import type { DayData } from '@/hooks/useMultiDayTimeline';
 import type { EventKey } from '@/utils/eventKeys';
 import { Screenshot } from '@/components/common/Screenshot';
 import { ImageGallery } from '@/components/common/ImageGallery';
@@ -29,7 +31,13 @@ interface EntryBlockData {
 }
 
 interface EventDropsTimelineProps {
-  data: TimelineGridData | null | undefined;
+  // New multi-day props
+  loadedDays?: Map<string, DayData>;
+  multiDayTimeRange?: { start: Date; end: Date };
+  onPlayheadChange?: (timestamp: Date) => void;
+
+  // Single-day props (used when multi-day not provided)
+  data?: TimelineGridData | null | undefined;
   filters: TimelineFilters;
   screenshots?: ScreenshotType[];
   entries?: EntryBlockData[];
@@ -66,6 +74,11 @@ const EVENT_TYPE_ICONS: Record<EventDropType, typeof GitCommit> = {
 };
 
 export function EventDropsTimeline({
+  // Multi-day props
+  loadedDays,
+  multiDayTimeRange,
+  onPlayheadChange,
+  // Single-day props
   data,
   filters,
   screenshots,
@@ -191,7 +204,17 @@ export function EventDropsTimeline({
   }, [collapseActivityRows]);
 
   // Transform data to EventDrops format
-  const eventDropsData = useEventDropsData({ data, filters, screenshots, entries, collapseActivityRows });
+  // Always call both hooks to satisfy React rules of hooks, then choose which data to use
+  const singleDayData = useEventDropsData({ data, filters, screenshots, entries, collapseActivityRows });
+  const multiDayData = useMultiDayEventDropsData({
+    loadedDays: loadedDays ?? new Map(),
+    timeRange: multiDayTimeRange ?? { start: new Date(), end: new Date() },
+    filters,
+    collapseActivityRows,
+  });
+
+  // Use multi-day data if provided, fall back to single-day
+  const eventDropsData = loadedDays && multiDayTimeRange ? multiDayData : singleDayData;
 
   // Handle resize drag for both filmstrip and list panels
   useEffect(() => {
@@ -375,6 +398,7 @@ export function EventDropsTimeline({
         // Calculate playhead timestamp (center of visible area)
         const centerTimestamp = newXScale.invert(chartCenterX);
         setPlayheadTimestamp(centerTimestamp);
+        onPlayheadChange?.(centerTimestamp);
 
         // Update x-axis
         const xAxisGroup = svg.select<SVGGElement>('.x-axis');
@@ -850,6 +874,7 @@ export function EventDropsTimeline({
     // Initialize playhead timestamp to center of day
     const initialCenterTime = xScale.invert(chartCenterX);
     setPlayheadTimestamp(initialCenterTime);
+    onPlayheadChange?.(initialCenterTime);
 
     // Initialize visible time range to full day so filmstrip shows immediately
     setVisibleTimeRange({ start: timeRange.start, end: timeRange.end });
@@ -864,7 +889,7 @@ export function EventDropsTimeline({
       .attr('opacity', 0.7)
       .text('Scroll to zoom • Drag to pan');
 
-  }, [eventDropsData, dimensions, onEventClick, getComputedColor, selectedEventKeys, onSelectionChange]);
+  }, [eventDropsData, dimensions, onEventClick, getComputedColor, selectedEventKeys, onSelectionChange, onPlayheadChange]);
 
   // Reset zoom handler
   const handleResetZoom = useCallback(() => {
@@ -878,8 +903,9 @@ export function EventDropsTimeline({
       setVisibleTimeRange(eventDropsData.timeRange);
       const centerTime = new Date((eventDropsData.timeRange.start.getTime() + eventDropsData.timeRange.end.getTime()) / 2);
       setPlayheadTimestamp(centerTime);
+      onPlayheadChange?.(centerTime);
     }
-  }, [eventDropsData]);
+  }, [eventDropsData, onPlayheadChange]);
 
   // Filter events by visible time range for the list view, sorted from playhead forward
   const visibleEvents = useMemo(() => {
