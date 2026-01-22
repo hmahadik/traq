@@ -130,6 +130,7 @@ export function TimelinePage() {
     allScreenshots,
     centerDate,
     isLoadingAny,
+    loadingDays,
     updateCenterFromPlayhead,
     setCenterDate,
   } = useMultiDayTimeline(dateStr);
@@ -514,6 +515,7 @@ export function TimelinePage() {
                   loadedDays={loadedDays}
                   multiDayTimeRange={timeRange}
                   onPlayheadChange={updateCenterFromPlayhead}
+                  loadingDays={loadingDays}
                 />
               }
               right={
@@ -539,6 +541,7 @@ export function TimelinePage() {
               loadedDays={loadedDays}
               multiDayTimeRange={timeRange}
               onPlayheadChange={updateCenterFromPlayhead}
+              loadingDays={loadingDays}
             />
           )}
         </div>

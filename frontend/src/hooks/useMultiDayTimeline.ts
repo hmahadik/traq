@@ -157,6 +157,17 @@ export function useMultiDayTimeline(initialDate: string) {
     return false;
   }, [loadedDays]);
 
+  // Build set of dates that are currently loading (for loading indicators)
+  const loadingDays = useMemo(() => {
+    const loading = new Set<string>();
+    for (const [date, dayData] of loadedDays.entries()) {
+      if (dayData.isLoading) {
+        loading.add(date);
+      }
+    }
+    return loading;
+  }, [loadedDays]);
+
   return {
     loadedDays,
     timeRange,
@@ -164,6 +175,7 @@ export function useMultiDayTimeline(initialDate: string) {
     centerDate,
     playheadDate: centerDate,
     isLoadingAny,
+    loadingDays,
     updateCenterFromPlayhead,
     setCenterDate,
   };

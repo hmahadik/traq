@@ -90,3 +90,17 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Timeline loading indicator pulse animation */
+@keyframes timeline-loading-pulse {
+  0%, 100% {
+    opacity: 0.3;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+.loading-pulse-line {
+  animation: timeline-loading-pulse 1.5s ease-in-out infinite;
+}

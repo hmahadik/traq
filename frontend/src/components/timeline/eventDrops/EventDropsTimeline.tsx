@@ -35,6 +35,7 @@ interface EventDropsTimelineProps {
   loadedDays?: Map<string, DayData>;
   multiDayTimeRange?: { start: Date; end: Date };
   onPlayheadChange?: (timestamp: Date) => void;
+  loadingDays?: Set<string>; // Dates that are currently loading (for loading indicators)
 
   // Single-day props (used when multi-day not provided)
   data?: TimelineGridData | null | undefined;
@@ -78,6 +79,7 @@ export function EventDropsTimeline({
   loadedDays,
   multiDayTimeRange,
   onPlayheadChange,
+  loadingDays,
   // Single-day props
   data,
   filters,
@@ -441,6 +443,32 @@ export function EventDropsTimeline({
               .attr('x', x);
           });
 
+        // Update loading indicator positions
+        svg.select('.loading-indicators')
+          .selectAll<SVGRectElement, unknown>('.loading-shimmer-bg')
+          .each(function() {
+            const rect = d3.select(this);
+            const dayStart = new Date(parseFloat(rect.attr('data-day-start') || '0'));
+            if (!isNaN(dayStart.getTime())) {
+              const dayEnd = new Date(dayStart);
+              dayEnd.setDate(dayEnd.getDate() + 1);
+              const startX = newXScale(dayStart);
+              const endX = newXScale(dayEnd);
+              rect.attr('x', startX).attr('width', Math.abs(endX - startX));
+            }
+          });
+
+        svg.select('.loading-indicators')
+          .selectAll<SVGLineElement, unknown>('.loading-pulse-line')
+          .each(function() {
+            const line = d3.select(this);
+            const dayStart = new Date(parseFloat(line.attr('data-day-start') || '0'));
+            if (!isNaN(dayStart.getTime())) {
+              const x = newXScale(dayStart);
+              line.attr('x1', x).attr('x2', x);
+            }
+          });
+
         // Update dots
         svg.selectAll<SVGCircleElement, EventDot>('.event-dot')
           .attr('cx', (d) => newXScale(d.timestamp));
@@ -587,6 +615,100 @@ export function EventDropsTimeline({
           .attr('font-weight', '600')
           .text(dateLabel);
       });
+
+    // Add loading indicators at edges where data is still loading
+    // Helper to convert Date to YYYY-MM-DD string
+    const getDateStr = (date: Date): string => {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    };
+
+    if (loadingDays && loadingDays.size > 0) {
+      // Add gradient definition for shimmer effect
+      const defs = svg.select('defs');
+
+      // Create animated gradient for shimmer
+      const loadingGradient = defs.append('linearGradient')
+        .attr('id', 'loading-shimmer')
+        .attr('x1', '0%')
+        .attr('y1', '0%')
+        .attr('x2', '100%')
+        .attr('y2', '0%');
+
+      loadingGradient.append('stop')
+        .attr('offset', '0%')
+        .attr('stop-color', '#3b82f6')
+        .attr('stop-opacity', 0.1);
+
+      loadingGradient.append('stop')
+        .attr('offset', '50%')
+        .attr('stop-color', '#3b82f6')
+        .attr('stop-opacity', 0.4);
+
+      loadingGradient.append('stop')
+        .attr('offset', '100%')
+        .attr('stop-color', '#3b82f6')
+        .attr('stop-opacity', 0.1);
+
+      // Animate the gradient
+      loadingGradient.append('animate')
+        .attr('attributeName', 'x1')
+        .attr('values', '-100%;100%')
+        .attr('dur', '1.5s')
+        .attr('repeatCount', 'indefinite');
+
+      loadingGradient.append('animate')
+        .attr('attributeName', 'x2')
+        .attr('values', '0%;200%')
+        .attr('dur', '1.5s')
+        .attr('repeatCount', 'indefinite');
+
+      const loadingGroup = chartGroup.append('g')
+        .attr('class', 'loading-indicators')
+        .attr('clip-path', 'url(#chart-clip)');
+
+      // Check each day boundary for loading state
+      const allDays = d3.timeDay.range(timeRange.start, new Date(timeRange.end.getTime() + 86400000)); // Include end day
+
+      allDays.forEach((dayStart) => {
+        const dayStr = getDateStr(dayStart);
+        const isLoading = loadingDays.has(dayStr);
+
+        if (isLoading) {
+          const dayEnd = new Date(dayStart);
+          dayEnd.setDate(dayEnd.getDate() + 1);
+
+          const startX = xScale(dayStart);
+          const endX = xScale(dayEnd);
+          const loadingWidth = Math.abs(endX - startX);
+
+          // Shimmer overlay for the entire day
+          loadingGroup.append('rect')
+            .attr('class', 'loading-shimmer-bg')
+            .attr('data-day-start', dayStart.getTime().toString())
+            .attr('x', startX)
+            .attr('y', MARGIN.top)
+            .attr('width', loadingWidth)
+            .attr('height', height - MARGIN.top - MARGIN.bottom)
+            .attr('fill', 'url(#loading-shimmer)')
+            .attr('pointer-events', 'none');
+
+          // Pulsing border at day start
+          loadingGroup.append('line')
+            .attr('class', 'loading-pulse-line')
+            .attr('data-day-start', dayStart.getTime().toString())
+            .attr('x1', startX)
+            .attr('x2', startX)
+            .attr('y1', MARGIN.top)
+            .attr('y2', height - MARGIN.bottom)
+            .attr('stroke', '#3b82f6')
+            .attr('stroke-width', 3)
+            .attr('opacity', 0.6);
+        }
+      });
+    }
 
     // Create clipped group for dots
     const dotsGroup = chartGroup.append('g')
@@ -889,7 +1011,7 @@ export function EventDropsTimeline({
       .attr('opacity', 0.7)
       .text('Scroll to zoom • Drag to pan');
 
-  }, [eventDropsData, dimensions, onEventClick, getComputedColor, selectedEventKeys, onSelectionChange, onPlayheadChange]);
+  }, [eventDropsData, dimensions, onEventClick, getComputedColor, selectedEventKeys, onSelectionChange, onPlayheadChange, loadingDays]);
 
   // Reset zoom handler
   const handleResetZoom = useCallback(() => {
