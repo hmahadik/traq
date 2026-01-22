@@ -352,7 +352,8 @@ export function EventDropsTimeline({
     // Extended zoom range: 0.5x = 48 hours visible, 48x = ~30 min visible
     const zoom = d3.zoom<SVGSVGElement, unknown>()
       .scaleExtent([0.5, 48])
-      .translateExtent([[MARGIN.left, 0], [width - MARGIN.right, height]])
+      // Remove left constraint - allow infinite pan into past
+      .translateExtent([[-Infinity, 0], [width - MARGIN.right, height]])
       .extent([[MARGIN.left, 0], [width - MARGIN.right, height]])
       // Center zoom on the playhead (center of chart) instead of mouse position
       .wheelDelta((event) => {
@@ -400,6 +401,21 @@ export function EventDropsTimeline({
           .data(gridLines)
           .attr('x1', (d) => newXScale(d))
           .attr('x2', (d) => newXScale(d));
+
+        // Update day boundary positions
+        svg.select('.day-boundaries')
+          .selectAll<SVGGElement, Date>('.day-boundary')
+          .each(function(d) {
+            const g = d3.select(this);
+            const x = newXScale(d);
+            g.select('line')
+              .attr('x1', x)
+              .attr('x2', x);
+            g.select('rect')
+              .attr('x', x - 45);
+            g.select('text')
+              .attr('x', x);
+          });
 
         // Update dots
         svg.selectAll<SVGCircleElement, EventDot>('.event-dot')
@@ -498,6 +514,55 @@ export function EventDropsTimeline({
       .attr('stroke', borderColor)
       .attr('stroke-opacity', 0.3)
       .attr('stroke-dasharray', '2,2');
+
+    // Add day boundary markers at midnight
+    const dayBoundaries = d3.timeDay.range(timeRange.start, timeRange.end);
+    chartGroup.append('g')
+      .attr('class', 'day-boundaries')
+      .selectAll('g')
+      .data(dayBoundaries.slice(1)) // Skip first day's start
+      .join('g')
+      .attr('class', 'day-boundary')
+      .each(function(d) {
+        const g = d3.select(this);
+        const x = xScale(d);
+
+        // Vertical line at midnight
+        g.append('line')
+          .attr('x1', x)
+          .attr('x2', x)
+          .attr('y1', MARGIN.top - 20)
+          .attr('y2', height - MARGIN.bottom)
+          .attr('stroke', '#3b82f6')
+          .attr('stroke-width', 2)
+          .attr('stroke-dasharray', '4,4')
+          .attr('opacity', 0.6);
+
+        // Date label above
+        const dateLabel = d.toLocaleDateString('en-US', {
+          weekday: 'short',
+          month: 'short',
+          day: 'numeric',
+        });
+
+        g.append('rect')
+          .attr('x', x - 45)
+          .attr('y', MARGIN.top - 35)
+          .attr('width', 90)
+          .attr('height', 18)
+          .attr('rx', 4)
+          .attr('fill', '#3b82f6')
+          .attr('opacity', 0.9);
+
+        g.append('text')
+          .attr('x', x)
+          .attr('y', MARGIN.top - 23)
+          .attr('text-anchor', 'middle')
+          .attr('fill', '#ffffff')
+          .attr('font-size', '11px')
+          .attr('font-weight', '600')
+          .text(dateLabel);
+      });
 
     // Create clipped group for dots
     const dotsGroup = chartGroup.append('g')
@@ -785,6 +850,9 @@ export function EventDropsTimeline({
     // Initialize playhead timestamp to center of day
     const initialCenterTime = xScale.invert(chartCenterX);
     setPlayheadTimestamp(initialCenterTime);
+
+    // Initialize visible time range to full day so filmstrip shows immediately
+    setVisibleTimeRange({ start: timeRange.start, end: timeRange.end });
 
     // Zoom instructions
     svg.append('text')
