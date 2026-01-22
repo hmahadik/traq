@@ -132,7 +132,7 @@ export function TimelinePage() {
     isLoadingAny,
     loadingDays,
     updateCenterFromPlayhead,
-    setCenterDate,
+    // setCenterDate available but not needed yet (for future date picker integration)
   } = useMultiDayTimeline(dateStr);
 
   // Get the center day's grid data for sidebar stats
