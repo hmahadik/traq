@@ -1496,3 +1496,10 @@ export function useSetProjectsAutoAssign() {
     },
   });
 }
+
+// ============================================================================
+// Re-export multi-day timeline hook
+// ============================================================================
+
+export { useMultiDayTimeline } from '@/hooks/useMultiDayTimeline';
+export type { DayData, MultiDayTimelineState, ScreenshotItem } from '@/hooks/useMultiDayTimeline';

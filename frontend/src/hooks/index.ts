@@ -9,3 +9,5 @@ export {
   usePrefersDarkMode,
   usePrefersReducedMotion,
 } from './useMediaQuery';
+export { useMultiDayTimeline } from './useMultiDayTimeline';
+export type { DayData, MultiDayTimelineState, ScreenshotItem } from './useMultiDayTimeline';
