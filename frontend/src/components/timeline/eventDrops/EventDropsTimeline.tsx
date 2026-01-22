@@ -58,7 +58,6 @@ const MARGIN = { top: 50, right: 30, bottom: 30, left: 160 };
 const ROW_HEIGHT = 32; // Fixed height for each swim lane
 const DOT_RADIUS = 5;
 const DOT_HOVER_RADIUS = 8;
-const BAR_HEIGHT = 14; // Height of duration bars
 const BAR_MIN_DURATION = 10; // Minimum duration (seconds) to render as bar
 const BAR_MIN_PIXELS = 6; // Minimum pixel width to render as bar
 
@@ -375,10 +374,14 @@ export function EventDropsTimeline({
 
     // Create zoom behavior
     // Extended zoom range: 0.5x = 48 hours visible, 48x = ~30 min visible
+    // Calculate the maximum right boundary (current time, capped at end of timeline)
+    const currentTime = new Date();
+    const rightBoundary = Math.min(xScale(currentTime), width - MARGIN.right);
+
     const zoom = d3.zoom<SVGSVGElement, unknown>()
       .scaleExtent([0.5, 48])
-      // Remove left constraint - allow infinite pan into past
-      .translateExtent([[-Infinity, 0], [width - MARGIN.right, height]])
+      // Left: infinite (pan into past), Right: capped at "now" (cannot scroll into future)
+      .translateExtent([[-Infinity, 0], [rightBoundary, height]])
       .extent([[MARGIN.left, 0], [width - MARGIN.right, height]])
       // Center zoom on the playhead (center of chart) instead of mouse position
       .wheelDelta((event) => {
