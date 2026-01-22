@@ -106,6 +106,25 @@ export function EventDropsTimeline({
   const [playheadTimestamp, setPlayheadTimestamp] = useState<Date | null>(null);
   // Track previous time range to detect domain changes and preserve visible area
   const previousTimeRangeRef = useRef<{ start: number; end: number } | null>(null);
+
+  // === ZOOM DECOUPLING: Use refs during active zoom, sync to state on zoom end ===
+  // These refs hold "live" values during zoom/pan - updated synchronously without React re-renders
+  const zoomTransformRef = useRef<d3.ZoomTransform>(d3.zoomIdentity);
+  const visibleTimeRangeRef = useRef<{ start: Date; end: Date } | null>(null);
+  const playheadTimestampRef = useRef<Date | null>(null);
+  const zoomSyncTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const dragSafetyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isZoomingRef = useRef(false);
+
+  // === SCALE REF: Store xScale for use in other effects ===
+  const xScaleRef = useRef<d3.ScaleTime<number, number> | null>(null);
+
+  // === CALLBACK REFS: Store callbacks in refs to avoid dependency array issues ===
+  const onPlayheadChangeRef = useRef(onPlayheadChange);
+  const onEventClickRef = useRef(onEventClick);
+  const onSelectionChangeRef = useRef(onSelectionChange);
+  const selectedEventKeysRef = useRef(selectedEventKeys);
+
   // Gallery state for fullscreen screenshot viewer
   const [galleryOpen, setGalleryOpen] = useState(false);
   const [galleryIndex, setGalleryIndex] = useState(0);
@@ -205,6 +224,35 @@ export function EventDropsTimeline({
       // Ignore localStorage errors
     }
   }, [collapseActivityRows]);
+
+  // Cleanup timeouts on unmount
+  useEffect(() => {
+    return () => {
+      if (zoomSyncTimeoutRef.current) {
+        clearTimeout(zoomSyncTimeoutRef.current);
+      }
+      if (dragSafetyTimeoutRef.current) {
+        clearTimeout(dragSafetyTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  // === KEEP CALLBACK REFS IN SYNC: Update refs when props change (no re-render) ===
+  useEffect(() => {
+    onPlayheadChangeRef.current = onPlayheadChange;
+  }, [onPlayheadChange]);
+
+  useEffect(() => {
+    onEventClickRef.current = onEventClick;
+  }, [onEventClick]);
+
+  useEffect(() => {
+    onSelectionChangeRef.current = onSelectionChange;
+  }, [onSelectionChange]);
+
+  useEffect(() => {
+    selectedEventKeysRef.current = selectedEventKeys;
+  }, [selectedEventKeys]);
 
   // Transform data to EventDrops format
   // Always call both hooks to satisfy React rules of hooks, then choose which data to use
@@ -345,7 +393,8 @@ export function EventDropsTimeline({
     const mutedColor = getComputedColor('--muted', '#262626');
     const backgroundColor = getComputedColor('--background', '#171717');
 
-    // Clear previous content
+    // Clear and rebuild - this is fine now that day navigation buttons are removed
+    // Rebuilds only happen when data actually changes (loading more data as user pans)
     svg.selectAll('*').remove();
 
     // Create clip path for the chart area
@@ -364,6 +413,9 @@ export function EventDropsTimeline({
       .domain([timeRange.start, timeRange.end])
       .range([MARGIN.left, width - MARGIN.right]);
 
+    // Store scale in ref for use in other effects
+    xScaleRef.current = xScale;
+
     // Use fixed row height instead of scaleBand
     const yScale = (rowName: string): number => {
       const index = rows.findIndex((r) => r.name === rowName);
@@ -376,50 +428,98 @@ export function EventDropsTimeline({
 
     // Create zoom behavior
     // Extended zoom range: 0.5x = 48 hours visible, 48x = ~30 min visible
-    // Calculate the maximum right boundary (current time, capped at end of timeline)
     const currentTime = new Date();
-    const rightBoundary = Math.min(xScale(currentTime), width - MARGIN.right);
 
     const zoom = d3.zoom<SVGSVGElement, unknown>()
       .scaleExtent([0.5, 48])
-      // Left: infinite (pan into past), Right: capped at "now" (cannot scroll into future)
-      .translateExtent([[-Infinity, 0], [rightBoundary, height]])
       .extent([[MARGIN.left, 0], [width - MARGIN.right, height]])
+      // Constrain panning so playhead can't go past "now"
+      .constrain((transform, extent, translateExtent) => {
+        // Calculate what the center timestamp would be with this transform
+        const testScale = transform.rescaleX(xScale);
+        const centerTimestamp = testScale.invert(chartCenterX);
+
+        // If center would be in the future, clamp it
+        if (centerTimestamp > currentTime) {
+          const nowX = testScale(currentTime);
+          const shiftNeeded = chartCenterX - nowX;
+          return d3.zoomIdentity
+            .translate(transform.x + shiftNeeded, transform.y)
+            .scale(transform.k);
+        }
+        return transform;
+      })
       // Center zoom on the playhead (center of chart) instead of mouse position
       .wheelDelta((event) => {
         // Standard wheel delta calculation
         return -event.deltaY * (event.deltaMode === 1 ? 0.05 : event.deltaMode ? 1 : 0.002);
       })
+      .on('start', () => {
+        // Mark that we're actively zooming - prevents unnecessary React re-renders
+        isZoomingRef.current = true;
+        // Safety: set a timeout to auto-release stuck drag after 5 seconds of no 'end' event
+        if (dragSafetyTimeoutRef.current) {
+          clearTimeout(dragSafetyTimeoutRef.current);
+        }
+        dragSafetyTimeoutRef.current = setTimeout(() => {
+          if (isZoomingRef.current) {
+            console.warn('Drag safety: auto-releasing stuck drag state');
+            isZoomingRef.current = false;
+            // Force sync state
+            setCurrentZoom(zoomTransformRef.current);
+            setVisibleTimeRange(visibleTimeRangeRef.current);
+            setPlayheadTimestamp(playheadTimestampRef.current);
+            if (playheadTimestampRef.current) {
+              onPlayheadChangeRef.current?.(playheadTimestampRef.current);
+            }
+          }
+        }, 5000);
+      })
       .on('zoom', (event) => {
         const transform = event.transform;
-        setCurrentZoom(transform);
 
-        // Create new scale based on zoom
+        // Create new scale based on zoom (already constrained by .constrain())
         const newXScale = transform.rescaleX(xScale);
 
-        // Calculate visible time range from the zoom transform
+        // Calculate center timestamp (playhead position)
+        const centerTimestamp = newXScale.invert(chartCenterX);
+
+        // === PERFORMANCE: Update refs immediately (no React re-render) ===
+        zoomTransformRef.current = transform;
+
+        // Calculate visible time range and playhead - store in refs
         const visibleStart = newXScale.invert(MARGIN.left);
         const visibleEnd = newXScale.invert(width - MARGIN.right);
-        setVisibleTimeRange({ start: visibleStart, end: visibleEnd });
+        visibleTimeRangeRef.current = { start: visibleStart, end: visibleEnd };
 
-        // Calculate playhead timestamp (center of visible area)
-        const centerTimestamp = newXScale.invert(chartCenterX);
-        setPlayheadTimestamp(centerTimestamp);
-        onPlayheadChange?.(centerTimestamp);
+        playheadTimestampRef.current = centerTimestamp;
 
-        // Update x-axis
+        // === DEBOUNCED STATE SYNC: Only update React state after zoom settles ===
+        // This prevents React re-renders during active panning/zooming
+        if (zoomSyncTimeoutRef.current) {
+          clearTimeout(zoomSyncTimeoutRef.current);
+        }
+        zoomSyncTimeoutRef.current = setTimeout(() => {
+          // Sync refs to React state (triggers re-render for UI elements that need it)
+          setCurrentZoom(zoomTransformRef.current);
+          setVisibleTimeRange(visibleTimeRangeRef.current);
+          setPlayheadTimestamp(playheadTimestampRef.current);
+          if (playheadTimestampRef.current) {
+            onPlayheadChangeRef.current?.(playheadTimestampRef.current);
+          }
+        }, 150); // 150ms debounce - syncs state after zoom gesture settles
+
+        // Update x-axis with multi-scale formatting
         const xAxisGroup = svg.select<SVGGElement>('.x-axis');
+        // Dynamically adjust tick interval based on zoom level
+        const tickInterval = transform.k > 8 ? d3.timeMinute.every(15)
+          : transform.k > 4 ? d3.timeMinute.every(30)
+          : transform.k > 2 ? d3.timeHour.every(1)
+          : d3.timeHour.every(2);
         xAxisGroup.call(
           d3.axisTop(newXScale)
-            .ticks(d3.timeHour.every(Math.max(1, Math.floor(2 / transform.k))))
-            .tickFormat((d) => {
-              const date = d as Date;
-              return date.toLocaleTimeString('en-US', {
-                hour: 'numeric',
-                minute: transform.k > 4 ? '2-digit' : undefined,
-                hour12: true,
-              });
-            }) as any
+            .ticks(tickInterval)
+            .tickFormat((d) => multiScaleFormat(d as Date)) as any
         );
         xAxisGroup.select('.domain').attr('stroke', borderColor);
         xAxisGroup.selectAll('.tick line').attr('stroke', borderColor);
@@ -494,6 +594,61 @@ export function EventDropsTimeline({
 
         svg.select('.now-text')
           .attr('x', (d: any) => newXScale(d));
+
+        // Update bottom date labels
+        const formatDateLabel = (date: Date): string => {
+          return date.toLocaleDateString('en-US', {
+            day: 'numeric',
+            month: 'long',
+            year: 'numeric',
+          });
+        };
+
+        const formatCenterLabel = (date: Date): string => {
+          const dayPart = date.toLocaleDateString('en-US', {
+            weekday: 'short',
+            month: 'short',
+            day: 'numeric',
+          });
+          const timePart = date.toLocaleTimeString('en-US', {
+            hour: 'numeric',
+            minute: '2-digit',
+            hour12: true,
+          });
+          return `${dayPart} • ${timePart}`;
+        };
+
+        svg.select('.date-label-left')
+          .text(formatDateLabel(visibleStart));
+
+        svg.select('.date-label-right')
+          .text(formatDateLabel(visibleEnd));
+
+        svg.select('.date-label-center')
+          .text(formatCenterLabel(centerTimestamp));
+      })
+      .on('end', () => {
+        // Zoom gesture ended - mark as not zooming and force final state sync
+        isZoomingRef.current = false;
+
+        // Clear any pending debounce and sync immediately
+        if (zoomSyncTimeoutRef.current) {
+          clearTimeout(zoomSyncTimeoutRef.current);
+          zoomSyncTimeoutRef.current = null;
+        }
+        // Clear drag safety timeout since we properly ended
+        if (dragSafetyTimeoutRef.current) {
+          clearTimeout(dragSafetyTimeoutRef.current);
+          dragSafetyTimeoutRef.current = null;
+        }
+
+        // Final sync to React state
+        setCurrentZoom(zoomTransformRef.current);
+        setVisibleTimeRange(visibleTimeRangeRef.current);
+        setPlayheadTimestamp(playheadTimestampRef.current);
+        if (playheadTimestampRef.current) {
+          onPlayheadChangeRef.current?.(playheadTimestampRef.current);
+        }
       });
 
     // Apply zoom to SVG
@@ -537,6 +692,26 @@ export function EventDropsTimeline({
       .attr('fill', (_, i) => (i % 2 === 0 ? mutedColor : 'transparent'))
       .attr('opacity', 0.4);
 
+    // Multi-scale time formatting (marmelab EventDrops style)
+    const formatMillisecond = d3.timeFormat('.%L');
+    const formatSecond = d3.timeFormat(':%S');
+    const formatMinute = d3.timeFormat('%-I:%M %p');
+    const formatHour = d3.timeFormat('%-I %p');
+    const formatDay = d3.timeFormat('%a %d');
+    const formatWeek = d3.timeFormat('%b %d');
+    const formatMonth = d3.timeFormat('%B');
+    const formatYear = d3.timeFormat('%Y');
+
+    const multiScaleFormat = (date: Date): string => {
+      return (d3.timeSecond(date) < date ? formatMillisecond
+        : d3.timeMinute(date) < date ? formatSecond
+        : d3.timeHour(date) < date ? formatMinute
+        : d3.timeDay(date) < date ? formatHour
+        : d3.timeMonth(date) < date ? (d3.timeWeek(date) < date ? formatDay : formatWeek)
+        : d3.timeYear(date) < date ? formatMonth
+        : formatYear)(date);
+    };
+
     // Create X-axis (time)
     chartGroup.append('g')
       .attr('class', 'x-axis')
@@ -544,13 +719,7 @@ export function EventDropsTimeline({
       .call(
         d3.axisTop(xScale)
           .ticks(d3.timeHour.every(2))
-          .tickFormat((d) => {
-            const date = d as Date;
-            return date.toLocaleTimeString('en-US', {
-              hour: 'numeric',
-              hour12: true,
-            });
-          }) as any
+          .tickFormat((d) => multiScaleFormat(d as Date)) as any
       )
       .call((g) => {
         g.select('.domain').attr('stroke', borderColor);
@@ -741,8 +910,8 @@ export function EventDropsTimeline({
     const dotEvents = allEvents.filter((e) => !shouldRenderAsBar(e, xScale));
     const barEvents = allEvents.filter((e) => shouldRenderAsBar(e, xScale));
 
-    // Helper to check if event is selected
-    const isSelected = (d: EventDot) => selectedEventKeys?.has(d.id) || false;
+    // Helper to check if event is selected (uses ref to avoid stale closure)
+    const isSelected = (d: EventDot) => selectedEventKeysRef.current?.has(d.id) || false;
 
     // Helper to get darker stroke color
     const getDarkerColor = (color: string) => {
@@ -800,9 +969,9 @@ export function EventDropsTimeline({
       })
       .on('click', function (event, d) {
         event.stopPropagation();
-        // Toggle selection
-        if (onSelectionChange) {
-          const newSelection = new Set(selectedEventKeys || []);
+        // Toggle selection (use refs to avoid stale closures)
+        if (onSelectionChangeRef.current) {
+          const newSelection = new Set(selectedEventKeysRef.current || []);
           if (newSelection.has(d.id)) {
             newSelection.delete(d.id);
           } else {
@@ -812,9 +981,9 @@ export function EventDropsTimeline({
             }
             newSelection.add(d.id);
           }
-          onSelectionChange(newSelection);
+          onSelectionChangeRef.current(newSelection);
         }
-        onEventClick?.(d);
+        onEventClickRef.current?.(d);
       });
 
     // Create bars (pills) for duration events - same height as dots for consistency
@@ -871,9 +1040,9 @@ export function EventDropsTimeline({
       })
       .on('click', function (event, d) {
         event.stopPropagation();
-        // Toggle selection
-        if (onSelectionChange) {
-          const newSelection = new Set(selectedEventKeys || []);
+        // Toggle selection (use refs to avoid stale closures)
+        if (onSelectionChangeRef.current) {
+          const newSelection = new Set(selectedEventKeysRef.current || []);
           if (newSelection.has(d.id)) {
             newSelection.delete(d.id);
           } else {
@@ -883,9 +1052,9 @@ export function EventDropsTimeline({
             }
             newSelection.add(d.id);
           }
-          onSelectionChange(newSelection);
+          onSelectionChangeRef.current(newSelection);
         }
-        onEventClick?.(d);
+        onEventClickRef.current?.(d);
       });
 
     // Fixed label group (doesn't zoom)
@@ -943,16 +1112,9 @@ export function EventDropsTimeline({
           .text(`${d.dotCount}`);
       });
 
-    // Add "now" indicator if viewing today
+    // Add "now" indicator if "now" is within the time range (works for multi-day views)
     const now = new Date();
-    const today = new Date(timeRange.start);
-    if (
-      now.getFullYear() === today.getFullYear() &&
-      now.getMonth() === today.getMonth() &&
-      now.getDate() === today.getDate() &&
-      now >= timeRange.start &&
-      now <= timeRange.end
-    ) {
+    if (now >= timeRange.start && now <= timeRange.end) {
       const nowX = xScale(now);
 
       chartGroup.append('line')
@@ -998,68 +1160,96 @@ export function EventDropsTimeline({
       .attr('fill', '#3b82f6')
       .attr('pointer-events', 'none');
 
-    // Check if time range domain changed (multi-day loading triggered)
-    const prevRange = previousTimeRangeRef.current;
-    const domainChanged = prevRange && (
-      prevRange.start !== timeRange.start.getTime() ||
-      prevRange.end !== timeRange.end.getTime()
-    );
-
-    // Store current time range for next comparison
+    // Store current time range for comparison
     previousTimeRangeRef.current = {
       start: timeRange.start.getTime(),
       end: timeRange.end.getTime(),
     };
 
-    // If domain changed AND we have a previous visible range, restore the view position
-    if (domainChanged && visibleTimeRange) {
-      // Calculate the zoom transform needed to show the same visible time range on the new scale
-      const visibleDuration = visibleTimeRange.end.getTime() - visibleTimeRange.start.getTime();
-      const totalDuration = timeRange.end.getTime() - timeRange.start.getTime();
-      const chartWidth = width - MARGIN.left - MARGIN.right;
+    // Initialize playhead to center of visible time range
+    const initialCenterTime = xScale.invert(chartCenterX);
+    setPlayheadTimestamp(initialCenterTime);
+    onPlayheadChangeRef.current?.(initialCenterTime);
 
-      // k = total_pixels_per_ms / visible_pixels_per_ms
-      const k = totalDuration / visibleDuration;
+    // Initialize visible time range to full range so filmstrip shows immediately
+    setVisibleTimeRange({ start: timeRange.start, end: timeRange.end });
 
-      // Calculate where the visible start should be in the new scale
-      const visibleStartX = xScale(visibleTimeRange.start);
+    // Bottom date labels (marmelab style) - fixed position labels
+    const dateLabelsGroup = svg.append('g').attr('class', 'date-labels-group');
 
-      // tx = MARGIN.left - k * visibleStartX (to position visible range at chart left)
-      // But we want to center on playhead, so calculate tx to put center of visible at chartCenterX
-      const visibleCenterTime = new Date((visibleTimeRange.start.getTime() + visibleTimeRange.end.getTime()) / 2);
-      const visibleCenterX = xScale(visibleCenterTime);
-      const tx = chartCenterX - k * visibleCenterX;
+    // Format for date labels: "22 January 2026"
+    const formatDateLabel = (date: Date): string => {
+      return date.toLocaleDateString('en-US', {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+      });
+    };
 
-      // Apply the calculated transform
-      const newTransform = d3.zoomIdentity.translate(tx, 0).scale(k);
-      svg.call(zoom.transform as any, newTransform);
+    // Format for center label: "Thu, Jan 22 • 11:59 AM"
+    const formatCenterLabel = (date: Date): string => {
+      const dayPart = date.toLocaleDateString('en-US', {
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric',
+      });
+      const timePart = date.toLocaleTimeString('en-US', {
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true,
+      });
+      return `${dayPart} • ${timePart}`;
+    };
 
-      // Update playhead to center of visible range
-      setPlayheadTimestamp(visibleCenterTime);
-      // Don't call onPlayheadChange here to avoid triggering more updates
-    } else {
-      // First mount - initialize playhead timestamp to center of day
-      const initialCenterTime = xScale.invert(chartCenterX);
-      setPlayheadTimestamp(initialCenterTime);
-      onPlayheadChange?.(initialCenterTime);
+    // Left date label (range start)
+    dateLabelsGroup.append('text')
+      .attr('class', 'date-label-left')
+      .attr('x', MARGIN.left + 10)
+      .attr('y', height - 8)
+      .attr('text-anchor', 'start')
+      .attr('fill', mutedForeground)
+      .attr('font-size', '12px')
+      .attr('font-weight', '500')
+      .text(formatDateLabel(timeRange.start));
 
-      // Initialize visible time range to full day so filmstrip shows immediately
-      setVisibleTimeRange({ start: timeRange.start, end: timeRange.end });
-    }
-
-    // Zoom instructions
-    svg.append('text')
-      .attr('x', width - 10)
+    // Right date label (range end)
+    dateLabelsGroup.append('text')
+      .attr('class', 'date-label-right')
+      .attr('x', width - MARGIN.right - 10)
       .attr('y', height - 8)
       .attr('text-anchor', 'end')
       .attr('fill', mutedForeground)
-      .attr('font-size', '10px')
-      .attr('opacity', 0.7)
+      .attr('font-size', '12px')
+      .attr('font-weight', '500')
+      .text(formatDateLabel(timeRange.end));
+
+    // Center date/time label (playhead position)
+    dateLabelsGroup.append('text')
+      .attr('class', 'date-label-center')
+      .attr('x', chartCenterX)
+      .attr('y', height - 8)
+      .attr('text-anchor', 'middle')
+      .attr('fill', '#3b82f6') // Blue to match playhead
+      .attr('font-size', '12px')
+      .attr('font-weight', '600')
+      .text(formatCenterLabel(initialCenterTime));
+
+    // Zoom instructions (smaller, positioned differently)
+    svg.append('text')
+      .attr('x', width - 10)
+      .attr('y', 12)
+      .attr('text-anchor', 'end')
+      .attr('fill', mutedForeground)
+      .attr('font-size', '9px')
+      .attr('opacity', 0.5)
       .text('Scroll to zoom • Drag to pan');
 
-  }, [eventDropsData, dimensions, onEventClick, getComputedColor, selectedEventKeys, onSelectionChange, onPlayheadChange, loadingDays]);
+  // NOTE: Callbacks (onEventClick, onSelectionChange, onPlayheadChange) are stored in refs
+  // to prevent this effect from re-running when parent re-renders with new callback refs.
+  // selectedEventKeys is also stored in a ref for the same reason.
+  }, [eventDropsData, dimensions, getComputedColor, loadingDays]);
 
-  // Reset zoom handler
+  // Reset zoom handler (uses ref for callback to avoid dependency)
   const handleResetZoom = useCallback(() => {
     const svg = d3.select(svgRef.current);
     svg.transition().duration(300).call(
@@ -1071,9 +1261,9 @@ export function EventDropsTimeline({
       setVisibleTimeRange(eventDropsData.timeRange);
       const centerTime = new Date((eventDropsData.timeRange.start.getTime() + eventDropsData.timeRange.end.getTime()) / 2);
       setPlayheadTimestamp(centerTime);
-      onPlayheadChange?.(centerTime);
+      onPlayheadChangeRef.current?.(centerTime);
     }
-  }, [eventDropsData, onPlayheadChange]);
+  }, [eventDropsData]);
 
   // Filter events by visible time range for the list view, sorted from playhead forward
   const visibleEvents = useMemo(() => {
@@ -1223,7 +1413,8 @@ export function EventDropsTimeline({
   return (
     <div className="relative w-full h-full flex flex-col">
       {/* Filmstrip - horizontal strip of screenshots centered on playhead */}
-      {filmstripScreenshots.length > 0 && (
+      {/* Filmstrip - show if ANY screenshots exist (not just visible range) to prevent layout shift */}
+      {screenshots && screenshots.length > 0 && (
         <div className="flex-shrink-0 border-b border-border bg-muted/20">
           {/* Filmstrip header - collapsible */}
           <div
@@ -1237,7 +1428,9 @@ export function EventDropsTimeline({
             )}
             <Camera className="h-3 w-3 text-muted-foreground" />
             <span className="text-xs font-medium text-muted-foreground">Screenshots</span>
-            <span className="text-xs text-muted-foreground/70">({filmstripScreenshots.length})</span>
+            <span className="text-xs text-muted-foreground/70">
+              ({filmstripScreenshots.length > 0 ? filmstripScreenshots.length : `${screenshots.length} total`})
+            </span>
           </div>
 
           {/* Filmstrip content - centered on playhead screenshot */}
@@ -1245,7 +1438,7 @@ export function EventDropsTimeline({
             <>
               {/* Playhead info - positioned to align with chart center */}
               <div className="relative h-10">
-                {playheadScreenshotIndex >= 0 && filmstripScreenshots[playheadScreenshotIndex] && (
+                {filmstripScreenshots.length > 0 && playheadScreenshotIndex >= 0 && filmstripScreenshots[playheadScreenshotIndex] && (
                   <div
                     className="absolute flex flex-col items-center"
                     style={{
@@ -1268,6 +1461,20 @@ export function EventDropsTimeline({
                     </span>
                   </div>
                 )}
+                {/* Empty state for playhead info area */}
+                {filmstripScreenshots.length === 0 && (
+                  <div
+                    className="absolute flex items-center justify-center"
+                    style={{
+                      left: MARGIN.left + (dimensions.width - MARGIN.left - MARGIN.right) / 2,
+                      transform: 'translateX(-50%)',
+                    }}
+                  >
+                    <span className="text-xs text-muted-foreground/50">
+                      No screenshots in view
+                    </span>
+                  </div>
+                )}
               </div>
 
               {/* Screenshot strip - centered with playhead screenshot in middle */}
@@ -1275,70 +1482,69 @@ export function EventDropsTimeline({
                 className="relative overflow-hidden"
                 style={{ height: filmstripHeight }}
               >
-                {/*
-                  Center the strip so the playhead screenshot aligns with the chart's playhead line.
-                  The chart center X = MARGIN.left + (chartWidth / 2).
-                  We calculate an offset to translate the strip so the playhead screenshot's center
-                  lands at that X position.
-                */}
-                {(() => {
-                  const thumbnailWidth = filmstripHeight * (16 / 9);
-                  const gap = 4; // gap-1 = 4px
-                  // For a screenshot at playheadScreenshotIndex, its center is at:
-                  // x = playheadScreenshotIndex * (thumbnailWidth + gap) + thumbnailWidth / 2
-                  // We want that to align with the chart center, so we offset by:
-                  // chartCenterOffsetFromLeft - playheadScreenshotCenter
-                  // Since we don't know container width in CSS, we use a simple approach:
-                  // Position the strip so screenshot 0's left edge would be at chartCenterX - (playheadIndex * itemWidth + thumbnailWidth/2)
-                  const itemWidth = thumbnailWidth + gap;
-                  const playheadScreenshotCenter = playheadScreenshotIndex * itemWidth + thumbnailWidth / 2;
+                {filmstripScreenshots.length > 0 ? (
+                  <>
+                    {/*
+                      Center the strip so the playhead screenshot aligns with the chart's playhead line.
+                      The chart center X = MARGIN.left + (chartWidth / 2).
+                      We calculate an offset to translate the strip so the playhead screenshot's center
+                      lands at that X position.
+                    */}
+                    {(() => {
+                      const thumbnailWidth = filmstripHeight * (16 / 9);
+                      const gap = 4; // gap-1 = 4px
+                      const itemWidth = thumbnailWidth + gap;
+                      const playheadScreenshotCenter = playheadScreenshotIndex * itemWidth + thumbnailWidth / 2;
 
-                  return (
+                      return (
+                        <div
+                          className="flex items-center gap-1 absolute"
+                          style={{
+                            height: filmstripHeight,
+                            left: MARGIN.left,
+                            transform: `translateX(calc((${dimensions.width - MARGIN.left - MARGIN.right}px / 2) - ${playheadScreenshotCenter}px))`,
+                          }}
+                        >
+                          {filmstripScreenshots.map((ss, index) => {
+                            const isAtPlayhead = index === playheadScreenshotIndex;
+                            return (
+                              <div
+                                key={ss.id}
+                                className={`flex-shrink-0 cursor-pointer transition-all h-full ${
+                                  isAtPlayhead
+                                    ? 'ring-2 ring-blue-500 ring-offset-1 ring-offset-background z-10'
+                                    : 'opacity-60 hover:opacity-100'
+                                }`}
+                                onClick={() => handleFilmstripClick(index)}
+                                title={`${formatEventTime(new Date(ss.timestamp * 1000))} - ${
+                                  typeof ss.appName === 'object' ? ss.appName?.String : ss.appName || 'Unknown'
+                                }`}
+                              >
+                                <Screenshot
+                                  screenshot={ss}
+                                  size="thumbnail"
+                                  showOverlay={false}
+                                  className="!w-auto h-full rounded"
+                                />
+                              </div>
+                            );
+                          })}
+                        </div>
+                      );
+                    })()}
+
+                    {/* Center indicator line aligned with playhead - at chart center */}
                     <div
-                      className="flex items-center gap-1 absolute"
-                      style={{
-                        height: filmstripHeight,
-                        // Position so that when we translate, the playhead screenshot lands at chart center
-                        // We use left: 50% of the chart area (accounting for margins)
-                        // Then shift left by the distance from strip start to playhead screenshot center
-                        left: MARGIN.left,
-                        // Transform: move to center of chart area, then back by playhead screenshot position
-                        transform: `translateX(calc((${dimensions.width - MARGIN.left - MARGIN.right}px / 2) - ${playheadScreenshotCenter}px))`,
-                      }}
-                    >
-                      {filmstripScreenshots.map((ss, index) => {
-                        const isAtPlayhead = index === playheadScreenshotIndex;
-                        return (
-                          <div
-                            key={ss.id}
-                            className={`flex-shrink-0 cursor-pointer transition-all h-full ${
-                              isAtPlayhead
-                                ? 'ring-2 ring-blue-500 ring-offset-1 ring-offset-background z-10'
-                                : 'opacity-60 hover:opacity-100'
-                            }`}
-                            onClick={() => handleFilmstripClick(index)}
-                            title={`${formatEventTime(new Date(ss.timestamp * 1000))} - ${
-                              typeof ss.appName === 'object' ? ss.appName?.String : ss.appName || 'Unknown'
-                            }`}
-                          >
-                            <Screenshot
-                              screenshot={ss}
-                              size="thumbnail"
-                              showOverlay={false}
-                              className="!w-auto h-full rounded"
-                            />
-                          </div>
-                        );
-                      })}
-                    </div>
-                  );
-                })()}
-
-                {/* Center indicator line aligned with playhead - at chart center */}
-                <div
-                  className="absolute top-0 bottom-0 w-0.5 bg-blue-500/50 pointer-events-none"
-                  style={{ left: MARGIN.left + (dimensions.width - MARGIN.left - MARGIN.right) / 2 }}
-                />
+                      className="absolute top-0 bottom-0 w-0.5 bg-blue-500/50 pointer-events-none"
+                      style={{ left: MARGIN.left + (dimensions.width - MARGIN.left - MARGIN.right) / 2 }}
+                    />
+                  </>
+                ) : (
+                  /* Empty state - maintain height to prevent layout shift */
+                  <div className="flex items-center justify-center h-full text-muted-foreground/30">
+                    <Camera className="h-8 w-8" />
+                  </div>
+                )}
               </div>
 
               {/* Filmstrip resize handle */}

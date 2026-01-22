@@ -1,7 +1,7 @@
 import { useState, useCallback, useMemo, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { ChevronLeft, ChevronRight, Calendar, Sparkles, Loader2, PanelRight, PanelRightClose } from 'lucide-react';
+import { Calendar, Sparkles, Loader2, PanelRight, PanelRightClose } from 'lucide-react';
 import { SplitPanel } from '@/components/common/SplitPanel';
 import { TimelineListView } from '@/components/timeline/TimelineListView';
 import { CalendarWidget } from '@/components/timeline';
@@ -346,14 +346,6 @@ export function TimelinePage() {
   }, [dateStr, clearAllSelections]);
 
   // Navigation handlers
-  const goToPrevious = useCallback(() => {
-    setSelectedDate((d) => addDays(d, -1));
-  }, []);
-
-  const goToNext = useCallback(() => {
-    if (!isToday) setSelectedDate((d) => addDays(d, 1));
-  }, [isToday]);
-
   const handleDateSelect = useCallback((date: Date) => {
     setSelectedDate(date);
   }, []);
@@ -384,19 +376,13 @@ export function TimelinePage() {
         return;
       }
 
-      switch (e.key.toLowerCase()) {
-        case 'arrowleft':
-          goToPrevious();
-          break;
-        case 'arrowright':
-          if (!isToday) goToNext();
-          break;
-      }
+      // Arrow keys now reserved for timeline panning (handled by D3 zoom)
+      // Day navigation removed - users pan the timeline instead
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [goToPrevious, goToNext, isToday]);
+  }, []);
 
   // Render timeline content
   const renderContent = () => {
@@ -428,13 +414,7 @@ export function TimelinePage() {
           {/* Desktop Header */}
           <div className="hidden xl:flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
-              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={goToPrevious}>
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
               <span className="text-sm font-medium">{formattedDate}</span>
-              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={goToNext} disabled={isToday}>
-                <ChevronRight className="h-4 w-4" />
-              </Button>
               <div className="flex items-center gap-1 ml-2">
                 <Button
                   variant={isToday ? 'secondary' : 'ghost'}
@@ -550,16 +530,18 @@ export function TimelinePage() {
   };
 
   return (
-    <div className="flex flex-col xl:flex-row gap-4 h-[calc(100vh-5rem)] lg:h-[calc(100vh-3rem)]">
+    <div className="flex flex-col xl:flex-row gap-4 h-[calc(100vh-5rem)] lg:h-[calc(100vh-3rem)] select-none">
       {/* Mobile Header */}
       <div className="xl:hidden flex items-center justify-between gap-2 flex-wrap">
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={goToPrevious}>
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          <span className="text-sm font-medium min-w-[100px] text-center">{formattedDate}</span>
-          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={goToNext} disabled={isToday}>
-            <ChevronRight className="h-4 w-4" />
+          <span className="text-sm font-medium">{formattedDate}</span>
+          <Button
+            variant={isToday ? 'secondary' : 'ghost'}
+            size="sm"
+            className="h-7 text-xs"
+            onClick={() => handleDateSelect(new Date())}
+          >
+            Today
           </Button>
         </div>
         <div className="flex items-center gap-2">
