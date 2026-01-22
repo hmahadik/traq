@@ -1,5 +1,5 @@
 // frontend/src/hooks/useMultiDayTimeline.ts
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useRef } from 'react';
 import { useTimelineGridData, useScreenshotsForDate } from '@/api/hooks';
 
 // Use generic types that work with both Wails bindings and local interfaces
@@ -141,11 +141,34 @@ export function useMultiDayTimeline(initialDate: string) {
     return merged.sort((a, b) => a.timestamp - b.timestamp);
   }, [loadedDays]);
 
+  // Track last update time to debounce
+  const lastCenterUpdateRef = useRef<number>(0);
+
   // Update center date when playhead moves significantly
+  // Only update if playhead is >18 hours from center AND debounced (500ms)
   const updateCenterFromPlayhead = useCallback((playheadTimestamp: Date) => {
-    const playheadDateStr = getDateString(playheadTimestamp);
-    if (playheadDateStr !== centerDate) {
-      setCenterDate(playheadDateStr);
+    const now = Date.now();
+
+    // Debounce: don't update more than once per 500ms
+    if (now - lastCenterUpdateRef.current < 500) {
+      return;
+    }
+
+    // Calculate the center of the current centerDate (noon)
+    const [year, month, day] = centerDate.split('-').map(Number);
+    const centerNoon = new Date(year, month - 1, day, 12, 0, 0);
+
+    // Calculate hours from center
+    const hoursFromCenter = Math.abs(playheadTimestamp.getTime() - centerNoon.getTime()) / (1000 * 60 * 60);
+
+    // Only update if playhead is more than 18 hours from center (past the edge of current day)
+    // This prevents thrashing when panning back and forth across midnight
+    if (hoursFromCenter > 18) {
+      const playheadDateStr = getDateString(playheadTimestamp);
+      if (playheadDateStr !== centerDate) {
+        lastCenterUpdateRef.current = now;
+        setCenterDate(playheadDateStr);
+      }
     }
   }, [centerDate]);
 

@@ -104,6 +104,8 @@ export function EventDropsTimeline({
   const [currentZoom, setCurrentZoom] = useState<d3.ZoomTransform>(d3.zoomIdentity);
   const [visibleTimeRange, setVisibleTimeRange] = useState<{ start: Date; end: Date } | null>(null);
   const [playheadTimestamp, setPlayheadTimestamp] = useState<Date | null>(null);
+  // Track previous time range to detect domain changes and preserve visible area
+  const previousTimeRangeRef = useRef<{ start: number; end: number } | null>(null);
   // Gallery state for fullscreen screenshot viewer
   const [galleryOpen, setGalleryOpen] = useState(false);
   const [galleryIndex, setGalleryIndex] = useState(0);
@@ -996,13 +998,54 @@ export function EventDropsTimeline({
       .attr('fill', '#3b82f6')
       .attr('pointer-events', 'none');
 
-    // Initialize playhead timestamp to center of day
-    const initialCenterTime = xScale.invert(chartCenterX);
-    setPlayheadTimestamp(initialCenterTime);
-    onPlayheadChange?.(initialCenterTime);
+    // Check if time range domain changed (multi-day loading triggered)
+    const prevRange = previousTimeRangeRef.current;
+    const domainChanged = prevRange && (
+      prevRange.start !== timeRange.start.getTime() ||
+      prevRange.end !== timeRange.end.getTime()
+    );
 
-    // Initialize visible time range to full day so filmstrip shows immediately
-    setVisibleTimeRange({ start: timeRange.start, end: timeRange.end });
+    // Store current time range for next comparison
+    previousTimeRangeRef.current = {
+      start: timeRange.start.getTime(),
+      end: timeRange.end.getTime(),
+    };
+
+    // If domain changed AND we have a previous visible range, restore the view position
+    if (domainChanged && visibleTimeRange) {
+      // Calculate the zoom transform needed to show the same visible time range on the new scale
+      const visibleDuration = visibleTimeRange.end.getTime() - visibleTimeRange.start.getTime();
+      const totalDuration = timeRange.end.getTime() - timeRange.start.getTime();
+      const chartWidth = width - MARGIN.left - MARGIN.right;
+
+      // k = total_pixels_per_ms / visible_pixels_per_ms
+      const k = totalDuration / visibleDuration;
+
+      // Calculate where the visible start should be in the new scale
+      const visibleStartX = xScale(visibleTimeRange.start);
+
+      // tx = MARGIN.left - k * visibleStartX (to position visible range at chart left)
+      // But we want to center on playhead, so calculate tx to put center of visible at chartCenterX
+      const visibleCenterTime = new Date((visibleTimeRange.start.getTime() + visibleTimeRange.end.getTime()) / 2);
+      const visibleCenterX = xScale(visibleCenterTime);
+      const tx = chartCenterX - k * visibleCenterX;
+
+      // Apply the calculated transform
+      const newTransform = d3.zoomIdentity.translate(tx, 0).scale(k);
+      svg.call(zoom.transform as any, newTransform);
+
+      // Update playhead to center of visible range
+      setPlayheadTimestamp(visibleCenterTime);
+      // Don't call onPlayheadChange here to avoid triggering more updates
+    } else {
+      // First mount - initialize playhead timestamp to center of day
+      const initialCenterTime = xScale.invert(chartCenterX);
+      setPlayheadTimestamp(initialCenterTime);
+      onPlayheadChange?.(initialCenterTime);
+
+      // Initialize visible time range to full day so filmstrip shows immediately
+      setVisibleTimeRange({ start: timeRange.start, end: timeRange.end });
+    }
 
     // Zoom instructions
     svg.append('text')
