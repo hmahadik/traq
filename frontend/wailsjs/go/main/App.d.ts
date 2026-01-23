@@ -16,6 +16,8 @@ export function AssignEventToProject(arg1:string,arg2:number,arg3:number):Promis
 
 export function AutoDiscoverProjects():Promise<Array<storage.Project>>;
 
+export function AutoInstallOllama():Promise<void>;
+
 export function BackfillProjects(arg1:string,arg2:string,arg3:number):Promise<service.BackfillResult>;
 
 export function BulkAcceptDrafts(arg1:Array<number>,arg2:Array<number>):Promise<void>;
@@ -150,6 +152,10 @@ export function GetLatestHierarchicalSummaries():Promise<Record<string, storage.
 
 export function GetMonthlyStats(arg1:number,arg2:number):Promise<service.MonthlyStats>;
 
+export function GetOllamaInstallInfo():Promise<Record<string, any>>;
+
+export function GetOllamaSetupStatus():Promise<inference.OllamaSetupStatus>;
+
 export function GetProductivityScore(arg1:string):Promise<service.ProductivityScore>;
 
 export function GetProject(arg1:number):Promise<storage.Project>;
@@ -242,6 +248,8 @@ export function PauseCapture():Promise<void>;
 
 export function PreviewBackfill(arg1:string,arg2:string,arg3:number):Promise<service.BackfillResult>;
 
+export function PullOllamaModel(arg1:string):Promise<void>;
+
 export function RegenerateSummary(arg1:number):Promise<storage.Summary>;
 
 export function RegisterGitRepository(arg1:string):Promise<storage.GitRepository>;
@@ -273,6 +281,8 @@ export function SetProjectsAutoAssign(arg1:boolean):Promise<void>;
 export function SetReportIncludeUnassigned(arg1:boolean):Promise<void>;
 
 export function SetTagsForSession(arg1:number,arg2:Array<string>):Promise<void>;
+
+export function StartOllamaService():Promise<void>;
 
 export function StartTracking():Promise<void>;
 

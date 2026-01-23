@@ -22,6 +22,10 @@ export function AutoDiscoverProjects() {
   return window['go']['main']['App']['AutoDiscoverProjects']();
 }
 
+export function AutoInstallOllama() {
+  return window['go']['main']['App']['AutoInstallOllama']();
+}
+
 export function BackfillProjects(arg1, arg2, arg3) {
   return window['go']['main']['App']['BackfillProjects'](arg1, arg2, arg3);
 }
@@ -290,6 +294,14 @@ export function GetMonthlyStats(arg1, arg2) {
   return window['go']['main']['App']['GetMonthlyStats'](arg1, arg2);
 }
 
+export function GetOllamaInstallInfo() {
+  return window['go']['main']['App']['GetOllamaInstallInfo']();
+}
+
+export function GetOllamaSetupStatus() {
+  return window['go']['main']['App']['GetOllamaSetupStatus']();
+}
+
 export function GetProductivityScore(arg1) {
   return window['go']['main']['App']['GetProductivityScore'](arg1);
 }
@@ -474,6 +486,10 @@ export function PreviewBackfill(arg1, arg2, arg3) {
   return window['go']['main']['App']['PreviewBackfill'](arg1, arg2, arg3);
 }
 
+export function PullOllamaModel(arg1) {
+  return window['go']['main']['App']['PullOllamaModel'](arg1);
+}
+
 export function RegenerateSummary(arg1) {
   return window['go']['main']['App']['RegenerateSummary'](arg1);
 }
@@ -536,6 +552,10 @@ export function SetReportIncludeUnassigned(arg1) {
 
 export function SetTagsForSession(arg1, arg2) {
   return window['go']['main']['App']['SetTagsForSession'](arg1, arg2);
+}
+
+export function StartOllamaService() {
+  return window['go']['main']['App']['StartOllamaService']();
 }
 
 export function StartTracking() {

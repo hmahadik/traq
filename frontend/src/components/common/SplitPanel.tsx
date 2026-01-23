@@ -11,6 +11,8 @@ interface SplitPanelProps {
   maxSize?: number; // maximum percentage
   storageKey?: string; // localStorage key for persistence
   className?: string;
+  rightCollapsed?: boolean; // When true, minimize right panel to collapsedSize
+  collapsedSize?: number; // Size (percentage) when collapsed, default 5
 }
 
 export function SplitPanel({
@@ -22,6 +24,8 @@ export function SplitPanel({
   maxSize = 100,
   storageKey,
   className,
+  rightCollapsed = false,
+  collapsedSize = 5,
 }: SplitPanelProps) {
   const [size, setSize] = useState(() => {
     if (storageKey) {
@@ -30,6 +34,9 @@ export function SplitPanel({
     }
     return defaultSize;
   });
+
+  // Effective size - use collapsed size when right panel is collapsed
+  const effectiveSize = rightCollapsed ? (100 - collapsedSize) : size;
 
   const containerRef = useRef<HTMLDivElement>(null);
   const isDragging = useRef(false);
@@ -87,23 +94,24 @@ export function SplitPanel({
       )}
     >
       <div
-        style={{ [isHorizontal ? 'width' : 'height']: `${size}%` }}
-        className="overflow-auto"
+        style={{ [isHorizontal ? 'width' : 'height']: `${effectiveSize}%` }}
+        className={cn('overflow-auto', rightCollapsed && 'transition-all duration-200')}
       >
         {left}
       </div>
 
       <div
-        onMouseDown={handleMouseDown}
+        onMouseDown={rightCollapsed ? undefined : handleMouseDown}
         className={cn(
-          'flex-shrink-0 bg-border hover:bg-primary/20 transition-colors',
-          isHorizontal ? 'w-1 cursor-col-resize' : 'h-1 cursor-row-resize'
+          'flex-shrink-0 bg-border transition-colors',
+          isHorizontal ? 'w-1' : 'h-1',
+          rightCollapsed ? 'cursor-default' : (isHorizontal ? 'cursor-col-resize hover:bg-primary/20' : 'cursor-row-resize hover:bg-primary/20')
         )}
       />
 
       <div
-        style={{ [isHorizontal ? 'width' : 'height']: `${100 - size}%` }}
-        className="overflow-auto"
+        style={{ [isHorizontal ? 'width' : 'height']: `${100 - effectiveSize}%` }}
+        className={cn('overflow-auto', rightCollapsed && 'transition-all duration-200')}
       >
         {right}
       </div>

@@ -1308,6 +1308,44 @@ func (a *App) GetBundledStatus() *inference.BundledStatus {
 	return a.inference.GetBundledStatus()
 }
 
+// GetOllamaSetupStatus checks if Ollama is installed and ready to use.
+func (a *App) GetOllamaSetupStatus() *inference.OllamaSetupStatus {
+	return inference.CheckOllamaSetup()
+}
+
+// StartOllamaService attempts to start the Ollama service.
+func (a *App) StartOllamaService() error {
+	return inference.StartOllamaService()
+}
+
+// PullOllamaModel pulls an Ollama model. Progress is reported via Wails events.
+func (a *App) PullOllamaModel(modelName string) error {
+	progressChan := make(chan inference.ModelPullProgress)
+
+	// Send progress updates via Wails runtime events
+	go func() {
+		for progress := range progressChan {
+			wailsRuntime.EventsEmit(a.ctx, "ollama-pull-progress", progress)
+		}
+	}()
+
+	return inference.PullOllamaModel(modelName, progressChan)
+}
+
+// GetOllamaInstallInfo returns installation instructions for Ollama.
+func (a *App) GetOllamaInstallInfo() map[string]interface{} {
+	return map[string]interface{}{
+		"command":        inference.GetOllamaInstallCommand(),
+		"url":            inference.GetOllamaInstallURL(),
+		"canAutoInstall": inference.CanAutoInstallOllama(),
+	}
+}
+
+// AutoInstallOllama attempts to automatically install Ollama (Linux only).
+func (a *App) AutoInstallOllama() error {
+	return inference.AutoInstallOllama()
+}
+
 // GetAvailableModels returns the list of available AI models for the bundled engine.
 func (a *App) GetAvailableModels() []*inference.ModelInfo {
 	models := inference.GetAvailableModels()

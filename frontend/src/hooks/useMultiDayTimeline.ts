@@ -177,15 +177,24 @@ export function useMultiDayTimeline(initialDate: string) {
   }, [allDayData, datesToLoad]);
 
   // Calculate combined time range
+  // Cap end time at "now" if today is included to prevent timeline extending into future
   const timeRange = useMemo(() => {
     const sortedDates = Array.from(loadedDays.keys()).sort();
+    const now = new Date();
+    const todayStr = getDateString(now);
+
     if (sortedDates.length === 0) {
-      const today = new Date();
-      return { start: dateToStartOfDay(getDateString(today)), end: dateToEndOfDay(getDateString(today)) };
+      return { start: dateToStartOfDay(todayStr), end: now };
     }
+
+    const lastDate = sortedDates[sortedDates.length - 1];
+    const rawEnd = dateToEndOfDay(lastDate);
+    // If today is included, cap end at current time
+    const end = (lastDate === todayStr && rawEnd > now) ? now : rawEnd;
+
     return {
       start: dateToStartOfDay(sortedDates[0]),
-      end: dateToEndOfDay(sortedDates[sortedDates.length - 1]),
+      end,
     };
   }, [loadedDays]);
 
@@ -320,7 +329,7 @@ export function useMultiDayTimeline(initialDate: string) {
   }, [loadedDays]);
 
   // Target date for programmatic navigation (e.g., "Today" button, prev/next)
-  // When set, EventDropsTimeline should pan to this date
+  // When set, Timeline should pan to this date
   const [targetPlayheadDate, setTargetPlayheadDate] = useState<Date | null>(null);
 
   // Go to a specific date - used by navigation buttons

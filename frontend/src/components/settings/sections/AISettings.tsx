@@ -20,6 +20,7 @@ import {
 import { formatBytes } from '@/lib/utils';
 import { SettingsCard } from '../SettingsCard';
 import { SettingsRow } from '../SettingsRow';
+import { OllamaSetupWizard } from '../OllamaSetupWizard';
 
 export function AISettings() {
   const { data: config, isLoading } = useConfig();
@@ -52,47 +53,49 @@ export function AISettings() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="bundled">Bundled (Recommended)</SelectItem>
-              <SelectItem value="ollama">External Ollama</SelectItem>
+              <SelectItem value="ollama">Ollama (Recommended)</SelectItem>
+              <SelectItem value="bundled">Bundled</SelectItem>
               <SelectItem value="cloud">Cloud API</SelectItem>
             </SelectContent>
           </Select>
         </SettingsRow>
 
         {inference.engine === 'ollama' && (
-          <>
-            <SettingsRow label="Ollama Host" vertical>
-              <Input
-                value={inference.ollama.host}
-                onChange={(e) =>
-                  updateConfig.mutate({
-                    inference: {
-                      ...inference,
-                      ollama: { ...inference.ollama, host: e.target.value },
-                    },
-                  })
-                }
-                placeholder="http://localhost:11434"
-              />
-            </SettingsRow>
-            <SettingsRow label="Model" vertical>
-              <Input
-                value={inference.ollama.model}
-                onChange={(e) =>
-                  updateConfig.mutate({
-                    inference: {
-                      ...inference,
-                      ollama: { ...inference.ollama, model: e.target.value },
-                    },
-                  })
-                }
-                placeholder="gemma3:12b-it-qat"
-              />
-            </SettingsRow>
-            <Button variant="outline" className="w-full">
-              Test Connection
-            </Button>
-          </>
+          <div className="space-y-4 pt-2">
+            <OllamaSetupWizard />
+
+            <div className="space-y-3 pt-3 border-t">
+              <p className="text-xs text-muted-foreground font-medium">Advanced Settings</p>
+              <SettingsRow label="Ollama Host" vertical>
+                <Input
+                  value={inference.ollama.host}
+                  onChange={(e) =>
+                    updateConfig.mutate({
+                      inference: {
+                        ...inference,
+                        ollama: { ...inference.ollama, host: e.target.value },
+                      },
+                    })
+                  }
+                  placeholder="http://localhost:11434"
+                />
+              </SettingsRow>
+              <SettingsRow label="Model" vertical>
+                <Input
+                  value={inference.ollama.model}
+                  onChange={(e) =>
+                    updateConfig.mutate({
+                      inference: {
+                        ...inference,
+                        ollama: { ...inference.ollama, model: e.target.value },
+                      },
+                    })
+                  }
+                  placeholder="qwen2.5:7b"
+                />
+              </SettingsRow>
+            </div>
+          </div>
         )}
 
         {inference.engine === 'cloud' && (

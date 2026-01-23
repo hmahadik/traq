@@ -1,12 +1,12 @@
 import { useMemo } from 'react';
 import type { TimelineGridData } from '@/types/timeline';
 import type { Screenshot } from '@/types/screenshot';
-import type { EventDropsData, EventDropsRow, EventDot } from './eventDropsTypes';
+import type { TimelineData, TimelineRow, EventDot } from './timelineTypes';
 import {
   EVENT_TYPE_COLORS,
   CATEGORY_HEX_COLORS,
   getAppHexColor,
-} from './eventDropsTypes';
+} from './timelineTypes';
 import type { TimelineFilters } from '../FilterControls';
 import { makeEventKey } from '@/utils/eventKeys';
 
@@ -26,30 +26,49 @@ interface EntryBlockData {
   source: string;
 }
 
-interface UseEventDropsDataOptions {
+interface UseTimelineDataOptions {
   data: TimelineGridData | null | undefined;
   filters: TimelineFilters;
   groupBy?: 'app' | 'eventType';
   screenshots?: Screenshot[];
   entries?: EntryBlockData[];
   collapseActivityRows?: boolean; // Merge all activity events into single "In Focus" row
+  hiddenLanes?: Set<string>; // Lanes to hide from the timeline
 }
 
-export function useEventDropsData({
+export function useTimelineData({
   data,
   filters,
   groupBy = 'app',
   screenshots,
   entries,
   collapseActivityRows = false,
-}: UseEventDropsDataOptions): EventDropsData | null {
+  hiddenLanes = new Set(),
+}: UseTimelineDataOptions): TimelineData | null {
   return useMemo(() => {
     if (!data) return null;
 
     // Parse the date for time range
     const [year, month, day] = data.date.split('-').map(Number);
     const startOfDay = new Date(year, month - 1, day, 0, 0, 0);
-    const endOfDay = new Date(year, month - 1, day, 23, 59, 59);
+    const endOfDayRaw = new Date(year, month - 1, day, 23, 59, 59);
+
+    // Cap end time at "now" if this is today (don't show future)
+    const now = new Date();
+    const isToday = now.getFullYear() === year && now.getMonth() === month - 1 && now.getDate() === day;
+    const endOfDay = isToday ? new Date(Math.min(now.getTime(), endOfDayRaw.getTime())) : endOfDayRaw;
+    const nowTimestamp = Math.floor(now.getTime() / 1000); // Unix timestamp in seconds
+
+    // Helper to cap duration at "now" for today's events
+    const capDuration = (startTimeSec: number, durationSec: number | undefined): number | undefined => {
+      if (!durationSec || !isToday) return durationSec;
+      const endTimeSec = startTimeSec + durationSec;
+      if (endTimeSec > nowTimestamp) {
+        // Cap at now
+        return Math.max(0, nowTimestamp - startTimeSec);
+      }
+      return durationSec;
+    };
 
     const allEvents: EventDot[] = [];
     const rowMap = new Map<string, EventDot[]>();
@@ -118,7 +137,7 @@ export function useEventDropsData({
               type: 'activity',
               row: rowName,
               label: activity.windowTitle || appName,
-              duration: activity.durationSeconds,
+              duration: capDuration(activity.startTime, activity.durationSeconds),
               color,
               metadata: activity,
             };
@@ -161,7 +180,7 @@ export function useEventDropsData({
             type: 'shell',
             row: rowName,
             label: event.command,
-            duration: event.durationSeconds,
+            duration: capDuration(event.timestamp, event.durationSeconds),
             color: EVENT_TYPE_COLORS.shell,
             metadata: event,
           };
@@ -182,7 +201,7 @@ export function useEventDropsData({
             type: 'browser',
             row: rowName,
             label: event.title || event.domain,
-            duration: event.visitDurationSeconds,
+            duration: capDuration(event.timestamp, event.visitDurationSeconds),
             color: getAppHexColor(event.browser || 'browser'),
             metadata: event,
           };
@@ -363,7 +382,8 @@ export function useEventDropsData({
         // Create EventDots from merged entries
         for (const merged of mergedEntries) {
           const rowName = 'Projects';
-          const duration = merged.endTime - merged.startTime;
+          const rawDuration = merged.endTime - merged.startTime;
+          const duration = capDuration(merged.startTime, rawDuration);
           const appList = Array.from(merged.apps).slice(0, 3).join(', ');
           const moreApps = merged.apps.size > 3 ? ` +${merged.apps.size - 3} more` : '';
 
@@ -390,8 +410,39 @@ export function useEventDropsData({
       }
     }
 
+    // Process session summaries (AI summaries)
+    if (data?.sessionSummaries && data.sessionSummaries.length > 0) {
+      for (const session of data.sessionSummaries) {
+        const rowName = 'Sessions';
+        const topApps = session.topApps || [];
+        const appList = topApps.slice(0, 3).map(a => a.appName).join(', ');
+        const moreApps = topApps.length > 3 ? ` +${topApps.length - 3}` : '';
+
+        const dot: EventDot = {
+          id: makeEventKey('session', session.id),
+          originalId: session.id,
+          timestamp: new Date(session.startTime * 1000),
+          type: 'session',
+          row: rowName,
+          label: session.summary || `Session: ${appList}${moreApps}`,
+          duration: capDuration(session.startTime, session.durationSeconds),
+          color: EVENT_TYPE_COLORS.session,
+          metadata: {
+            explanation: session.explanation,
+            tags: session.tags,
+            topApps: session.topApps,
+            isDraft: session.isDraft,
+            draftStatus: session.draftStatus,
+            confidence: session.confidence,
+            category: session.category,
+          },
+        };
+        addToRow(rowName, dot);
+      }
+    }
+
     // Convert row map to sorted array
-    const rows: EventDropsRow[] = Array.from(rowMap.entries())
+    const allRows: TimelineRow[] = Array.from(rowMap.entries())
       .map(([normalizedName, events]) => {
         // Sort events by timestamp
         events.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
@@ -409,17 +460,21 @@ export function useEventDropsData({
           data: events,
         };
       })
-      // Sort rows: Projects first, then In Focus (if collapsed), then apps with most events, then special rows
+      // Sort rows: Fixed order at top, then app rows by count, then special rows at bottom
       .sort((a, b) => {
-        // Projects lane always first
-        if (a.name === 'Projects') return -1;
-        if (b.name === 'Projects') return 1;
+        // Fixed order for top rows
+        const fixedOrder = ['In Focus', 'Activity', 'Screenshots', 'Projects', 'Sessions'];
+        const aFixed = fixedOrder.indexOf(a.name);
+        const bFixed = fixedOrder.indexOf(b.name);
 
-        // In Focus (collapsed activity) comes second
-        if (a.name === 'In Focus') return -1;
-        if (b.name === 'In Focus') return 1;
+        // If both are in fixed order, sort by that order
+        if (aFixed !== -1 && bFixed !== -1) return aFixed - bFixed;
+        // If only one is in fixed order, it goes first
+        if (aFixed !== -1) return -1;
+        if (bFixed !== -1) return 1;
 
-        const specialRows = ['Screenshots', 'Git', 'Shell', 'Browser', 'Files', 'Activity'];
+        // Special rows go at the bottom
+        const specialRows = ['Git', 'Shell', 'Browser', 'Files'];
         const aIsSpecial = specialRows.includes(a.name);
         const bIsSpecial = specialRows.includes(b.name);
 
@@ -429,8 +484,15 @@ export function useEventDropsData({
           return specialRows.indexOf(a.name) - specialRows.indexOf(b.name);
         }
 
+        // App rows sorted by event count
         return b.dotCount - a.dotCount;
       });
+
+    // Collect all available lane names before filtering (for dropdown)
+    const availableLanes = allRows.map(row => row.name);
+
+    // Filter out hidden lanes
+    const rows = allRows.filter(row => !hiddenLanes.has(row.name));
 
     return {
       rows,
@@ -439,6 +501,7 @@ export function useEventDropsData({
         end: endOfDay,
       },
       totalEvents: allEvents.length,
+      availableLanes,
     };
-  }, [data, filters, groupBy, screenshots, entries, collapseActivityRows]);
+  }, [data, filters, groupBy, screenshots, entries, collapseActivityRows, hiddenLanes]);
 }

@@ -1,7 +1,7 @@
 import { useState, useCallback, useMemo, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Calendar, Sparkles, Loader2, PanelRight, PanelRightClose, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Calendar, Sparkles, Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { SplitPanel } from '@/components/common/SplitPanel';
 import { EventList } from '@/components/timeline/EventList';
 import { CalendarWidget } from '@/components/timeline';
@@ -18,11 +18,10 @@ import {
   useBulkAssignProject,
 } from '@/api/hooks';
 import { useMultiDayTimeline } from '@/hooks/useMultiDayTimeline';
-import { EventDropsTimeline, EventDot } from '@/components/timeline/eventDrops';
+import { Timeline, EventDot } from '@/components/timeline';
 import { DailySummaryCard } from '@/components/timeline/DailySummaryCard';
 import { BreakdownBar } from '@/components/timeline/BreakdownBar';
 import { TopAppsSection } from '@/components/timeline/TopAppsSection';
-import { TimelinePageSkeleton } from '@/components/timeline/TimelineGridSkeleton';
 import { FilterControls, TimelineFilters } from '@/components/timeline/FilterControls';
 import { GlobalSearch } from '@/components/timeline/GlobalSearch';
 import { SessionDetailDrawer } from '@/components/session/SessionDetailDrawer';
@@ -76,9 +75,18 @@ export function TimelinePage() {
   // State for multi-type event selection (works in both grid and list views)
   const [selectedEventKeys, setSelectedEventKeys] = useState<Set<EventKey>>(new Set());
 
+  // Playhead timestamp from Timeline (for EventList ordering)
+  const [playheadTimestamp, setPlayheadTimestamp] = useState<Date | null>(null);
 
-  // List panel state
-  const [showListPanel, setShowListPanel] = useState(true);
+  // EventList collapsed state (lifted here to control SplitPanel size)
+  const [listCollapsed, setListCollapsed] = useState(() => {
+    try {
+      const stored = localStorage.getItem('eventlist-collapsed');
+      return stored === 'true';
+    } catch {
+      return false;
+    }
+  });
 
   const [filters, setFilters] = useState<TimelineFilters>(() => {
     try {
@@ -403,6 +411,12 @@ export function TimelinePage() {
     toast.info('Accept drafts functionality coming soon');
   }, []);
 
+  // Wrapper for playhead change - captures timestamp for EventList ordering
+  const handlePlayheadChange = useCallback((timestamp: Date, visibleRange?: { start: Date; end: Date }, zoomLevel?: number) => {
+    setPlayheadTimestamp(timestamp);
+    updateCenterFromPlayhead(timestamp, visibleRange, zoomLevel);
+  }, [updateCenterFromPlayhead]);
+
   // Clear selection when date changes
   useEffect(() => {
     clearAllSelections();
@@ -481,7 +495,11 @@ export function TimelinePage() {
   // Render timeline content
   const renderContent = () => {
     if (isLoading) {
-      return <TimelinePageSkeleton />;
+      return (
+        <div className="flex items-center justify-center h-64">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      );
     }
 
     if (!gridData) {
@@ -557,15 +575,6 @@ export function TimelinePage() {
                 variant="ghost"
                 size="icon"
                 className="h-8 w-8"
-                onClick={() => setShowListPanel(!showListPanel)}
-                title={showListPanel ? "Hide list" : "Show list"}
-              >
-                {showListPanel ? <PanelRightClose className="h-4 w-4" /> : <PanelRight className="h-4 w-4" />}
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8"
                 onClick={() => setShowCalendar(!showCalendar)}
               >
                 <Calendar className="h-4 w-4" />
@@ -589,65 +598,50 @@ export function TimelinePage() {
             </div>
           </div>
 
-          {showListPanel ? (
-            <SplitPanel
-              direction="vertical"
-              defaultSize={65}
-              minSize={30}
-              maxSize={85}
-              storageKey="timeline-vertical-split-size"
-              left={
-                <EventDropsTimeline
-                  data={gridData}
-                  filters={filters}
-                  screenshots={allScreenshots}
-                  entries={entriesData}
-                  hideEmbeddedList={true}
-                  selectedEventKeys={selectedEventKeys}
-                  onSelectionChange={handleSelectionChange}
-                  onEventDelete={handleEventDropDelete}
-                  onEventEdit={handleEventDropEdit}
-                  onViewScreenshot={handleEventDropViewScreenshot}
-                  loadedDays={loadedDays}
-                  multiDayTimeRange={timeRange}
-                  onPlayheadChange={updateCenterFromPlayhead}
-                  loadingDays={loadingDays}
-                  targetPlayheadDate={targetPlayheadDate}
-                  onTargetReached={clearTargetPlayhead}
-                />
-              }
-              right={
-                <EventList
-                  gridData={gridData}
-                  selectedIds={selectedEventKeys}
-                  onSelectionChange={handleSelectionChange}
-                  onEventEdit={handleEventDropEdit}
-                  onEventDelete={handleDeleteEvents}
-                  onAssignProject={handleAssignToProject}
-                  onMerge={handleMerge}
-                  onAcceptDrafts={handleAcceptDrafts}
-                />
-              }
-            />
-          ) : (
-            <EventDropsTimeline
-              data={gridData}
-              filters={filters}
-              screenshots={allScreenshots}
-              entries={entriesData}
-              selectedEventKeys={selectedEventKeys}
-              onSelectionChange={handleSelectionChange}
-              onEventDelete={handleEventDropDelete}
-              onEventEdit={handleEventDropEdit}
-              onViewScreenshot={handleEventDropViewScreenshot}
-              loadedDays={loadedDays}
-              multiDayTimeRange={timeRange}
-              onPlayheadChange={updateCenterFromPlayhead}
-              loadingDays={loadingDays}
-              targetPlayheadDate={targetPlayheadDate}
-              onTargetReached={clearTargetPlayhead}
-            />
-          )}
+          <SplitPanel
+            direction="vertical"
+            defaultSize={65}
+            minSize={30}
+            maxSize={85}
+            storageKey="timeline-vertical-split-size"
+            rightCollapsed={listCollapsed}
+            collapsedSize={5}
+            left={
+              <Timeline
+                data={gridData}
+                filters={filters}
+                screenshots={allScreenshots}
+                entries={entriesData}
+                hideEmbeddedList={true}
+                selectedEventKeys={selectedEventKeys}
+                onSelectionChange={handleSelectionChange}
+                onEventDelete={handleEventDropDelete}
+                onEventEdit={handleEventDropEdit}
+                onViewScreenshot={handleEventDropViewScreenshot}
+                loadedDays={loadedDays}
+                multiDayTimeRange={timeRange}
+                onPlayheadChange={handlePlayheadChange}
+                loadingDays={loadingDays}
+                targetPlayheadDate={targetPlayheadDate}
+                onTargetReached={clearTargetPlayhead}
+              />
+            }
+            right={
+              <EventList
+                gridData={gridData}
+                playheadTimestamp={playheadTimestamp}
+                selectedIds={selectedEventKeys}
+                onSelectionChange={handleSelectionChange}
+                onEventEdit={handleEventDropEdit}
+                onEventDelete={handleDeleteEvents}
+                onAssignProject={handleAssignToProject}
+                onMerge={handleMerge}
+                onAcceptDrafts={handleAcceptDrafts}
+                collapsed={listCollapsed}
+                onCollapsedChange={setListCollapsed}
+              />
+            }
+          />
         </div>
       </>
     );
@@ -690,15 +684,6 @@ export function TimelinePage() {
         <div className="flex items-center gap-2">
           <FilterControls filters={filters} onFiltersChange={setFilters} />
           <GlobalSearch onNavigateToDate={handleSearchNavigateToDate} />
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8"
-            onClick={() => setShowListPanel(!showListPanel)}
-            title={showListPanel ? "Hide list" : "Show list"}
-          >
-            {showListPanel ? <PanelRightClose className="h-4 w-4" /> : <PanelRight className="h-4 w-4" />}
-          </Button>
           <Button
             variant="ghost"
             size="icon"

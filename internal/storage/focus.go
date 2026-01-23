@@ -32,7 +32,8 @@ func (s *Store) SaveFocusEvent(event *WindowFocusEvent) (int64, error) {
 func (s *Store) GetFocusEventsBySession(sessionID int64) ([]*WindowFocusEvent, error) {
 	rows, err := s.db.Query(`
 		SELECT id, window_title, app_name, window_class,
-		       start_time, end_time, duration_seconds, session_id, created_at
+		       start_time, end_time, duration_seconds, session_id, created_at,
+		       project_id, project_confidence, project_source
 		FROM window_focus_events
 		WHERE session_id = ?
 		ORDER BY start_time ASC`, sessionID)
@@ -50,7 +51,8 @@ func (s *Store) GetFocusEventsBySession(sessionID int64) ([]*WindowFocusEvent, e
 func (s *Store) GetFocusEventsByTimeRange(start, end int64) ([]*WindowFocusEvent, error) {
 	rows, err := s.db.Query(`
 		SELECT id, window_title, app_name, window_class,
-		       start_time, end_time, duration_seconds, session_id, created_at
+		       start_time, end_time, duration_seconds, session_id, created_at,
+		       project_id, project_confidence, project_source
 		FROM window_focus_events
 		WHERE start_time <= ? AND end_time > ?
 		ORDER BY start_time ASC`, end, start)
@@ -325,6 +327,7 @@ func scanFocusEvents(rows *sql.Rows) ([]*WindowFocusEvent, error) {
 		err := rows.Scan(
 			&event.ID, &event.WindowTitle, &event.AppName, &event.WindowClass,
 			&event.StartTime, &event.EndTime, &event.DurationSeconds, &event.SessionID, &event.CreatedAt,
+			&event.ProjectID, &event.ProjectConfidence, &event.ProjectSource,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan focus event: %w", err)

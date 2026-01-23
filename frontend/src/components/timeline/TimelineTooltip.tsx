@@ -1,15 +1,14 @@
-import { useMemo } from 'react';
-import { GitCommit, Terminal, Globe, FileText, Coffee, Monitor, Camera, Trash2, Pencil, FolderKanban } from 'lucide-react';
-import type { EventDot, EventDropType } from './eventDropsTypes';
+import { useMemo, forwardRef } from 'react';
+import { GitCommit, Terminal, Globe, FileText, Coffee, Monitor, Camera, Trash2, Pencil, FolderKanban, Sparkles, X } from 'lucide-react';
+import type { EventDot, EventDropType } from './timelineTypes';
 
-interface EventDropsTooltipProps {
+interface TimelineTooltipProps {
   event: EventDot | null;
   position: { x: number; y: number } | null;
   onDelete?: (event: EventDot) => void;
   onEdit?: (event: EventDot) => void;
   onViewScreenshot?: (event: EventDot) => void;
-  onMouseEnter?: () => void;
-  onMouseLeave?: () => void;
+  onClose?: () => void;
 }
 
 const EVENT_TYPE_ICONS: Record<EventDropType, typeof GitCommit> = {
@@ -21,6 +20,7 @@ const EVENT_TYPE_ICONS: Record<EventDropType, typeof GitCommit> = {
   afk: Coffee,
   screenshot: Camera,
   projects: FolderKanban,
+  session: Sparkles,
 };
 
 const EVENT_TYPE_LABELS: Record<EventDropType, string> = {
@@ -32,6 +32,7 @@ const EVENT_TYPE_LABELS: Record<EventDropType, string> = {
   afk: 'Break',
   screenshot: 'Screenshot',
   projects: 'Project',
+  session: 'Session Summary',
 };
 
 function formatTime(date: Date): string {
@@ -55,15 +56,13 @@ function formatDuration(seconds?: number): string | null {
   return minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`;
 }
 
-export function EventDropsTooltip({
+export const TimelineTooltip = forwardRef<HTMLDivElement, TimelineTooltipProps>(function TimelineTooltip({
   event,
   position,
   onDelete,
   onEdit,
-  onViewScreenshot,
-  onMouseEnter,
-  onMouseLeave,
-}: EventDropsTooltipProps) {
+  onClose,
+}, ref) {
   const content = useMemo(() => {
     if (!event) return null;
 
@@ -148,6 +147,26 @@ export function EventDropsTooltip({
         }
         break;
       }
+      case 'session': {
+        const meta = event.metadata as Record<string, unknown>;
+        if (meta.category) {
+          extraDetails.push({
+            label: 'Category',
+            value: String(meta.category).charAt(0).toUpperCase() + String(meta.category).slice(1),
+          });
+        }
+        if (meta.topApps && Array.isArray(meta.topApps) && meta.topApps.length > 0) {
+          const appNames = meta.topApps.slice(0, 3).map((a: { appName: string }) => a.appName).join(', ');
+          extraDetails.push({ label: 'Top Apps', value: appNames });
+        }
+        if (meta.tags && Array.isArray(meta.tags) && meta.tags.length > 0) {
+          extraDetails.push({ label: 'Tags', value: meta.tags.slice(0, 3).join(', ') });
+        }
+        if (meta.isDraft) {
+          extraDetails.push({ label: 'Status', value: String(meta.draftStatus) || 'Draft' });
+        }
+        break;
+      }
     }
 
     return {
@@ -204,10 +223,9 @@ export function EventDropsTooltip({
 
   return (
     <div
+      ref={ref}
       className="fixed z-50"
       style={tooltipStyle}
-      onMouseEnter={onMouseEnter}
-      onMouseLeave={onMouseLeave}
     >
       <div className="bg-popover border border-border rounded-lg shadow-lg p-3 min-w-[200px] max-w-[300px]">
         {/* Header with icon and type */}
@@ -219,7 +237,19 @@ export function EventDropsTooltip({
             <Icon className="h-3.5 w-3.5 text-white" />
           </div>
           <span className="text-xs font-medium text-muted-foreground">{typeLabel}</span>
-          <span className="text-xs text-muted-foreground ml-auto">{time}</span>
+          <span className="text-xs text-muted-foreground ml-auto mr-1">{time}</span>
+          {onClose && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onClose();
+              }}
+              className="p-0.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+              title="Close"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          )}
         </div>
 
         {/* Main label */}
@@ -277,4 +307,4 @@ export function EventDropsTooltip({
       </div>
     </div>
   );
-}
+});

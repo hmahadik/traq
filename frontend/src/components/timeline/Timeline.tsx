@@ -1,19 +1,27 @@
 import { useRef, useEffect, useState, useCallback, useMemo } from 'react';
 import * as d3 from 'd3';
-import { ChevronDown, ChevronRight, Eye, Camera } from 'lucide-react';
+import { ChevronDown, Eye, Camera } from 'lucide-react';
 import type { TimelineGridData } from '@/types/timeline';
 import type { Screenshot as ScreenshotType } from '@/types/screenshot';
 import type { TimelineFilters } from '../FilterControls';
-import { useEventDropsData } from './useEventDropsData';
-import { useMultiDayEventDropsData } from './useMultiDayEventDropsData';
-import { EventDropsTooltip } from './EventDropsTooltip';
-import type { EventDot } from './eventDropsTypes';
+import { useTimelineData } from './useTimelineData';
+import { useMultiDayTimelineData } from './useMultiDayTimelineData';
+import { TimelineTooltip } from './TimelineTooltip';
+import type { EventDot } from './timelineTypes';
 import type { DayData } from '@/hooks/useMultiDayTimeline';
 import type { EventKey } from '@/utils/eventKeys';
 import { Screenshot } from '@/components/common/Screenshot';
 import { ImageGallery } from '@/components/common/ImageGallery';
-import { EventList } from '../EventList';
 import { api } from '@/api/client';
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuCheckboxItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+} from '@/components/ui/dropdown-menu';
+import { Button } from '@/components/ui/button';
 
 // Entry block data from ProjectsColumn
 interface EntryBlockData {
@@ -31,7 +39,7 @@ interface EntryBlockData {
   source: string;
 }
 
-interface EventDropsTimelineProps {
+interface TimelineProps {
   // New multi-day props
   loadedDays?: Map<string, DayData>;
   multiDayTimeRange?: { start: Date; end: Date };
@@ -67,7 +75,7 @@ const BAR_MIN_DURATION = 10; // Minimum duration (seconds) to render as bar
 const BAR_MIN_PIXELS = 6; // Minimum pixel width to render as bar
 
 
-export function EventDropsTimeline({
+export function Timeline({
   // Multi-day props
   loadedDays,
   multiDayTimeRange,
@@ -89,15 +97,13 @@ export function EventDropsTimeline({
   onEventDelete,
   onEventEdit,
   onViewScreenshot,
-}: EventDropsTimelineProps) {
+}: TimelineProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
-  const resizeHandleRef = useRef<HTMLDivElement>(null);
+  const tooltipRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ width: 800, height: 400 });
-  const [hoveredEvent, setHoveredEvent] = useState<EventDot | null>(null);
+  const [clickedEvent, setClickedEvent] = useState<EventDot | null>(null);
   const [tooltipPosition, setTooltipPosition] = useState<{ x: number; y: number } | null>(null);
-  const isTooltipHoveredRef = useRef(false);
-  const hideTooltipTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [currentZoom, setCurrentZoom] = useState<d3.ZoomTransform>(d3.zoomIdentity);
   const [visibleTimeRange, setVisibleTimeRange] = useState<{ start: Date; end: Date } | null>(null);
   const [playheadTimestamp, setPlayheadTimestamp] = useState<Date | null>(null);
@@ -140,21 +146,9 @@ export function EventDropsTimeline({
   // Gallery state for fullscreen screenshot viewer
   const [galleryOpen, setGalleryOpen] = useState(false);
   const [galleryIndex, setGalleryIndex] = useState(0);
-  const [listHeight, setListHeight] = useState(() => {
-    try {
-      const stored = localStorage.getItem('eventdrops-list-height');
-      if (stored) {
-        const parsed = parseInt(stored, 10);
-        if (!isNaN(parsed) && parsed >= 100 && parsed <= 500) return parsed;
-      }
-    } catch (e) {
-      // Ignore localStorage errors
-    }
-    return 200;
-  });
   const [filmstripHeight, setFilmstripHeight] = useState(() => {
     try {
-      const stored = localStorage.getItem('eventdrops-filmstrip-height');
+      const stored = localStorage.getItem('timeline-filmstrip-height');
       if (stored) {
         const parsed = parseInt(stored, 10);
         if (!isNaN(parsed) && parsed >= 48 && parsed <= 200) return parsed;
@@ -165,46 +159,42 @@ export function EventDropsTimeline({
     return 64; // Default height for filmstrip
   });
   const [isResizing, setIsResizing] = useState(false);
-  const [resizingTarget, setResizingTarget] = useState<'list' | 'filmstrip' | null>(null);
+  const [resizingTarget, setResizingTarget] = useState<'filmstrip' | null>(null);
   const resizeStartRef = useRef<{ startY: number; startHeight: number } | null>(null);
   const [collapseActivityRows, setCollapseActivityRows] = useState(() => {
     try {
-      const stored = localStorage.getItem('eventdrops-collapse-activity');
+      const stored = localStorage.getItem('timeline-collapse-activity');
       return stored === 'true';
     } catch {
       return true; // Default to collapsed
     }
   });
+
+  // Hidden lanes - which special lanes to hide
+  const [hiddenLanes, setHiddenLanes] = useState<Set<string>>(() => {
+    try {
+      const stored = localStorage.getItem('timeline-hidden-lanes');
+      if (stored) {
+        return new Set(JSON.parse(stored));
+      }
+    } catch {
+      // Ignore
+    }
+    return new Set(); // All visible by default
+  });
   const [filmstripCollapsed, setFilmstripCollapsed] = useState(() => {
     try {
-      const stored = localStorage.getItem('eventdrops-filmstrip-collapsed');
+      const stored = localStorage.getItem('timeline-filmstrip-collapsed');
       return stored === 'true';
     } catch {
       return false;
     }
   });
-  const [listCollapsed, setListCollapsed] = useState(() => {
-    try {
-      const stored = localStorage.getItem('eventdrops-list-collapsed');
-      return stored === 'true';
-    } catch {
-      return false;
-    }
-  });
-
-  // Persist list height to localStorage
-  useEffect(() => {
-    try {
-      localStorage.setItem('eventdrops-list-height', listHeight.toString());
-    } catch (e) {
-      // Ignore localStorage errors
-    }
-  }, [listHeight]);
 
   // Persist filmstrip height to localStorage
   useEffect(() => {
     try {
-      localStorage.setItem('eventdrops-filmstrip-height', filmstripHeight.toString());
+      localStorage.setItem('timeline-filmstrip-height', filmstripHeight.toString());
     } catch (e) {
       // Ignore localStorage errors
     }
@@ -213,29 +203,42 @@ export function EventDropsTimeline({
   // Persist filmstrip collapsed state
   useEffect(() => {
     try {
-      localStorage.setItem('eventdrops-filmstrip-collapsed', filmstripCollapsed.toString());
+      localStorage.setItem('timeline-filmstrip-collapsed', filmstripCollapsed.toString());
     } catch (e) {
       // Ignore localStorage errors
     }
   }, [filmstripCollapsed]);
 
-  // Persist list collapsed state
-  useEffect(() => {
-    try {
-      localStorage.setItem('eventdrops-list-collapsed', listCollapsed.toString());
-    } catch (e) {
-      // Ignore localStorage errors
-    }
-  }, [listCollapsed]);
-
   // Persist collapse state to localStorage
   useEffect(() => {
     try {
-      localStorage.setItem('eventdrops-collapse-activity', collapseActivityRows.toString());
+      localStorage.setItem('timeline-collapse-activity', collapseActivityRows.toString());
     } catch {
       // Ignore localStorage errors
     }
   }, [collapseActivityRows]);
+
+  // Persist hidden lanes to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem('timeline-hidden-lanes', JSON.stringify(Array.from(hiddenLanes)));
+    } catch {
+      // Ignore localStorage errors
+    }
+  }, [hiddenLanes]);
+
+  // Toggle lane visibility
+  const toggleLaneVisibility = useCallback((laneName: string) => {
+    setHiddenLanes(prev => {
+      const next = new Set(prev);
+      if (next.has(laneName)) {
+        next.delete(laneName);
+      } else {
+        next.add(laneName);
+      }
+      return next;
+    });
+  }, []);
 
   // Cleanup timeouts and refs on unmount
   useEffect(() => {
@@ -251,6 +254,35 @@ export function EventDropsTimeline({
       zoomRef.current = null;
     };
   }, []);
+
+  // Click outside to dismiss tooltip
+  useEffect(() => {
+    if (!clickedEvent) return;
+
+    const handleClickOutside = (e: MouseEvent) => {
+      // Don't dismiss if clicking inside the tooltip
+      if (tooltipRef.current?.contains(e.target as Node)) {
+        return;
+      }
+      // Don't dismiss if clicking on an event dot or bar (those have their own handlers)
+      const target = e.target as Element;
+      if (target.classList.contains('event-dot') || target.classList.contains('event-bar')) {
+        return;
+      }
+      setClickedEvent(null);
+      setTooltipPosition(null);
+    };
+
+    // Delay adding listener to avoid immediate dismissal from the click that opened the tooltip
+    const timeoutId = setTimeout(() => {
+      document.addEventListener('click', handleClickOutside);
+    }, 0);
+
+    return () => {
+      clearTimeout(timeoutId);
+      document.removeEventListener('click', handleClickOutside);
+    };
+  }, [clickedEvent]);
 
   // === KEEP CALLBACK REFS IN SYNC: Update refs when props change (no re-render) ===
   useEffect(() => {
@@ -279,20 +311,21 @@ export function EventDropsTimeline({
     targetPlayheadDateRef.current = targetPlayheadDate;
   }, [targetPlayheadDate]);
 
-  // Transform data to EventDrops format
+  // Transform data to Timeline format
   // Always call both hooks to satisfy React rules of hooks, then choose which data to use
-  const singleDayData = useEventDropsData({ data, filters, screenshots, entries, collapseActivityRows });
-  const multiDayData = useMultiDayEventDropsData({
+  const singleDayData = useTimelineData({ data, filters, screenshots, entries, collapseActivityRows, hiddenLanes });
+  const multiDayData = useMultiDayTimelineData({
     loadedDays: loadedDays ?? new Map(),
     timeRange: multiDayTimeRange ?? { start: new Date(), end: new Date() },
     filters,
     collapseActivityRows,
+    hiddenLanes,
   });
 
   // Use multi-day data if provided, fall back to single-day
-  const eventDropsData = loadedDays && multiDayTimeRange ? multiDayData : singleDayData;
+  const timelineData = loadedDays && multiDayTimeRange ? multiDayData : singleDayData;
 
-  // Handle resize drag for both filmstrip and list panels
+  // Handle resize drag for filmstrip panel
   useEffect(() => {
     let rafId: number | null = null;
     let pendingHeight: number | null = null;
@@ -300,43 +333,24 @@ export function EventDropsTimeline({
     const handleMouseMove = (e: MouseEvent) => {
       if (!isResizing || !resizeStartRef.current || !resizingTarget) return;
 
-      if (resizingTarget === 'filmstrip') {
-        // Filmstrip: dragging DOWN = positive delta = bigger height
-        const deltaY = e.clientY - resizeStartRef.current.startY;
-        const newHeight = Math.max(48, Math.min(200, resizeStartRef.current.startHeight + deltaY));
-        pendingHeight = newHeight;
-        if (rafId === null) {
-          rafId = requestAnimationFrame(() => {
-            if (pendingHeight !== null) {
-              setFilmstripHeight(pendingHeight);
-            }
-            rafId = null;
-          });
-        }
-      } else {
-        // List: dragging UP = positive delta = bigger height
-        const deltaY = resizeStartRef.current.startY - e.clientY;
-        const newHeight = Math.max(100, Math.min(500, resizeStartRef.current.startHeight + deltaY));
-        pendingHeight = newHeight;
-        if (rafId === null) {
-          rafId = requestAnimationFrame(() => {
-            if (pendingHeight !== null) {
-              setListHeight(pendingHeight);
-            }
-            rafId = null;
-          });
-        }
+      // Filmstrip: dragging DOWN = positive delta = bigger height
+      const deltaY = e.clientY - resizeStartRef.current.startY;
+      const newHeight = Math.max(48, Math.min(200, resizeStartRef.current.startHeight + deltaY));
+      pendingHeight = newHeight;
+      if (rafId === null) {
+        rafId = requestAnimationFrame(() => {
+          if (pendingHeight !== null) {
+            setFilmstripHeight(pendingHeight);
+          }
+          rafId = null;
+        });
       }
     };
 
     const handleMouseUp = () => {
       // Apply final height immediately
       if (pendingHeight !== null) {
-        if (resizingTarget === 'filmstrip') {
-          setFilmstripHeight(pendingHeight);
-        } else {
-          setListHeight(pendingHeight);
-        }
+        setFilmstripHeight(pendingHeight);
       }
       if (rafId !== null) {
         cancelAnimationFrame(rafId);
@@ -393,7 +407,7 @@ export function EventDropsTimeline({
       if (entry) {
         const { width } = entry.contentRect;
         // Calculate height based on fixed row height
-        const numRows = eventDropsData?.rows.length || 1;
+        const numRows = timelineData?.rows.length || 1;
         const calculatedHeight = MARGIN.top + MARGIN.bottom + numRows * rowHeight;
         setDimensions({ width, height: calculatedHeight });
       }
@@ -401,15 +415,15 @@ export function EventDropsTimeline({
 
     resizeObserver.observe(container);
     return () => resizeObserver.disconnect();
-  }, [eventDropsData?.rows.length, rowHeight]);
+  }, [timelineData?.rows.length, rowHeight]);
 
   // D3 rendering with zoom - uses enter/update/exit pattern to preserve zoom state
   useEffect(() => {
     const svg = d3.select(svgRef.current);
-    if (!svg.node() || !eventDropsData) return;
+    if (!svg.node() || !timelineData) return;
 
     const { width, height } = dimensions;
-    const { rows, timeRange } = eventDropsData;
+    const { rows, timeRange } = timelineData;
 
     // Get actual colors
     const foregroundColor = getComputedColor('--foreground', '#e5e5e5');
@@ -1075,53 +1089,40 @@ export function EventDropsTimeline({
       return color;
     };
 
-    // Create dots for brief/instant events
+    // Create thin bars for brief/instant events (instead of circles)
+    const BAR_WIDTH = 3;
     dotsGroup.selectAll('.event-dot')
       .data(dotEvents, (d) => (d as EventDot).id)
-      .join('circle')
+      .join('rect')
       .attr('class', 'event-dot')
-      .attr('cx', (d) => xScale(d.timestamp))
-      .attr('cy', (d) => (yScale(d.row) || 0) + yScale.bandwidth() / 2)
-      .attr('r', DOT_RADIUS)
+      .attr('x', (d) => xScale(d.timestamp) - BAR_WIDTH / 2)
+      .attr('y', (d) => (yScale(d.row) || 0) + yScale.bandwidth() / 2 - DOT_RADIUS)
+      .attr('width', BAR_WIDTH)
+      .attr('height', DOT_RADIUS * 2)
       .attr('fill', (d) => d.color)
       .attr('stroke', (d) => isSelected(d) ? '#fff' : getDarkerColor(d.color))
-      .attr('stroke-width', (d) => isSelected(d) ? 2.5 : 1.5)
+      .attr('stroke-width', (d) => isSelected(d) ? 2.5 : 1)
       .style('cursor', 'pointer')
-      .on('mouseenter', function (event, d) {
-        // Clear any pending hide timeout
-        if (hideTooltipTimeoutRef.current) {
-          clearTimeout(hideTooltipTimeoutRef.current);
-          hideTooltipTimeoutRef.current = null;
-        }
-
+      .on('mouseenter', function () {
         d3.select(this)
           .transition()
           .duration(100)
-          .attr('r', DOT_HOVER_RADIUS);
-
-        setHoveredEvent(d);
-        setTooltipPosition({ x: event.clientX, y: event.clientY });
-      })
-      .on('mousemove', function (event) {
-        setTooltipPosition({ x: event.clientX, y: event.clientY });
+          .attr('width', BAR_WIDTH + 2)
+          .attr('x', (d: EventDot) => xScale(d.timestamp) - (BAR_WIDTH + 2) / 2);
       })
       .on('mouseleave', function () {
         d3.select(this)
           .transition()
           .duration(100)
-          .attr('r', DOT_RADIUS);
-
-        // Delay hiding to allow mouse to move to tooltip
-        hideTooltipTimeoutRef.current = setTimeout(() => {
-          if (!isTooltipHoveredRef.current) {
-            setHoveredEvent(null);
-            setTooltipPosition(null);
-          }
-        }, 150);
+          .attr('width', BAR_WIDTH)
+          .attr('x', (d: EventDot) => xScale(d.timestamp) - BAR_WIDTH / 2);
       })
       .on('click', function (event, d) {
         event.stopPropagation();
-        // Toggle selection (use refs to avoid stale closures)
+        // Show tooltip on click
+        setClickedEvent(d);
+        setTooltipPosition({ x: event.clientX, y: event.clientY });
+        // Handle selection (use refs to avoid stale closures)
         if (onSelectionChangeRef.current) {
           const newSelection = new Set(selectedEventKeysRef.current || []);
           if (newSelection.has(d.id)) {
@@ -1138,7 +1139,7 @@ export function EventDropsTimeline({
         onEventClickRef.current?.(d);
       });
 
-    // Create bars (pills) for duration events - same height as dots for consistency
+    // Create rectangles for duration events - sharp corners (no rx/ry)
     dotsGroup.selectAll('.event-bar')
       .data(barEvents, (d) => (d as EventDot).id)
       .join('rect')
@@ -1147,52 +1148,36 @@ export function EventDropsTimeline({
       .attr('y', (d) => (yScale(d.row) || 0) + yScale.bandwidth() / 2 - DOT_RADIUS)
       .attr('width', (d) => {
         const startTime = d.timestamp.getTime();
-        const endTime = startTime + ((d.duration || 0) * 1000);
+        const rawEndTime = startTime + ((d.duration || 0) * 1000);
+        // Cap end time at "now" to prevent bars extending into the future
+        const endTime = Math.min(rawEndTime, Date.now());
         return Math.max(BAR_MIN_PIXELS, xScale(new Date(endTime)) - xScale(d.timestamp));
       })
       .attr('height', DOT_RADIUS * 2)
-      .attr('rx', DOT_RADIUS)
-      .attr('ry', DOT_RADIUS)
+      // No rx/ry - sharp corners for rectangles
       .attr('fill', (d) => d.color)
       .attr('fill-opacity', 0.7)
       .attr('stroke', (d) => isSelected(d) ? '#fff' : getDarkerColor(d.color))
       .attr('stroke-width', (d) => isSelected(d) ? 2.5 : 1.5)
       .style('cursor', 'pointer')
-      .on('mouseenter', function (event, d) {
-        // Clear any pending hide timeout
-        if (hideTooltipTimeoutRef.current) {
-          clearTimeout(hideTooltipTimeoutRef.current);
-          hideTooltipTimeoutRef.current = null;
-        }
-
+      .on('mouseenter', function () {
         d3.select(this)
           .transition()
           .duration(100)
           .attr('fill-opacity', 0.9);
-
-        setHoveredEvent(d);
-        setTooltipPosition({ x: event.clientX, y: event.clientY });
-      })
-      .on('mousemove', function (event) {
-        setTooltipPosition({ x: event.clientX, y: event.clientY });
       })
       .on('mouseleave', function () {
         d3.select(this)
           .transition()
           .duration(100)
           .attr('fill-opacity', 0.7);
-
-        // Delay hiding to allow mouse to move to tooltip
-        hideTooltipTimeoutRef.current = setTimeout(() => {
-          if (!isTooltipHoveredRef.current) {
-            setHoveredEvent(null);
-            setTooltipPosition(null);
-          }
-        }, 150);
       })
       .on('click', function (event, d) {
         event.stopPropagation();
-        // Toggle selection (use refs to avoid stale closures)
+        // Show tooltip on click
+        setClickedEvent(d);
+        setTooltipPosition({ x: event.clientX, y: event.clientY });
+        // Handle selection (use refs to avoid stale closures)
         if (onSelectionChangeRef.current) {
           const newSelection = new Set(selectedEventKeysRef.current || []);
           if (newSelection.has(d.id)) {
@@ -1577,18 +1562,18 @@ export function EventDropsTimeline({
   // to prevent this effect from re-running when parent re-renders with new callback refs.
   // selectedEventKeys is also stored in a ref for the same reason.
   // targetPlayheadDate is included to trigger navigation when user clicks Today/Yesterday/etc.
-  }, [eventDropsData, dimensions, getComputedColor, loadingDays, targetPlayheadDate]);
+  }, [timelineData, dimensions, getComputedColor, loadingDays, targetPlayheadDate]);
 
   // Reset zoom handler - pans to center of time range at default zoom level
   const handleResetZoom = useCallback(() => {
     const svg = d3.select(svgRef.current);
     const zoom = zoomRef.current;
 
-    if (!svg.node() || !zoom || !eventDropsData) return;
+    if (!svg.node() || !zoom || !timelineData) return;
 
     // Calculate center of time range
     const centerTime = new Date(
-      (eventDropsData.timeRange.start.getTime() + eventDropsData.timeRange.end.getTime()) / 2
+      (timelineData.timeRange.start.getTime() + timelineData.timeRange.end.getTime()) / 2
     );
 
     const currentScale = xScaleRef.current;
@@ -1599,7 +1584,7 @@ export function EventDropsTimeline({
 
     // Calculate zoom level for ~3h visible dynamically based on domain size
     const desiredVisibleMs = 3 * 60 * 60 * 1000; // 3 hours
-    const totalDomainMs = eventDropsData.timeRange.end.getTime() - eventDropsData.timeRange.start.getTime();
+    const totalDomainMs = timelineData.timeRange.end.getTime() - timelineData.timeRange.start.getTime();
     const targetK = Math.max(1, totalDomainMs / desiredVisibleMs);
     const centerX = currentScale(centerTime);
     const newTx = chartCenterX - centerX * targetK;
@@ -1612,45 +1597,15 @@ export function EventDropsTimeline({
       .call(zoom.transform as any, newTransform);
 
     // Update state (reset zoom to ~3h visible)
-    const resetVisibleRange = eventDropsData.timeRange;
+    const resetVisibleRange = timelineData.timeRange;
     setVisibleTimeRange(resetVisibleRange);
     visibleTimeRangeRef.current = resetVisibleRange;
     setPlayheadTimestamp(centerTime);
     playheadTimestampRef.current = centerTime;
     onPlayheadChangeRef.current?.(centerTime, resetVisibleRange, targetK);
-  }, [eventDropsData, dimensions]);
+  }, [timelineData, dimensions]);
 
-  // Filter events by visible time range for the list view, sorted from playhead forward
-  const visibleEvents = useMemo(() => {
-    if (!eventDropsData) return [];
-
-    // Use visible time range or fall back to full day
-    const range = visibleTimeRange || eventDropsData.timeRange;
-
-    // Flatten all events and filter by time range
-    const allEvents = eventDropsData.rows.flatMap(row => row.data);
-    const filtered = allEvents.filter(event => {
-      const time = event.timestamp.getTime();
-      return time >= range.start.getTime() && time <= range.end.getTime();
-    });
-
-    // Sort events so that the one at/after playhead comes first, then chronological from there
-    const playheadTime = playheadTimestamp?.getTime() || range.start.getTime();
-
-    // Split into events before and after playhead
-    const beforePlayhead = filtered
-      .filter(e => e.timestamp.getTime() < playheadTime)
-      .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime()); // Reverse chronological
-
-    const afterPlayhead = filtered
-      .filter(e => e.timestamp.getTime() >= playheadTime)
-      .sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime()); // Chronological
-
-    // Show events from playhead forward first, then earlier events
-    return [...afterPlayhead, ...beforePlayhead];
-  }, [eventDropsData, visibleTimeRange, playheadTimestamp]);
-
-  // Format time for list display
+  // Format time for filmstrip display
   const formatEventTime = (date: Date) => {
     return date.toLocaleTimeString('en-US', {
       hour: 'numeric',
@@ -1660,22 +1615,13 @@ export function EventDropsTimeline({
   };
 
   // Empty state
-  if (!eventDropsData || eventDropsData.rows.length === 0) {
+  if (!timelineData || timelineData.rows.length === 0) {
     return (
       <div className="flex items-center justify-center h-64 text-muted-foreground">
         <p>No events to display</p>
       </div>
     );
   }
-
-  // Calculate time range display
-  const timeRangeDisplay = useMemo(() => {
-    const range = visibleTimeRange || eventDropsData?.timeRange;
-    if (!range) return '';
-    const start = range.start.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
-    const end = range.end.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
-    return `${start} - ${end}`;
-  }, [visibleTimeRange, eventDropsData]);
 
   // Get screenshots in visible range for filmstrip, sorted by timestamp
   const filmstripScreenshots = useMemo(() => {
@@ -1739,7 +1685,7 @@ export function EventDropsTimeline({
 
   // Calculate visible duration for zoom indicator
   const visibleDurationLabel = useMemo(() => {
-    const range = visibleTimeRange || eventDropsData?.timeRange;
+    const range = visibleTimeRange || timelineData?.timeRange;
     if (!range) return null;
     const durationMs = range.end.getTime() - range.start.getTime();
     const durationHours = durationMs / (1000 * 60 * 60);
@@ -1753,7 +1699,7 @@ export function EventDropsTimeline({
     } else {
       return `${Math.round(durationHours * 60)}m`;
     }
-  }, [visibleTimeRange, eventDropsData]);
+  }, [visibleTimeRange, timelineData]);
 
   return (
     <div className="relative w-full h-full flex flex-col">
@@ -1912,25 +1858,120 @@ export function EventDropsTimeline({
       <div className="relative flex-1 min-h-[200px]">
         {/* Controls */}
         <div className="absolute top-2 right-2 z-10 flex gap-1">
-          {/* Toggle collapse activity lanes */}
-          <button
-            onClick={() => setCollapseActivityRows(!collapseActivityRows)}
-            className="px-2 py-1 text-xs bg-muted hover:bg-muted/80 rounded text-muted-foreground flex items-center gap-1"
-            title={collapseActivityRows ? 'Expand app lanes' : 'Collapse to In Focus'}
-          >
-            {collapseActivityRows ? (
-              <>
-                <ChevronRight className="h-3 w-3" />
-                <Eye className="h-3 w-3" />
-              </>
-            ) : (
-              <>
-                <ChevronDown className="h-3 w-3" />
-                <Eye className="h-3 w-3" />
-              </>
-            )}
-            {collapseActivityRows ? 'Expand Apps' : 'In Focus'}
-          </button>
+          {/* Lane visibility dropdown */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="sm" className="h-7 px-2 text-xs bg-muted hover:bg-muted/80">
+                <Eye className="h-3 w-3 mr-1" />
+                Lanes
+                <ChevronDown className="h-3 w-3 ml-1" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56 max-h-[70vh] overflow-y-auto">
+              <DropdownMenuLabel className="text-xs flex justify-between items-center">
+                <span>Visible Lanes</span>
+                <div className="flex gap-1">
+                  <button
+                    className="text-[10px] px-1 py-0.5 rounded bg-muted hover:bg-muted/80"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setHiddenLanes(new Set());
+                    }}
+                  >
+                    All
+                  </button>
+                  <button
+                    className="text-[10px] px-1 py-0.5 rounded bg-muted hover:bg-muted/80"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      const allLanes = timelineData?.availableLanes || [];
+                      setHiddenLanes(new Set(allLanes));
+                    }}
+                  >
+                    None
+                  </button>
+                </div>
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+
+              {/* Activity Display Mode */}
+              <DropdownMenuCheckboxItem
+                checked={collapseActivityRows}
+                onCheckedChange={(checked) => setCollapseActivityRows(checked)}
+              >
+                Collapse Apps to "In Focus"
+              </DropdownMenuCheckboxItem>
+              <DropdownMenuSeparator />
+
+              {/* Dynamically render all available lanes */}
+              {(() => {
+                const allLanes = timelineData?.availableLanes || [];
+                const specialLanes = ['In Focus', 'Activity', 'Screenshots', 'Projects', 'Sessions'];
+                const eventTypeLanes = ['Git', 'Shell', 'Browser', 'Files'];
+
+                // Separate lanes into categories
+                const special = allLanes.filter(l => specialLanes.includes(l));
+                const eventTypes = allLanes.filter(l => eventTypeLanes.includes(l));
+                const appLanes = allLanes.filter(l => !specialLanes.includes(l) && !eventTypeLanes.includes(l));
+
+                return (
+                  <>
+                    {/* Special lanes */}
+                    {special.length > 0 && (
+                      <>
+                        <DropdownMenuLabel className="text-[10px] text-muted-foreground py-1">Special</DropdownMenuLabel>
+                        {special.map(lane => (
+                          <DropdownMenuCheckboxItem
+                            key={lane}
+                            checked={!hiddenLanes.has(lane)}
+                            onCheckedChange={() => toggleLaneVisibility(lane)}
+                          >
+                            {lane}
+                          </DropdownMenuCheckboxItem>
+                        ))}
+                      </>
+                    )}
+
+                    {/* App lanes */}
+                    {appLanes.length > 0 && (
+                      <>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuLabel className="text-[10px] text-muted-foreground py-1">
+                          Apps ({appLanes.length})
+                        </DropdownMenuLabel>
+                        {appLanes.map(lane => (
+                          <DropdownMenuCheckboxItem
+                            key={lane}
+                            checked={!hiddenLanes.has(lane)}
+                            onCheckedChange={() => toggleLaneVisibility(lane)}
+                          >
+                            {lane}
+                          </DropdownMenuCheckboxItem>
+                        ))}
+                      </>
+                    )}
+
+                    {/* Event type lanes */}
+                    {eventTypes.length > 0 && (
+                      <>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuLabel className="text-[10px] text-muted-foreground py-1">Events</DropdownMenuLabel>
+                        {eventTypes.map(lane => (
+                          <DropdownMenuCheckboxItem
+                            key={lane}
+                            checked={!hiddenLanes.has(lane)}
+                            onCheckedChange={() => toggleLaneVisibility(lane)}
+                          >
+                            {lane}
+                          </DropdownMenuCheckboxItem>
+                        ))}
+                      </>
+                    )}
+                  </>
+                );
+              })()}
+            </DropdownMenuContent>
+          </DropdownMenu>
           <button
             onClick={handleResetZoom}
             className="px-2 py-1 text-xs bg-muted hover:bg-muted/80 rounded text-muted-foreground"
@@ -1955,91 +1996,15 @@ export function EventDropsTimeline({
         </div>
       </div>
 
-      {/* Bottom half: Event list - only show when not using side panel */}
-      {!hideEmbeddedList && (
-      <div className="flex-shrink-0 border-t border-border bg-background/50">
-        {/* List header - clickable to collapse */}
-        <div
-          className="px-4 py-2 flex items-center justify-between cursor-pointer hover:bg-muted/30"
-          onClick={() => setListCollapsed(!listCollapsed)}
-        >
-          <div className="flex items-center gap-2">
-            {listCollapsed ? (
-              <ChevronRight className="h-3 w-3 text-muted-foreground" />
-            ) : (
-              <ChevronDown className="h-3 w-3 text-muted-foreground" />
-            )}
-            <span className="text-sm font-medium text-foreground">Events</span>
-            <span className="text-xs text-muted-foreground">
-              ({visibleEvents.length} in view)
-            </span>
-            {playheadTimestamp && (
-              <span className="text-xs text-blue-400 flex items-center gap-1">
-                <span className="w-2 h-2 bg-blue-500 rounded-full" />
-                {formatEventTime(playheadTimestamp)}
-              </span>
-            )}
-          </div>
-          <span className="text-xs text-muted-foreground">{timeRangeDisplay}</span>
-        </div>
-
-        {/* List content - only show when not collapsed */}
-        {!listCollapsed && (
-          <>
-            {/* Resize handle */}
-            <div
-              ref={resizeHandleRef}
-              className="h-1.5 cursor-ns-resize flex items-center justify-center group hover:bg-muted/50 transition-colors"
-              onMouseDown={(e) => {
-                e.stopPropagation();
-                resizeStartRef.current = { startY: e.clientY, startHeight: listHeight };
-                setResizingTarget('list');
-                setIsResizing(true);
-              }}
-            >
-              <div className="w-8 h-0.5 bg-muted-foreground/20 group-hover:bg-muted-foreground/40 rounded-full transition-colors" />
-            </div>
-
-            {/* Event list - consolidated component */}
-            <div style={{ height: listHeight }}>
-              <EventList
-                events={visibleEvents}
-                playheadTimestamp={playheadTimestamp}
-                selectedIds={selectedEventKeys}
-                onSelectionChange={onSelectionChange}
-                onEventEdit={onEventEdit}
-                onEventDelete={onEventDelete ? (ids) => {
-                  // Convert Set<EventKey> to single event delete
-                  const firstId = ids.values().next().value;
-                  if (firstId) {
-                    const event = visibleEvents.find(e => e.id === firstId);
-                    if (event) onEventDelete(event);
-                  }
-                } : undefined}
-                maxItems={100}
-              />
-            </div>
-          </>
-        )}
-      </div>
-      )}
-
-      <EventDropsTooltip
-        event={hoveredEvent}
+      <TimelineTooltip
+        ref={tooltipRef}
+        event={clickedEvent}
         position={tooltipPosition}
         onDelete={onEventDelete}
         onEdit={onEventEdit}
         onViewScreenshot={onViewScreenshot}
-        onMouseEnter={() => {
-          if (hideTooltipTimeoutRef.current) {
-            clearTimeout(hideTooltipTimeoutRef.current);
-            hideTooltipTimeoutRef.current = null;
-          }
-          isTooltipHoveredRef.current = true;
-        }}
-        onMouseLeave={() => {
-          isTooltipHoveredRef.current = false;
-          setHoveredEvent(null);
+        onClose={() => {
+          setClickedEvent(null);
           setTooltipPosition(null);
         }}
       />

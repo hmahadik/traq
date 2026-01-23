@@ -55,6 +55,7 @@ export interface ActivityBlock {
   pixelHeight: number; // Height in pixels
   // Project assignment fields
   projectId?: number;
+  projectName?: string;
   projectColor?: string;
   projectSource?: string; // 'manual' | 'rule' | 'ai'
   projectConfidence?: number; // 0-1 confidence score for auto-assignments

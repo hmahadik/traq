@@ -72,6 +72,28 @@ export namespace inference {
 	        this.filename = source["filename"];
 	    }
 	}
+	export class OllamaSetupStatus {
+	    installed: boolean;
+	    running: boolean;
+	    version?: string;
+	    models: string[];
+	    recommendedModel: string;
+	    needsSetup: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new OllamaSetupStatus(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.installed = source["installed"];
+	        this.running = source["running"];
+	        this.version = source["version"];
+	        this.models = source["models"];
+	        this.recommendedModel = source["recommendedModel"];
+	        this.needsSetup = source["needsSetup"];
+	    }
+	}
 	export class ServerDownloadStatus {
 	    installed: boolean;
 	    serverPath: string;
@@ -221,6 +243,7 @@ export namespace service {
 	    pixelPosition: number;
 	    pixelHeight: number;
 	    projectId?: number;
+	    projectName?: string;
 	    projectColor?: string;
 	    projectSource?: string;
 	    projectConfidence?: number;
@@ -243,6 +266,7 @@ export namespace service {
 	        this.pixelPosition = source["pixelPosition"];
 	        this.pixelHeight = source["pixelHeight"];
 	        this.projectId = source["projectId"];
+	        this.projectName = source["projectName"];
 	        this.projectColor = source["projectColor"];
 	        this.projectSource = source["projectSource"];
 	        this.projectConfidence = source["projectConfidence"];

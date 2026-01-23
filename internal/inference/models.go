@@ -57,6 +57,14 @@ var AvailableModels = []ModelInfo{
 		DownloadURL: "https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/qwen2.5-1.5b-instruct-q4_k_m.gguf",
 		Filename:    "qwen2.5-1.5b-instruct-q4_k_m.gguf",
 	},
+	{
+		ID:          "qwen2.5-7b-q4",
+		Name:        "Qwen 2.5 7B (Q4) ⭐ Recommended",
+		Description: "Alibaba's Qwen 2.5 7B, quantized to Q4_K_M. Excellent instruction-following, great for summaries.",
+		Size:        4_700_000_000, // ~4.7GB
+		DownloadURL: "https://huggingface.co/Qwen/Qwen2.5-7B-Instruct-GGUF/resolve/main/qwen2.5-7b-instruct-q4_k_m.gguf",
+		Filename:    "qwen2.5-7b-instruct-q4_k_m.gguf",
+	},
 }
 
 // GetModelsDir returns the directory where models are stored

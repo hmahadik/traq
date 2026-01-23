@@ -1,27 +1,29 @@
 import { useMemo } from 'react';
 import type { TimelineGridData } from '@/types/timeline';
-import type { EventDropsData, EventDropsRow, EventDot } from './eventDropsTypes';
+import type { TimelineData, TimelineRow, EventDot } from './timelineTypes';
 import {
   EVENT_TYPE_COLORS,
   getAppHexColor,
-} from './eventDropsTypes';
+} from './timelineTypes';
 import type { TimelineFilters } from '../FilterControls';
 import { makeEventKey } from '@/utils/eventKeys';
 import type { DayData } from '@/hooks/useMultiDayTimeline';
 
-interface UseMultiDayEventDropsDataOptions {
+interface UseMultiDayTimelineDataOptions {
   loadedDays: Map<string, DayData>;
   timeRange: { start: Date; end: Date };
   filters: TimelineFilters;
   collapseActivityRows?: boolean; // Merge all activity events into single "In Focus" row
+  hiddenLanes?: Set<string>; // Lanes to hide from the timeline
 }
 
-export function useMultiDayEventDropsData({
+export function useMultiDayTimelineData({
   loadedDays,
   timeRange,
   filters,
   collapseActivityRows = false,
-}: UseMultiDayEventDropsDataOptions): EventDropsData | null {
+  hiddenLanes = new Set(),
+}: UseMultiDayTimelineDataOptions): TimelineData | null {
   return useMemo(() => {
     // Check if we have any data
     if (loadedDays.size === 0) return null;
@@ -35,6 +37,29 @@ export function useMultiDayEventDropsData({
       }
     }
     if (!hasAnyData) return null;
+
+    // Get current time for capping durations - events shouldn't extend past "now"
+    const now = new Date();
+    const nowTimestamp = Math.floor(now.getTime() / 1000); // Unix timestamp in seconds
+    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+
+    // Helper to cap duration at "now" for today's events
+    const capDuration = (dateStr: string, startTimeSec: number, durationSec: number | undefined): number | undefined => {
+      if (!durationSec) return durationSec;
+      // Only cap for today's events
+      if (dateStr !== todayStr) return durationSec;
+      const endTimeSec = startTimeSec + durationSec;
+      if (endTimeSec > nowTimestamp) {
+        // Cap at now
+        return Math.max(0, nowTimestamp - startTimeSec);
+      }
+      return durationSec;
+    };
+
+    // Helper to check if an event starts in the future (shouldn't be rendered)
+    const isInFuture = (startTimeSec: number): boolean => {
+      return startTimeSec > nowTimestamp;
+    };
 
     const allEvents: EventDot[] = [];
     const rowMap = new Map<string, EventDot[]>();
@@ -89,6 +114,9 @@ export function useMultiDayEventDropsData({
         for (const [, hourApps] of Object.entries(data.hourlyGrid)) {
           for (const [appName, activities] of Object.entries(hourApps)) {
             for (const activity of activities) {
+              // Skip events that start in the future (shouldn't happen, but defensive)
+              if (isInFuture(activity.startTime)) continue;
+
               // When collapsed, all activities go to "In Focus" row
               // When expanded, each app gets its own row
               const rowName = collapseActivityRows
@@ -106,7 +134,7 @@ export function useMultiDayEventDropsData({
                 type: 'activity',
                 row: rowName,
                 label: activity.windowTitle || appName,
-                duration: activity.durationSeconds,
+                duration: capDuration(dateStr, activity.startTime, activity.durationSeconds),
                 color,
                 metadata: activity,
               };
@@ -121,6 +149,9 @@ export function useMultiDayEventDropsData({
       if (filters.showGit) {
         for (const [, hourEvents] of Object.entries(data.gitEvents)) {
           for (const event of hourEvents) {
+            // Skip events that are in the future
+            if (isInFuture(event.timestamp)) continue;
+
             const rowName = 'Git';
             const dot: EventDot = {
               id: makeEventKey('git', event.id),
@@ -141,6 +172,9 @@ export function useMultiDayEventDropsData({
       if (filters.showShell) {
         for (const [, hourEvents] of Object.entries(data.shellEvents)) {
           for (const event of hourEvents) {
+            // Skip events that start in the future
+            if (isInFuture(event.timestamp)) continue;
+
             const rowName = 'Shell';
             const dot: EventDot = {
               id: makeEventKey('shell', event.id),
@@ -149,7 +183,7 @@ export function useMultiDayEventDropsData({
               type: 'shell',
               row: rowName,
               label: event.command,
-              duration: event.durationSeconds,
+              duration: capDuration(dateStr, event.timestamp, event.durationSeconds),
               color: EVENT_TYPE_COLORS.shell,
               metadata: event,
             };
@@ -162,6 +196,9 @@ export function useMultiDayEventDropsData({
       if (filters.showBrowser) {
         for (const [, hourEvents] of Object.entries(data.browserEvents)) {
           for (const event of hourEvents) {
+            // Skip events that start in the future
+            if (isInFuture(event.timestamp)) continue;
+
             const rowName = event.browser || 'Browser';
             const dot: EventDot = {
               id: makeEventKey('browser', event.id),
@@ -170,7 +207,7 @@ export function useMultiDayEventDropsData({
               type: 'browser',
               row: rowName,
               label: event.title || event.domain,
-              duration: event.visitDurationSeconds,
+              duration: capDuration(dateStr, event.timestamp, event.visitDurationSeconds),
               color: getAppHexColor(event.browser || 'browser'),
               metadata: event,
             };
@@ -183,6 +220,9 @@ export function useMultiDayEventDropsData({
       if (filters.showFiles) {
         for (const [, hourEvents] of Object.entries(data.fileEvents)) {
           for (const event of hourEvents) {
+            // Skip events that start in the future
+            if (isInFuture(event.timestamp)) continue;
+
             const rowName = 'Files';
             const dot: EventDot = {
               id: makeEventKey('file', event.id),
@@ -202,7 +242,9 @@ export function useMultiDayEventDropsData({
       // Process Activity periods (inverse of AFK blocks) - show when user was active
       if (data.dayStats?.daySpan) {
         const dayStart = data.dayStats.daySpan.startTime;
-        const dayEnd = data.dayStats.daySpan.endTime;
+        // Cap dayEnd at "now" for today to prevent activity bars extending into the future
+        const rawDayEnd = data.dayStats.daySpan.endTime;
+        const dayEnd = (dateStr === todayStr && rawDayEnd > nowTimestamp) ? nowTimestamp : rawDayEnd;
 
         // Collect and sort all AFK blocks
         const allAfkBlocks = Object.values(data.afkBlocks)
@@ -214,9 +256,14 @@ export function useMultiDayEventDropsData({
         let activityId = 0;
 
         for (const afk of allAfkBlocks) {
+          // Skip if we've passed "now" on today
+          if (dateStr === todayStr && currentStart >= nowTimestamp) break;
+
           // If there's a gap before this AFK period, that's an activity period
           if (afk.startTime > currentStart) {
-            const activityEnd = afk.startTime;
+            // Cap activity end at "now" for today
+            const rawActivityEnd = afk.startTime;
+            const activityEnd = (dateStr === todayStr && rawActivityEnd > nowTimestamp) ? nowTimestamp : rawActivityEnd;
             const durationSeconds = activityEnd - currentStart;
 
             // Only include if duration is at least 60 seconds
@@ -241,8 +288,8 @@ export function useMultiDayEventDropsData({
           currentStart = Math.max(currentStart, afk.endTime);
         }
 
-        // Add final activity period after last AFK
-        if (currentStart < dayEnd) {
+        // Add final activity period after last AFK (only if start is before "now" on today)
+        if (currentStart < dayEnd && !(dateStr === todayStr && currentStart >= nowTimestamp)) {
           const durationSeconds = dayEnd - currentStart;
           if (durationSeconds >= 60) {
             const rowName = 'Activity';
@@ -262,7 +309,7 @@ export function useMultiDayEventDropsData({
         }
 
         // If no AFK blocks, the entire day span is active
-        if (allAfkBlocks.length === 0) {
+        if (allAfkBlocks.length === 0 && dayStart < dayEnd) {
           const durationSeconds = dayEnd - dayStart;
           const rowName = 'Activity';
           const dot: EventDot = {
@@ -283,6 +330,9 @@ export function useMultiDayEventDropsData({
       // Process screenshots from this day's data
       if (dayData.screenshots && dayData.screenshots.length > 0) {
         for (const screenshot of dayData.screenshots) {
+          // Skip screenshots in the future (shouldn't happen but defensive)
+          if (isInFuture(screenshot.timestamp)) continue;
+
           const rowName = 'Screenshots';
           const dot: EventDot = {
             id: makeEventKey('screenshot', screenshot.id),
@@ -300,7 +350,7 @@ export function useMultiDayEventDropsData({
     }
 
     // Convert row map to sorted array
-    const rows: EventDropsRow[] = Array.from(rowMap.entries())
+    const allRows: TimelineRow[] = Array.from(rowMap.entries())
       .map(([normalizedName, events]) => {
         // Sort events by timestamp
         events.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
@@ -318,13 +368,21 @@ export function useMultiDayEventDropsData({
           data: events,
         };
       })
-      // Sort rows: In Focus (if collapsed) first, then apps with most events, then special rows
+      // Sort rows: Fixed order at top, then app rows by count, then special rows at bottom
       .sort((a, b) => {
-        // In Focus (collapsed activity) comes first
-        if (a.name === 'In Focus') return -1;
-        if (b.name === 'In Focus') return 1;
+        // Fixed order for top rows
+        const fixedOrder = ['In Focus', 'Activity', 'Screenshots', 'Projects', 'Sessions'];
+        const aFixed = fixedOrder.indexOf(a.name);
+        const bFixed = fixedOrder.indexOf(b.name);
 
-        const specialRows = ['Screenshots', 'Git', 'Shell', 'Browser', 'Files', 'Activity'];
+        // If both are in fixed order, sort by that order
+        if (aFixed !== -1 && bFixed !== -1) return aFixed - bFixed;
+        // If only one is in fixed order, it goes first
+        if (aFixed !== -1) return -1;
+        if (bFixed !== -1) return 1;
+
+        // Special rows go at the bottom
+        const specialRows = ['Git', 'Shell', 'Browser', 'Files'];
         const aIsSpecial = specialRows.includes(a.name);
         const bIsSpecial = specialRows.includes(b.name);
 
@@ -334,13 +392,21 @@ export function useMultiDayEventDropsData({
           return specialRows.indexOf(a.name) - specialRows.indexOf(b.name);
         }
 
+        // App rows sorted by event count
         return b.dotCount - a.dotCount;
       });
+
+    // Collect all available lane names before filtering (for dropdown)
+    const availableLanes = allRows.map(row => row.name);
+
+    // Filter out hidden lanes
+    const rows = allRows.filter(row => !hiddenLanes.has(row.name));
 
     return {
       rows,
       timeRange,
       totalEvents: allEvents.length,
+      availableLanes,
     };
-  }, [loadedDays, timeRange, filters, collapseActivityRows]);
+  }, [loadedDays, timeRange, filters, collapseActivityRows, hiddenLanes]);
 }

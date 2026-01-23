@@ -339,45 +339,57 @@ func buildPrompt(ctx *SessionContext) string {
 	}
 
 	// === ENHANCED PROMPT INSTRUCTIONS ===
-	sb.WriteString(`Please respond in this exact JSON format:
+	sb.WriteString(`Respond in this exact JSON format:
 {
-  "summary": "2-3 sentences describing SPECIFIC activities and accomplishments. Be specific about files, projects, documents worked on. Never use generic phrases like 'coding and browsing'.",
-  "explanation": "A paragraph explaining the main work themes and how activities connected.",
+  "summary": "2-3 sentences describing what was accomplished.",
+  "explanation": "A paragraph explaining the work themes.",
   "projects": [
     {
       "name": "Project Name",
       "timeMinutes": 45,
-      "activities": ["Specific activity 1", "Specific activity 2"],
+      "activities": ["Did X to achieve Y", "Fixed bug in Z component"],
       "confidence": "high"
     }
   ],
-  "tags": ["tag1", "tag2", "tag3"],
+  "tags": ["tag1", "tag2"],
   "confidence": "high"
 }
 
-CRITICAL PROJECT DETECTION GUIDELINES:
-- IDENTIFY ALL DISTINCT PROJECTS worked on during this session
-- A "project" is a coherent body of work: a codebase, a presentation, a document, a client, hardware testing, etc.
-- Use git repositories, file paths, window titles, and domains to detect projects
-- ESTIMATE TIME spent on each project based on activity duration
-- If working on "Traq codebase": project name is "Traq" (not "Traq Development" or "Development")
-- If testing "Embedded World Demo hardware": project name is "Embedded World Demo"
-- If doing email/slack without clear project context: project name is "Communications" or "Administration"
-- List 2-5 specific activities accomplished per project
-- Time estimates should add up to approximately the session duration
-- Be SPECIFIC with project names - infer from file paths, git repos, window titles
+PROJECT DETECTION:
+- Identify distinct projects from git repos, file paths, window titles, domains
+- "Traq" not "Traq Development", "Synaptics" not "Synaptics Work"
+- Research/learning ABOUT a project belongs TO that project (e.g., researching "RAG for factory operations" = part of Synaptics/42T project, NOT separate "Research")
+- Only use "Research" project for truly unrelated learning
+- Time estimates should sum to session duration
 
-EXAMPLES:
-- Git repo "hmahadik/traq", files in "/projects/traq/" → Project: "Traq"
-- Window title "Embedded World Demo Setup.pptx" → Project: "Embedded World Demo"
-- Multiple activities in same git repo → ONE project, not multiple
-- Mix of Slack, Gmail, Calendar → Project: "Communications"
+ACTIVITY QUALITY - CRITICAL:
+Each activity MUST describe a concrete action with context. Pattern: "[Action verb] [specific thing] [optional: why/result]"
 
-OTHER GUIDELINES:
-- Be SPECIFIC: mention file names, actual project names from context
-- Extract meeting details from window titles
-- NEVER use generic phrases like "various activities", "code editing", "browser usage"
-- The summary should read like a human wrote it for a standup report
+GOOD ACTIVITIES (include these):
+- "Implemented pan/zoom controls for timeline visualization"
+- "Fixed cross-midnight date filtering bug in reports"
+- "Reviewed EventDrops library for timeline inspiration"
+- "Debugged AI summary generation - model was hallucinating project names"
+- "Researched RAG vs tool-calling patterns for factory agent"
+- "Tested SL2619 touchpad gestures on demo hardware"
+
+BAD ACTIVITIES (NEVER include these):
+- "Edited files in /path/to/project" ← useless, obviously files were edited
+- "Reviewed documentation" ← which docs? why?
+- "Tested functionalities" ← what functionalities? be specific
+- "Coding and development" ← says nothing
+- "Browser activity" or "web browsing" ← useless
+- "Worked on project" ← circular, tells nothing
+- "Made changes" or "updated code" ← no specifics
+- Any activity that just restates the project name
+- Any activity under 5 words (too vague)
+
+INFER SPECIFICS FROM CONTEXT:
+- Window title "timeline.tsx - VS Code" + git commit "fix zoom" → "Fixed zoom behavior in timeline component"
+- Browser on "localhost:8000/demo" + focus on "SL2619" → "Tested SL2619 demo application locally"
+- YouTube "Microsoft Factory Agent" + domain "sl2619" context → "Researched Microsoft Factory Operations patterns for Synaptics demo"
+
+If you cannot infer a specific activity, OMIT IT rather than writing something generic.
 `)
 
 	return sb.String()
@@ -406,7 +418,8 @@ func parseResponse(response string) *SummaryResult {
 			result.Summary = parsed.Summary
 			result.Explanation = parsed.Explanation
 			result.Tags = parsed.Tags
-			result.Projects = parsed.Projects
+			// Filter garbage activities from projects
+			result.Projects = filterProjectActivities(parsed.Projects)
 			if parsed.Confidence != "" {
 				result.Confidence = parsed.Confidence
 			}
@@ -422,6 +435,100 @@ func parseResponse(response string) *SummaryResult {
 	result.Tags = []string{"general"}
 
 	return result
+}
+
+// filterProjectActivities removes garbage activities from project breakdowns
+func filterProjectActivities(projects []ProjectBreakdown) []ProjectBreakdown {
+	var filtered []ProjectBreakdown
+	for _, p := range projects {
+		var goodActivities []string
+		for _, act := range p.Activities {
+			if !isGarbageActivity(act) {
+				goodActivities = append(goodActivities, act)
+			}
+		}
+		p.Activities = goodActivities
+		filtered = append(filtered, p)
+	}
+	return filtered
+}
+
+// isGarbageActivity returns true if an activity is too vague/useless
+func isGarbageActivity(activity string) bool {
+	lower := strings.ToLower(strings.TrimSpace(activity))
+
+	// Too short to be meaningful
+	if len(strings.Fields(activity)) < 4 {
+		return true
+	}
+
+	// Exact garbage phrases
+	garbagePhrases := []string{
+		"reviewed documentation",
+		"tested functionalities",
+		"coding and development",
+		"browser activity",
+		"web browsing",
+		"worked on project",
+		"made changes",
+		"updated code",
+		"code editing",
+		"various activities",
+		"general development",
+		"development work",
+		"coding session",
+		"programming tasks",
+		"software development",
+	}
+	for _, phrase := range garbagePhrases {
+		if lower == phrase || strings.HasPrefix(lower, phrase+" ") {
+			return true
+		}
+	}
+
+	// Pattern: "Edited files in [path]" or "Modified files in [path]"
+	if strings.HasPrefix(lower, "edited files in ") ||
+		strings.HasPrefix(lower, "modified files in ") ||
+		strings.HasPrefix(lower, "changed files in ") ||
+		strings.HasPrefix(lower, "updated files in ") {
+		return true
+	}
+
+	// Pattern: ends with generic terms
+	genericEndings := []string{
+		" in the browser",
+		" in browser",
+		" in chrome",
+		" in google chrome",
+		" in firefox",
+		" and more",
+		" etc",
+		" etc.",
+	}
+	for _, ending := range genericEndings {
+		if strings.HasSuffix(lower, ending) {
+			return true
+		}
+	}
+
+	// Pattern: "Tested X in Y" where Y is just a browser name
+	if strings.Contains(lower, "tested") && strings.Contains(lower, "in google chrome") {
+		// Unless it has more specific context
+		if !strings.Contains(lower, "bug") && !strings.Contains(lower, "feature") &&
+			!strings.Contains(lower, "component") && !strings.Contains(lower, "page") {
+			return true
+		}
+	}
+
+	// Pattern: Activity is just "[Something] Demo" with no verb
+	if strings.HasSuffix(lower, " demo") && !strings.Contains(lower, "built") &&
+		!strings.Contains(lower, "created") && !strings.Contains(lower, "tested") &&
+		!strings.Contains(lower, "fixed") && !strings.Contains(lower, "implemented") &&
+		!strings.Contains(lower, "reviewed") && !strings.Contains(lower, "presented") {
+		return true
+	}
+
+	return false
 }
 
 // Ollama API types

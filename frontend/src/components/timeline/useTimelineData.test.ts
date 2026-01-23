@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { renderHook } from '@testing-library/react';
-import { useEventDropsData } from './useEventDropsData';
+import { useTimelineData } from './useTimelineData';
 import type { TimelineGridData, ActivityBlock } from '@/types/timeline';
 import type { TimelineFilters } from '../FilterControls';
 
@@ -41,25 +41,25 @@ const defaultFilters: TimelineFilters = {
   showAfk: true,
 };
 
-describe('useEventDropsData', () => {
+describe('useTimelineData', () => {
   describe('null/empty data handling', () => {
     it('returns null when data is null', () => {
       const { result } = renderHook(() =>
-        useEventDropsData({ data: null, filters: defaultFilters })
+        useTimelineData({ data: null, filters: defaultFilters })
       );
       expect(result.current).toBeNull();
     });
 
     it('returns null when data is undefined', () => {
       const { result } = renderHook(() =>
-        useEventDropsData({ data: undefined, filters: defaultFilters })
+        useTimelineData({ data: undefined, filters: defaultFilters })
       );
       expect(result.current).toBeNull();
     });
 
     it('returns empty rows when grid has no events', () => {
       const { result } = renderHook(() =>
-        useEventDropsData({
+        useTimelineData({
           data: createMockGridData(),
           filters: defaultFilters,
         })
@@ -73,7 +73,7 @@ describe('useEventDropsData', () => {
   describe('time range', () => {
     it('sets time range to full day based on date', () => {
       const { result } = renderHook(() =>
-        useEventDropsData({
+        useTimelineData({
           data: createMockGridData({ date: '2024-01-16' }),
           filters: defaultFilters,
         })
@@ -102,7 +102,7 @@ describe('useEventDropsData', () => {
       });
 
       const { result } = renderHook(() =>
-        useEventDropsData({
+        useTimelineData({
           data: createMockGridData({
             hourlyGrid: {
               '0': { 'VS Code': [activity] },
@@ -131,7 +131,7 @@ describe('useEventDropsData', () => {
       const vscodeActivity = createMockActivity({ id: 2, appName: 'VS Code' });
 
       const { result } = renderHook(() =>
-        useEventDropsData({
+        useTimelineData({
           data: createMockGridData({
             hourlyGrid: {
               '0': {
@@ -154,7 +154,7 @@ describe('useEventDropsData', () => {
       const activity = createMockActivity();
 
       const { result } = renderHook(() =>
-        useEventDropsData({
+        useTimelineData({
           data: createMockGridData({
             hourlyGrid: {
               '0': { Chrome: [activity] },
@@ -186,7 +186,7 @@ describe('useEventDropsData', () => {
       };
 
       const { result } = renderHook(() =>
-        useEventDropsData({
+        useTimelineData({
           data: createMockGridData({
             gitEvents: {
               '0': [gitEvent],
@@ -218,7 +218,7 @@ describe('useEventDropsData', () => {
       };
 
       const { result } = renderHook(() =>
-        useEventDropsData({
+        useTimelineData({
           data: createMockGridData({
             gitEvents: { '0': [gitEvent] },
           }),
@@ -243,7 +243,7 @@ describe('useEventDropsData', () => {
       };
 
       const { result } = renderHook(() =>
-        useEventDropsData({
+        useTimelineData({
           data: createMockGridData({
             shellEvents: { '0': [shellEvent] },
           }),
@@ -270,7 +270,7 @@ describe('useEventDropsData', () => {
       };
 
       const { result } = renderHook(() =>
-        useEventDropsData({
+        useTimelineData({
           data: createMockGridData({
             shellEvents: { '0': [shellEvent] },
           }),
@@ -284,7 +284,9 @@ describe('useEventDropsData', () => {
   });
 
   describe('AFK blocks processing', () => {
-    it('transforms AFK blocks into EventDots', () => {
+    // Note: useTimelineData uses AFK blocks to calculate Activity periods in "In Focus" mode,
+    // not to create Breaks events directly. Breaks events are created in EventList.tsx instead.
+    it('handles AFK blocks without crashing', () => {
       const afkBlock = {
         id: 1,
         sessionId: 1,
@@ -294,7 +296,7 @@ describe('useEventDropsData', () => {
       };
 
       const { result } = renderHook(() =>
-        useEventDropsData({
+        useTimelineData({
           data: createMockGridData({
             afkBlocks: { '0': [afkBlock] },
           }),
@@ -302,11 +304,10 @@ describe('useEventDropsData', () => {
         })
       );
 
-      expect(result.current?.totalEvents).toBe(1);
-      const breaksRow = result.current?.rows.find((r) => r.name === 'Breaks');
-      expect(breaksRow).toBeDefined();
-      expect(breaksRow?.data[0].type).toBe('afk');
-      expect(breaksRow?.data[0].label).toBe('Break (15m)');
+      // Hook should process data without errors
+      expect(result.current).not.toBeNull();
+      // AFK blocks don't create rows directly in useTimelineData (handled by EventList)
+      expect(result.current?.rows).toBeDefined();
     });
   });
 
@@ -325,7 +326,7 @@ describe('useEventDropsData', () => {
       };
 
       const { result } = renderHook(() =>
-        useEventDropsData({
+        useTimelineData({
           data: createMockGridData(),
           filters: defaultFilters,
           screenshots: [screenshot],
@@ -350,7 +351,7 @@ describe('useEventDropsData', () => {
       const vscodeActivity = createMockActivity({ id: 4, appName: 'VS Code' });
 
       const { result } = renderHook(() =>
-        useEventDropsData({
+        useTimelineData({
           data: createMockGridData({
             hourlyGrid: {
               '0': {
@@ -386,7 +387,7 @@ describe('useEventDropsData', () => {
       };
 
       const { result } = renderHook(() =>
-        useEventDropsData({
+        useTimelineData({
           data: createMockGridData({
             hourlyGrid: { '0': { Chrome: [activity] } },
             gitEvents: { '0': [gitEvent] },
@@ -408,7 +409,7 @@ describe('useEventDropsData', () => {
       const chromeActivity2 = createMockActivity({ id: 2, appName: 'chrome' });
 
       const { result } = renderHook(() =>
-        useEventDropsData({
+        useTimelineData({
           data: createMockGridData({
             hourlyGrid: {
               '0': { Chrome: [chromeActivity1] },
@@ -432,7 +433,7 @@ describe('useEventDropsData', () => {
       const chromeActivity2 = createMockActivity({ id: 2, appName: 'Chrome' });
 
       const { result } = renderHook(() =>
-        useEventDropsData({
+        useTimelineData({
           data: createMockGridData({
             hourlyGrid: {
               '0': { chrome: [chromeActivity1] },
@@ -459,7 +460,7 @@ describe('useEventDropsData', () => {
       ];
 
       const { result } = renderHook(() =>
-        useEventDropsData({
+        useTimelineData({
           data: createMockGridData({
             hourlyGrid: { '0': { Chrome: activities } },
           }),

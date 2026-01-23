@@ -5,9 +5,9 @@ import {
   APP_HEX_COLORS,
   DEFAULT_APP_COLOR,
   getAppHexColor,
-} from './eventDropsTypes';
+} from './timelineTypes';
 
-describe('eventDropsTypes', () => {
+describe('timelineTypes', () => {
   describe('EVENT_TYPE_COLORS', () => {
     it('has colors for all event types', () => {
       expect(EVENT_TYPE_COLORS.activity).toBe('#3b82f6');

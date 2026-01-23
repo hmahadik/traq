@@ -66,6 +66,7 @@ type ActivityBlock struct {
 	PixelPosition     float64 `json:"pixelPosition"`                    // Vertical position in pixels (0-60)
 	PixelHeight       float64 `json:"pixelHeight"`                      // Height in pixels
 	ProjectID         int64   `json:"projectId,omitempty"`              // Assigned project ID
+	ProjectName       string  `json:"projectName,omitempty"`            // Project name for display
 	ProjectColor      string  `json:"projectColor,omitempty"`           // Project color for visual distinction
 	ProjectSource     string  `json:"projectSource,omitempty"`          // 'unassigned', 'user', 'rule', 'ai'
 	ProjectConfidence float64 `json:"projectConfidence,omitempty"`      // Confidence of project assignment (0-1)
@@ -372,6 +373,7 @@ func (s *TimelineService) GetTimelineGridDataWithOptions(date string, opts Timel
 		if event.ProjectID.Valid && event.ProjectID.Int64 > 0 {
 			block.ProjectID = event.ProjectID.Int64
 			if proj, ok := projectMap[event.ProjectID.Int64]; ok {
+				block.ProjectName = proj.Name
 				block.ProjectColor = proj.Color
 			}
 			if event.ProjectSource.Valid {

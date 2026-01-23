@@ -1,7 +1,7 @@
-// EventDrops Timeline Types
+// Timeline Types
 // Based on marmelab/EventDrops pattern but adapted for Traq's data structures
 
-export type EventDropType = 'activity' | 'git' | 'shell' | 'browser' | 'file' | 'afk' | 'screenshot' | 'projects';
+export type EventDropType = 'activity' | 'git' | 'shell' | 'browser' | 'file' | 'afk' | 'screenshot' | 'projects' | 'session';
 
 export interface EventDot {
   id: string; // Unique ID: `${type}-${originalId}`
@@ -16,20 +16,21 @@ export interface EventDot {
   metadata: any; // Original event data - can be ActivityBlock, GitEventDisplay, etc.
 }
 
-export interface EventDropsRow {
+export interface TimelineRow {
   name: string; // "VS Code", "Git", "Shell", etc.
   color: string; // Primary dot color for this row
   dotCount: number; // Number of events in this row
   data: EventDot[]; // Individual events
 }
 
-export interface EventDropsData {
-  rows: EventDropsRow[];
+export interface TimelineData {
+  rows: TimelineRow[];
   timeRange: {
     start: Date;
     end: Date;
   };
   totalEvents: number;
+  availableLanes: string[]; // All lane names before filtering (for dropdown)
 }
 
 // Color constants for event types (hex values for D3)
@@ -42,6 +43,7 @@ export const EVENT_TYPE_COLORS: Record<EventDropType, string> = {
   afk: '#f97316', // orange-500
   screenshot: '#ec4899', // pink-500
   projects: '#6366f1', // indigo-500
+  session: '#f59e0b', // amber-500
 };
 
 // Category colors for activities (hex values for D3)

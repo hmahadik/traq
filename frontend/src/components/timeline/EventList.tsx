@@ -1,12 +1,12 @@
 // frontend/src/components/timeline/EventList.tsx
-// Consolidated event list component combining best features of TimelineListView and EventDropsTimeline embedded list
+// Consolidated event list component combining best features of TimelineListView and Timeline embedded list
 
 import { useState, useCallback, useRef, useMemo, useEffect } from 'react';
 import {
   TimelineGridData,
   ListViewSort,
 } from '@/types/timeline';
-import type { EventDot, EventDropType } from './eventDrops/eventDropsTypes';
+import type { EventDot, EventDropType } from './timelineTypes';
 import type { EventKey } from '@/utils/eventKeys';
 import { makeEventKey } from '@/utils/eventKeys';
 import { Input } from '@/components/ui/input';
@@ -23,6 +23,7 @@ import { cn, formatDuration } from '@/lib/utils';
 import {
   ChevronUp,
   ChevronDown,
+  ChevronRight,
   Search,
   Pencil,
   Trash2,
@@ -39,9 +40,12 @@ import {
   Check,
   X,
   Filter,
+  List,
 } from 'lucide-react';
 import { useProjects } from '@/api/hooks';
 import type { Project } from '@/api/client';
+
+const LIST_COLLAPSED_KEY = 'eventlist-collapsed';
 
 // Icon map for event types
 const EVENT_TYPE_ICONS: Record<EventDropType, typeof GitCommit> = {
@@ -77,10 +81,14 @@ interface EventListProps {
   // Display
   maxItems?: number;
   className?: string;
+
+  // Collapse state - can be controlled externally
+  collapsed?: boolean;
+  onCollapsedChange?: (collapsed: boolean) => void;
 }
 
-// Convert TimelineGridData to EventDot array (similar to useEventDropsData but simpler)
-function gridDataToEvents(data: TimelineGridData | undefined, projectsMap: Map<number, Project>): EventDot[] {
+// Convert TimelineGridData to EventDot array (similar to useTimelineData but simpler)
+function gridDataToEvents(data: TimelineGridData | undefined): EventDot[] {
   if (!data) return [];
 
   const events: EventDot[] = [];
@@ -89,7 +97,6 @@ function gridDataToEvents(data: TimelineGridData | undefined, projectsMap: Map<n
   Object.entries(data.hourlyGrid).forEach(([_hour, apps]) => {
     Object.entries(apps).forEach(([_appName, blocks]) => {
       blocks.forEach((block) => {
-        const project = block.projectId ? projectsMap.get(block.projectId) : undefined;
         events.push({
           id: makeEventKey('activity', block.id),
           originalId: block.id,
@@ -104,8 +111,8 @@ function gridDataToEvents(data: TimelineGridData | undefined, projectsMap: Map<n
             windowTitle: block.windowTitle,
             category: block.category,
             projectId: block.projectId,
-            projectColor: project?.color || block.projectColor,
-            projectName: project?.name,
+            projectColor: block.projectColor,
+            projectName: block.projectName,
           },
         });
       });
@@ -222,7 +229,41 @@ export function EventList({
   onAcceptDrafts,
   maxItems = 100,
   className,
+  collapsed: collapsedProp,
+  onCollapsedChange,
 }: EventListProps) {
+  // Internal collapsed state with localStorage persistence (used when not controlled)
+  const [internalCollapsed, setInternalCollapsed] = useState(() => {
+    try {
+      const stored = localStorage.getItem(LIST_COLLAPSED_KEY);
+      return stored === 'true';
+    } catch {
+      return false;
+    }
+  });
+
+  // Use prop if controlled, otherwise internal state
+  const isControlled = collapsedProp !== undefined;
+  const collapsed = isControlled ? collapsedProp : internalCollapsed;
+
+  const setCollapsed = useCallback((value: boolean) => {
+    if (onCollapsedChange) {
+      onCollapsedChange(value);
+    }
+    if (!isControlled) {
+      setInternalCollapsed(value);
+    }
+  }, [isControlled, onCollapsedChange]);
+
+  // Persist collapsed state
+  useEffect(() => {
+    try {
+      localStorage.setItem(LIST_COLLAPSED_KEY, collapsed.toString());
+    } catch {
+      // Ignore localStorage errors
+    }
+  }, [collapsed]);
+
   // Fetch projects for assign dropdown and project name lookup
   const { data: projects } = useProjects();
 
@@ -238,7 +279,7 @@ export function EventList({
   // Use events prop if provided, otherwise transform gridData
   const rawEvents = useMemo(() => {
     if (eventsProp) {
-      // If events prop provided, enrich with project names
+      // If events prop provided, enrich with project names from projectsMap
       return eventsProp.map((event) => {
         if (event.metadata?.projectId && !event.metadata?.projectName) {
           const project = projectsMap.get(event.metadata.projectId);
@@ -256,7 +297,8 @@ export function EventList({
         return event;
       });
     }
-    return gridDataToEvents(gridData, projectsMap);
+    // gridData already includes projectName from backend
+    return gridDataToEvents(gridData);
   }, [eventsProp, gridData, projectsMap]);
 
   // Get unique apps for filter dropdown
@@ -513,16 +555,67 @@ export function EventList({
     lastSelectedIndex.current = null;
   }, [rawEvents]);
 
+  // Format playhead time for display
+  const formatPlayheadTime = (date: Date) => {
+    return date.toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    });
+  };
+
   if (rawEvents.length === 0) {
     return (
-      <div className={cn('flex items-center justify-center h-32 text-muted-foreground text-xs', className)}>
-        No events to display
+      <div className={cn('flex flex-col h-full', className)}>
+        {/* Collapsible header */}
+        <div
+          className="flex items-center gap-2 px-3 py-2 border-b bg-muted/30 cursor-pointer hover:bg-muted/50"
+          onClick={() => setCollapsed(!collapsed)}
+        >
+          {collapsed ? (
+            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+          ) : (
+            <ChevronDown className="h-4 w-4 text-muted-foreground" />
+          )}
+          <List className="h-4 w-4 text-muted-foreground" />
+          <span className="text-sm font-medium">Events</span>
+          <span className="text-xs text-muted-foreground">(0)</span>
+        </div>
+        {!collapsed && (
+          <div className="flex items-center justify-center flex-1 text-muted-foreground text-sm">
+            No events to display
+          </div>
+        )}
       </div>
     );
   }
 
   return (
-    <div className={cn('flex flex-col h-full text-[11px]', className)}>
+    <div className={cn('flex flex-col h-full', className)}>
+      {/* Collapsible header */}
+      <div
+        className="flex items-center gap-2 px-3 py-2 border-b bg-muted/30 cursor-pointer hover:bg-muted/50"
+        onClick={() => setCollapsed(!collapsed)}
+      >
+        {collapsed ? (
+          <ChevronRight className="h-4 w-4 text-muted-foreground" />
+        ) : (
+          <ChevronDown className="h-4 w-4 text-muted-foreground" />
+        )}
+        <List className="h-4 w-4 text-muted-foreground" />
+        <span className="text-sm font-medium">Events</span>
+        <span className="text-xs text-muted-foreground">({sortedEvents.length})</span>
+        {playheadTimestamp && (
+          <span className="text-xs text-blue-400 flex items-center gap-1 ml-auto">
+            <span className="w-2 h-2 bg-blue-500 rounded-full" />
+            {formatPlayheadTime(playheadTimestamp)}
+          </span>
+        )}
+      </div>
+
+      {/* Content - only show when not collapsed */}
+      {collapsed ? null : (
+      <>
       {/* Header with search, filters, and actions */}
       <div className="flex items-center gap-1.5 px-2 py-1.5 border-b bg-muted/30">
         {/* Search */}
@@ -532,7 +625,7 @@ export function EventList({
             placeholder="Search..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-6 h-6 text-[11px]"
+            className="pl-6 h-6 text-xs"
           />
         </div>
 
@@ -543,7 +636,7 @@ export function EventList({
               variant="ghost"
               size="sm"
               className={cn(
-                'h-6 px-1.5 text-[11px]',
+                'h-6 px-1.5 text-xs',
                 selectedApps.size > 0 && 'text-primary'
               )}
             >
@@ -590,7 +683,7 @@ export function EventList({
             <Button
               variant="ghost"
               size="sm"
-              className="h-6 px-1.5 text-[11px]"
+              className="h-6 px-1.5 text-xs"
               onClick={handleEdit}
               disabled={!canEdit}
               title={canEdit ? 'Edit' : 'Select a single activity to edit'}
@@ -605,7 +698,7 @@ export function EventList({
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-6 px-1.5 text-[11px]"
+                    className="h-6 px-1.5 text-xs"
                     disabled={!canAssign}
                   >
                     <FolderKanban className="h-3 w-3 mr-1" />
@@ -635,7 +728,7 @@ export function EventList({
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-6 px-1.5 text-[11px]"
+                className="h-6 px-1.5 text-xs"
                 onClick={handleMerge}
                 disabled={!canMerge}
                 title={canMerge ? 'Merge selected' : 'Select 2+ items to merge'}
@@ -649,7 +742,7 @@ export function EventList({
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-6 px-1.5 text-[11px]"
+                className="h-6 px-1.5 text-xs"
                 onClick={handleAcceptDrafts}
               >
                 <Check className="h-3 w-3 mr-1" />
@@ -660,7 +753,7 @@ export function EventList({
             <Button
               variant="ghost"
               size="sm"
-              className="h-6 px-1.5 text-[11px] text-destructive hover:text-destructive"
+              className="h-6 px-1.5 text-xs text-destructive hover:text-destructive"
               onClick={handleDelete}
               disabled={!canDelete}
               title="Delete selected"
@@ -674,7 +767,7 @@ export function EventList({
             <Button
               variant="ghost"
               size="sm"
-              className="h-6 px-1 text-[11px]"
+              className="h-6 px-1 text-xs"
               onClick={selectNone}
               title="Clear selection"
             >
@@ -743,9 +836,9 @@ export function EventList({
       </div>
 
       {/* Event list */}
-      <div className="flex-1 overflow-auto">
+      <div className="flex-1 overflow-auto text-xs">
         {displayEvents.length === 0 ? (
-          <div className="flex items-center justify-center h-32 text-muted-foreground text-[11px]">
+          <div className="flex items-center justify-center h-32 text-muted-foreground">
             {searchQuery || selectedApps.size > 0 ? 'No items match your filters' : 'No events to display'}
           </div>
         ) : (
@@ -765,15 +858,15 @@ export function EventList({
                   toggleSelection(event.id, index, e.shiftKey);
                 }}
                 className={cn(
-                  'flex items-center border-b cursor-pointer select-none group',
+                  'flex items-center border-b cursor-pointer select-none group border-l-2',
                   isSelected
-                    ? 'bg-primary/10 ring-1 ring-inset ring-primary/30'
-                    : 'hover:bg-muted/50',
-                  isAtPlayhead && 'bg-blue-500/10 border-l-2 border-l-blue-500'
+                    ? 'bg-primary/10 border-l-primary'
+                    : 'border-l-transparent hover:bg-muted/50',
+                  isAtPlayhead && !isSelected && 'bg-blue-500/5 border-l-blue-500/50'
                 )}
               >
                 {/* Checkbox */}
-                <div className="w-8 px-2 py-1 flex items-center justify-center">
+                <div className="w-8 px-2 py-1.5 flex items-center justify-center">
                   <input
                     type="checkbox"
                     checked={isSelected}
@@ -784,17 +877,17 @@ export function EventList({
                 </div>
 
                 {/* Time */}
-                <div className="w-16 px-1 py-1 text-muted-foreground">
+                <div className="w-16 px-1 py-1.5 text-muted-foreground">
                   {formatEventTime(event.timestamp)}
                 </div>
 
                 {/* Duration */}
-                <div className="w-14 px-1 py-1 text-muted-foreground">
+                <div className="w-14 px-1 py-1.5 text-muted-foreground">
                   {event.duration ? formatDuration(event.duration) : '-'}
                 </div>
 
                 {/* App with icon */}
-                <div className="w-20 px-1 py-1 flex items-center gap-1">
+                <div className="w-20 px-1 py-1.5 flex items-center gap-1">
                   <div
                     className="w-4 h-4 rounded flex items-center justify-center flex-shrink-0"
                     style={{ backgroundColor: event.color }}
@@ -805,10 +898,10 @@ export function EventList({
                 </div>
 
                 {/* Title */}
-                <div className="flex-1 px-1 py-1 truncate">{event.label}</div>
+                <div className="flex-1 px-1 py-1.5 truncate">{event.label}</div>
 
                 {/* Project badge */}
-                <div className="w-24 px-1 py-1">
+                <div className="w-24 px-1 py-1.5">
                   {projectName && projectColor && (
                     <span
                       className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px]"
@@ -862,6 +955,8 @@ export function EventList({
           </div>
         )}
       </div>
+      </>
+      )}
     </div>
   );
 }

@@ -1034,6 +1034,27 @@ func isGarbageActivity(activity string) bool {
 		}
 	}
 
+	// Pattern 3: Activities that are just project name regurgitation (no actual work described)
+	// e.g., "Smart Panel Demo - SL2619", "Event Drops Demo", "Traq codebase"
+	projectNamePatterns := []string{
+		"smart panel demo", "event drops demo", "sl2619", "sl261",
+		"traq codebase", "synaptics demo", "42t demo",
+	}
+	for _, pattern := range projectNamePatterns {
+		// If the activity is basically just the project name (with minor additions)
+		if lower == pattern || strings.HasPrefix(lower, pattern+" -") || strings.HasSuffix(lower, " "+pattern) {
+			return true
+		}
+	}
+
+	// Pattern 4: Activities that are just "[Something] Demo" with no verb/action
+	if strings.HasSuffix(lower, " demo") && !strings.Contains(lower, "implement") &&
+		!strings.Contains(lower, "creat") && !strings.Contains(lower, "build") &&
+		!strings.Contains(lower, "fix") && !strings.Contains(lower, "add") &&
+		!strings.Contains(lower, "work") && !strings.Contains(lower, "develop") {
+		return true
+	}
+
 	return false
 }
 
@@ -3007,7 +3028,7 @@ func (s *ReportsService) normalizeProjectName(name string) string {
 	}
 
 	// Synaptics variations
-	if strings.Contains(lower, "synaptics") || strings.Contains(lower, "sl261") || strings.Contains(lower, "sl2619") || strings.Contains(lower, "42t") || strings.Contains(lower, "42 tech") {
+	if strings.Contains(lower, "synaptics") || strings.Contains(lower, "sl261") || strings.Contains(lower, "sl2619") || strings.Contains(lower, "42t") || strings.Contains(lower, "42 tech") || strings.Contains(lower, "smart panel") || strings.Contains(lower, "acusight") || strings.Contains(lower, "factory") {
 		return "Synaptics/42T"
 	}
 
@@ -3461,6 +3482,10 @@ func (s *ReportsService) formatWeeklySummaryHTML(data *WeeklySummaryData) string
 				sb.WriteString(`<div class="report-project-stats">`)
 				var days []string
 				for d := range project.DailyAccomplishments {
+					// Filter out days outside the report's date range
+					if d < data.StartDate || d > data.EndDate {
+						continue
+					}
 					days = append(days, d)
 				}
 				sort.Strings(days)
@@ -3829,9 +3854,12 @@ func (s *ReportsService) formatWeeklySummaryMarkdown(data *WeeklySummaryData) st
 		if hasAccomplishments {
 			sb.WriteString("#### Key Accomplishments by Day:\n\n")
 
-			// Sort days
+			// Sort days (filter out days outside the report's date range)
 			var days []string
 			for d := range project.DailyAccomplishments {
+				if d < data.StartDate || d > data.EndDate {
+					continue
+				}
 				days = append(days, d)
 			}
 			sort.Strings(days)

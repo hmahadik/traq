@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { EventDropsTooltip } from './EventDropsTooltip';
-import type { EventDot } from './eventDropsTypes';
+import { TimelineTooltip } from './TimelineTooltip';
+import type { EventDot } from './timelineTypes';
 
 // Helper to create mock event
 const createMockEvent = (overrides: Partial<EventDot> = {}): EventDot => ({
@@ -17,25 +17,25 @@ const createMockEvent = (overrides: Partial<EventDot> = {}): EventDot => ({
   ...overrides,
 });
 
-describe('EventDropsTooltip', () => {
+describe('TimelineTooltip', () => {
   describe('rendering', () => {
     it('returns null when event is null', () => {
       const { container } = render(
-        <EventDropsTooltip event={null} position={{ x: 100, y: 100 }} />
+        <TimelineTooltip event={null} position={{ x: 100, y: 100 }} />
       );
       expect(container.firstChild).toBeNull();
     });
 
     it('returns null when position is null', () => {
       const { container } = render(
-        <EventDropsTooltip event={createMockEvent()} position={null} />
+        <TimelineTooltip event={createMockEvent()} position={null} />
       );
       expect(container.firstChild).toBeNull();
     });
 
     it('renders tooltip when event and position are provided', () => {
       render(
-        <EventDropsTooltip
+        <TimelineTooltip
           event={createMockEvent()}
           position={{ x: 100, y: 100 }}
         />
@@ -47,7 +47,7 @@ describe('EventDropsTooltip', () => {
   describe('event type display', () => {
     it('displays Activity type label', () => {
       render(
-        <EventDropsTooltip
+        <TimelineTooltip
           event={createMockEvent({ type: 'activity' })}
           position={{ x: 100, y: 100 }}
         />
@@ -57,7 +57,7 @@ describe('EventDropsTooltip', () => {
 
     it('displays Git Commit type label', () => {
       render(
-        <EventDropsTooltip
+        <TimelineTooltip
           event={createMockEvent({ type: 'git', label: 'feat: add feature' })}
           position={{ x: 100, y: 100 }}
         />
@@ -67,7 +67,7 @@ describe('EventDropsTooltip', () => {
 
     it('displays Shell Command type label', () => {
       render(
-        <EventDropsTooltip
+        <TimelineTooltip
           event={createMockEvent({ type: 'shell', label: 'npm test' })}
           position={{ x: 100, y: 100 }}
         />
@@ -77,7 +77,7 @@ describe('EventDropsTooltip', () => {
 
     it('displays Browser Visit type label', () => {
       render(
-        <EventDropsTooltip
+        <TimelineTooltip
           event={createMockEvent({ type: 'browser', label: 'Example.com' })}
           position={{ x: 100, y: 100 }}
         />
@@ -87,7 +87,7 @@ describe('EventDropsTooltip', () => {
 
     it('displays Break type label for afk events', () => {
       render(
-        <EventDropsTooltip
+        <TimelineTooltip
           event={createMockEvent({ type: 'afk', label: 'Break (15m)' })}
           position={{ x: 100, y: 100 }}
         />
@@ -97,7 +97,7 @@ describe('EventDropsTooltip', () => {
 
     it('displays Screenshot type label', () => {
       render(
-        <EventDropsTooltip
+        <TimelineTooltip
           event={createMockEvent({ type: 'screenshot', label: 'screenshot.png' })}
           position={{ x: 100, y: 100 }}
         />
@@ -109,7 +109,7 @@ describe('EventDropsTooltip', () => {
   describe('duration display', () => {
     it('displays duration in seconds when < 60', () => {
       render(
-        <EventDropsTooltip
+        <TimelineTooltip
           event={createMockEvent({ duration: 45 })}
           position={{ x: 100, y: 100 }}
         />
@@ -119,7 +119,7 @@ describe('EventDropsTooltip', () => {
 
     it('displays duration in minutes when >= 60 and < 3600', () => {
       render(
-        <EventDropsTooltip
+        <TimelineTooltip
           event={createMockEvent({ duration: 300 })}
           position={{ x: 100, y: 100 }}
         />
@@ -129,7 +129,7 @@ describe('EventDropsTooltip', () => {
 
     it('displays duration in hours and minutes when >= 3600', () => {
       render(
-        <EventDropsTooltip
+        <TimelineTooltip
           event={createMockEvent({ duration: 5400 })}
           position={{ x: 100, y: 100 }}
         />
@@ -139,7 +139,7 @@ describe('EventDropsTooltip', () => {
 
     it('does not display duration when undefined', () => {
       render(
-        <EventDropsTooltip
+        <TimelineTooltip
           event={createMockEvent({ duration: undefined })}
           position={{ x: 100, y: 100 }}
         />
@@ -149,7 +149,7 @@ describe('EventDropsTooltip', () => {
 
     it('does not display duration when 0', () => {
       render(
-        <EventDropsTooltip
+        <TimelineTooltip
           event={createMockEvent({ duration: 0 })}
           position={{ x: 100, y: 100 }}
         />
@@ -163,7 +163,7 @@ describe('EventDropsTooltip', () => {
       const event = createMockEvent({
         timestamp: new Date('2024-01-16T14:30:00'),
       });
-      render(<EventDropsTooltip event={event} position={{ x: 100, y: 100 }} />);
+      render(<TimelineTooltip event={event} position={{ x: 100, y: 100 }} />);
       // Time should be displayed (format depends on locale)
       expect(screen.getByText(/2:30 PM/i)).toBeInTheDocument();
     });
@@ -173,7 +173,7 @@ describe('EventDropsTooltip', () => {
     it('shows edit button only for activity type', () => {
       const onEdit = vi.fn();
       render(
-        <EventDropsTooltip
+        <TimelineTooltip
           event={createMockEvent({ type: 'activity' })}
           position={{ x: 100, y: 100 }}
           onEdit={onEdit}
@@ -185,7 +185,7 @@ describe('EventDropsTooltip', () => {
     it('does not show edit button for non-activity types', () => {
       const onEdit = vi.fn();
       render(
-        <EventDropsTooltip
+        <TimelineTooltip
           event={createMockEvent({ type: 'git' })}
           position={{ x: 100, y: 100 }}
           onEdit={onEdit}
@@ -197,7 +197,7 @@ describe('EventDropsTooltip', () => {
     it('shows delete button for non-screenshot types', () => {
       const onDelete = vi.fn();
       render(
-        <EventDropsTooltip
+        <TimelineTooltip
           event={createMockEvent({ type: 'activity' })}
           position={{ x: 100, y: 100 }}
           onDelete={onDelete}
@@ -209,7 +209,7 @@ describe('EventDropsTooltip', () => {
     it('does not show delete button for screenshot type', () => {
       const onDelete = vi.fn();
       render(
-        <EventDropsTooltip
+        <TimelineTooltip
           event={createMockEvent({ type: 'screenshot' })}
           position={{ x: 100, y: 100 }}
           onDelete={onDelete}
@@ -222,7 +222,7 @@ describe('EventDropsTooltip', () => {
       const onEdit = vi.fn();
       const event = createMockEvent({ type: 'activity' });
       render(
-        <EventDropsTooltip
+        <TimelineTooltip
           event={event}
           position={{ x: 100, y: 100 }}
           onEdit={onEdit}
@@ -236,7 +236,7 @@ describe('EventDropsTooltip', () => {
       const onDelete = vi.fn();
       const event = createMockEvent({ type: 'activity' });
       render(
-        <EventDropsTooltip
+        <TimelineTooltip
           event={event}
           position={{ x: 100, y: 100 }}
           onDelete={onDelete}
@@ -250,7 +250,7 @@ describe('EventDropsTooltip', () => {
       const onEdit = vi.fn();
       const event = createMockEvent({ type: 'activity' });
       render(
-        <EventDropsTooltip
+        <TimelineTooltip
           event={event}
           position={{ x: 100, y: 100 }}
           onEdit={onEdit}
@@ -268,7 +268,7 @@ describe('EventDropsTooltip', () => {
   describe('extra details', () => {
     it('shows app name for activity events', () => {
       render(
-        <EventDropsTooltip
+        <TimelineTooltip
           event={createMockEvent({
             type: 'activity',
             metadata: { appName: 'Chrome' },
@@ -282,7 +282,7 @@ describe('EventDropsTooltip', () => {
 
     it('shows repository for git events', () => {
       render(
-        <EventDropsTooltip
+        <TimelineTooltip
           event={createMockEvent({
             type: 'git',
             metadata: { repository: 'my-repo', branch: 'main' },
@@ -296,7 +296,7 @@ describe('EventDropsTooltip', () => {
 
     it('shows changes for git events', () => {
       render(
-        <EventDropsTooltip
+        <TimelineTooltip
           event={createMockEvent({
             type: 'git',
             metadata: { insertions: 10, deletions: 5 },
@@ -310,7 +310,7 @@ describe('EventDropsTooltip', () => {
 
     it('shows shell type for shell events', () => {
       render(
-        <EventDropsTooltip
+        <TimelineTooltip
           event={createMockEvent({
             type: 'shell',
             metadata: { shellType: 'bash' },
@@ -324,7 +324,7 @@ describe('EventDropsTooltip', () => {
 
     it('shows exit code for failed shell commands', () => {
       render(
-        <EventDropsTooltip
+        <TimelineTooltip
           event={createMockEvent({
             type: 'shell',
             metadata: { exitCode: 1 },
@@ -338,7 +338,7 @@ describe('EventDropsTooltip', () => {
 
     it('does not show exit code for successful shell commands', () => {
       render(
-        <EventDropsTooltip
+        <TimelineTooltip
           event={createMockEvent({
             type: 'shell',
             metadata: { exitCode: 0 },
@@ -351,7 +351,7 @@ describe('EventDropsTooltip', () => {
 
     it('shows domain for browser events', () => {
       render(
-        <EventDropsTooltip
+        <TimelineTooltip
           event={createMockEvent({
             type: 'browser',
             metadata: { domain: 'example.com' },
@@ -364,31 +364,30 @@ describe('EventDropsTooltip', () => {
     });
   });
 
-  describe('mouse events', () => {
-    it('calls onMouseEnter when mouse enters tooltip', () => {
-      const onMouseEnter = vi.fn();
+  describe('close behavior', () => {
+    it('calls onClose when close button is clicked', () => {
+      const onClose = vi.fn();
       render(
-        <EventDropsTooltip
+        <TimelineTooltip
           event={createMockEvent()}
           position={{ x: 100, y: 100 }}
-          onMouseEnter={onMouseEnter}
+          onClose={onClose}
         />
       );
-      fireEvent.mouseEnter(screen.getByText('Test Window Title').closest('div')!.parentElement!);
-      expect(onMouseEnter).toHaveBeenCalled();
+      fireEvent.click(screen.getByTitle('Close'));
+      expect(onClose).toHaveBeenCalled();
     });
 
-    it('calls onMouseLeave when mouse leaves tooltip', () => {
-      const onMouseLeave = vi.fn();
+    it('renders close button when onClose is provided', () => {
+      const onClose = vi.fn();
       render(
-        <EventDropsTooltip
+        <TimelineTooltip
           event={createMockEvent()}
           position={{ x: 100, y: 100 }}
-          onMouseLeave={onMouseLeave}
+          onClose={onClose}
         />
       );
-      fireEvent.mouseLeave(screen.getByText('Test Window Title').closest('div')!.parentElement!);
-      expect(onMouseLeave).toHaveBeenCalled();
+      expect(screen.getByTitle('Close')).toBeInTheDocument();
     });
   });
 });
