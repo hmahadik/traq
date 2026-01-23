@@ -61,9 +61,10 @@ type Daemon struct {
 	currentAFKID    int64 // Track ongoing AFK event ID
 
 	// Auto-update support
-	onUpdateReady     func() bool    // Returns true if update is pending
-	onUpdateApply     func()         // Called to apply update and restart
-	afkRestartMinutes int            // AFK duration threshold for auto-restart (default: 10)
+	onUpdateReady       func() bool // Returns true if update is pending
+	onUpdateApply       func()      // Called to apply update and restart
+	afkRestartMinutes   int         // AFK duration threshold for auto-restart (default: 10)
+	autoUpdateAttempted bool        // Prevents repeated update attempts in same AFK period
 }
 
 // NewDaemon creates a new tracking daemon.
@@ -357,10 +358,16 @@ func (d *Daemon) checkAutoUpdate() {
 	onReady := d.onUpdateReady
 	onApply := d.onUpdateApply
 	threshold := d.afkRestartMinutes
+	alreadyAttempted := d.autoUpdateAttempted
 	d.mu.RUnlock()
 
 	// Skip if callbacks not set
 	if onReady == nil || onApply == nil {
+		return
+	}
+
+	// Skip if we already tried during this AFK period
+	if alreadyAttempted {
 		return
 	}
 
@@ -374,6 +381,11 @@ func (d *Daemon) checkAutoUpdate() {
 	if idleDuration < time.Duration(threshold)*time.Minute {
 		return
 	}
+
+	// Mark that we've attempted the update to prevent repeated tries
+	d.mu.Lock()
+	d.autoUpdateAttempted = true
+	d.mu.Unlock()
 
 	// Trigger update and restart
 	fmt.Printf("Auto-update: AFK for %v with pending update, restarting...\n", idleDuration)
@@ -411,10 +423,11 @@ func (d *Daemon) onAFK() {
 }
 
 func (d *Daemon) onReturn() {
-	// Close current AFK event
+	// Close current AFK event and reset auto-update attempt flag
 	d.mu.Lock()
 	afkID := d.currentAFKID
 	d.currentAFKID = 0
+	d.autoUpdateAttempted = false
 	d.mu.Unlock()
 
 	if afkID > 0 {

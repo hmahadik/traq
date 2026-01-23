@@ -361,14 +361,25 @@ func ApplyPendingUpdate(dataDir string) (bool, error) {
 func (s *UpdateService) ApplyAndRestart() error {
 	applied, err := ApplyPendingUpdate(s.dataDir)
 	if err != nil {
+		// Clear pending flag on error so we don't keep retrying a broken update
+		s.mu.Lock()
+		s.updatePending = false
+		s.pendingInfo = nil
+		s.mu.Unlock()
 		return err
 	}
 
-	if applied {
-		return RestartSelf()
+	if !applied {
+		// No staged file found - clear the stale pending flag
+		s.mu.Lock()
+		s.updatePending = false
+		s.pendingInfo = nil
+		s.mu.Unlock()
+		log.Println("Auto-update: no staged update file found, clearing pending flag")
+		return nil
 	}
 
-	return nil
+	return RestartSelf()
 }
 
 // RestartSelf restarts the current process.

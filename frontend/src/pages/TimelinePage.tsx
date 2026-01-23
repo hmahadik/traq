@@ -1,9 +1,9 @@
 import { useState, useCallback, useMemo, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Calendar, Sparkles, Loader2, PanelRight, PanelRightClose } from 'lucide-react';
+import { Calendar, Sparkles, Loader2, PanelRight, PanelRightClose, ChevronLeft, ChevronRight } from 'lucide-react';
 import { SplitPanel } from '@/components/common/SplitPanel';
-import { TimelineListView } from '@/components/timeline/TimelineListView';
+import { EventList } from '@/components/timeline/EventList';
 import { CalendarWidget } from '@/components/timeline';
 import {
   useCalendarHeatmap,
@@ -15,6 +15,7 @@ import {
   useDeleteShellCommands,
   useDeleteFileEvents,
   useDeleteAFKEvents,
+  useBulkAssignProject,
 } from '@/api/hooks';
 import { useMultiDayTimeline } from '@/hooks/useMultiDayTimeline';
 import { EventDropsTimeline, EventDot } from '@/components/timeline/eventDrops';
@@ -26,7 +27,6 @@ import { FilterControls, TimelineFilters } from '@/components/timeline/FilterCon
 import { GlobalSearch } from '@/components/timeline/GlobalSearch';
 import { SessionDetailDrawer } from '@/components/session/SessionDetailDrawer';
 import { ActivityEditDialog } from '@/components/timeline/ActivityEditDialog';
-import { BulkActionsToolbar } from '@/components/timeline/BulkActionsToolbar';
 import { ProjectAssignDialog } from '@/components/timeline/ProjectAssignDialog';
 import { EventKey, parseEventKey } from '@/utils/eventKeys';
 import type { ActivityBlock } from '@/types/timeline';
@@ -71,14 +71,11 @@ export function TimelinePage() {
   const deleteShellCommands = useDeleteShellCommands();
   const deleteFileEvents = useDeleteFileEvents();
   const deleteAFKEvents = useDeleteAFKEvents();
+  const bulkAssignProject = useBulkAssignProject();
 
   // State for multi-type event selection (works in both grid and list views)
   const [selectedEventKeys, setSelectedEventKeys] = useState<Set<EventKey>>(new Set());
 
-  // Track where selection originated from - affects list filtering behavior
-  // When selection comes from 'visualization' (drops), list filters to selected items
-  // When selection comes from 'list', list does NOT filter (allows multi-select)
-  const [selectionSource, setSelectionSource] = useState<'visualization' | 'list' | null>(null);
 
   // List panel state
   const [showListPanel, setShowListPanel] = useState(true);
@@ -121,7 +118,6 @@ export function TimelinePage() {
   }, [location.search]);
 
   const dateStr = getDateString(selectedDate);
-  const isToday = dateStr === getDateString(new Date());
 
   // Multi-day timeline data
   const {
@@ -132,8 +128,18 @@ export function TimelinePage() {
     isLoadingAny,
     loadingDays,
     updateCenterFromPlayhead,
-    // setCenterDate available but not needed yet (for future date picker integration)
+    // Navigation functions
+    targetPlayheadDate,
+    goToDate,
+    goToToday,
+    clearTargetPlayhead,
   } = useMultiDayTimeline(dateStr);
+
+  // Use centerDate (actual view position) for button highlighting, not selectedDate
+  const todayStr = getDateString(new Date());
+  const yesterdayStr = getDateString(addDays(new Date(), -1));
+  const isViewingToday = centerDate === todayStr;
+  const isViewingYesterday = centerDate === yesterdayStr;
 
   // Get the center day's grid data for sidebar stats
   const centerDayData = loadedDays.get(centerDate);
@@ -255,16 +261,9 @@ export function TimelinePage() {
     }
   }, []);
 
-  // Handle selection change from drops visualization
-  const handleDropsSelectionChange = useCallback((keys: Set<EventKey>) => {
+  // Handle selection change from drops visualization or list
+  const handleSelectionChange = useCallback((keys: Set<EventKey>) => {
     setSelectedEventKeys(keys);
-    setSelectionSource(keys.size > 0 ? 'visualization' : null);
-  }, []);
-
-  // Handle selection change from list view
-  const handleListSelectionChange = useCallback((keys: Set<EventKey>) => {
-    setSelectedEventKeys(keys);
-    setSelectionSource(keys.size > 0 ? 'list' : null);
   }, []);
 
   // Clear all selections
@@ -272,7 +271,57 @@ export function TimelinePage() {
     setSelectedEventKeys(new Set());
   }, []);
 
-  // Handle bulk delete - supports all event types
+  // Handle delete for specific event IDs (used by EventList inline delete)
+  const handleDeleteEvents = useCallback(async (ids: Set<EventKey>) => {
+    // Group items by type
+    const byType: Record<string, number[]> = {};
+    ids.forEach((key) => {
+      const { type, id } = parseEventKey(key);
+      if (!byType[type]) byType[type] = [];
+      byType[type].push(id);
+    });
+
+    const totalCount = Object.values(byType).reduce((sum, arr) => sum + arr.length, 0);
+    if (totalCount === 0) return;
+
+    try {
+      const promises: Promise<void>[] = [];
+
+      if (byType['activity']?.length) {
+        promises.push(deleteActivities.mutateAsync(byType['activity']));
+      }
+      if (byType['browser']?.length) {
+        promises.push(deleteBrowserVisits.mutateAsync(byType['browser']));
+      }
+      if (byType['git']?.length) {
+        promises.push(deleteGitCommits.mutateAsync(byType['git']));
+      }
+      if (byType['shell']?.length) {
+        promises.push(deleteShellCommands.mutateAsync(byType['shell']));
+      }
+      if (byType['file']?.length) {
+        promises.push(deleteFileEvents.mutateAsync(byType['file']));
+      }
+      if (byType['afk']?.length) {
+        promises.push(deleteAFKEvents.mutateAsync(byType['afk']));
+      }
+
+      await Promise.all(promises);
+      toast.success(`Deleted ${totalCount} ${totalCount === 1 ? 'item' : 'items'}`);
+    } catch (error) {
+      console.error('Failed to delete items:', error);
+      toast.error('Failed to delete selected items');
+    }
+  }, [
+    deleteActivities,
+    deleteBrowserVisits,
+    deleteGitCommits,
+    deleteShellCommands,
+    deleteFileEvents,
+    deleteAFKEvents,
+  ]);
+
+  // Handle bulk delete - supports all event types (uses current selection)
   const handleDeleteSelected = useCallback(async () => {
     // Group selected items by type
     const byType: Record<string, number[]> = {};
@@ -326,16 +375,30 @@ export function TimelinePage() {
   ]);
 
   // Bulk action handlers
+  // Handle project assignment from EventList
+  const handleAssignToProject = useCallback((keys: Set<EventKey>, projectId: number) => {
+    const assignments = Array.from(keys).map((key) => {
+      const { type, id } = parseEventKey(key);
+      return { eventType: type, eventId: id, projectId };
+    });
+    bulkAssignProject.mutate(assignments, {
+      onSuccess: () => {
+        clearAllSelections();
+      },
+    });
+  }, [bulkAssignProject, clearAllSelections]);
+
+  // Handle opening project dialog (for legacy flow)
   const handleAssignProject = useCallback((_keys: EventKey[]) => {
     setShowAssignDialog(true);
   }, []);
 
-  const handleMerge = useCallback((_keys: EventKey[]) => {
+  const handleMerge = useCallback((_keys: Set<EventKey>) => {
     // TODO: Implement merge
     toast.info('Merge functionality coming soon');
   }, []);
 
-  const handleAcceptDrafts = useCallback((_keys: EventKey[]) => {
+  const handleAcceptDrafts = useCallback((_keys: Set<EventKey>) => {
     // TODO: Implement draft acceptance
     toast.info('Accept drafts functionality coming soon');
   }, []);
@@ -348,7 +411,38 @@ export function TimelinePage() {
   // Navigation handlers
   const handleDateSelect = useCallback((date: Date) => {
     setSelectedDate(date);
-  }, []);
+    goToDate(date);
+  }, [goToDate]);
+
+  const handleGoToToday = useCallback(() => {
+    setSelectedDate(new Date());
+    goToToday();
+  }, [goToToday]);
+
+  const handleGoToYesterday = useCallback(() => {
+    const yesterday = addDays(new Date(), -1);
+    setSelectedDate(yesterday);
+    goToDate(yesterday);
+  }, [goToDate]);
+
+  const handlePrevDay = useCallback(() => {
+    const [year, month, day] = centerDate.split('-').map(Number);
+    const currentCenterDate = new Date(year, month - 1, day);
+    const prevDate = addDays(currentCenterDate, -1);
+    setSelectedDate(prevDate);
+    goToDate(prevDate);
+  }, [centerDate, goToDate]);
+
+  const handleNextDay = useCallback(() => {
+    const [year, month, day] = centerDate.split('-').map(Number);
+    const currentCenterDate = new Date(year, month - 1, day);
+    const nextDate = addDays(currentCenterDate, 1);
+    // Don't allow navigating past today
+    if (getDateString(nextDate) <= todayStr) {
+      setSelectedDate(nextDate);
+      goToDate(nextDate);
+    }
+  }, [centerDate, goToDate, todayStr]);
 
   const handleSearchNavigateToDate = useCallback((dateString: string) => {
     const [year, month, day] = dateString.split('-').map(Number);
@@ -414,21 +508,43 @@ export function TimelinePage() {
           {/* Desktop Header */}
           <div className="hidden xl:flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
-              <span className="text-sm font-medium">{formattedDate}</span>
+              {/* Prev/Next day navigation */}
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7"
+                onClick={handlePrevDay}
+                title="Previous day"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <span className="text-sm font-medium min-w-[80px] text-center">{formattedDate}</span>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7"
+                onClick={handleNextDay}
+                disabled={centerDate === todayStr}
+                title="Next day"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+
+              {/* Quick nav buttons */}
               <div className="flex items-center gap-1 ml-2">
                 <Button
-                  variant={isToday ? 'secondary' : 'ghost'}
+                  variant={isViewingToday ? 'secondary' : 'ghost'}
                   size="sm"
                   className="h-7 text-xs"
-                  onClick={() => handleDateSelect(new Date())}
+                  onClick={handleGoToToday}
                 >
                   Today
                 </Button>
                 <Button
-                  variant={dateStr === getDateString(addDays(new Date(), -1)) ? 'secondary' : 'ghost'}
+                  variant={isViewingYesterday ? 'secondary' : 'ghost'}
                   size="sm"
                   className="h-7 text-xs"
-                  onClick={() => handleDateSelect(addDays(new Date(), -1))}
+                  onClick={handleGoToYesterday}
                 >
                   Yesterday
                 </Button>
@@ -488,7 +604,7 @@ export function TimelinePage() {
                   entries={entriesData}
                   hideEmbeddedList={true}
                   selectedEventKeys={selectedEventKeys}
-                  onSelectionChange={handleDropsSelectionChange}
+                  onSelectionChange={handleSelectionChange}
                   onEventDelete={handleEventDropDelete}
                   onEventEdit={handleEventDropEdit}
                   onViewScreenshot={handleEventDropViewScreenshot}
@@ -496,14 +612,20 @@ export function TimelinePage() {
                   multiDayTimeRange={timeRange}
                   onPlayheadChange={updateCenterFromPlayhead}
                   loadingDays={loadingDays}
+                  targetPlayheadDate={targetPlayheadDate}
+                  onTargetReached={clearTargetPlayhead}
                 />
               }
               right={
-                <TimelineListView
-                  data={gridData}
+                <EventList
+                  gridData={gridData}
                   selectedIds={selectedEventKeys}
-                  onSelectionChange={handleListSelectionChange}
-                  selectionSource={selectionSource}
+                  onSelectionChange={handleSelectionChange}
+                  onEventEdit={handleEventDropEdit}
+                  onEventDelete={handleDeleteEvents}
+                  onAssignProject={handleAssignToProject}
+                  onMerge={handleMerge}
+                  onAcceptDrafts={handleAcceptDrafts}
                 />
               }
             />
@@ -514,7 +636,7 @@ export function TimelinePage() {
               screenshots={allScreenshots}
               entries={entriesData}
               selectedEventKeys={selectedEventKeys}
-              onSelectionChange={handleDropsSelectionChange}
+              onSelectionChange={handleSelectionChange}
               onEventDelete={handleEventDropDelete}
               onEventEdit={handleEventDropEdit}
               onViewScreenshot={handleEventDropViewScreenshot}
@@ -522,6 +644,8 @@ export function TimelinePage() {
               multiDayTimeRange={timeRange}
               onPlayheadChange={updateCenterFromPlayhead}
               loadingDays={loadingDays}
+              targetPlayheadDate={targetPlayheadDate}
+              onTargetReached={clearTargetPlayhead}
             />
           )}
         </div>
@@ -534,12 +658,31 @@ export function TimelinePage() {
       {/* Mobile Header */}
       <div className="xl:hidden flex items-center justify-between gap-2 flex-wrap">
         <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7"
+            onClick={handlePrevDay}
+            title="Previous day"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
           <span className="text-sm font-medium">{formattedDate}</span>
           <Button
-            variant={isToday ? 'secondary' : 'ghost'}
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7"
+            onClick={handleNextDay}
+            disabled={centerDate === todayStr}
+            title="Next day"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+          <Button
+            variant={isViewingToday ? 'secondary' : 'ghost'}
             size="sm"
             className="h-7 text-xs"
-            onClick={() => handleDateSelect(new Date())}
+            onClick={handleGoToToday}
           >
             Today
           </Button>
@@ -600,16 +743,6 @@ export function TimelinePage() {
           setEditDialogOpen(open);
           if (!open) setEditingActivity(null);
         }}
-      />
-
-      {/* Bulk Actions Toolbar */}
-      <BulkActionsToolbar
-        selectedKeys={selectedEventKeys}
-        onClear={clearAllSelections}
-        onAssignProject={handleAssignProject}
-        onMerge={handleMerge}
-        onDelete={handleDeleteSelected}
-        onAcceptDrafts={handleAcceptDrafts}
       />
 
       {/* Project Assignment Dialog */}
