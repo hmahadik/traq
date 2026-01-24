@@ -73,6 +73,7 @@ const DOT_RADIUS = 5;
 const DOT_HOVER_RADIUS = 8;
 const BAR_MIN_DURATION = 10; // Minimum duration (seconds) to render as bar
 const BAR_MIN_PIXELS = 6; // Minimum pixel width to render as bar
+const BAR_WIDTH = 3; // Width of thin bars for instant/brief events (event-dot)
 
 
 export function Timeline({
@@ -121,6 +122,10 @@ export function Timeline({
 
   // === SCALE REF: Store xScale for use in other effects ===
   const xScaleRef = useRef<d3.ScaleTime<number, number> | null>(null);
+
+  // === NOW REF: Store consistent "now" time for both NOW line and bar capping ===
+  // This prevents visual mismatch when bars are capped at a different time than the NOW line
+  const nowTimeRef = useRef<number>(Date.now());
 
   // === CHART CENTER REF: Store chartCenterX so handlers always use current value ===
   const chartCenterXRef = useRef(0);
@@ -682,16 +687,19 @@ export function Timeline({
             }
           });
 
-        // Update dots
-        svg.selectAll<SVGCircleElement, EventDot>('.event-dot')
-          .attr('cx', (d) => newXScale(d.timestamp));
+        // Update dots (rendered as thin rect elements, not circles)
+        svg.selectAll<SVGRectElement, EventDot>('.event-dot')
+          .attr('x', (d) => newXScale(d.timestamp) - BAR_WIDTH / 2);
 
-        // Update bars
+        // Update bars - use consistent nowTimeRef to match NOW line position
         svg.selectAll<SVGRectElement, EventDot>('.event-bar')
           .attr('x', (d) => newXScale(d.timestamp))
           .attr('width', (d) => {
             const startTime = d.timestamp.getTime();
-            const endTime = startTime + ((d.duration || 0) * 1000);
+            const rawEndTime = startTime + ((d.duration || 0) * 1000);
+            // Cap end time at "now" to prevent bars extending into the future
+            // Use nowTimeRef for consistency with NOW line position
+            const endTime = Math.min(rawEndTime, nowTimeRef.current);
             return Math.max(BAR_MIN_PIXELS, newXScale(new Date(endTime)) - newXScale(d.timestamp));
           });
 
@@ -1072,9 +1080,15 @@ export function Timeline({
       return pixelWidth >= BAR_MIN_PIXELS;
     };
 
+    // Update nowTimeRef at the start of each render cycle for consistency
+    nowTimeRef.current = Date.now();
+
+    // Filter out events that start after "now" (defensive - shouldn't happen but prevents future rendering)
+    const eventsBeforeNow = allEvents.filter((e) => e.timestamp.getTime() <= nowTimeRef.current);
+
     // Split events into dots and bars based on duration
-    const dotEvents = allEvents.filter((e) => !shouldRenderAsBar(e, xScale));
-    const barEvents = allEvents.filter((e) => shouldRenderAsBar(e, xScale));
+    const dotEvents = eventsBeforeNow.filter((e) => !shouldRenderAsBar(e, xScale));
+    const barEvents = eventsBeforeNow.filter((e) => shouldRenderAsBar(e, xScale));
 
     // Helper to check if event is selected (uses ref to avoid stale closure)
     const isSelected = (d: EventDot) => selectedEventKeysRef.current?.has(d.id) || false;
@@ -1090,7 +1104,6 @@ export function Timeline({
     };
 
     // Create thin bars for brief/instant events (instead of circles)
-    const BAR_WIDTH = 3;
     dotsGroup.selectAll('.event-dot')
       .data(dotEvents, (d) => (d as EventDot).id)
       .join('rect')
@@ -1150,7 +1163,8 @@ export function Timeline({
         const startTime = d.timestamp.getTime();
         const rawEndTime = startTime + ((d.duration || 0) * 1000);
         // Cap end time at "now" to prevent bars extending into the future
-        const endTime = Math.min(rawEndTime, Date.now());
+        // Use nowTimeRef for consistency with NOW line position
+        const endTime = Math.min(rawEndTime, nowTimeRef.current);
         return Math.max(BAR_MIN_PIXELS, xScale(new Date(endTime)) - xScale(d.timestamp));
       })
       .attr('height', DOT_RADIUS * 2)
@@ -1262,8 +1276,12 @@ export function Timeline({
 
     // Add "now" indicator if "now" is within the time range (works for multi-day views)
     // Uses data join so it properly appears/disappears based on time range
-    const now = new Date();
-    const nowData = (now >= timeRange.start && now <= timeRange.end) ? [now] : [];
+    // Use nowTimeRef for consistency with bar capping
+    // Buffer handles staleness: timeRange.end is capped at "now" when useMemo runs,
+    // but time passes before this effect runs. Use 15 minute buffer to handle this.
+    const nowDate = new Date(nowTimeRef.current);
+    const bufferMs = 15 * 60 * 1000; // 15 minute buffer to handle timeRange staleness
+    const nowData = (nowDate >= timeRange.start && nowDate.getTime() <= timeRange.end.getTime() + bufferMs) ? [nowDate] : [];
 
     // Now line - uses data join for proper enter/update/exit
     chartGroup.selectAll<SVGLineElement, Date>('.now-line')
