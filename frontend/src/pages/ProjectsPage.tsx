@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
@@ -10,6 +10,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { ResizableHandle } from '@/components/ui/resizable';
 import { ProjectsSidebar } from '@/components/projects/ProjectsSidebar';
 import { ProjectsUnifiedView } from '@/components/projects/ProjectsUnifiedView';
 import { useCreateProject, useUpdateProject, useProject, useProjects } from '@/api/hooks';
@@ -157,6 +158,8 @@ export function ProjectsPage() {
   const [formOpen, setFormOpen] = useState(false);
   const [editingProjectId, setEditingProjectId] = useState<number | null>(null);
   const [selectedProjectIds, setSelectedProjectIds] = useState<Set<number>>(new Set());
+  const [sidebarWidth, setSidebarWidth] = useState(220); // pixels
+  const containerRef = useRef<HTMLDivElement>(null);
 
   // Auto-select all projects on first load
   useEffect(() => {
@@ -164,6 +167,14 @@ export function ProjectsPage() {
       setSelectedProjectIds(new Set(projects.map((p) => p.id)));
     }
   }, [projects]);
+
+  const handleSidebarResize = useCallback((delta: number) => {
+    setSidebarWidth((prev) => {
+      const newWidth = prev + delta;
+      // Clamp between 150px and 400px
+      return Math.max(150, Math.min(400, newWidth));
+    });
+  }, []);
 
   const handleNewProject = () => {
     setEditingProjectId(null);
@@ -200,18 +211,25 @@ export function ProjectsPage() {
   };
 
   return (
-    <div className="h-full flex overflow-hidden -mx-4 sm:-mx-6 -my-6">
-      <ProjectsSidebar
-        selectedProjectIds={selectedProjectIds}
-        onSelectionChange={setSelectedProjectIds}
-        onNewProject={handleNewProject}
-        onEditProject={handleEditProject}
-      />
-      <div className="flex-1 flex flex-col min-h-0 p-6">
-        <ProjectsUnifiedView
-          selectedProjectIds={selectedProjectIds}
-          onNewProject={handleNewProject}
-        />
+    <div ref={containerRef} className="h-full overflow-hidden -mx-4 sm:-mx-6 -my-6">
+      <div className="flex h-full">
+        <div style={{ width: sidebarWidth, flexShrink: 0 }}>
+          <ProjectsSidebar
+            selectedProjectIds={selectedProjectIds}
+            onSelectionChange={setSelectedProjectIds}
+            onNewProject={handleNewProject}
+            onEditProject={handleEditProject}
+          />
+        </div>
+        <ResizableHandle onResize={handleSidebarResize} />
+        <div className="flex-1 min-w-0">
+          <div className="h-full flex flex-col min-h-0 p-6">
+            <ProjectsUnifiedView
+              selectedProjectIds={selectedProjectIds}
+              onNewProject={handleNewProject}
+            />
+          </div>
+        </div>
       </div>
 
       {/* Create/Edit dialog */}

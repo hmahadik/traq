@@ -11,6 +11,9 @@ export default defineConfig({
       "@wailsjs": path.resolve(__dirname, "./wailsjs"),
     },
   },
+  optimizeDeps: {
+    include: ['react-resizable-panels'],
+  },
   server: {
     proxy: {
       // Proxy screenshot requests to the Go screenshot server (for dev mode)

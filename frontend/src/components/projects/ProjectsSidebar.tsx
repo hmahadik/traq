@@ -1,8 +1,11 @@
+import { useMemo } from 'react';
 import { Plus, Loader2, CheckSquare, Square, CircleOff } from 'lucide-react';
+import { useQueries } from '@tanstack/react-query';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useProjects, useUnassignedEventCount } from '@/api/hooks';
+import { api } from '@/api/client';
 
 // Special ID for unassigned activities
 export const UNASSIGNED_PROJECT_ID = 0;
@@ -22,6 +25,30 @@ export function ProjectsSidebar({
 }: ProjectsSidebarProps) {
   const { data: projects, isLoading } = useProjects();
   const { data: unassignedCount } = useUnassignedEventCount();
+
+  // Fetch stats for all projects
+  const statsQueries = useQueries({
+    queries: (projects || []).map((project) => ({
+      queryKey: ['project', project.id, 'stats'],
+      queryFn: () => api.projects.getStats(project.id),
+      staleTime: 60000, // 1 minute
+    })),
+  });
+
+  // Build a map of projectId -> eventCount
+  const projectEventCounts = useMemo(() => {
+    const counts: Record<number, number> = {};
+    if (projects) {
+      projects.forEach((project, idx) => {
+        const stats = statsQueries[idx]?.data;
+        if (stats) {
+          // Sum of focus events and screenshots gives a good "activity" count
+          counts[project.id] = stats.focusEventCount + stats.screenshotCount;
+        }
+      });
+    }
+    return counts;
+  }, [projects, statsQueries]);
 
   const toggleProject = (id: number) => {
     const next = new Set(selectedProjectIds);
@@ -46,7 +73,7 @@ export function ProjectsSidebar({
   const someSelected = selectedProjectIds.size > 0 && !allSelected;
 
   return (
-    <aside className="w-52 flex-shrink-0 border-r bg-muted/30 flex flex-col">
+    <aside className="h-full border-r bg-muted/30 flex flex-col">
       <div className="p-4 border-b flex items-center justify-between">
         <h1 className="text-lg font-semibold">Projects</h1>
         <Button size="icon" variant="ghost" className="h-8 w-8" onClick={onNewProject}>
@@ -114,6 +141,7 @@ export function ProjectsSidebar({
           <ul className="space-y-0.5">
             {projects.map((project) => {
               const isSelected = selectedProjectIds.has(project.id);
+              const eventCount = projectEventCounts[project.id];
               return (
                 <li key={project.id}>
                   <div
@@ -139,6 +167,18 @@ export function ProjectsSidebar({
                       style={{ backgroundColor: project.color }}
                     />
                     <span className="truncate flex-1">{project.name}</span>
+                    {eventCount != null && eventCount > 0 && (
+                      <span
+                        className={cn(
+                          'text-[10px] px-1.5 py-0.5 rounded-full font-medium',
+                          isSelected
+                            ? 'bg-primary/20 text-primary'
+                            : 'bg-muted text-muted-foreground'
+                        )}
+                      >
+                        {eventCount.toLocaleString()}
+                      </span>
+                    )}
                   </div>
                 </li>
               );

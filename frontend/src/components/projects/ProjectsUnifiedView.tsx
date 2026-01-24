@@ -1,23 +1,23 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback, useRef } from 'react';
 import { format, subDays } from 'date-fns';
 import { useQueries } from '@tanstack/react-query';
 import {
-  Clock,
   Sparkles,
   Plus,
   Loader2,
   Pencil,
   Trash2,
-  CheckSquare,
   ArrowRight,
   X,
   Lightbulb,
+  Filter,
+  FilterX,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ResizableHandle } from '@/components/ui/resizable';
 import {
   Select,
   SelectContent,
@@ -62,9 +62,9 @@ function formatDuration(seconds: number): string {
 }
 
 const PATTERN_TYPE_LABELS: Record<string, string> = {
-  app_name: 'App Name',
-  window_title: 'Window Title',
-  git_repo: 'Git Repo',
+  app_name: 'App',
+  window_title: 'Title',
+  git_repo: 'Git',
   domain: 'Domain',
   path: 'Path',
 };
@@ -80,7 +80,7 @@ const MATCH_TYPE_LABELS: Record<string, string> = {
 // Check if an activity matches a pattern
 function matchesPattern(
   activity: { appName: string; windowTitle: string },
-  pattern: ProjectPattern
+  pattern: { patternType: string; patternValue: string; matchType: string }
 ): boolean {
   const field = pattern.patternType === 'app_name' ? activity.appName : activity.windowTitle;
   if (!field) return false;
@@ -117,7 +117,27 @@ export function ProjectsUnifiedView({ selectedProjectIds, onNewProject }: Projec
   // Date range for activities
   const [dateRange, setDateRange] = useState('7');
   const endDate = format(new Date(), 'yyyy-MM-dd');
-  const startDate = format(subDays(new Date(), parseInt(dateRange)), 'yyyy-MM-dd');
+  const startDate = dateRange === 'all'
+    ? '2000-01-01'
+    : format(subDays(new Date(), parseInt(dateRange)), 'yyyy-MM-dd');
+
+  // Selected rule for filtering
+  const [selectedRuleId, setSelectedRuleId] = useState<number | null>(null);
+
+  // Resizable panel width (percentage)
+  const [rulesWidth, setRulesWidth] = useState(45);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const handlePanelResize = useCallback((delta: number) => {
+    if (!containerRef.current) return;
+    const containerWidth = containerRef.current.offsetWidth;
+    const deltaPercent = (delta / containerWidth) * 100;
+    setRulesWidth((prev) => {
+      const newWidth = prev + deltaPercent;
+      // Clamp between 25% and 70%
+      return Math.max(25, Math.min(70, newWidth));
+    });
+  }, []);
 
   // Fetch activities and patterns for each selected project
   const selectedProjectsArray = Array.from(selectedProjectIds).filter(id => id !== UNASSIGNED_PROJECT_ID);
@@ -126,7 +146,7 @@ export function ProjectsUnifiedView({ selectedProjectIds, onNewProject }: Projec
   // Fetch unassigned activities separately
   const unassignedQuery = useUnassignedActivities(startDate, endDate, includeUnassigned);
 
-  // Use useQueries for variable number of projects (avoids hooks-in-map anti-pattern)
+  // Use useQueries for variable number of projects
   const activitiesQueries = useQueries({
     queries: selectedProjectsArray.map((id) => ({
       queryKey: ['projects', id, 'activities', startDate, endDate],
@@ -155,7 +175,6 @@ export function ProjectsUnifiedView({ selectedProjectIds, onNewProject }: Projec
       projectId: number;
     }> = [];
 
-    // Add project activities
     activitiesQueries.forEach((q, idx) => {
       const projectId = selectedProjectsArray[idx];
       if (q.data) {
@@ -165,7 +184,6 @@ export function ProjectsUnifiedView({ selectedProjectIds, onNewProject }: Projec
       }
     });
 
-    // Add unassigned activities
     if (includeUnassigned && unassignedQuery.data) {
       unassignedQuery.data.forEach((a) => {
         activities.push({ ...a, projectId: UNASSIGNED_PROJECT_ID });
@@ -192,6 +210,17 @@ export function ProjectsUnifiedView({ selectedProjectIds, onNewProject }: Projec
     return patterns;
   }, [patternsQueries, selectedProjectsArray, allProjects]);
 
+  // Get selected rule
+  const selectedRule = useMemo(() => {
+    return selectedRuleId ? allPatterns.find(p => p.id === selectedRuleId) : null;
+  }, [selectedRuleId, allPatterns]);
+
+  // Filter activities based on selected rule
+  const filteredActivities = useMemo(() => {
+    if (!selectedRule) return allActivities;
+    return allActivities.filter(activity => matchesPattern(activity, selectedRule));
+  }, [allActivities, selectedRule]);
+
   const isLoading = activitiesQueries.some((q) => q.isLoading) ||
     patternsQueries.some((q) => q.isLoading) ||
     (includeUnassigned && unassignedQuery.isLoading);
@@ -200,12 +229,6 @@ export function ProjectsUnifiedView({ selectedProjectIds, onNewProject }: Projec
   const [selectedActivityIds, setSelectedActivityIds] = useState<Set<string>>(new Set());
   const [reassignDialogOpen, setReassignDialogOpen] = useState(false);
   const [targetProjectId, setTargetProjectId] = useState<string>('');
-
-  // Rule selection state
-  const [selectedRuleIds, setSelectedRuleIds] = useState<Set<number>>(new Set());
-  const [bulkDeleteDialogOpen, setBulkDeleteDialogOpen] = useState(false);
-  const [isApplyingBulk, setIsApplyingBulk] = useState(false);
-  const [isDeletingBulk, setIsDeletingBulk] = useState(false);
 
   // Rule dialog state
   const [ruleDialogOpen, setRuleDialogOpen] = useState(false);
@@ -221,26 +244,28 @@ export function ProjectsUnifiedView({ selectedProjectIds, onNewProject }: Projec
   const [prefillPatternValue, setPrefillPatternValue] = useState<string>('');
   const [prefillProjectId, setPrefillProjectId] = useState<number | undefined>();
 
+  // Bulk delete dialog
+  const [bulkDeleteDialogOpen, setBulkDeleteDialogOpen] = useState(false);
+  const [selectedRuleIds, setSelectedRuleIds] = useState<Set<number>>(new Set());
+  const [isDeletingBulk, setIsDeletingBulk] = useState(false);
+
   // Suggested rule from selected activities
   const selectedActivities = useMemo(() => {
-    return allActivities.filter((a) => selectedActivityIds.has(`${a.eventType}-${a.eventId}`));
-  }, [allActivities, selectedActivityIds]);
+    return filteredActivities.filter((a) => selectedActivityIds.has(`${a.eventType}-${a.eventId}`));
+  }, [filteredActivities, selectedActivityIds]);
 
   const suggestedRule = useMemo(() => {
     if (selectedActivities.length < 2) return null;
 
-    // Check if all from same project
     const projectIds = new Set(selectedActivities.map((a) => a.projectId));
     if (projectIds.size !== 1) return null;
     const projectId = selectedActivities[0].projectId;
 
-    // Try to find common app name
     const appNames = new Set(selectedActivities.map((a) => a.appName?.toLowerCase()).filter(Boolean));
     if (appNames.size === 1) {
       return { projectId, type: 'app_name', value: selectedActivities[0].appName };
     }
 
-    // Try to find common substring in window titles
     const titles = selectedActivities.map((a) => a.windowTitle || '').filter(Boolean);
     if (titles.length > 0) {
       const words = titles[0].split(/\s+/).filter((w) => w.length >= 3);
@@ -254,7 +279,7 @@ export function ProjectsUnifiedView({ selectedProjectIds, onNewProject }: Projec
     return null;
   }, [selectedActivities]);
 
-  // Activity handlers
+  // Handlers
   const toggleActivitySelect = (key: string) => {
     setSelectedActivityIds((prev) => {
       const next = new Set(prev);
@@ -268,7 +293,7 @@ export function ProjectsUnifiedView({ selectedProjectIds, onNewProject }: Projec
   };
 
   const selectAllActivities = () => {
-    setSelectedActivityIds(new Set(allActivities.map((a) => `${a.eventType}-${a.eventId}`)));
+    setSelectedActivityIds(new Set(filteredActivities.map((a) => `${a.eventType}-${a.eventId}`)));
   };
 
   const clearActivitySelection = () => {
@@ -302,7 +327,15 @@ export function ProjectsUnifiedView({ selectedProjectIds, onNewProject }: Projec
     setRuleDialogOpen(true);
   };
 
-  // Rule handlers
+  const handleDeletePattern = (patternId: number) => {
+    if (confirm('Delete this rule? Events already assigned will keep their assignment.')) {
+      deletePattern.mutate(patternId);
+      if (selectedRuleId === patternId) {
+        setSelectedRuleId(null);
+      }
+    }
+  };
+
   const toggleRuleSelect = (ruleId: number) => {
     setSelectedRuleIds((prev) => {
       const next = new Set(prev);
@@ -315,42 +348,19 @@ export function ProjectsUnifiedView({ selectedProjectIds, onNewProject }: Projec
     });
   };
 
-  const selectAllRules = () => {
-    setSelectedRuleIds(new Set(allPatterns.map((p) => p.id)));
-  };
-
-  const clearRuleSelection = () => {
-    setSelectedRuleIds(new Set());
-  };
-
-  const handleBulkApplyRules = async () => {
-    setIsApplyingBulk(true);
-    try {
-      for (const ruleId of selectedRuleIds) {
-        await applyToHistory.mutateAsync(ruleId);
-      }
-      clearRuleSelection();
-    } finally {
-      setIsApplyingBulk(false);
-    }
-  };
-
   const handleBulkDeleteRules = async () => {
     setIsDeletingBulk(true);
     try {
       for (const ruleId of selectedRuleIds) {
         await deletePattern.mutateAsync(ruleId);
       }
-      clearRuleSelection();
+      setSelectedRuleIds(new Set());
       setBulkDeleteDialogOpen(false);
+      if (selectedRuleId && selectedRuleIds.has(selectedRuleId)) {
+        setSelectedRuleId(null);
+      }
     } finally {
       setIsDeletingBulk(false);
-    }
-  };
-
-  const handleDeletePattern = (patternId: number) => {
-    if (confirm('Delete this rule? Events already assigned will keep their assignment.')) {
-      deletePattern.mutate(patternId);
     }
   };
 
@@ -375,98 +385,40 @@ export function ProjectsUnifiedView({ selectedProjectIds, onNewProject }: Projec
   const hasRuleSelection = selectedRuleIds.size > 0;
 
   return (
-    <div className="h-full flex flex-col gap-4">
-      {/* Header */}
-      <div className="shrink-0">
-        <h1 className="text-2xl font-bold">
-          {selectedProjectsArray.length === 1 && !includeUnassigned
-            ? allProjects?.find((p) => p.id === selectedProjectsArray[0])?.name || 'Project'
-            : selectedProjectsArray.length === 0 && includeUnassigned
-              ? 'Unassigned Activities'
-              : `${selectedProjectsArray.length + (includeUnassigned ? 1 : 0)} Selected`}
-        </h1>
-        {(selectedProjectsArray.length > 1 || (selectedProjectsArray.length >= 1 && includeUnassigned)) && (
-          <div className="flex gap-2 mt-2 flex-wrap">
-            {includeUnassigned && (
-              <Badge variant="outline" className="gap-1.5 border-amber-500 text-amber-600">
-                Unassigned
-              </Badge>
-            )}
-            {selectedProjectsArray.map((id) => {
-              const project = allProjects?.find((p) => p.id === id);
-              if (!project) return null;
-              return (
-                <Badge key={id} variant="secondary" className="gap-1.5">
-                  <span
-                    className="w-2 h-2 rounded-full"
-                    style={{ backgroundColor: project.color }}
-                  />
-                  {project.name}
-                </Badge>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
-      <Tabs defaultValue="rules" className="flex-1 flex flex-col min-h-0 [&>div[role=tabpanel]]:flex-1 [&>div[role=tabpanel]]:min-h-0">
-        <TabsList className="shrink-0 w-fit">
-          <TabsTrigger value="rules">
-            Rules ({allPatterns.length})
-          </TabsTrigger>
-          <TabsTrigger value="activities">
-            Activities ({allActivities.length})
-          </TabsTrigger>
-        </TabsList>
-
-        {/* RULES TAB */}
-        <TabsContent value="rules" className="flex-1 flex flex-col gap-3 min-h-0 mt-2 data-[state=inactive]:hidden">
-          <div className="flex justify-between items-center gap-4">
-            <p className="text-sm text-muted-foreground">
-              Rules automatically assign activities to projects based on patterns.
-            </p>
-
-            {hasRuleSelection ? (
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-muted-foreground">
-                  {selectedRuleIds.size} selected
-                </span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleBulkApplyRules}
-                  disabled={isApplyingBulk}
-                >
-                  {isApplyingBulk ? (
-                    <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                  ) : (
-                    <Sparkles className="h-4 w-4 mr-1" />
-                  )}
-                  Apply to Existing
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="text-destructive hover:text-destructive"
-                  onClick={() => setBulkDeleteDialogOpen(true)}
-                >
-                  <Trash2 className="h-4 w-4 mr-1" />
-                  Delete
-                </Button>
-                <Button variant="ghost" size="sm" onClick={clearRuleSelection}>
-                  Cancel
-                </Button>
-              </div>
-            ) : (
-              <div className="flex items-center gap-2">
-                {allPatterns.length > 0 && (
-                  <Button variant="ghost" size="sm" onClick={selectAllRules}>
-                    <CheckSquare className="h-4 w-4 mr-1" />
-                    Select All
-                  </Button>
+    <div className="h-full flex flex-col gap-3">
+      {/* Side by side panels */}
+      <div ref={containerRef} className="flex-1 min-h-0 flex gap-3">
+        {/* Rules Panel */}
+        <div style={{ width: `${rulesWidth}%`, flexShrink: 0 }} className="h-full overflow-hidden border rounded-lg">
+          <div className="h-full flex flex-col">
+            {/* Rules header */}
+            <div className="shrink-0 flex items-center justify-between px-3 py-2 border-b bg-muted/30">
+              <span className="text-sm font-medium">Rules ({allPatterns.length})</span>
+              <div className="flex items-center gap-1">
+                {hasRuleSelection && (
+                  <>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 px-2 text-xs text-destructive hover:text-destructive"
+                      onClick={() => setBulkDeleteDialogOpen(true)}
+                    >
+                      <Trash2 className="h-3 w-3 mr-1" />
+                      Delete ({selectedRuleIds.size})
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 px-2 text-xs"
+                      onClick={() => setSelectedRuleIds(new Set())}
+                    >
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </>
                 )}
                 <Button
                   size="sm"
+                  className="h-7 px-2 text-xs"
                   onClick={() => {
                     setEditingRule(null);
                     setPrefillPatternType('');
@@ -475,96 +427,65 @@ export function ProjectsUnifiedView({ selectedProjectIds, onNewProject }: Projec
                     setRuleDialogOpen(true);
                   }}
                 >
-                  <Plus className="h-4 w-4 mr-1" />
-                  Add Rule
+                  <Plus className="h-3 w-3 mr-1" />
+                  Add
                 </Button>
               </div>
-            )}
-          </div>
+            </div>
 
-          {/* Rules Table */}
-          <div className="border rounded-lg flex-1 min-h-0 flex flex-col overflow-hidden">
-            {isLoading ? (
-              <div className="flex-1 flex items-center justify-center">
-                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-              </div>
-            ) : allPatterns.length > 0 ? (
-              <>
-                {/* Column headers */}
-                <div className="flex items-center border-b bg-muted/50 text-xs font-medium text-muted-foreground shrink-0">
-                  <div className="w-8 px-2 py-2 flex items-center justify-center">
-                    <Checkbox
-                      checked={selectedRuleIds.size === allPatterns.length && allPatterns.length > 0}
-                      onCheckedChange={() => {
-                        if (selectedRuleIds.size === allPatterns.length) {
-                          clearRuleSelection();
-                        } else {
-                          selectAllRules();
-                        }
-                      }}
-                      className="h-3.5 w-3.5"
-                    />
-                  </div>
-                  <div className="w-28 px-2 py-2">Project</div>
-                  <div className="w-24 px-2 py-2">Field</div>
-                  <div className="w-20 px-2 py-2">Match</div>
-                  <div className="flex-1 px-2 py-2">Pattern</div>
-                  <div className="w-14 px-2 py-2 text-right">Hits</div>
-                  <div className="w-24 px-2 py-2"></div>
+            {/* Rules list */}
+            <div className="flex-1 overflow-y-auto">
+              {isLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
                 </div>
-
-                {/* Rules list */}
-                <div className="flex-1 overflow-y-auto text-xs">
+              ) : allPatterns.length > 0 ? (
+                <div className="text-xs">
                   {allPatterns.map((pattern) => {
-                    const isSelected = selectedRuleIds.has(pattern.id);
+                    const isSelected = selectedRuleId === pattern.id;
+                    const isChecked = selectedRuleIds.has(pattern.id);
                     return (
                       <div
                         key={pattern.id}
-                        onClick={() => toggleRuleSelect(pattern.id)}
+                        onClick={() => setSelectedRuleId(isSelected ? null : pattern.id)}
                         className={cn(
-                          'flex items-center border-b cursor-pointer select-none group border-l-2',
+                          'flex items-center gap-2 px-3 py-2 border-b cursor-pointer group border-l-2',
                           isSelected
                             ? 'bg-primary/10 border-l-primary'
                             : 'border-l-transparent hover:bg-muted/50'
                         )}
                       >
-                        <div className="w-8 px-2 py-2 flex items-center justify-center">
-                          <Checkbox
-                            checked={isSelected}
-                            onCheckedChange={() => toggleRuleSelect(pattern.id)}
-                            onClick={(e) => e.stopPropagation()}
-                            className="h-3.5 w-3.5"
-                          />
+                        <Checkbox
+                          checked={isChecked}
+                          onCheckedChange={() => toggleRuleSelect(pattern.id)}
+                          onClick={(e) => e.stopPropagation()}
+                          className="h-3.5 w-3.5"
+                        />
+                        <span
+                          className="w-2.5 h-2.5 rounded-full shrink-0"
+                          style={{ backgroundColor: pattern.project?.color }}
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-muted-foreground">
+                              {PATTERN_TYPE_LABELS[pattern.patternType]}
+                            </span>
+                            <span className="text-muted-foreground/60">
+                              {MATCH_TYPE_LABELS[pattern.matchType]}
+                            </span>
+                            <code className="bg-muted px-1 rounded font-mono truncate text-[11px]">
+                              {pattern.patternValue}
+                            </code>
+                          </div>
                         </div>
-                        <div className="w-28 px-2 py-2 flex items-center gap-1.5">
-                          <span
-                            className="w-2.5 h-2.5 rounded-full shrink-0"
-                            style={{ backgroundColor: pattern.project?.color }}
-                          />
-                          <span className="truncate">{pattern.project?.name}</span>
-                        </div>
-                        <div className="w-24 px-2 py-2 text-muted-foreground">
-                          {PATTERN_TYPE_LABELS[pattern.patternType] || pattern.patternType}
-                        </div>
-                        <div className="w-20 px-2 py-2 text-muted-foreground">
-                          {MATCH_TYPE_LABELS[pattern.matchType] || pattern.matchType}
-                        </div>
-                        <div className="flex-1 px-2 py-2">
-                          <code className="bg-muted px-1.5 py-0.5 rounded text-[11px] font-mono">
-                            {pattern.patternValue}
-                          </code>
-                        </div>
-                        <div className="w-14 px-2 py-2 text-right text-muted-foreground">
-                          {pattern.hitCount}
-                        </div>
-                        <div className="w-24 px-2 py-2 flex items-center gap-0.5 justify-end opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
+                        <span className="text-muted-foreground tabular-nums">{pattern.hitCount}</span>
+                        <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100" onClick={(e) => e.stopPropagation()}>
                           <button
                             onClick={() => applyToHistory.mutate(pattern.id)}
-                            disabled={applyToHistory.isPending}
                             className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground"
                             title="Apply to existing"
                           >
-                            <Sparkles className="h-3.5 w-3.5" />
+                            <Sparkles className="h-3 w-3" />
                           </button>
                           <button
                             onClick={() => {
@@ -576,202 +497,201 @@ export function ProjectsUnifiedView({ selectedProjectIds, onNewProject }: Projec
                                 matchType: pattern.matchType,
                                 weight: pattern.weight,
                               });
-                              setPrefillPatternType('');
-                              setPrefillPatternValue('');
                               setRuleDialogOpen(true);
                             }}
                             className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground"
-                            title="Edit rule"
                           >
-                            <Pencil className="h-3.5 w-3.5" />
+                            <Pencil className="h-3 w-3" />
                           </button>
                           <button
                             onClick={() => handleDeletePattern(pattern.id)}
                             className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-destructive"
-                            title="Delete rule"
                           >
-                            <Trash2 className="h-3.5 w-3.5" />
+                            <Trash2 className="h-3 w-3" />
                           </button>
                         </div>
                       </div>
                     );
                   })}
                 </div>
-              </>
-            ) : (
-              <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground p-8">
-                <Sparkles className="h-8 w-8 mb-3 opacity-50" />
-                <p>No rules yet.</p>
-                <p className="text-sm mt-1">
-                  Add rules to automatically assign activities to projects.
-                </p>
-              </div>
-            )}
-          </div>
-        </TabsContent>
-
-        {/* ACTIVITIES TAB */}
-        <TabsContent value="activities" className="flex-1 flex flex-col gap-3 min-h-0 mt-2 data-[state=inactive]:hidden">
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex items-center gap-2">
-              <Select value={dateRange} onValueChange={setDateRange}>
-                <SelectTrigger className="w-32">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="1">Today</SelectItem>
-                  <SelectItem value="7">Last 7 days</SelectItem>
-                  <SelectItem value="30">Last 30 days</SelectItem>
-                  <SelectItem value="90">Last 90 days</SelectItem>
-                </SelectContent>
-              </Select>
-              <span className="text-sm text-muted-foreground">
-                {allActivities.length} activities
-              </span>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-8 text-muted-foreground text-sm">
+                  <p>No rules yet</p>
+                </div>
+              )}
             </div>
+          </div>
+        </div>
 
-            {hasActivitySelection ? (
+        <ResizableHandle onResize={handlePanelResize} />
+
+        {/* Activities Panel */}
+        <div className="flex-1 min-w-0 h-full overflow-hidden border rounded-lg">
+          <div className="h-full flex flex-col">
+            {/* Activities header */}
+            <div className="shrink-0 flex items-center justify-between px-3 py-2 border-b bg-muted/30">
               <div className="flex items-center gap-2">
-                <span className="text-sm text-muted-foreground">
-                  {selectedActivityIds.size} selected
+                <span className="text-sm font-medium">
+                  Activities ({filteredActivities.length})
                 </span>
-                {suggestedRule && (
+                {selectedRule && (
+                  <Badge variant="secondary" className="text-xs gap-1">
+                    <Filter className="h-3 w-3" />
+                    Filtered by rule
+                    <button
+                      onClick={() => setSelectedRuleId(null)}
+                      className="hover:text-foreground"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </Badge>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                <Select value={dateRange} onValueChange={setDateRange}>
+                  <SelectTrigger className="w-24 h-7 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="1">Today</SelectItem>
+                    <SelectItem value="7">7 days</SelectItem>
+                    <SelectItem value="30">30 days</SelectItem>
+                    <SelectItem value="90">90 days</SelectItem>
+                    <SelectItem value="all">All time</SelectItem>
+                  </SelectContent>
+                </Select>
+                {hasActivitySelection ? (
+                  <>
+                    {suggestedRule && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 px-2 text-xs"
+                        onClick={handleCreateRuleFromSelection}
+                      >
+                        <Lightbulb className="h-3 w-3 mr-1" />
+                        Create Rule
+                      </Button>
+                    )}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 px-2 text-xs"
+                      onClick={() => setReassignDialogOpen(true)}
+                    >
+                      <ArrowRight className="h-3 w-3 mr-1" />
+                      Move ({selectedActivityIds.size})
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 px-1 text-xs"
+                      onClick={clearActivitySelection}
+                    >
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </>
+                ) : (
                   <Button
-                    variant="outline"
+                    variant="ghost"
                     size="sm"
-                    onClick={handleCreateRuleFromSelection}
-                    className="gap-1"
+                    className="h-7 px-2 text-xs"
+                    onClick={selectAllActivities}
+                    disabled={filteredActivities.length === 0}
                   >
-                    <Lightbulb className="h-4 w-4" />
-                    Create Rule
+                    Select All
                   </Button>
                 )}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setReassignDialogOpen(true)}
-                >
-                  <ArrowRight className="h-4 w-4 mr-1" />
-                  Move
-                </Button>
-                <Button variant="ghost" size="sm" onClick={clearActivitySelection}>
-                  Cancel
-                </Button>
               </div>
-            ) : (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={selectAllActivities}
-                disabled={allActivities.length === 0}
-              >
-                <CheckSquare className="h-4 w-4 mr-1" />
-                Select All
-              </Button>
-            )}
-          </div>
+            </div>
 
-          {/* Activities List */}
-          <div className="border rounded-lg flex-1 min-h-0 flex flex-col overflow-hidden">
-            {isLoading ? (
-              <div className="flex-1 flex items-center justify-center">
-                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            {/* Column headers */}
+            <div className="shrink-0 flex items-center border-b bg-muted/50 text-xs font-medium text-muted-foreground">
+              <div className="w-8 px-2 py-1.5 flex items-center justify-center">
+                <Checkbox
+                  checked={selectedActivityIds.size === filteredActivities.length && filteredActivities.length > 0}
+                  onCheckedChange={() => {
+                    if (selectedActivityIds.size === filteredActivities.length) {
+                      clearActivitySelection();
+                    } else {
+                      selectAllActivities();
+                    }
+                  }}
+                  className="h-3 w-3"
+                />
               </div>
-            ) : allActivities.length > 0 ? (
-              <>
-                {/* Column headers */}
-                <div className="flex items-center border-b bg-muted/50 text-xs font-medium text-muted-foreground shrink-0">
-                  <div className="w-8 px-2 py-2 flex items-center justify-center">
-                    <Checkbox
-                      checked={selectedActivityIds.size === allActivities.length && allActivities.length > 0}
-                      onCheckedChange={() => {
-                        if (selectedActivityIds.size === allActivities.length) {
-                          clearActivitySelection();
-                        } else {
-                          selectAllActivities();
-                        }
-                      }}
-                      className="h-3.5 w-3.5"
-                    />
-                  </div>
-                  {selectedProjectIds.size > 1 && <div className="w-8 px-1 py-2"></div>}
-                  <div className="w-24 px-2 py-2">App</div>
-                  <div className="flex-1 px-2 py-2">Window Title</div>
-                  <div className="w-16 px-2 py-2 text-right">Duration</div>
-                  <div className="w-20 px-2 py-2 text-center">Source</div>
+              {selectedProjectIds.size > 1 && <div className="w-6"></div>}
+              <div className="w-20 px-1 py-1.5">App</div>
+              <div className="flex-1 px-1 py-1.5">Window Title</div>
+              <div className="w-14 px-1 py-1.5 text-right">Dur</div>
+            </div>
+
+            {/* Activities list */}
+            <div className="flex-1 overflow-y-auto text-xs">
+              {isLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
                 </div>
+              ) : filteredActivities.length > 0 ? (
+                filteredActivities.map((activity) => {
+                  const key = `${activity.eventType}-${activity.eventId}`;
+                  const isSelected = selectedActivityIds.has(key);
+                  const project = allProjects?.find((p) => p.id === activity.projectId);
 
-                {/* Activities list */}
-                <div className="flex-1 overflow-y-auto text-xs">
-                  {allActivities.map((activity) => {
-                    const key = `${activity.eventType}-${activity.eventId}`;
-                    const isSelected = selectedActivityIds.has(key);
-                    const project = allProjects?.find((p) => p.id === activity.projectId);
-
-                    return (
-                      <div
-                        key={key}
-                        onClick={() => toggleActivitySelect(key)}
-                        className={cn(
-                          'flex items-center border-b cursor-pointer select-none border-l-2',
-                          isSelected
-                            ? 'bg-primary/10 border-l-primary'
-                            : 'border-l-transparent hover:bg-muted/50'
-                        )}
-                      >
-                        <div className="w-8 px-2 py-2 flex items-center justify-center">
-                          <Checkbox
-                            checked={isSelected}
-                            onCheckedChange={() => toggleActivitySelect(key)}
-                            onClick={(e) => e.stopPropagation()}
-                            className="h-3.5 w-3.5"
-                          />
-                        </div>
-
-                        {selectedProjectIds.size > 1 && (
-                          <div className="w-8 px-1 py-2 flex items-center justify-center">
-                            {activity.projectId === UNASSIGNED_PROJECT_ID ? (
-                              <span
-                                className="w-2.5 h-2.5 rounded-full border-2 border-amber-500 bg-transparent"
-                                title="Unassigned"
-                              />
-                            ) : project ? (
-                              <span
-                                className="w-2.5 h-2.5 rounded-full"
-                                style={{ backgroundColor: project.color }}
-                                title={project.name}
-                              />
-                            ) : null}
-                          </div>
-                        )}
-
-                        <div className="w-24 px-2 py-2 truncate font-medium">
-                          {activity.appName}
-                        </div>
-                        <div className="flex-1 px-2 py-2 truncate text-muted-foreground">
-                          {activity.windowTitle}
-                        </div>
-                        <div className="w-16 px-2 py-2 text-right text-muted-foreground">
-                          {formatDuration(activity.durationSeconds)}
-                        </div>
-                        <div className="w-20 px-2 py-2 text-center">
-                          <span className="px-1.5 py-0.5 rounded bg-muted text-[10px]">
-                            {activity.source}
-                          </span>
-                        </div>
+                  return (
+                    <div
+                      key={key}
+                      onClick={() => toggleActivitySelect(key)}
+                      className={cn(
+                        'flex items-center border-b cursor-pointer select-none border-l-2',
+                        isSelected
+                          ? 'bg-primary/10 border-l-primary'
+                          : 'border-l-transparent hover:bg-muted/50'
+                      )}
+                    >
+                      <div className="w-8 px-2 py-1.5 flex items-center justify-center">
+                        <Checkbox
+                          checked={isSelected}
+                          onCheckedChange={() => toggleActivitySelect(key)}
+                          onClick={(e) => e.stopPropagation()}
+                          className="h-3 w-3"
+                        />
                       </div>
-                    );
-                  })}
+
+                      {selectedProjectIds.size > 1 && (
+                        <div className="w-6 flex items-center justify-center">
+                          {activity.projectId === UNASSIGNED_PROJECT_ID ? (
+                            <span className="w-2 h-2 rounded-full border border-amber-500" />
+                          ) : project ? (
+                            <span
+                              className="w-2 h-2 rounded-full"
+                              style={{ backgroundColor: project.color }}
+                            />
+                          ) : null}
+                        </div>
+                      )}
+
+                      <div className="w-20 px-1 py-1.5 truncate font-medium">
+                        {activity.appName}
+                      </div>
+                      <div className="flex-1 px-1 py-1.5 truncate text-muted-foreground">
+                        {activity.windowTitle}
+                      </div>
+                      <div className="w-14 px-1 py-1.5 text-right text-muted-foreground tabular-nums">
+                        {formatDuration(activity.durationSeconds)}
+                      </div>
+                    </div>
+                  );
+                })
+              ) : (
+                <div className="flex items-center justify-center py-8 text-muted-foreground text-sm">
+                  {selectedRule ? 'No activities match this rule' : 'No activities in this time range'}
                 </div>
-              </>
-            ) : (
-              <div className="flex-1 flex items-center justify-center text-muted-foreground">
-                No activities in this time range
-              </div>
-            )}
+              )}
+            </div>
           </div>
-        </TabsContent>
-      </Tabs>
+        </div>
+      </div>
 
       {/* Reassign Dialog */}
       <AlertDialog open={reassignDialogOpen} onOpenChange={setReassignDialogOpen}>
