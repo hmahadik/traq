@@ -785,9 +785,9 @@ export function EventList({
       </div>
 
       {/* Column headers */}
-      <div className="flex items-center border-b bg-muted/50 text-[10px] font-medium text-muted-foreground">
+      <div className="flex items-center border-b bg-muted/50 text-xs font-medium text-muted-foreground">
         {/* Checkbox header */}
-        <div className="w-8 px-2 py-1 flex items-center justify-center">
+        <div className="w-8 px-2 py-2 flex items-center justify-center">
           <input
             type="checkbox"
             checked={allSelected}
@@ -866,7 +866,7 @@ export function EventList({
                 )}
               >
                 {/* Checkbox */}
-                <div className="w-8 px-2 py-1.5 flex items-center justify-center">
+                <div className="w-8 px-2 py-2 flex items-center justify-center">
                   <input
                     type="checkbox"
                     checked={isSelected}
@@ -877,7 +877,7 @@ export function EventList({
                 </div>
 
                 {/* Time */}
-                <div className="w-16 px-1 py-1.5 text-muted-foreground">
+                <div className="w-16 px-1 py-2 text-muted-foreground">
                   {formatEventTime(event.timestamp)}
                 </div>
 

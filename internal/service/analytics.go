@@ -9,6 +9,24 @@ import (
 	"traq/internal/storage"
 )
 
+// clampedEventDuration calculates the duration of a focus event that falls within a time range.
+// Events may span beyond the query range (e.g., across midnight), so we clamp to the range boundaries.
+func clampedEventDuration(evt *storage.WindowFocusEvent, rangeStart, rangeEnd int64) float64 {
+	effectiveStart := evt.StartTime
+	if effectiveStart < rangeStart {
+		effectiveStart = rangeStart
+	}
+	effectiveEnd := evt.EndTime
+	if effectiveEnd > rangeEnd {
+		effectiveEnd = rangeEnd
+	}
+	duration := float64(effectiveEnd - effectiveStart)
+	if duration < 0 {
+		return 0
+	}
+	return duration
+}
+
 // AnalyticsService provides analytics and statistics.
 type AnalyticsService struct {
 	store *storage.Store
@@ -305,10 +323,11 @@ func (s *AnalyticsService) GetDailyStatsWithComparison(date string, withComparis
 	stats.ActiveMinutes = totalActiveSeconds / 60
 
 	// Get top apps from focus events for app usage tracking
+	// Clamp durations to day boundaries for events spanning midnight
 	focusEvents, _ := s.store.GetWindowFocusEventsByTimeRange(start, end)
 	appDurations := make(map[string]float64)
 	for _, evt := range focusEvents {
-		appDurations[evt.AppName] += evt.DurationSeconds
+		appDurations[evt.AppName] += clampedEventDuration(evt, start, end)
 	}
 
 	// Convert to sorted list
@@ -632,10 +651,11 @@ func (s *AnalyticsService) GetAppUsage(start, end int64) ([]*AppUsage, error) {
 		return nil, err
 	}
 
+	// Clamp durations to query range for events spanning boundaries
 	appDurations := make(map[string]float64)
 	appCounts := make(map[string]int64)
 	for _, evt := range focusEvents {
-		appDurations[evt.AppName] += evt.DurationSeconds
+		appDurations[evt.AppName] += clampedEventDuration(evt, start, end)
 		appCounts[evt.AppName]++
 	}
 
@@ -663,6 +683,7 @@ func (s *AnalyticsService) GetProjectUsage(start, end int64) ([]*ProjectUsage, e
 	}
 
 	// Aggregate by project
+	// Aggregate by project, clamping durations to the query time range
 	projectDurations := make(map[int64]float64)
 	projectCounts := make(map[int64]int64)
 	var totalDuration float64
@@ -672,9 +693,11 @@ func (s *AnalyticsService) GetProjectUsage(start, end int64) ([]*ProjectUsage, e
 		if evt.ProjectID.Valid {
 			projectID = evt.ProjectID.Int64
 		}
-		projectDurations[projectID] += evt.DurationSeconds
+
+		duration := clampedEventDuration(evt, start, end)
+		projectDurations[projectID] += duration
 		projectCounts[projectID]++
-		totalDuration += evt.DurationSeconds
+		totalDuration += duration
 	}
 
 	// Build result slice
@@ -966,9 +989,9 @@ func (s *AnalyticsService) GetProductivityScore(date string) (*ProductivityScore
 
 	score := &ProductivityScore{}
 
-	// Categorize and sum durations
+	// Categorize and sum durations, clamping to day boundaries
 	for _, evt := range focusEvents {
-		minutes := int64(evt.DurationSeconds / 60)
+		minutes := int64(clampedEventDuration(evt, start, end) / 60)
 
 		category := s.CategorizeApp(evt.AppName)
 		switch category {
@@ -1227,7 +1250,7 @@ func (s *AnalyticsService) GetTopWindows(start, end int64, limit int) ([]*Window
 		return nil, err
 	}
 
-	// Aggregate durations and counts by window title
+	// Aggregate durations and counts by window title, clamping to query range
 	windowDurations := make(map[string]float64)
 	windowCounts := make(map[string]int64)
 	windowApps := make(map[string]string) // window title -> app name (most recent)
@@ -1235,7 +1258,7 @@ func (s *AnalyticsService) GetTopWindows(start, end int64, limit int) ([]*Window
 	for _, evt := range focusEvents {
 		// Use window title as key (windows can have different apps theoretically)
 		key := evt.WindowTitle
-		windowDurations[key] += evt.DurationSeconds
+		windowDurations[key] += clampedEventDuration(evt, start, end)
 		windowCounts[key]++
 		windowApps[key] = evt.AppName // Keep track of the app (use last seen)
 	}

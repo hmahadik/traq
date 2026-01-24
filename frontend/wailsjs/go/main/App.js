@@ -14,6 +14,10 @@ export function AddTagToSession(arg1, arg2) {
   return window['go']['main']['App']['AddTagToSession'](arg1, arg2);
 }
 
+export function ApplyRuleToHistory(arg1) {
+  return window['go']['main']['App']['ApplyRuleToHistory'](arg1);
+}
+
 export function AssignEventToProject(arg1, arg2, arg3) {
   return window['go']['main']['App']['AssignEventToProject'](arg1, arg2, arg3);
 }
@@ -44,6 +48,10 @@ export function CheckForUpdate() {
 
 export function CreateProject(arg1, arg2, arg3) {
   return window['go']['main']['App']['CreateProject'](arg1, arg2, arg3);
+}
+
+export function CreateProjectRule(arg1) {
+  return window['go']['main']['App']['CreateProjectRule'](arg1);
 }
 
 export function DeleteAFKEvents(arg1) {
@@ -422,6 +430,10 @@ export function GetTrackedRepositories() {
   return window['go']['main']['App']['GetTrackedRepositories']();
 }
 
+export function GetUnassignedActivities(arg1, arg2) {
+  return window['go']['main']['App']['GetUnassignedActivities'](arg1, arg2);
+}
+
 export function GetUnassignedEventCount() {
   return window['go']['main']['App']['GetUnassignedEventCount']();
 }
@@ -466,6 +478,10 @@ export function MergeTags(arg1, arg2) {
   return window['go']['main']['App']['MergeTags'](arg1, arg2);
 }
 
+export function MigrateHardcodedPatterns() {
+  return window['go']['main']['App']['MigrateHardcodedPatterns']();
+}
+
 export function OpenDataDir() {
   return window['go']['main']['App']['OpenDataDir']();
 }
@@ -484,6 +500,10 @@ export function PauseCapture() {
 
 export function PreviewBackfill(arg1, arg2, arg3) {
   return window['go']['main']['App']['PreviewBackfill'](arg1, arg2, arg3);
+}
+
+export function PreviewRuleMatches(arg1) {
+  return window['go']['main']['App']['PreviewRuleMatches'](arg1);
 }
 
 export function PullOllamaModel(arg1) {
@@ -604,6 +624,10 @@ export function UpdateHierarchicalSummary(arg1, arg2) {
 
 export function UpdateProject(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['UpdateProject'](arg1, arg2, arg3, arg4);
+}
+
+export function UpdateProjectRule(arg1, arg2) {
+  return window['go']['main']['App']['UpdateProjectRule'](arg1, arg2);
 }
 
 export function WatchDirectory(arg1) {

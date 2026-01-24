@@ -3,8 +3,14 @@ package storage
 import (
 	"database/sql"
 	"fmt"
+	"regexp"
 	"time"
 )
+
+// compileRegex compiles a regex pattern, returning an error if invalid.
+func compileRegex(pattern string) (*regexp.Regexp, error) {
+	return regexp.Compile(pattern)
+}
 
 // ============================================================================
 // Project CRUD
@@ -367,6 +373,44 @@ func (s *Store) GetProjectActivities(projectID int64, startTime, endTime int64, 
 	return activities, rows.Err()
 }
 
+// GetUnassignedActivities returns activities without project assignment
+func (s *Store) GetUnassignedActivities(startTime, endTime int64, limit int) ([]ProjectActivity, error) {
+	query := `
+		SELECT
+			'focus' as event_type,
+			id,
+			app_name,
+			window_title,
+			start_time,
+			duration_seconds,
+			0 as confidence,
+			'none' as source
+		FROM window_focus_events
+		WHERE (project_id IS NULL OR project_id = 0)
+		  AND start_time >= ? AND start_time <= ?
+		ORDER BY start_time DESC
+		LIMIT ?
+	`
+
+	rows, err := s.db.Query(query, startTime, endTime, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var activities []ProjectActivity
+	for rows.Next() {
+		var a ProjectActivity
+		err := rows.Scan(&a.EventType, &a.EventID, &a.AppName, &a.WindowTitle,
+			&a.StartTime, &a.DurationSeconds, &a.Confidence, &a.Source)
+		if err != nil {
+			return nil, err
+		}
+		activities = append(activities, a)
+	}
+	return activities, rows.Err()
+}
+
 // GetFocusEventsByProject returns focus events for a specific project in a time range
 func (s *Store) GetFocusEventsByProject(startTime, endTime int64, projectID int64) ([]*WindowFocusEvent, error) {
 	rows, err := s.db.Query(`
@@ -382,4 +426,318 @@ func (s *Store) GetFocusEventsByProject(startTime, endTime int64, projectID int6
 	defer rows.Close()
 
 	return scanFocusEvents(rows)
+}
+
+// ============================================================================
+// Project Rules / Pattern Management (User-configurable rules)
+// ============================================================================
+
+// CreatePattern creates a new pattern without incrementing hit_count (unlike UpsertPattern).
+func (s *Store) CreatePattern(projectID int64, patternType, patternValue, matchType string, weight float64) (int64, error) {
+	now := time.Now().Unix()
+	result, err := s.db.Exec(`
+		INSERT INTO project_patterns (project_id, pattern_type, pattern_value, match_type, weight, hit_count, created_at)
+		VALUES (?, ?, ?, ?, ?, 0, ?)
+	`, projectID, patternType, patternValue, matchType, weight, now)
+	if err != nil {
+		return 0, fmt.Errorf("failed to create pattern: %w", err)
+	}
+
+	id, err := result.LastInsertId()
+	if err != nil {
+		return 0, fmt.Errorf("failed to get pattern id: %w", err)
+	}
+	return id, nil
+}
+
+// UpdatePattern updates an existing pattern's details.
+func (s *Store) UpdatePattern(id int64, patternType, patternValue, matchType string, weight float64) error {
+	_, err := s.db.Exec(`
+		UPDATE project_patterns
+		SET pattern_type = ?, pattern_value = ?, match_type = ?, weight = ?
+		WHERE id = ?
+	`, patternType, patternValue, matchType, weight, id)
+	if err != nil {
+		return fmt.Errorf("failed to update pattern: %w", err)
+	}
+	return nil
+}
+
+// GetPattern returns a single pattern by ID.
+func (s *Store) GetPattern(id int64) (*ProjectPattern, error) {
+	var p ProjectPattern
+	var lastUsed sql.NullInt64
+	err := s.db.QueryRow(`
+		SELECT id, project_id, pattern_type, pattern_value, match_type,
+		       weight, hit_count, last_used_at, created_at
+		FROM project_patterns WHERE id = ?
+	`, id).Scan(&p.ID, &p.ProjectID, &p.PatternType, &p.PatternValue,
+		&p.MatchType, &p.Weight, &p.HitCount, &lastUsed, &p.CreatedAt)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("failed to get pattern: %w", err)
+	}
+	if lastUsed.Valid {
+		p.LastUsedAt = lastUsed.Int64
+	}
+	return &p, nil
+}
+
+// buildPatternMatchCondition returns the SQL condition and params for matching patterns.
+// It handles all match types except regex (which must be done in Go).
+func buildPatternMatchCondition(patternType, patternValue, matchType string) (condition string, params []interface{}, needsGoFilter bool) {
+	var field string
+	switch patternType {
+	case "window_title":
+		field = "window_title"
+	case "app_name":
+		field = "app_name"
+	default:
+		// For other pattern types (git_repo, domain, path), we use window_title as fallback
+		// These would need specific table queries in a real implementation
+		field = "window_title"
+	}
+
+	switch matchType {
+	case "exact":
+		return fmt.Sprintf("LOWER(%s) = LOWER(?)", field), []interface{}{patternValue}, false
+	case "contains":
+		return fmt.Sprintf("LOWER(%s) LIKE '%%' || LOWER(?) || '%%'", field), []interface{}{patternValue}, false
+	case "prefix":
+		return fmt.Sprintf("LOWER(%s) LIKE LOWER(?) || '%%'", field), []interface{}{patternValue}, false
+	case "suffix":
+		return fmt.Sprintf("LOWER(%s) LIKE '%%' || LOWER(?)", field), []interface{}{patternValue}, false
+	case "regex":
+		// Regex requires Go filtering - return broad match and flag for post-processing
+		return "1=1", nil, true
+	default:
+		return fmt.Sprintf("LOWER(%s) LIKE '%%' || LOWER(?) || '%%'", field), []interface{}{patternValue}, false
+	}
+}
+
+// CountMatchingEvents counts events that would match a given pattern.
+func (s *Store) CountMatchingEvents(patternType, patternValue, matchType string) (int, error) {
+	condition, params, needsGoFilter := buildPatternMatchCondition(patternType, patternValue, matchType)
+
+	if needsGoFilter {
+		// For regex, we need to load all and filter in Go
+		return s.countMatchingEventsRegex(patternType, patternValue)
+	}
+
+	var count int
+	query := fmt.Sprintf(`SELECT COUNT(*) FROM window_focus_events WHERE %s`, condition)
+	err := s.db.QueryRow(query, params...).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("failed to count matching events: %w", err)
+	}
+	return count, nil
+}
+
+// countMatchingEventsRegex counts events using Go regex filtering.
+func (s *Store) countMatchingEventsRegex(patternType, patternValue string) (int, error) {
+	field := "window_title"
+	if patternType == "app_name" {
+		field = "app_name"
+	}
+
+	rows, err := s.db.Query(fmt.Sprintf(`SELECT %s FROM window_focus_events WHERE %s IS NOT NULL AND %s != ''`, field, field, field))
+	if err != nil {
+		return 0, fmt.Errorf("failed to query events for regex: %w", err)
+	}
+	defer rows.Close()
+
+	re, err := compileRegex(patternValue)
+	if err != nil {
+		return 0, fmt.Errorf("invalid regex pattern: %w", err)
+	}
+
+	count := 0
+	for rows.Next() {
+		var value string
+		if err := rows.Scan(&value); err != nil {
+			continue
+		}
+		if re.MatchString(value) {
+			count++
+		}
+	}
+	return count, rows.Err()
+}
+
+// GetSampleMatchingEvents returns up to N sample window titles that match a pattern.
+func (s *Store) GetSampleMatchingEvents(patternType, patternValue, matchType string, limit int) ([]string, error) {
+	condition, params, needsGoFilter := buildPatternMatchCondition(patternType, patternValue, matchType)
+
+	if needsGoFilter {
+		return s.getSampleMatchingEventsRegex(patternType, patternValue, limit)
+	}
+
+	field := "window_title"
+	if patternType == "app_name" {
+		field = "app_name"
+	}
+
+	// Get distinct samples
+	query := fmt.Sprintf(`
+		SELECT DISTINCT %s FROM window_focus_events
+		WHERE %s AND %s IS NOT NULL AND %s != ''
+		ORDER BY start_time DESC
+		LIMIT ?
+	`, field, condition, field, field)
+	params = append(params, limit)
+
+	rows, err := s.db.Query(query, params...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get sample events: %w", err)
+	}
+	defer rows.Close()
+
+	var samples []string
+	for rows.Next() {
+		var sample string
+		if err := rows.Scan(&sample); err != nil {
+			continue
+		}
+		samples = append(samples, sample)
+	}
+	return samples, rows.Err()
+}
+
+// getSampleMatchingEventsRegex gets sample events using Go regex filtering.
+func (s *Store) getSampleMatchingEventsRegex(patternType, patternValue string, limit int) ([]string, error) {
+	field := "window_title"
+	if patternType == "app_name" {
+		field = "app_name"
+	}
+
+	rows, err := s.db.Query(fmt.Sprintf(`
+		SELECT DISTINCT %s FROM window_focus_events
+		WHERE %s IS NOT NULL AND %s != ''
+		ORDER BY start_time DESC
+	`, field, field, field))
+	if err != nil {
+		return nil, fmt.Errorf("failed to query events for regex: %w", err)
+	}
+	defer rows.Close()
+
+	re, err := compileRegex(patternValue)
+	if err != nil {
+		return nil, fmt.Errorf("invalid regex pattern: %w", err)
+	}
+
+	var samples []string
+	for rows.Next() && len(samples) < limit {
+		var value string
+		if err := rows.Scan(&value); err != nil {
+			continue
+		}
+		if re.MatchString(value) {
+			samples = append(samples, value)
+		}
+	}
+	return samples, rows.Err()
+}
+
+// ApplyPatternToEvents bulk assigns a project to all events matching a pattern.
+// Returns the number of events updated.
+func (s *Store) ApplyPatternToEvents(projectID int64, patternType, patternValue, matchType string) (int, error) {
+	condition, params, needsGoFilter := buildPatternMatchCondition(patternType, patternValue, matchType)
+
+	if needsGoFilter {
+		return s.applyPatternToEventsRegex(projectID, patternType, patternValue)
+	}
+
+	// Build update query for window_focus_events
+	query := fmt.Sprintf(`
+		UPDATE window_focus_events
+		SET project_id = ?, project_confidence = 1.0, project_source = 'rule'
+		WHERE %s
+	`, condition)
+	allParams := append([]interface{}{projectID}, params...)
+
+	result, err := s.db.Exec(query, allParams...)
+	if err != nil {
+		return 0, fmt.Errorf("failed to apply pattern to events: %w", err)
+	}
+
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return 0, fmt.Errorf("failed to get rows affected: %w", err)
+	}
+	return int(affected), nil
+}
+
+// applyPatternToEventsRegex applies pattern using Go regex filtering.
+func (s *Store) applyPatternToEventsRegex(projectID int64, patternType, patternValue string) (int, error) {
+	field := "window_title"
+	if patternType == "app_name" {
+		field = "app_name"
+	}
+
+	rows, err := s.db.Query(fmt.Sprintf(`SELECT id, %s FROM window_focus_events WHERE %s IS NOT NULL AND %s != ''`, field, field, field))
+	if err != nil {
+		return 0, fmt.Errorf("failed to query events for regex: %w", err)
+	}
+	defer rows.Close()
+
+	re, err := compileRegex(patternValue)
+	if err != nil {
+		return 0, fmt.Errorf("invalid regex pattern: %w", err)
+	}
+
+	var ids []int64
+	for rows.Next() {
+		var id int64
+		var value string
+		if err := rows.Scan(&id, &value); err != nil {
+			continue
+		}
+		if re.MatchString(value) {
+			ids = append(ids, id)
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return 0, err
+	}
+
+	if len(ids) == 0 {
+		return 0, nil
+	}
+
+	// Update in batches
+	updated := 0
+	for i := 0; i < len(ids); i += 500 {
+		end := i + 500
+		if end > len(ids) {
+			end = len(ids)
+		}
+		batch := ids[i:end]
+
+		placeholders := make([]byte, 0, len(batch)*2)
+		args := make([]interface{}, 0, len(batch)+1)
+		args = append(args, projectID)
+		for j, id := range batch {
+			if j > 0 {
+				placeholders = append(placeholders, ',')
+			}
+			placeholders = append(placeholders, '?')
+			args = append(args, id)
+		}
+
+		query := fmt.Sprintf(`
+			UPDATE window_focus_events
+			SET project_id = ?, project_confidence = 1.0, project_source = 'rule'
+			WHERE id IN (%s)
+		`, string(placeholders))
+
+		result, err := s.db.Exec(query, args...)
+		if err != nil {
+			return updated, fmt.Errorf("failed to update batch: %w", err)
+		}
+		affected, _ := result.RowsAffected()
+		updated += int(affected)
+	}
+	return updated, nil
 }

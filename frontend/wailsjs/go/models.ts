@@ -1550,6 +1550,26 @@ export namespace service {
 	        this.productivePercentage = source["productivePercentage"];
 	    }
 	}
+	export class ProjectRuleInput {
+	    projectId: number;
+	    patternType: string;
+	    patternValue: string;
+	    matchType: string;
+	    weight?: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new ProjectRuleInput(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.projectId = source["projectId"];
+	        this.patternType = source["patternType"];
+	        this.patternValue = source["patternValue"];
+	        this.matchType = source["matchType"];
+	        this.weight = source["weight"];
+	    }
+	}
 	export class ProjectUsage {
 	    projectId: number;
 	    projectName: string;
@@ -1623,6 +1643,20 @@ export namespace service {
 	        this.reportType = source["reportType"];
 	        this.format = source["format"];
 	        this.createdAt = source["createdAt"];
+	    }
+	}
+	export class RulePreview {
+	    matchCount: number;
+	    sampleMatches: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new RulePreview(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.matchCount = source["matchCount"];
+	        this.sampleMatches = source["sampleMatches"];
 	    }
 	}
 	export class ScreenshotDisplay {

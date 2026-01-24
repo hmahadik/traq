@@ -60,7 +60,7 @@ func createTestChromiumDB(path string, visits []struct {
 	}
 	defer db.Close()
 
-	// Create Chrome schema
+	// Create Chrome schema (including originator_cache_guid for sync filtering)
 	_, err = db.Exec(`
 		CREATE TABLE urls (
 			id INTEGER PRIMARY KEY,
@@ -71,7 +71,8 @@ func createTestChromiumDB(path string, visits []struct {
 			id INTEGER PRIMARY KEY,
 			url INTEGER,
 			visit_time INTEGER,
-			visit_duration INTEGER DEFAULT 0
+			visit_duration INTEGER DEFAULT 0,
+			originator_cache_guid TEXT
 		);
 	`)
 	if err != nil {
@@ -683,9 +684,10 @@ func TestBrowserTracker_VisitMetadata(t *testing.T) {
 		t.Errorf("Expected browser 'chrome', got '%s'", v.Browser)
 	}
 
-	// Chrome visits have duration
-	if !v.VisitDurationSeconds.Valid {
-		t.Error("Expected visit duration to be set")
+	// Duration is intentionally NOT stored - it's computed from focus events at read time
+	// Chrome's visit_duration is unreliable (includes idle time, synced visits, etc.)
+	if v.VisitDurationSeconds.Valid {
+		t.Error("Expected visit duration to NOT be set (computed at read time instead)")
 	}
 
 	// Timestamp should be close to now

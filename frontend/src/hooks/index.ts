@@ -1,3 +1,4 @@
+export { useDebounce } from './useDebounce';
 export { useKeyboardNav } from './useKeyboardNav';
 export { useListNav } from './useListNav';
 export { useLocalStorage } from './useLocalStorage';

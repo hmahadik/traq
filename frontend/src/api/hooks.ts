@@ -28,9 +28,11 @@ function safeEventsOn(eventName: string, callback: (...args: any[]) => void): ()
 }
 
 // Helper to convert date string to timestamp range
+// Note: new Date("YYYY-MM-DD") parses as UTC, causing off-by-one errors in negative UTC offsets.
+// We parse the components manually to create a local midnight date.
 function getDateRange(date: string): { start: number; end: number } {
-  const d = new Date(date);
-  const start = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime() / 1000;
+  const [year, month, day] = date.split('-').map(Number);
+  const start = new Date(year, month - 1, day).getTime() / 1000;
   const end = start + 24 * 60 * 60 - 1; // End of day
   return { start, end };
 }
@@ -1303,6 +1305,118 @@ export function useDeleteProjectPattern() {
   });
 }
 
+// ============================================================================
+// Project Rules Hooks (User-configurable patterns)
+// ============================================================================
+
+export interface ProjectRuleInput {
+  projectId: number;
+  patternType: string;  // app_name, window_title, git_repo, domain
+  patternValue: string;
+  matchType: string;    // exact, contains, prefix, suffix, regex
+  weight?: number;
+}
+
+/**
+ * Create a new project rule (pattern)
+ */
+export function useCreateProjectRule() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (rule: ProjectRuleInput) => api.projects.createRule(rule),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['project'] });
+      toast.success('Rule created');
+    },
+    onError: (error: unknown) => {
+      console.error('Create rule failed:', error);
+      const message = error instanceof Error ? error.message : String(error);
+      toast.error(`Failed to create rule: ${message}`);
+    },
+  });
+}
+
+/**
+ * Update an existing project rule
+ */
+export function useUpdateProjectRule() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, rule }: { id: number; rule: Partial<Omit<ProjectRuleInput, 'projectId'>> }) =>
+      api.projects.updateRule(id, rule),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['project'] });
+      toast.success('Rule updated');
+    },
+    onError: (error: unknown) => {
+      console.error('Update rule failed:', error);
+      const message = error instanceof Error ? error.message : String(error);
+      toast.error(`Failed to update rule: ${message}`);
+    },
+  });
+}
+
+/**
+ * Preview what events would match a pattern.
+ * Pass null to skip the query.
+ */
+export function usePreviewRuleMatches(rule: { patternType: string; patternValue: string; matchType: string } | null) {
+  return useQuery({
+    queryKey: ['project', 'rule-preview', rule?.patternType, rule?.patternValue, rule?.matchType],
+    queryFn: () => api.projects.previewRule(rule!),
+    enabled: !!rule && !!rule.patternValue && rule.patternValue.length >= 2,
+    staleTime: 0, // Always re-fetch on rule change
+    gcTime: 60 * 1000, // Cache for 1 minute
+  });
+}
+
+/**
+ * Apply a rule to all matching historical events
+ */
+export function useApplyRuleToHistory() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (patternId: number) => api.projects.applyRuleToHistory(patternId),
+    onSuccess: (count) => {
+      queryClient.invalidateQueries({ queryKey: ['timeline'] });
+      queryClient.invalidateQueries({ queryKey: ['project'] });
+      toast.success(`Rule applied to ${count} events`);
+    },
+    onError: (error: unknown) => {
+      console.error('Apply rule failed:', error);
+      const message = error instanceof Error ? error.message : String(error);
+      toast.error(`Failed to apply rule: ${message}`);
+    },
+  });
+}
+
+/**
+ * Migrate legacy hardcoded patterns to database (one-time operation)
+ */
+export function useMigrateHardcodedPatterns() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: () => api.projects.migrateHardcodedPatterns(),
+    onSuccess: (count) => {
+      queryClient.invalidateQueries({ queryKey: ['project'] });
+      if (count > 0) {
+        toast.success(`Migrated ${count} patterns to database`);
+      } else {
+        toast.info('All patterns already migrated');
+      }
+    },
+    onError: (error: unknown) => {
+      console.error('Migration failed:', error);
+      const message = error instanceof Error ? error.message : String(error);
+      toast.error(`Failed to migrate patterns: ${message}`);
+    },
+  });
+}
+
 /**
  * Assign an event to a project
  */
@@ -1356,6 +1470,18 @@ export function useUnassignedEventCount() {
     queryKey: ['unassigned-events-count'],
     queryFn: () => api.projects.getUnassignedCount(),
     staleTime: 1000 * 60, // 1 minute
+  });
+}
+
+/**
+ * Get unassigned activities in a date range
+ */
+export function useUnassignedActivities(startDate: string, endDate: string, enabled = true) {
+  return useQuery({
+    queryKey: ['unassigned-activities', startDate, endDate],
+    queryFn: () => api.projects.getUnassignedActivities(startDate, endDate),
+    enabled: enabled && !!startDate && !!endDate,
+    staleTime: 1000 * 30, // 30 seconds
   });
 }
 

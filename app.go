@@ -1699,6 +1699,15 @@ func (a *App) GetProjectActivities(projectID int64, startDate, endDate string) (
 	return a.store.GetProjectActivities(projectID, start.Unix(), end.Unix(), 500)
 }
 
+// GetUnassignedActivities returns activities without project assignment in a time range.
+func (a *App) GetUnassignedActivities(startDate, endDate string) ([]storage.ProjectActivity, error) {
+	start, _ := time.ParseInLocation("2006-01-02", startDate, time.Local)
+	end, _ := time.ParseInLocation("2006-01-02", endDate, time.Local)
+	end = end.Add(24 * time.Hour) // Include full end day
+
+	return a.store.GetUnassignedActivities(start.Unix(), end.Unix(), 500)
+}
+
 // GetProjectPatterns returns learned patterns for a project.
 func (a *App) GetProjectPatterns(projectID int64) ([]storage.ProjectPattern, error) {
 	if a.Projects == nil {
@@ -1713,6 +1722,47 @@ func (a *App) DeleteProjectPattern(patternID int64) error {
 		return fmt.Errorf("projects service not initialized")
 	}
 	return a.Projects.DeletePattern(patternID)
+}
+
+// CreateProjectRule creates a new user-defined pattern rule.
+func (a *App) CreateProjectRule(rule service.ProjectRuleInput) (*storage.ProjectPattern, error) {
+	if a.Projects == nil {
+		return nil, fmt.Errorf("projects service not initialized")
+	}
+	return a.Projects.CreateProjectRule(rule)
+}
+
+// UpdateProjectRule updates an existing pattern rule.
+func (a *App) UpdateProjectRule(id int64, rule service.ProjectRuleInput) error {
+	if a.Projects == nil {
+		return fmt.Errorf("projects service not initialized")
+	}
+	return a.Projects.UpdateProjectRule(id, rule)
+}
+
+// PreviewRuleMatches shows what events would match a pattern without applying it.
+func (a *App) PreviewRuleMatches(rule service.ProjectRuleInput) (*service.RulePreview, error) {
+	if a.Projects == nil {
+		return nil, fmt.Errorf("projects service not initialized")
+	}
+	return a.Projects.PreviewRuleMatches(rule)
+}
+
+// ApplyRuleToHistory applies a pattern to all matching historical events.
+func (a *App) ApplyRuleToHistory(patternID int64) (int, error) {
+	if a.Projects == nil {
+		return 0, fmt.Errorf("projects service not initialized")
+	}
+	return a.Projects.ApplyRuleToHistory(patternID)
+}
+
+// MigrateHardcodedPatterns migrates legacy hardcoded project detection rules to the database.
+// This is idempotent and safe to call multiple times.
+func (a *App) MigrateHardcodedPatterns() (int, error) {
+	if a.Projects == nil {
+		return 0, fmt.Errorf("projects service not initialized")
+	}
+	return a.Projects.MigrateHardcodedPatterns()
 }
 
 // AssignEventToProject manually assigns an event to a project.

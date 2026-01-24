@@ -12,6 +12,8 @@ export function AcceptSummaryDraft(arg1:number):Promise<void>;
 
 export function AddTagToSession(arg1:number,arg2:string):Promise<void>;
 
+export function ApplyRuleToHistory(arg1:number):Promise<number>;
+
 export function AssignEventToProject(arg1:string,arg2:number,arg3:number):Promise<void>;
 
 export function AutoDiscoverProjects():Promise<Array<storage.Project>>;
@@ -27,6 +29,8 @@ export function BulkAssignProject(arg1:Array<main.BulkAssignment>):Promise<void>
 export function CheckForUpdate():Promise<service.UpdateInfo>;
 
 export function CreateProject(arg1:string,arg2:string,arg3:string):Promise<storage.Project>;
+
+export function CreateProjectRule(arg1:service.ProjectRuleInput):Promise<storage.ProjectPattern>;
 
 export function DeleteAFKEvents(arg1:Array<number>):Promise<void>;
 
@@ -216,6 +220,8 @@ export function GetTopWindows(arg1:string,arg2:number):Promise<Array<service.Win
 
 export function GetTrackedRepositories():Promise<Array<storage.GitRepository>>;
 
+export function GetUnassignedActivities(arg1:string,arg2:string):Promise<Array<storage.ProjectActivity>>;
+
 export function GetUnassignedEventCount():Promise<number>;
 
 export function GetUpdateStatus():Promise<service.UpdateStatus>;
@@ -238,6 +244,8 @@ export function ListHierarchicalSummaries(arg1:string,arg2:number):Promise<Array
 
 export function MergeTags(arg1:string,arg2:string):Promise<number>;
 
+export function MigrateHardcodedPatterns():Promise<number>;
+
 export function OpenDataDir():Promise<void>;
 
 export function OptimizeDatabase():Promise<number>;
@@ -247,6 +255,8 @@ export function ParseTimeRange(arg1:string):Promise<service.TimeRange>;
 export function PauseCapture():Promise<void>;
 
 export function PreviewBackfill(arg1:string,arg2:string,arg3:number):Promise<service.BackfillResult>;
+
+export function PreviewRuleMatches(arg1:service.ProjectRuleInput):Promise<service.RulePreview>;
 
 export function PullOllamaModel(arg1:string):Promise<void>;
 
@@ -307,5 +317,7 @@ export function UpdateFocusEvent(arg1:number,arg2:string,arg3:string,arg4:number
 export function UpdateHierarchicalSummary(arg1:number,arg2:string):Promise<void>;
 
 export function UpdateProject(arg1:number,arg2:string,arg3:string,arg4:string):Promise<void>;
+
+export function UpdateProjectRule(arg1:number,arg2:service.ProjectRuleInput):Promise<void>;
 
 export function WatchDirectory(arg1:string):Promise<void>;

@@ -2,6 +2,7 @@ package service
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"regexp"
 	"strings"
@@ -34,6 +35,21 @@ type AssignmentResult struct {
 	Confidence  float64 `json:"confidence"`
 	Source      string  `json:"source"` // 'rule', 'ai', 'user'
 	Reason      string  `json:"reason"` // Human-readable explanation
+}
+
+// ProjectRuleInput is the input for creating/updating a project rule.
+type ProjectRuleInput struct {
+	ProjectID    int64   `json:"projectId"`
+	PatternType  string  `json:"patternType"`  // app_name, window_title, git_repo, domain
+	PatternValue string  `json:"patternValue"`
+	MatchType    string  `json:"matchType"` // exact, contains, prefix, suffix, regex
+	Weight       float64 `json:"weight,omitempty"`
+}
+
+// RulePreview shows what events would match a pattern.
+type RulePreview struct {
+	MatchCount    int      `json:"matchCount"`
+	SampleMatches []string `json:"sampleMatches"` // up to 5 window titles
 }
 
 // NewProjectAssignmentService creates a new project assignment service.
@@ -301,6 +317,300 @@ func (s *ProjectAssignmentService) DeletePattern(patternID int64) error {
 		s.refreshPatternCache()
 	}
 	return err
+}
+
+// ============================================================================
+// Project Rules CRUD (User-configurable rules)
+// ============================================================================
+
+// CreateProjectRule creates a new pattern rule for a project.
+func (s *ProjectAssignmentService) CreateProjectRule(input ProjectRuleInput) (*storage.ProjectPattern, error) {
+	// Validate inputs
+	if input.ProjectID == 0 {
+		return nil, errInvalidInput("projectId is required")
+	}
+	if input.PatternType == "" {
+		return nil, errInvalidInput("patternType is required")
+	}
+	if input.PatternValue == "" {
+		return nil, errInvalidInput("patternValue is required")
+	}
+	if input.MatchType == "" {
+		input.MatchType = "contains" // default
+	}
+	if input.Weight == 0 {
+		input.Weight = 1.0 // default
+	}
+
+	// Validate pattern type
+	validTypes := map[string]bool{"app_name": true, "window_title": true, "git_repo": true, "domain": true, "path": true}
+	if !validTypes[input.PatternType] {
+		return nil, errInvalidInput("invalid patternType: " + input.PatternType)
+	}
+
+	// Validate match type
+	validMatchTypes := map[string]bool{"exact": true, "contains": true, "prefix": true, "suffix": true, "regex": true}
+	if !validMatchTypes[input.MatchType] {
+		return nil, errInvalidInput("invalid matchType: " + input.MatchType)
+	}
+
+	// Validate regex if that's the match type
+	if input.MatchType == "regex" {
+		if _, err := regexp.Compile(input.PatternValue); err != nil {
+			return nil, errInvalidInput("invalid regex pattern: " + err.Error())
+		}
+	}
+
+	// Create the pattern
+	id, err := s.store.CreatePattern(input.ProjectID, input.PatternType, input.PatternValue, input.MatchType, input.Weight)
+	if err != nil {
+		return nil, err
+	}
+
+	// Refresh cache
+	s.refreshPatternCache()
+
+	// Return the created pattern
+	return s.store.GetPattern(id)
+}
+
+// UpdateProjectRule updates an existing pattern rule.
+func (s *ProjectAssignmentService) UpdateProjectRule(id int64, input ProjectRuleInput) error {
+	// Get existing pattern to verify it exists
+	existing, err := s.store.GetPattern(id)
+	if err != nil {
+		return err
+	}
+	if existing == nil {
+		return errInvalidInput("pattern not found")
+	}
+
+	// Use existing values for any unset fields
+	if input.PatternType == "" {
+		input.PatternType = existing.PatternType
+	}
+	if input.PatternValue == "" {
+		input.PatternValue = existing.PatternValue
+	}
+	if input.MatchType == "" {
+		input.MatchType = existing.MatchType
+	}
+	if input.Weight == 0 {
+		input.Weight = existing.Weight
+	}
+
+	// Validate regex if that's the match type
+	if input.MatchType == "regex" {
+		if _, err := regexp.Compile(input.PatternValue); err != nil {
+			return errInvalidInput("invalid regex pattern: " + err.Error())
+		}
+	}
+
+	// Update the pattern
+	if err := s.store.UpdatePattern(id, input.PatternType, input.PatternValue, input.MatchType, input.Weight); err != nil {
+		return err
+	}
+
+	// Refresh cache
+	s.refreshPatternCache()
+	return nil
+}
+
+// PreviewRuleMatches shows what events would match a pattern without applying it.
+func (s *ProjectAssignmentService) PreviewRuleMatches(input ProjectRuleInput) (*RulePreview, error) {
+	// Validate inputs
+	if input.PatternType == "" {
+		return nil, errInvalidInput("patternType is required")
+	}
+	if input.PatternValue == "" {
+		return nil, errInvalidInput("patternValue is required")
+	}
+	if input.MatchType == "" {
+		input.MatchType = "contains"
+	}
+
+	// Validate regex if that's the match type
+	if input.MatchType == "regex" {
+		if _, err := regexp.Compile(input.PatternValue); err != nil {
+			return nil, errInvalidInput("invalid regex pattern: " + err.Error())
+		}
+	}
+
+	// Get count
+	count, err := s.store.CountMatchingEvents(input.PatternType, input.PatternValue, input.MatchType)
+	if err != nil {
+		return nil, err
+	}
+
+	// Get samples
+	samples, err := s.store.GetSampleMatchingEvents(input.PatternType, input.PatternValue, input.MatchType, 5)
+	if err != nil {
+		return nil, err
+	}
+
+	return &RulePreview{
+		MatchCount:    count,
+		SampleMatches: samples,
+	}, nil
+}
+
+// ApplyRuleToHistory applies a pattern to all matching historical events.
+func (s *ProjectAssignmentService) ApplyRuleToHistory(patternID int64) (int, error) {
+	// Get the pattern
+	pattern, err := s.store.GetPattern(patternID)
+	if err != nil {
+		return 0, err
+	}
+	if pattern == nil {
+		return 0, errInvalidInput("pattern not found")
+	}
+
+	// Apply to events
+	count, err := s.store.ApplyPatternToEvents(pattern.ProjectID, pattern.PatternType, pattern.PatternValue, pattern.MatchType)
+	if err != nil {
+		return 0, err
+	}
+
+	log.Printf("Applied pattern %d to %d events", patternID, count)
+	return count, nil
+}
+
+// errInvalidInput creates a formatted error for invalid input.
+func errInvalidInput(msg string) error {
+	return &InvalidInputError{Message: msg}
+}
+
+// InvalidInputError represents a validation error.
+type InvalidInputError struct {
+	Message string
+}
+
+func (e *InvalidInputError) Error() string {
+	return e.Message
+}
+
+// ============================================================================
+// Legacy Pattern Migration (One-time migration of hardcoded rules to DB)
+// ============================================================================
+
+// MigrateHardcodedPatterns creates database patterns from the legacy hardcoded rules.
+// This is idempotent - it won't create duplicates if called multiple times.
+// Returns number of patterns created.
+func (s *ProjectAssignmentService) MigrateHardcodedPatterns() (int, error) {
+	// Define legacy patterns grouped by project
+	type legacyPattern struct {
+		projectName  string
+		projectColor string
+		patternType  string
+		patternValue string
+	}
+
+	legacyPatterns := []legacyPattern{
+		// Traq project
+		{projectName: "Traq", projectColor: "#6366f1", patternType: "window_title", patternValue: "traq"},
+		{projectName: "Traq", projectColor: "#6366f1", patternType: "window_title", patternValue: "activity-tracker"},
+		{projectName: "Traq", projectColor: "#6366f1", patternType: "window_title", patternValue: "activity tracker"},
+		{projectName: "Traq", projectColor: "#6366f1", patternType: "git_repo", patternValue: "traq"},
+		{projectName: "Traq", projectColor: "#6366f1", patternType: "git_repo", patternValue: "activity-tracker"},
+
+		// Synaptics/42T project
+		{projectName: "Synaptics/42T", projectColor: "#f97316", patternType: "window_title", patternValue: "synaptics"},
+		{projectName: "Synaptics/42T", projectColor: "#f97316", patternType: "window_title", patternValue: "sl261"},
+		{projectName: "Synaptics/42T", projectColor: "#f97316", patternType: "window_title", patternValue: "sl2619"},
+		{projectName: "Synaptics/42T", projectColor: "#f97316", patternType: "window_title", patternValue: "torq"},
+		{projectName: "Synaptics/42T", projectColor: "#f97316", patternType: "window_title", patternValue: "tflite"},
+		{projectName: "Synaptics/42T", projectColor: "#f97316", patternType: "window_title", patternValue: "mobilenet"},
+		{projectName: "Synaptics/42T", projectColor: "#f97316", patternType: "window_title", patternValue: "yolo"},
+		{projectName: "Synaptics/42T", projectColor: "#f97316", patternType: "git_repo", patternValue: "synaptics"},
+		{projectName: "Synaptics/42T", projectColor: "#f97316", patternType: "git_repo", patternValue: "42t"},
+		{projectName: "Synaptics/42T", projectColor: "#f97316", patternType: "git_repo", patternValue: "sl261"},
+
+		// Claude Code project
+		{projectName: "Claude Code", projectColor: "#8b5cf6", patternType: "window_title", patternValue: "autonomous-coding"},
+		{projectName: "Claude Code", projectColor: "#8b5cf6", patternType: "window_title", patternValue: "claude-quickstarts"},
+		{projectName: "Claude Code", projectColor: "#8b5cf6", patternType: "git_repo", patternValue: "claude-quickstarts"},
+		{projectName: "Claude Code", projectColor: "#8b5cf6", patternType: "git_repo", patternValue: "autonomous-coding"},
+
+		// Arcturus Admin project
+		{projectName: "Arcturus Admin", projectColor: "#ec4899", patternType: "window_title", patternValue: "arcturus"},
+		{projectName: "Arcturus Admin", projectColor: "#ec4899", patternType: "window_title", patternValue: "eng-mv"},
+		{projectName: "Arcturus Admin", projectColor: "#ec4899", patternType: "window_title", patternValue: "brinq-boyz"},
+
+		// AI/ML Research project
+		{projectName: "AI/ML Research", projectColor: "#14b8a6", patternType: "window_title", patternValue: "functiongemma"},
+		{projectName: "AI/ML Research", projectColor: "#14b8a6", patternType: "window_title", patternValue: "fine-tuning"},
+		{projectName: "AI/ML Research", projectColor: "#14b8a6", patternType: "window_title", patternValue: "gemma"},
+
+		// Acusight project
+		{projectName: "Acusight", projectColor: "#22c55e", patternType: "git_repo", patternValue: "acusight"},
+
+		// Portainer project
+		{projectName: "Portainer", projectColor: "#06b6d4", patternType: "git_repo", patternValue: "portainer"},
+
+		// Fleet project
+		{projectName: "Fleet", projectColor: "#3b82f6", patternType: "git_repo", patternValue: "fleet"},
+	}
+
+	// Get existing projects
+	existingProjects, err := s.store.GetProjects()
+	if err != nil {
+		return 0, err
+	}
+	projectByName := make(map[string]*storage.Project)
+	for i := range existingProjects {
+		projectByName[strings.ToLower(existingProjects[i].Name)] = &existingProjects[i]
+	}
+
+	// Get existing patterns to avoid duplicates
+	allPatterns, err := s.store.GetAllPatterns()
+	if err != nil {
+		return 0, err
+	}
+	existingPatternKeys := make(map[string]bool)
+	for _, p := range allPatterns {
+		key := fmt.Sprintf("%d:%s:%s:contains", p.ProjectID, p.PatternType, strings.ToLower(p.PatternValue))
+		existingPatternKeys[key] = true
+	}
+
+	created := 0
+
+	for _, lp := range legacyPatterns {
+		// Get or create project
+		project := projectByName[strings.ToLower(lp.projectName)]
+		if project == nil {
+			// Create the project
+			newProject, err := s.store.CreateProject(lp.projectName, lp.projectColor, "Migrated from hardcoded patterns")
+			if err != nil {
+				log.Printf("MigrateHardcodedPatterns: failed to create project %s: %v", lp.projectName, err)
+				continue
+			}
+			project = newProject
+			projectByName[strings.ToLower(lp.projectName)] = project
+		}
+
+		// Check if pattern already exists
+		key := fmt.Sprintf("%d:%s:%s:contains", project.ID, lp.patternType, strings.ToLower(lp.patternValue))
+		if existingPatternKeys[key] {
+			continue // Skip duplicate
+		}
+
+		// Create the pattern
+		_, err := s.store.CreatePattern(project.ID, lp.patternType, lp.patternValue, "contains", 1.0)
+		if err != nil {
+			log.Printf("MigrateHardcodedPatterns: failed to create pattern %s/%s: %v", lp.projectName, lp.patternValue, err)
+			continue
+		}
+		existingPatternKeys[key] = true
+		created++
+	}
+
+	// Refresh pattern cache
+	if created > 0 {
+		s.refreshPatternCache()
+		log.Printf("MigrateHardcodedPatterns: created %d patterns", created)
+	}
+
+	return created, nil
 }
 
 // ============================================================================

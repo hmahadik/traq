@@ -100,7 +100,10 @@ export function Sidebar() {
       <nav className="flex-1 py-4">
         <ul className="space-y-1">
           {navItems.map(({ to, label, icon: Icon }) => {
-            const isActive = location.pathname === to || (to === '/' && location.pathname === '/timeline');
+            const isActive =
+              location.pathname === to ||
+              (to === '/' && location.pathname === '/timeline') ||
+              (to !== '/' && location.pathname.startsWith(to + '/'));
             return (
               <li key={to}>
                 <Link

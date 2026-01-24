@@ -1,11 +1,12 @@
-import { useState } from 'react';
-import { Loader2, Play, Eye } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { Loader2, Play, Eye, Plus, Pencil, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
 import { SettingsCard } from '../SettingsCard';
 import { SettingsRow } from '../SettingsRow';
+import { ProjectRuleDialog } from './ProjectRuleDialog';
 import {
   useReportIncludeUnassigned,
   useSetReportIncludeUnassigned,
@@ -13,6 +14,10 @@ import {
   useSetProjectsAutoAssign,
   useBackfillPreview,
   useBackfillRun,
+  useProjects,
+  useProjectPatterns,
+  useDeleteProjectPattern,
+  useMigrateHardcodedPatterns,
 } from '@/api/hooks';
 
 interface BackfillResult {
@@ -20,6 +25,32 @@ interface BackfillResult {
   autoAssigned: number;
   alreadyAssigned: number;
   noMatch: number;
+}
+
+// Helper to format pattern type for display
+const PATTERN_TYPE_LABELS: Record<string, string> = {
+  window_title: 'Window Title',
+  app_name: 'App Name',
+  git_repo: 'Git Repo',
+  domain: 'Domain',
+  path: 'Path',
+};
+
+const MATCH_TYPE_LABELS: Record<string, string> = {
+  contains: 'contains',
+  exact: 'equals',
+  prefix: 'starts with',
+  suffix: 'ends with',
+  regex: 'matches regex',
+};
+
+interface EditingRule {
+  id: number;
+  projectId: number;
+  patternType: string;
+  patternValue: string;
+  matchType: string;
+  weight: number;
 }
 
 export function ProjectsSettings() {
@@ -31,6 +62,20 @@ export function ProjectsSettings() {
 
   const backfillPreview = useBackfillPreview();
   const backfillRun = useBackfillRun();
+
+  // Projects and patterns for rules UI
+  const { data: projects } = useProjects();
+  const deletePattern = useDeleteProjectPattern();
+  const migratePatterns = useMigrateHardcodedPatterns();
+
+  // Load patterns for all projects
+  const projectPatternQueries = useMemo(() => {
+    return projects?.map(p => ({ id: p.id, name: p.name, color: p.color })) || [];
+  }, [projects]);
+
+  // Dialog state
+  const [ruleDialogOpen, setRuleDialogOpen] = useState(false);
+  const [editingRule, setEditingRule] = useState<EditingRule | null>(null);
 
   // Date range for backfill (default to last 7 days)
   const today = new Date().toISOString().split('T')[0];
@@ -75,6 +120,27 @@ export function ProjectsSettings() {
     }
   };
 
+  const handleAddRule = () => {
+    setEditingRule(null);
+    setRuleDialogOpen(true);
+  };
+
+  const handleEditRule = (rule: EditingRule) => {
+    setEditingRule(rule);
+    setRuleDialogOpen(true);
+  };
+
+  const handleDeleteRule = async (patternId: number) => {
+    if (!confirm('Delete this rule? Events already assigned will keep their assignment.')) {
+      return;
+    }
+    try {
+      await deletePattern.mutateAsync(patternId);
+    } catch (error) {
+      // Error handling is done in the hook
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Auto-Assignment */}
@@ -110,6 +176,55 @@ export function ProjectsSettings() {
           />
         </SettingsRow>
       </SettingsCard>
+
+      {/* Project Matching Rules */}
+      <SettingsCard
+        title="Project Matching Rules"
+        description="Define patterns to automatically assign activities to projects"
+        action={
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => migratePatterns.mutate()}
+              disabled={migratePatterns.isPending}
+            >
+              {migratePatterns.isPending && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
+              Import Defaults
+            </Button>
+            <Button size="sm" onClick={handleAddRule}>
+              <Plus className="h-4 w-4 mr-1" />
+              Add Rule
+            </Button>
+          </div>
+        }
+      >
+        {projectPatternQueries.length === 0 ? (
+          <div className="text-sm text-muted-foreground text-center py-4">
+            No projects found. Create a project first.
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {projectPatternQueries.map((project) => (
+              <ProjectRulesSection
+                key={project.id}
+                projectId={project.id}
+                projectName={project.name}
+                projectColor={project.color}
+                onEdit={handleEditRule}
+                onDelete={handleDeleteRule}
+              />
+            ))}
+          </div>
+        )}
+      </SettingsCard>
+
+      {/* Rule Dialog */}
+      <ProjectRuleDialog
+        open={ruleDialogOpen}
+        onOpenChange={setRuleDialogOpen}
+        editRule={editingRule}
+      />
 
       {/* Backfill */}
       <SettingsCard
@@ -199,6 +314,96 @@ export function ProjectsSettings() {
           </Button>
         </div>
       </SettingsCard>
+    </div>
+  );
+}
+
+// Sub-component to display rules for a single project
+interface ProjectRulesSectionProps {
+  projectId: number;
+  projectName: string;
+  projectColor: string;
+  onEdit: (rule: EditingRule) => void;
+  onDelete: (patternId: number) => void;
+}
+
+function ProjectRulesSection({
+  projectId,
+  projectName,
+  projectColor,
+  onEdit,
+  onDelete,
+}: ProjectRulesSectionProps) {
+  const { data: patterns, isLoading } = useProjectPatterns(projectId);
+
+  // Don't show projects without patterns
+  if (!isLoading && (!patterns || patterns.length === 0)) {
+    return null;
+  }
+
+  return (
+    <div className="border rounded-lg p-3 space-y-2">
+      <div className="flex items-center gap-2 font-medium">
+        <span
+          className="w-3 h-3 rounded-full shrink-0"
+          style={{ backgroundColor: projectColor }}
+        />
+        {projectName}
+        {isLoading && <Loader2 className="h-3 w-3 animate-spin" />}
+      </div>
+
+      {patterns && patterns.length > 0 && (
+        <div className="space-y-1.5 pl-5">
+          {patterns.map((pattern) => (
+            <div
+              key={pattern.id}
+              className="flex items-center justify-between text-sm group"
+            >
+              <div className="flex-1 min-w-0">
+                <span className="text-muted-foreground">
+                  {PATTERN_TYPE_LABELS[pattern.patternType] || pattern.patternType}
+                </span>{' '}
+                <span className="text-muted-foreground">
+                  {MATCH_TYPE_LABELS[pattern.matchType] || pattern.matchType}
+                </span>{' '}
+                <code className="bg-muted px-1 py-0.5 rounded text-xs">
+                  {pattern.patternValue}
+                </code>
+                {pattern.hitCount > 0 && (
+                  <span className="text-muted-foreground text-xs ml-2">
+                    ({pattern.hitCount} hits)
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 w-7 p-0"
+                  onClick={() => onEdit({
+                    id: pattern.id,
+                    projectId,
+                    patternType: pattern.patternType,
+                    patternValue: pattern.patternValue,
+                    matchType: pattern.matchType,
+                    weight: pattern.weight,
+                  })}
+                >
+                  <Pencil className="h-3.5 w-3.5" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 w-7 p-0 text-destructive hover:text-destructive"
+                  onClick={() => onDelete(pattern.id)}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

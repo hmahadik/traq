@@ -669,6 +669,8 @@ func (s *TimelineService) GetTimelineGridDataWithOptions(date string, opts Timel
 	}
 
 	// Fetch browser visits for the day
+	// Note: Synced visits from other devices are already filtered out at the SQL level
+	// via originator_cache_guid check in browser.go
 	browserVisits_, err := s.store.GetBrowserVisitsByTimeRange(dayStart.Unix(), dayEnd.Unix())
 	if err != nil {
 		// Non-fatal: log and continue with empty browser visits
@@ -676,6 +678,8 @@ func (s *TimelineService) GetTimelineGridDataWithOptions(date string, opts Timel
 	}
 
 	// Build browser events map: hour -> events
+	// Duration is always 0 - browser visits are just URL context,
+	// actual time tracking comes from window focus events
 	browserEvents := make(map[int][]BrowserEventDisplay)
 
 	for _, visit := range browserVisits_ {
@@ -688,12 +692,6 @@ func (s *TimelineService) GetTimelineGridDataWithOptions(date string, opts Timel
 		title := ""
 		if visit.Title.Valid {
 			title = visit.Title.String
-		}
-
-		// Get visit duration or use 0
-		visitDuration := int64(0)
-		if visit.VisitDurationSeconds.Valid {
-			visitDuration = visit.VisitDurationSeconds.Int64
 		}
 
 		// Get transition type or use empty string
@@ -709,7 +707,7 @@ func (s *TimelineService) GetTimelineGridDataWithOptions(date string, opts Timel
 			Title:                title,
 			Domain:               visit.Domain,
 			Browser:              visit.Browser,
-			VisitDurationSeconds: visitDuration,
+			VisitDurationSeconds: 0, // Duration tracked by focus events, not browser visits
 			TransitionType:       transitionType,
 			HourOffset:           hour,
 			MinuteOffset:         minute,
@@ -859,6 +857,10 @@ func (s *TimelineService) calculateDayStats(focusEvents []*storage.WindowFocusEv
 	}
 
 	// Calculate total time and category breakdown, excluding AFK periods
+	// Clamp event durations to day boundaries to avoid overcounting events spanning midnight
+	dayStartUnix := dayStart.Unix()
+	dayEndUnix := dayEnd.Unix()
+
 	var totalSeconds float64
 	breakdown := map[string]float64{
 		"focus":    0,
@@ -873,9 +875,23 @@ func (s *TimelineService) calculateDayStats(focusEvents []*storage.WindowFocusEv
 			continue
 		}
 
-		totalSeconds += event.DurationSeconds
+		// Clamp to day boundaries
+		effectiveStart := event.StartTime
+		if effectiveStart < dayStartUnix {
+			effectiveStart = dayStartUnix
+		}
+		effectiveEnd := event.EndTime
+		if effectiveEnd > dayEndUnix {
+			effectiveEnd = dayEndUnix
+		}
+		duration := float64(effectiveEnd - effectiveStart)
+		if duration < 0 {
+			duration = 0
+		}
+
+		totalSeconds += duration
 		category := categories[event.AppName]
-		breakdown[category] += event.DurationSeconds
+		breakdown[category] += duration
 	}
 
 	// Count and categorize breaks (based on v1 logic: gaps between 1min and 2hr)
@@ -952,10 +968,17 @@ func (s *TimelineService) calculateDayStats(focusEvents []*storage.WindowFocusEv
 	}
 
 	// Calculate day span (first to last activity, excluding AFK)
+	// IMPORTANT: Clamp to day boundaries to avoid counting time from previous/next day
 	var daySpan *DaySpan
 	if len(sortedEvents) > 0 {
 		firstActivity := sortedEvents[0].StartTime
+		if firstActivity < dayStartUnix {
+			firstActivity = dayStartUnix
+		}
 		lastActivity := sortedEvents[len(sortedEvents)-1].EndTime
+		if lastActivity > dayEndUnix {
+			lastActivity = dayEndUnix
+		}
 		spanSeconds := float64(lastActivity - firstActivity)
 
 		daySpan = &DaySpan{

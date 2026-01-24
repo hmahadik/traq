@@ -1044,6 +1044,57 @@ export const projects = {
     return App.DeleteProjectPattern(patternId);
   },
 
+  // =========== Project Rules (User-configurable patterns) ===========
+
+  /** Create a new project rule (pattern) */
+  createRule: async (rule: {
+    projectId: number;
+    patternType: string;
+    patternValue: string;
+    matchType: string;
+    weight?: number;
+  }) => {
+    await waitForReady();
+    return App.CreateProjectRule(rule);
+  },
+
+  /** Update an existing project rule */
+  updateRule: async (id: number, rule: {
+    patternType?: string;
+    patternValue?: string;
+    matchType?: string;
+    weight?: number;
+  }) => {
+    await waitForReady();
+    return App.UpdateProjectRule(id, rule as Parameters<typeof App.UpdateProjectRule>[1]);
+  },
+
+  /** Preview what events would match a pattern */
+  previewRule: async (rule: {
+    patternType: string;
+    patternValue: string;
+    matchType: string;
+  }): Promise<{ matchCount: number; sampleMatches: string[] }> => {
+    await waitForReady();
+    const result = await App.PreviewRuleMatches(rule as Parameters<typeof App.PreviewRuleMatches>[0]);
+    return {
+      matchCount: result.matchCount,
+      sampleMatches: result.sampleMatches || [],
+    };
+  },
+
+  /** Apply a rule to all matching historical events */
+  applyRuleToHistory: async (patternId: number): Promise<number> => {
+    await waitForReady();
+    return App.ApplyRuleToHistory(patternId);
+  },
+
+  /** Migrate legacy hardcoded patterns to database (one-time migration) */
+  migrateHardcodedPatterns: async (): Promise<number> => {
+    await waitForReady();
+    return App.MigrateHardcodedPatterns();
+  },
+
   /** Assign an event to a project */
   assignEvent: async (eventType: string, eventId: number, projectId: number) => {
     await waitForReady();
@@ -1054,6 +1105,12 @@ export const projects = {
   getUnassignedCount: async () => {
     await waitForReady();
     return withRetry(() => App.GetUnassignedEventCount());
+  },
+
+  /** Get activities without project assignment */
+  getUnassignedActivities: async (startDate: string, endDate: string) => {
+    await waitForReady();
+    return withRetry(() => App.GetUnassignedActivities(startDate, endDate));
   },
 
   /** Bulk assign multiple activities to a project */

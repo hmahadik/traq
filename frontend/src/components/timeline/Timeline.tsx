@@ -73,7 +73,7 @@ const DOT_RADIUS = 5;
 const DOT_HOVER_RADIUS = 8;
 const BAR_MIN_DURATION = 10; // Minimum duration (seconds) to render as bar
 const BAR_MIN_PIXELS = 6; // Minimum pixel width to render as bar
-const BAR_WIDTH = 3; // Width of thin bars for instant/brief events (event-dot)
+const BAR_WIDTH = 1; // Width of thin bars for instant/brief events (event-dot)
 
 
 export function Timeline({
@@ -498,7 +498,7 @@ export function Timeline({
     let zoom = zoomRef.current;
     if (shouldRecreateZoom) {
       zoom = d3.zoom<SVGSVGElement, unknown>()
-        .scaleExtent([0.5, 48])
+        .scaleExtent([0.5, 1440])
         .extent([[MARGIN.left, 0], [width - MARGIN.right, height]])
         // Constrain panning: playhead can't go before data start or past "now"
         .constrain((transform, _extent, _translateExtent) => {
@@ -1066,6 +1066,32 @@ export function Timeline({
     // Flatten all events for rendering
     const allEvents = rows.flatMap((row) => row.data);
 
+    // === COMPUTE EFFECTIVE SCALE FOR BAR/DOT CATEGORIZATION ===
+    // We need to use the scale that will actually be visible after initial zoom,
+    // not the base scale. Otherwise, events with duration get incorrectly rendered
+    // as dots because they're too small in the unzoomed base scale.
+    //
+    // If we have a saved zoom transform, use that. Otherwise, compute what the
+    // initial ~3h zoom would be.
+    let effectiveScale = xScale;
+    if (zoomTransformRef.current && zoomTransformRef.current.k !== 1) {
+      // Use existing zoom transform
+      effectiveScale = zoomTransformRef.current.rescaleX(xScale);
+    } else if (!chartInitializedRef.current) {
+      // First render: compute initial zoom level (~3h visible)
+      const desiredVisibleMs = 3 * 60 * 60 * 1000; // 3 hours
+      const totalDomainMs = timeRange.end.getTime() - timeRange.start.getTime();
+      const initialK = Math.max(1, totalDomainMs / desiredVisibleMs);
+
+      // Simulate the transform to get the effective scale
+      const now = new Date();
+      const initialCenterTime = new Date(Math.min(now.getTime(), timeRange.end.getTime()));
+      const targetX = xScale(initialCenterTime);
+      const initialTx = chartCenterX - targetX * initialK;
+      const simulatedTransform = d3.zoomIdentity.translate(initialTx, 0).scale(initialK);
+      effectiveScale = simulatedTransform.rescaleX(xScale);
+    }
+
     // Helper to determine if event should render as bar vs dot
     const shouldRenderAsBar = (
       event: EventDot,
@@ -1086,9 +1112,9 @@ export function Timeline({
     // Filter out events that start after "now" (defensive - shouldn't happen but prevents future rendering)
     const eventsBeforeNow = allEvents.filter((e) => e.timestamp.getTime() <= nowTimeRef.current);
 
-    // Split events into dots and bars based on duration
-    const dotEvents = eventsBeforeNow.filter((e) => !shouldRenderAsBar(e, xScale));
-    const barEvents = eventsBeforeNow.filter((e) => shouldRenderAsBar(e, xScale));
+    // Split events into dots and bars based on duration - use effective (zoomed) scale
+    const dotEvents = eventsBeforeNow.filter((e) => !shouldRenderAsBar(e, effectiveScale));
+    const barEvents = eventsBeforeNow.filter((e) => shouldRenderAsBar(e, effectiveScale));
 
     // Helper to check if event is selected (uses ref to avoid stale closure)
     const isSelected = (d: EventDot) => selectedEventKeysRef.current?.has(d.id) || false;
@@ -1117,18 +1143,22 @@ export function Timeline({
       .attr('stroke-width', (d) => isSelected(d) ? 2.5 : 1)
       .style('cursor', 'pointer')
       .on('mouseenter', function () {
+        // Use transformed scale from current zoom to avoid position jumping
+        const currentScale = zoomTransformRef.current.rescaleX(xScaleRef.current!);
         d3.select(this)
           .transition()
           .duration(100)
           .attr('width', BAR_WIDTH + 2)
-          .attr('x', (d: EventDot) => xScale(d.timestamp) - (BAR_WIDTH + 2) / 2);
+          .attr('x', (d: EventDot) => currentScale(d.timestamp) - (BAR_WIDTH + 2) / 2);
       })
       .on('mouseleave', function () {
+        // Use transformed scale from current zoom to avoid position jumping
+        const currentScale = zoomTransformRef.current.rescaleX(xScaleRef.current!);
         d3.select(this)
           .transition()
           .duration(100)
           .attr('width', BAR_WIDTH)
-          .attr('x', (d: EventDot) => xScale(d.timestamp) - BAR_WIDTH / 2);
+          .attr('x', (d: EventDot) => currentScale(d.timestamp) - BAR_WIDTH / 2);
       })
       .on('click', function (event, d) {
         event.stopPropagation();

@@ -1,12 +1,7 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import { Plus, Pencil, Trash2, X, Clock, FileCode, GitCommit, Sparkles, CheckSquare, Square } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ProjectActivitiesTab } from '@/components/projects/ProjectActivitiesTab';
+import { Button } from '@/components/ui/button';
 import {
   Dialog,
   DialogContent,
@@ -15,28 +10,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
-import { Badge } from '@/components/ui/badge';
-import {
-  useProjects,
-  useProjectStats,
-  useProjectPatterns,
-  useCreateProject,
-  useUpdateProject,
-  useDeleteProject,
-  useDeleteProjectPattern,
-  useUnassignedEventCount,
-} from '@/api/hooks';
-import type { Project, ProjectPattern, ProjectStats } from '@/api/client';
+import { ProjectsSidebar } from '@/components/projects/ProjectsSidebar';
+import { ProjectsUnifiedView } from '@/components/projects/ProjectsUnifiedView';
+import { useCreateProject, useUpdateProject, useProject, useProjects } from '@/api/hooks';
 
 // Default color palette for new projects
 const COLOR_PALETTE = [
@@ -52,178 +28,26 @@ const COLOR_PALETTE = [
   '#3b82f6', // Blue
 ];
 
-function formatMinutes(minutes: number): string {
-  if (minutes < 60) return `${Math.round(minutes)}m`;
-  const hours = Math.floor(minutes / 60);
-  const mins = Math.round(minutes % 60);
-  return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
-}
-
-function PatternTypeLabel({ type }: { type: string }) {
-  const labels: Record<string, string> = {
-    app_name: 'App',
-    window_title: 'Window',
-    git_repo: 'Git Repo',
-    domain: 'Domain',
-    path: 'Path',
-  };
-  return <span className="text-xs text-muted-foreground">{labels[type] || type}</span>;
-}
-
 interface ProjectFormData {
   name: string;
   color: string;
   description: string;
 }
 
-function ProjectCard({
-  project,
-  stats,
-  patterns,
-  onEdit,
-  onDelete,
-  onDeletePattern,
-  selectionMode,
-  isSelected,
-  onToggleSelect,
-}: {
-  project: Project;
-  stats?: ProjectStats | null;
-  patterns?: ProjectPattern[];
-  onEdit: () => void;
-  onDelete: () => void;
-  onDeletePattern: (patternId: number) => void;
-  selectionMode?: boolean;
-  isSelected?: boolean;
-  onToggleSelect?: () => void;
-}) {
-  return (
-    <Card
-      className={`relative ${selectionMode ? 'cursor-pointer' : ''} ${isSelected ? 'ring-2 ring-primary' : ''}`}
-      onClick={selectionMode ? onToggleSelect : undefined}
-    >
-      <CardHeader className="pb-2">
-        <div className="flex items-start justify-between">
-          <div className="flex items-center gap-2">
-            {selectionMode && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onToggleSelect?.();
-                }}
-                className="p-0.5 -ml-1"
-              >
-                {isSelected ? (
-                  <CheckSquare className="h-5 w-5 text-primary" />
-                ) : (
-                  <Square className="h-5 w-5 text-muted-foreground" />
-                )}
-              </button>
-            )}
-            <div
-              className="w-4 h-4 rounded-full shrink-0"
-              style={{ backgroundColor: project.color }}
-            />
-            <CardTitle className="text-lg">{project.name}</CardTitle>
-          </div>
-          {!selectionMode && (
-            <div className="flex gap-1">
-              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onEdit}>
-                <Pencil className="h-4 w-4" />
-              </Button>
-              <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={onDelete}>
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            </div>
-          )}
-        </div>
-        {project.description && (
-          <CardDescription className="mt-1">{project.description}</CardDescription>
-        )}
-      </CardHeader>
-      <CardContent>
-        <Tabs defaultValue="overview">
-          <TabsList className="mb-3">
-            <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="activities">Activities</TabsTrigger>
-            <TabsTrigger value="patterns">Patterns</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="overview" className="space-y-3 mt-0">
-            {/* Stats */}
-            {stats && (
-              <div className="flex gap-4 text-sm">
-                <div className="flex items-center gap-1 text-muted-foreground">
-                  <Clock className="h-4 w-4" />
-                  <span>{formatMinutes(stats.totalMinutes)}</span>
-                </div>
-                <div className="flex items-center gap-1 text-muted-foreground">
-                  <FileCode className="h-4 w-4" />
-                  <span>{stats.focusEventCount} events</span>
-                </div>
-                <div className="flex items-center gap-1 text-muted-foreground">
-                  <GitCommit className="h-4 w-4" />
-                  <span>{stats.gitCommitCount} commits</span>
-                </div>
-              </div>
-            )}
-            {patterns && patterns.length > 0 && (
-              <div className="text-sm text-muted-foreground flex items-center gap-1">
-                <Sparkles className="h-4 w-4" />
-                {patterns.length} learned patterns
-              </div>
-            )}
-          </TabsContent>
-
-          <TabsContent value="activities" className="mt-0">
-            <ProjectActivitiesTab project={project} />
-          </TabsContent>
-
-          <TabsContent value="patterns" className="mt-0">
-            {patterns && patterns.length > 0 ? (
-              <div className="flex flex-wrap gap-1">
-                {patterns.map((p) => (
-                  <Badge
-                    key={p.id}
-                    variant="secondary"
-                    className="text-xs flex items-center gap-1 pr-1"
-                  >
-                    <PatternTypeLabel type={p.patternType} />
-                    <span className="font-mono">{p.patternValue}</span>
-                    <button
-                      className="ml-1 hover:text-destructive"
-                      onClick={() => onDeletePattern(p.id)}
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  </Badge>
-                ))}
-              </div>
-            ) : (
-              <div className="text-sm text-muted-foreground text-center py-4">
-                No patterns learned yet. Assign activities to help Traq learn.
-              </div>
-            )}
-          </TabsContent>
-        </Tabs>
-      </CardContent>
-    </Card>
-  );
-}
-
 function ProjectFormDialog({
   open,
   onOpenChange,
-  project,
+  editProjectId,
   onSave,
   isSaving,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  project?: Project | null;
+  editProjectId?: number | null;
   onSave: (data: ProjectFormData) => void;
   isSaving: boolean;
 }) {
+  const { data: project } = useProject(editProjectId || 0);
   const [formData, setFormData] = useState<ProjectFormData>({
     name: '',
     color: COLOR_PALETTE[0],
@@ -233,13 +57,21 @@ function ProjectFormDialog({
   // Reset form data when dialog opens or project changes
   useEffect(() => {
     if (open) {
-      setFormData({
-        name: project?.name || '',
-        color: project?.color || COLOR_PALETTE[Math.floor(Math.random() * COLOR_PALETTE.length)],
-        description: project?.description || '',
-      });
+      if (project && editProjectId) {
+        setFormData({
+          name: project.name,
+          color: project.color,
+          description: project.description || '',
+        });
+      } else {
+        setFormData({
+          name: '',
+          color: COLOR_PALETTE[Math.floor(Math.random() * COLOR_PALETTE.length)],
+          description: '',
+        });
+      }
     }
-  }, [open, project]);
+  }, [open, project, editProjectId]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -247,14 +79,16 @@ function ProjectFormDialog({
     onSave(formData);
   };
 
+  const isEditing = !!editProjectId;
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[425px]">
         <form onSubmit={handleSubmit}>
           <DialogHeader>
-            <DialogTitle>{project ? 'Edit Project' : 'Create Project'}</DialogTitle>
+            <DialogTitle>{isEditing ? 'Edit Project' : 'Create Project'}</DialogTitle>
             <DialogDescription>
-              {project
+              {isEditing
                 ? 'Update the project details below.'
                 : 'Create a new project to organize your activities.'}
             </DialogDescription>
@@ -306,7 +140,7 @@ function ProjectFormDialog({
               Cancel
             </Button>
             <Button type="submit" disabled={!formData.name.trim() || isSaving}>
-              {isSaving ? 'Saving...' : project ? 'Save Changes' : 'Create Project'}
+              {isSaving ? 'Saving...' : isEditing ? 'Save Changes' : 'Create Project'}
             </Button>
           </DialogFooter>
         </form>
@@ -316,283 +150,82 @@ function ProjectFormDialog({
 }
 
 export function ProjectsPage() {
-  const { data: projects, isLoading } = useProjects();
-  const { data: unassignedCount } = useUnassignedEventCount();
   const createProject = useCreateProject();
   const updateProject = useUpdateProject();
-  const deleteProject = useDeleteProject();
-  const deletePattern = useDeleteProjectPattern();
+  const { data: projects } = useProjects();
 
   const [formOpen, setFormOpen] = useState(false);
-  const [editingProject, setEditingProject] = useState<Project | null>(null);
-  const [deletingProject, setDeletingProject] = useState<Project | null>(null);
+  const [editingProjectId, setEditingProjectId] = useState<number | null>(null);
+  const [selectedProjectIds, setSelectedProjectIds] = useState<Set<number>>(new Set());
 
-  // Selection mode state
-  const [selectionMode, setSelectionMode] = useState(false);
-  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
-  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
-
-  const toggleSelect = (id: number) => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
-      }
-      return next;
-    });
-  };
-
-  const selectAll = () => {
-    if (!projects) return;
-    setSelectedIds(new Set(projects.map((p) => p.id)));
-  };
-
-  const exitSelectionMode = () => {
-    setSelectionMode(false);
-    setSelectedIds(new Set());
-  };
-
-  const handleBulkDelete = async () => {
-    const idsToDelete = Array.from(selectedIds);
-    for (const id of idsToDelete) {
-      await deleteProject.mutateAsync(id);
+  // Auto-select all projects on first load
+  useEffect(() => {
+    if (projects && projects.length > 0 && selectedProjectIds.size === 0) {
+      setSelectedProjectIds(new Set(projects.map((p) => p.id)));
     }
-    exitSelectionMode();
-    setBulkDeleteOpen(false);
+  }, [projects]);
+
+  const handleNewProject = () => {
+    setEditingProjectId(null);
+    setFormOpen(true);
   };
 
-  const handleCreate = (data: ProjectFormData) => {
-    createProject.mutate(data, {
-      onSuccess: () => setFormOpen(false),
-    });
+  const handleEditProject = (projectId: number) => {
+    setEditingProjectId(projectId);
+    setFormOpen(true);
   };
 
-  const handleUpdate = (data: ProjectFormData) => {
-    if (!editingProject) return;
-    updateProject.mutate(
-      { id: editingProject.id, ...data },
-      {
-        onSuccess: () => {
-          setEditingProject(null);
+  const handleSave = (data: ProjectFormData) => {
+    if (editingProjectId) {
+      updateProject.mutate(
+        { id: editingProjectId, ...data },
+        {
+          onSuccess: () => {
+            setFormOpen(false);
+            setEditingProjectId(null);
+          },
+        }
+      );
+    } else {
+      createProject.mutate(data, {
+        onSuccess: (newProject) => {
           setFormOpen(false);
+          // Add new project to selection
+          if (newProject?.id) {
+            setSelectedProjectIds((prev) => new Set([...prev, newProject.id]));
+          }
         },
-      }
-    );
-  };
-
-  const handleDelete = () => {
-    // Capture ID before dialog close can clear deletingProject state
-    const projectId = deletingProject?.id;
-    if (!projectId) return;
-    deleteProject.mutate(projectId, {
-      onSuccess: () => setDeletingProject(null),
-    });
-  };
-
-  const handleDeletePattern = (patternId: number) => {
-    deletePattern.mutate(patternId);
+      });
+    }
   };
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Projects</h1>
-          <p className="text-muted-foreground">
-            Organize activities into projects. Traq learns from your assignments to auto-suggest.
-          </p>
-        </div>
-        {selectionMode ? (
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={selectAll}
-              disabled={!projects || selectedIds.size === projects.length}
-            >
-              Select All
-            </Button>
-            <Button
-              variant="destructive"
-              size="sm"
-              onClick={() => setBulkDeleteOpen(true)}
-              disabled={selectedIds.size === 0}
-            >
-              <Trash2 className="h-4 w-4 mr-2" />
-              Delete ({selectedIds.size})
-            </Button>
-            <Button variant="ghost" size="sm" onClick={exitSelectionMode}>
-              Cancel
-            </Button>
-          </div>
-        ) : (
-          <div className="flex items-center gap-2">
-            {projects && projects.length > 1 && (
-              <Button variant="outline" onClick={() => setSelectionMode(true)}>
-                <CheckSquare className="h-4 w-4 mr-2" />
-                Select
-              </Button>
-            )}
-            <Button onClick={() => setFormOpen(true)}>
-              <Plus className="h-4 w-4 mr-2" />
-              New Project
-            </Button>
-          </div>
-        )}
+    <div className="h-full flex overflow-hidden -mx-4 sm:-mx-6 -my-6">
+      <ProjectsSidebar
+        selectedProjectIds={selectedProjectIds}
+        onSelectionChange={setSelectedProjectIds}
+        onNewProject={handleNewProject}
+        onEditProject={handleEditProject}
+      />
+      <div className="flex-1 flex flex-col min-h-0 p-6">
+        <ProjectsUnifiedView
+          selectedProjectIds={selectedProjectIds}
+          onNewProject={handleNewProject}
+        />
       </div>
-
-      {/* Unassigned count notice */}
-      {unassignedCount != null && unassignedCount > 0 && (
-        <Card className="bg-amber-50 dark:bg-amber-950 border-amber-200 dark:border-amber-800">
-          <CardContent className="flex items-center justify-between py-3">
-            <div className="flex items-center gap-3">
-              <Sparkles className="h-5 w-5 text-amber-600 dark:text-amber-400" />
-              <span className="text-sm">
-                You have <strong>{unassignedCount.toLocaleString()}</strong> activities without project assignments.
-              </span>
-            </div>
-            <Link
-              to="/settings/projects"
-              className="text-sm text-amber-700 dark:text-amber-400 hover:underline font-medium"
-            >
-              Configure in Settings →
-            </Link>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Projects grid */}
-      {isLoading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {[1, 2, 3].map((i) => (
-            <Card key={i} className="h-40 animate-pulse bg-muted/50" />
-          ))}
-        </div>
-      ) : projects && projects.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {projects.map((project) => (
-            <ProjectCardWithData
-              key={project.id}
-              project={project}
-              onEdit={() => {
-                setEditingProject(project);
-                setFormOpen(true);
-              }}
-              onDelete={() => setDeletingProject(project)}
-              onDeletePattern={handleDeletePattern}
-              selectionMode={selectionMode}
-              isSelected={selectedIds.has(project.id)}
-              onToggleSelect={() => toggleSelect(project.id)}
-            />
-          ))}
-        </div>
-      ) : (
-        <Card className="py-12 text-center">
-          <CardContent>
-            <div className="text-muted-foreground mb-4">
-              No projects yet. Create your first project to start organizing activities.
-            </div>
-            <Button onClick={() => setFormOpen(true)}>
-              <Plus className="h-4 w-4 mr-2" />
-              Create First Project
-            </Button>
-          </CardContent>
-        </Card>
-      )}
 
       {/* Create/Edit dialog */}
       <ProjectFormDialog
         open={formOpen}
         onOpenChange={(open) => {
           setFormOpen(open);
-          if (!open) setEditingProject(null);
+          if (!open) setEditingProjectId(null);
         }}
-        project={editingProject}
-        onSave={editingProject ? handleUpdate : handleCreate}
+        editProjectId={editingProjectId}
+        onSave={handleSave}
         isSaving={createProject.isPending || updateProject.isPending}
       />
-
-      {/* Delete confirmation */}
-      <AlertDialog open={!!deletingProject} onOpenChange={(open) => !open && setDeletingProject(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete Project</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete "{deletingProject?.name}"? This will remove all learned
-              patterns and clear project assignments from events. This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground">
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {/* Bulk delete confirmation */}
-      <AlertDialog open={bulkDeleteOpen} onOpenChange={setBulkDeleteOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete {selectedIds.size} Projects</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete {selectedIds.size} projects? This will remove all learned
-              patterns and clear project assignments from events. This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleBulkDelete}
-              className="bg-destructive text-destructive-foreground"
-              disabled={deleteProject.isPending}
-            >
-              {deleteProject.isPending ? 'Deleting...' : `Delete ${selectedIds.size} Projects`}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
-  );
-}
-
-// Wrapper component to fetch stats and patterns for each project
-function ProjectCardWithData({
-  project,
-  onEdit,
-  onDelete,
-  onDeletePattern,
-  selectionMode,
-  isSelected,
-  onToggleSelect,
-}: {
-  project: Project;
-  onEdit: () => void;
-  onDelete: () => void;
-  onDeletePattern: (patternId: number) => void;
-  selectionMode?: boolean;
-  isSelected?: boolean;
-  onToggleSelect?: () => void;
-}) {
-  const { data: stats } = useProjectStats(project.id);
-  const { data: patterns } = useProjectPatterns(project.id);
-
-  return (
-    <ProjectCard
-      project={project}
-      stats={stats}
-      patterns={patterns}
-      onEdit={onEdit}
-      onDelete={onDelete}
-      onDeletePattern={onDeletePattern}
-      selectionMode={selectionMode}
-      isSelected={isSelected}
-      onToggleSelect={onToggleSelect}
-    />
   );
 }
 

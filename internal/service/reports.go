@@ -240,7 +240,7 @@ func (s *ReportsService) buildEnhancedReportContext(tr *TimeRange) (*EnhancedRep
 	if err != nil {
 		return nil, fmt.Errorf("failed to get browser history: %w", err)
 	}
-	ctx.DomainGroups = s.aggregateBrowserByDomain(browserVisits)
+	ctx.DomainGroups = s.aggregateBrowserByDomain(browserVisits, focusEvents)
 
 	// Get git commits
 	ctx.GitCommits, _ = s.store.GetGitCommitsByTimeRange(tr.Start, tr.End)
@@ -475,15 +475,13 @@ func (s *ReportsService) cleanMeetingTitle(windowTitle, platform string) string 
 }
 
 // aggregateBrowserByDomain groups browser visits by domain.
-func (s *ReportsService) aggregateBrowserByDomain(visits []*storage.BrowserVisit) []DomainGroup {
+// Browser visits are URL context only - duration tracking comes from window focus events.
+func (s *ReportsService) aggregateBrowserByDomain(visits []*storage.BrowserVisit, focusEvents []*storage.WindowFocusEvent) []DomainGroup {
 	domainMap := make(map[string]*DomainGroup)
 
 	for _, visit := range visits {
 		if existing, ok := domainMap[visit.Domain]; ok {
 			existing.VisitCount++
-			if visit.VisitDurationSeconds.Valid {
-				existing.DurationSeconds += float64(visit.VisitDurationSeconds.Int64)
-			}
 			// Keep first 3 sample titles
 			if len(existing.SampleTitles) < 3 && visit.Title.Valid && visit.Title.String != "" {
 				// Check if title is already in samples
@@ -500,13 +498,11 @@ func (s *ReportsService) aggregateBrowserByDomain(visits []*storage.BrowserVisit
 			}
 		} else {
 			dg := &DomainGroup{
-				Domain:       visit.Domain,
-				VisitCount:   1,
-				TopicLabel:   s.inferDomainTopic(visit.Domain),
-				SampleTitles: []string{},
-			}
-			if visit.VisitDurationSeconds.Valid {
-				dg.DurationSeconds = float64(visit.VisitDurationSeconds.Int64)
+				Domain:          visit.Domain,
+				VisitCount:      1,
+				TopicLabel:      s.inferDomainTopic(visit.Domain),
+				SampleTitles:    []string{},
+				DurationSeconds: 0, // Duration tracked by focus events, not browser visits
 			}
 			if visit.Title.Valid && visit.Title.String != "" {
 				dg.SampleTitles = append(dg.SampleTitles, visit.Title.String)
@@ -515,13 +511,13 @@ func (s *ReportsService) aggregateBrowserByDomain(visits []*storage.BrowserVisit
 		}
 	}
 
-	// Convert to slice and sort by duration
+	// Convert to slice and sort by visit count (since duration is always 0)
 	var result []DomainGroup
 	for _, dg := range domainMap {
 		result = append(result, *dg)
 	}
 	sort.Slice(result, func(i, j int) bool {
-		return result[i].DurationSeconds > result[j].DurationSeconds
+		return result[i].VisitCount > result[j].VisitCount
 	})
 
 	return result
@@ -589,9 +585,11 @@ func (s *ReportsService) detectProjectFromLearnedPatterns(ctx *storage.Assignmen
 	return ""
 }
 
-// DetectProjectFromWindowTitle extracts project name from various window title patterns.
+// DetectProjectFromWindowTitle extracts project name from learned patterns.
+// Hardcoded detection rules have been migrated to database patterns.
+// Call MigrateHardcodedPatterns() on first run to populate the patterns.
 func (s *ReportsService) DetectProjectFromWindowTitle(windowTitle, appName string) string {
-	// First, try learned patterns
+	// Use learned patterns from database
 	if projectName := s.detectProjectFromLearnedPatterns(&storage.AssignmentContext{
 		AppName:     appName,
 		WindowTitle: windowTitle,
@@ -599,11 +597,10 @@ func (s *ReportsService) DetectProjectFromWindowTitle(windowTitle, appName strin
 		return projectName
 	}
 
-	// Fall back to hardcoded detection
+	// VS Code pattern: extract project name from workspace title
+	// "file - ProjectName (Workspace) - Visual Studio Code"
 	lower := strings.ToLower(windowTitle)
 	appLower := strings.ToLower(appName)
-
-	// VS Code pattern: "file - ProjectName (Workspace) - Visual Studio Code"
 	if strings.Contains(appLower, "code") || strings.Contains(lower, "visual studio code") {
 		parts := strings.Split(windowTitle, " - ")
 		if len(parts) >= 3 {
@@ -615,85 +612,21 @@ func (s *ReportsService) DetectProjectFromWindowTitle(windowTitle, appName strin
 		}
 	}
 
-	// Chrome/Browser pattern: "project-name - Google Chrome" or "project - title - Chrome"
-	if strings.Contains(appLower, "chrome") || strings.Contains(appLower, "firefox") || strings.Contains(appLower, "browser") {
-		parts := strings.Split(windowTitle, " - ")
-		if len(parts) >= 2 {
-			// Check for Claude pattern: "project - Claude - Google Chrome"
-			for _, part := range parts {
-				partLower := strings.ToLower(part)
-				if strings.Contains(partLower, "traq") {
-					return "Traq"
-				}
-				if strings.Contains(partLower, "activity-tracker") || strings.Contains(partLower, "activity tracker") {
-					return "Traq"
-				}
-				if strings.Contains(partLower, "synaptics") || strings.Contains(partLower, "sl261") || strings.Contains(partLower, "sl2619") ||
-					strings.Contains(partLower, "torq") || strings.Contains(partLower, "tflite") ||
-					strings.Contains(partLower, "mobilenet") || strings.Contains(partLower, "yolo") {
-					return "Synaptics/42T"
-				}
-				if strings.Contains(partLower, "arcturus") {
-					return "Arcturus Admin"
-				}
-				if strings.Contains(partLower, "functiongemma") || strings.Contains(partLower, "fine-tuning") || strings.Contains(partLower, "gemma") {
-					return "AI/ML Research"
-				}
-				if strings.Contains(partLower, "autonomous-coding") || strings.Contains(partLower, "claude-quickstarts") {
-					return "Claude Code"
-				}
-			}
-		}
-	}
-
-	// Terminal pattern: tmux, tilix with project context
-	if strings.Contains(appLower, "terminal") || strings.Contains(appLower, "tilix") || strings.Contains(appLower, "tmux") {
-		// Terminal activity is ambiguous, return empty
-		return ""
-	}
-
-	// Slack pattern
-	if strings.Contains(appLower, "slack") {
-		if strings.Contains(lower, "eng-mv") || strings.Contains(lower, "brinq-boyz") || strings.Contains(lower, "arcturus") {
-			return "Arcturus Admin"
-		}
-	}
-
 	return ""
 }
 
-// DetectProjectFromGitRepo extracts project name from git repository path.
+// DetectProjectFromGitRepo extracts project name from learned patterns.
+// Hardcoded detection rules have been migrated to database patterns.
+// Call MigrateHardcodedPatterns() on first run to populate the patterns.
 func (s *ReportsService) DetectProjectFromGitRepo(repoPath string) string {
-	// First, try learned patterns
+	// Use learned patterns from database
 	if projectName := s.detectProjectFromLearnedPatterns(&storage.AssignmentContext{
 		GitRepo: repoPath,
 	}); projectName != "" {
 		return projectName
 	}
 
-	// Fall back to hardcoded detection
-	lower := strings.ToLower(repoPath)
-
-	if strings.Contains(lower, "traq") || strings.Contains(lower, "activity-tracker") {
-		return "Traq"
-	}
-	if strings.Contains(lower, "claude-quickstarts") || strings.Contains(lower, "autonomous-coding") {
-		return "Claude Code"
-	}
-	if strings.Contains(lower, "synaptics") || strings.Contains(lower, "42t") || strings.Contains(lower, "sl261") {
-		return "Synaptics/42T"
-	}
-	if strings.Contains(lower, "acusight") {
-		return "Acusight"
-	}
-	if strings.Contains(lower, "portainer") {
-		return "Portainer"
-	}
-	if strings.Contains(lower, "fleet") {
-		return "Fleet"
-	}
-
-	// Extract repo name from path
+	// Fall back: extract repo name from path
 	parts := strings.Split(repoPath, "/")
 	for i := len(parts) - 1; i >= 0; i-- {
 		if parts[i] != "" && parts[i] != ".git" {
@@ -2618,11 +2551,12 @@ func (s *ReportsService) inferFileCategory(filename string) string {
 }
 
 // aggregateBrowserForWeekly aggregates browser visits and extracts research topics
+// Browser visits are URL context only - duration tracking comes from window focus events.
 func (s *ReportsService) aggregateBrowserForWeekly(visits []*storage.BrowserVisit, focusEvents []*storage.WindowFocusEvent) ([]BrowserDomainSummary, []ResearchTopic) {
 	domainMap := make(map[string]*BrowserDomainSummary)
 	topicMap := make(map[string]*ResearchTopic)
 
-	// From browser visits
+	// From browser visits (URL context only, no duration)
 	for _, visit := range visits {
 		domain := visit.Domain
 		if _, ok := domainMap[domain]; !ok {
@@ -2633,9 +2567,7 @@ func (s *ReportsService) aggregateBrowserForWeekly(visits []*storage.BrowserVisi
 			}
 		}
 		domainMap[domain].VisitCount++
-		if visit.VisitDurationSeconds.Valid {
-			domainMap[domain].DurationMins += visit.VisitDurationSeconds.Int64 / 60
-		}
+		// Duration is 0 - tracked by focus events instead
 		if visit.Title.Valid && visit.Title.String != "" && len(domainMap[domain].SampleTitles) < 5 {
 			// Avoid duplicates
 			found := false
@@ -2647,24 +2579,6 @@ func (s *ReportsService) aggregateBrowserForWeekly(visits []*storage.BrowserVisi
 			}
 			if !found {
 				domainMap[domain].SampleTitles = append(domainMap[domain].SampleTitles, visit.Title.String)
-			}
-		}
-
-		// Extract research topics from Claude conversations
-		if visit.Title.Valid && (strings.Contains(visit.Domain, "claude.ai") || strings.Contains(visit.Domain, "anthropic")) {
-			title := visit.Title.String
-			// Extract topic from title like "Topic - Claude"
-			if idx := strings.Index(title, " - Claude"); idx > 0 {
-				topic := strings.TrimSpace(title[:idx])
-				if _, ok := topicMap[topic]; !ok {
-					topicMap[topic] = &ResearchTopic{
-						Topic:  topic,
-						Source: "Claude",
-					}
-				}
-				if visit.VisitDurationSeconds.Valid {
-					topicMap[topic].DurationMins += visit.VisitDurationSeconds.Int64 / 60
-				}
 			}
 		}
 	}
@@ -2783,34 +2697,9 @@ func (s *ReportsService) buildProjectSummaries(focusEvents []*storage.WindowFocu
 		}
 	}
 
-	// From browser visits for research/AI projects
-	for _, visit := range browserVisits {
-		if visit.Title.Valid {
-			projectName := ""
-			title := visit.Title.String
-			lower := strings.ToLower(title)
-
-			// Detect project from browser titles
-			if strings.Contains(lower, "traq") || strings.Contains(lower, "activity-tracker") || strings.Contains(lower, "activity tracker") {
-				projectName = "Traq"
-			} else if strings.Contains(lower, "synaptics") || strings.Contains(lower, "sl261") || strings.Contains(lower, "sl2619") {
-				projectName = "Synaptics/42T"
-			} else if strings.Contains(lower, "autonomous-coding") || strings.Contains(lower, "claude-quickstarts") {
-				projectName = "Claude Code"
-			} else if strings.Contains(lower, "functiongemma") || strings.Contains(lower, "fine-tuning gemma") {
-				projectName = "AI/ML Research"
-			} else if strings.Contains(lower, "arcturus") {
-				projectName = "Arcturus Admin"
-			}
-
-			if projectName != "" {
-				project := getProject(projectName)
-				if visit.VisitDurationSeconds.Valid {
-					project.Hours += float64(visit.VisitDurationSeconds.Int64) / 3600
-				}
-			}
-		}
-	}
+	// Note: Browser visits are URL context only - time tracking comes from focus events above.
+	// Project detection from browser URLs is redundant since focus events already capture
+	// browser window titles which contain the same project indicators.
 
 	// Calculate total hours for percentage
 	var totalHours float64
@@ -2933,15 +2822,13 @@ func (s *ReportsService) buildProjectSummariesFromAI(sessions []*storage.Session
 		}
 	}
 
-	// From browser visits for research/AI projects
+	// From browser visits - project detection only (duration tracked by focus events)
 	for _, visit := range browserVisits {
 		if visit.Title.Valid {
 			projectName := s.DetectProjectFromBrowserTitle(visit.Title.String)
 			if projectName != "" {
-				project := getProject(projectName)
-				if visit.VisitDurationSeconds.Valid {
-					project.Hours += float64(visit.VisitDurationSeconds.Int64) / 3600
-				}
+				// Just ensure project exists - don't add duration (focus events track that)
+				getProject(projectName)
 			}
 		}
 	}
@@ -3019,53 +2906,26 @@ func (s *ReportsService) buildProjectSummariesFromAI(sessions []*storage.Session
 }
 
 // normalizeProjectName consolidates common project name variations.
+// This now primarily relies on database patterns. The function attempts to
+// match the name against learned patterns and returns a standardized name.
 func (s *ReportsService) normalizeProjectName(name string) string {
-	lower := strings.ToLower(name)
-
-	// Traq variations
-	if strings.Contains(lower, "traq") || strings.Contains(lower, "activity-tracker") || strings.Contains(lower, "activity tracker") {
-		return "Traq"
+	// Try to match using learned patterns
+	if projectName := s.detectProjectFromLearnedPatterns(&storage.AssignmentContext{
+		WindowTitle: name,
+	}); projectName != "" {
+		return projectName
 	}
-
-	// Synaptics variations
-	if strings.Contains(lower, "synaptics") || strings.Contains(lower, "sl261") || strings.Contains(lower, "sl2619") || strings.Contains(lower, "42t") || strings.Contains(lower, "42 tech") || strings.Contains(lower, "smart panel") || strings.Contains(lower, "acusight") || strings.Contains(lower, "factory") {
-		return "Synaptics/42T"
-	}
-
-	// Arcturus variations
-	if strings.Contains(lower, "arcturus") || strings.Contains(lower, "ucmib") {
-		return "Arcturus Admin"
-	}
-
-	// Claude Code variations
-	if strings.Contains(lower, "claude code") || strings.Contains(lower, "autonomous-coding") || strings.Contains(lower, "claude-quickstarts") {
-		return "Claude Code"
-	}
-
 	return name
 }
 
 // DetectProjectFromBrowserTitle detects project from browser page title.
+// Hardcoded detection rules have been migrated to database patterns.
+// Call MigrateHardcodedPatterns() on first run to populate the patterns.
 func (s *ReportsService) DetectProjectFromBrowserTitle(title string) string {
-	lower := strings.ToLower(title)
-
-	if strings.Contains(lower, "traq") || strings.Contains(lower, "activity-tracker") || strings.Contains(lower, "activity tracker") {
-		return "Traq"
-	}
-	if strings.Contains(lower, "synaptics") || strings.Contains(lower, "sl261") || strings.Contains(lower, "sl2619") {
-		return "Synaptics/42T"
-	}
-	if strings.Contains(lower, "autonomous-coding") || strings.Contains(lower, "claude-quickstarts") {
-		return "Claude Code"
-	}
-	if strings.Contains(lower, "functiongemma") || strings.Contains(lower, "fine-tuning gemma") {
-		return "AI/ML Research"
-	}
-	if strings.Contains(lower, "arcturus") {
-		return "Arcturus Admin"
-	}
-
-	return ""
+	// Use learned patterns from database
+	return s.detectProjectFromLearnedPatterns(&storage.AssignmentContext{
+		WindowTitle: title,
+	})
 }
 
 // isDuplicateActivity checks if an activity is a duplicate or semantically similar.

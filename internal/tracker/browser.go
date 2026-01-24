@@ -192,6 +192,8 @@ func (t *BrowserTracker) readChromiumHistory(db *sql.DB, browser string, sinceTi
 	chromeEpochOffset := int64(11644473600000000) // Microseconds from 1601 to 1970
 	sinceChrome := sinceTimestamp*1000000 + chromeEpochOffset
 
+	// Filter out synced visits from other devices (phone, tablet, other computers)
+	// by checking originator_cache_guid - if set, the visit originated elsewhere
 	query := `
 		SELECT
 			u.url,
@@ -201,6 +203,7 @@ func (t *BrowserTracker) readChromiumHistory(db *sql.DB, browser string, sinceTi
 		FROM urls u
 		JOIN visits v ON u.id = v.url
 		WHERE v.visit_time > ?
+			AND (v.originator_cache_guid IS NULL OR v.originator_cache_guid = '')
 		ORDER BY v.visit_time ASC
 		LIMIT 1000
 	`
@@ -232,12 +235,15 @@ func (t *BrowserTracker) readChromiumHistory(db *sql.DB, browser string, sinceTi
 		domain := extractDomain(visitURL)
 
 		visits = append(visits, &storage.BrowserVisit{
-			Timestamp:            unixTimestamp,
-			URL:                  visitURL,
-			Title:                sql.NullString{String: title, Valid: title != ""},
-			Domain:               domain,
-			Browser:              browser,
-			VisitDurationSeconds: sql.NullInt64{Int64: duration / 1000000, Valid: duration > 0},
+			Timestamp: unixTimestamp,
+			URL:       visitURL,
+			Title:     sql.NullString{String: title, Valid: title != ""},
+			Domain:    domain,
+			Browser:   browser,
+			// NOTE: We intentionally don't store Chrome's visit_duration here.
+			// Chrome's duration is unreliable (includes idle time, background tabs, etc.)
+			// Duration is computed at read time from window focus events instead.
+			VisitDurationSeconds: sql.NullInt64{Valid: false},
 			SessionID:            sql.NullInt64{Int64: sessionID, Valid: sessionID > 0},
 		})
 	}
