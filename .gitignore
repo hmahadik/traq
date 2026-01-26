@@ -66,6 +66,31 @@ Thumbs.db
 # Binary
 traq
 
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# Database
+traq.db
+
+# Dev scripts (local only)
+agent.py
+utils.py
+generate_test_summaries.py
+test_summary_models.sh
+
+# Dev notes & test outputs (local only)
+PLAN.md
+ROADMAP.md
+TODO.md
+Target_Daily_Report.md
+Weekly_Summary_*.md
+Weekly_Summary_*.html
+haiku_summary.md
+sonnet_summary.md
+target_report.md
+
 # Git worktrees
 .worktrees/
 
