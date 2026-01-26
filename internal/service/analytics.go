@@ -1561,8 +1561,8 @@ func (s *AnalyticsService) exportDailyHTML(stats *DailyStats, appUsage []*AppUsa
 	html.WriteString("<table><thead><tr><th>Application</th><th>Duration</th><th>Percentage</th><th>Focus Count</th></tr></thead><tbody>")
 	for _, app := range appUsage {
 		minutes := int(app.DurationSeconds / 60)
-		html.WriteString(fmt.Sprintf("<tr><td>%s</td><td>%d min</td><td>%.1f%%</td><td>%d</td></tr>", 
-			app.AppName, minutes, app.Percentage, app.FocusCount))
+		html.WriteString(fmt.Sprintf("<tr><td>%s</td><td>%d min</td><td>%.1f%%</td><td>%d</td></tr>",
+			esc(app.AppName), minutes, app.Percentage, app.FocusCount))
 	}
 	html.WriteString("</tbody></table>")
 	
