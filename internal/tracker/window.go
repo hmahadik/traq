@@ -10,9 +10,10 @@ import (
 
 // WindowTracker tracks the currently focused window.
 type WindowTracker struct {
-	platform     platform.Platform
-	store        *storage.Store
-	currentFocus *WindowFocus
+	platform        platform.Platform
+	store           *storage.Store
+	currentFocus    *WindowFocus
+	onActivitySaved ActivitySavedCallback
 }
 
 // WindowFocus represents the currently focused window.
@@ -67,8 +68,12 @@ func (t *WindowTracker) RecordFocusChange(newWindow *platform.WindowInfo, sessio
 				SessionID:       sql.NullInt64{Int64: t.currentFocus.SessionID, Valid: t.currentFocus.SessionID > 0},
 			}
 
-			if _, err := t.store.SaveFocusEvent(event); err != nil {
+			eventID, err := t.store.SaveFocusEvent(event)
+			if err != nil {
 				return err
+			}
+			if eventID > 0 && t.onActivitySaved != nil {
+				go t.onActivitySaved("focus", eventID, event.AppName, event.WindowTitle, "")
 			}
 		}
 	}
@@ -105,8 +110,12 @@ func (t *WindowTracker) FlushCurrentFocus() error {
 			SessionID:       sql.NullInt64{Int64: t.currentFocus.SessionID, Valid: t.currentFocus.SessionID > 0},
 		}
 
-		if _, err := t.store.SaveFocusEvent(event); err != nil {
+		eventID, err := t.store.SaveFocusEvent(event)
+		if err != nil {
 			return err
+		}
+		if eventID > 0 && t.onActivitySaved != nil {
+			go t.onActivitySaved("focus", eventID, event.AppName, event.WindowTitle, "")
 		}
 	}
 

@@ -39,6 +39,13 @@ func DefaultDaemonConfig(dataDir string) *DaemonConfig {
 	}
 }
 
+// ActivitySavedCallback is called after a new activity is saved to the database.
+// eventType: "screenshot", "focus", or "git"
+// eventID: the database ID of the saved event
+// appName, windowTitle: window context (empty for git commits)
+// gitRepo: repository path (empty for non-git events)
+type ActivitySavedCallback func(eventType string, eventID int64, appName, windowTitle, gitRepo string)
+
 // Daemon is the main tracking daemon.
 type Daemon struct {
 	config  *DaemonConfig
@@ -59,6 +66,9 @@ type Daemon struct {
 	mu              sync.RWMutex
 	lastDHash       string
 	currentAFKID    int64 // Track ongoing AFK event ID
+
+	// Activity auto-assignment callback
+	onActivitySaved ActivitySavedCallback
 
 	// Auto-update support
 	onUpdateReady       func() bool // Returns true if update is pending
@@ -339,7 +349,18 @@ func (d *Daemon) tick() {
 		sc.WindowHeight = sql.NullInt64{Int64: int64(windowInfo.Height), Valid: true}
 	}
 
-	d.store.SaveScreenshot(sc)
+	scID, _ := d.store.SaveScreenshot(sc)
+
+	// Auto-assign screenshot to project if callback is set
+	if scID > 0 && d.onActivitySaved != nil {
+		appName := ""
+		windowTitle := ""
+		if windowInfo != nil {
+			appName = windowInfo.AppName
+			windowTitle = windowInfo.Title
+		}
+		go d.onActivitySaved("screenshot", scID, appName, windowTitle, "")
+	}
 
 	// Poll shell history for new commands
 	d.shell.Poll(session.ID)
@@ -506,6 +527,16 @@ func (d *Daemon) SetAFKRestartMinutes(minutes int) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	d.afkRestartMinutes = minutes
+}
+
+// SetOnActivitySaved sets a callback that fires after a new activity is saved.
+// This is used for auto-assigning activities to projects.
+func (d *Daemon) SetOnActivitySaved(fn ActivitySavedCallback) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.onActivitySaved = fn
+	d.window.onActivitySaved = fn
+	d.git.onActivitySaved = fn
 }
 
 // SetMonitorMode sets the monitor selection mode.

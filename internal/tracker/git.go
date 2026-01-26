@@ -17,9 +17,10 @@ import (
 
 // GitTracker tracks git activity in registered repositories.
 type GitTracker struct {
-	store          *storage.Store
-	checkpointFile string
-	maxCommits     int
+	store           *storage.Store
+	checkpointFile  string
+	maxCommits      int
+	onActivitySaved ActivitySavedCallback
 }
 
 // GitCheckpoint stores the last seen commit for each repository.
@@ -122,6 +123,9 @@ func (t *GitTracker) Poll(sessionID int64) ([]*storage.GitCommit, error) {
 				}
 				commit.ID = id
 				allCommits = append(allCommits, commit)
+				if t.onActivitySaved != nil {
+					go t.onActivitySaved("git", id, "", "", repo.Path)
+				}
 			}
 
 			// Update checkpoint with newest commit

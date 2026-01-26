@@ -137,6 +137,30 @@ func (a *App) startup(ctx context.Context) {
 	// Must be before Reports since Reports uses it for pattern matching
 	a.Projects = service.NewProjectAssignmentService(a.store)
 
+	// Wire up auto-assignment of new activities to projects
+	if a.daemon != nil {
+		a.daemon.SetOnActivitySaved(func(eventType string, eventID int64, appName, windowTitle, gitRepo string) {
+			// Check if auto-assign is enabled
+			val, err := a.store.GetConfig("projects.auto_assign")
+			if err != nil || val != "true" {
+				return
+			}
+
+			ctx := &storage.AssignmentContext{
+				AppName:     appName,
+				WindowTitle: windowTitle,
+				GitRepo:     gitRepo,
+			}
+
+			match := a.Projects.SuggestProject(ctx)
+			if match != nil && match.Confidence > 0 {
+				if err := a.store.SetEventProject(eventType, eventID, match.ProjectID, match.Confidence, "rule"); err != nil {
+					log.Printf("Auto-assign failed for %s/%d: %v", eventType, eventID, err)
+				}
+			}
+		})
+	}
+
 	// Initialize embedding service (for semantic similarity-based project assignment)
 	a.Embeddings = service.NewEmbeddingService(a.store, nil) // ONNX optional, nil for now
 	// Load existing labeled vectors in background
