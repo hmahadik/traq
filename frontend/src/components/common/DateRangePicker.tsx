@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ChevronLeft, ChevronRight, Calendar } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -36,6 +36,14 @@ export function DateRangePicker({ value, onChange, minDate, maxDate, trigger }: 
   const [selectionStart, setSelectionStart] = useState<Date | null>(value.start);
   const [selectionEnd, setSelectionEnd] = useState<Date | null>(value.end);
   const [selectingEnd, setSelectingEnd] = useState(false);
+
+  // Sync internal state when value changes externally (e.g., navigation buttons)
+  useEffect(() => {
+    setViewDate(value.start);
+    setSelectionStart(value.start);
+    setSelectionEnd(value.end);
+    setSelectingEnd(false);
+  }, [value.start, value.end]);
 
   const year = viewDate.getFullYear();
   const month = viewDate.getMonth();
