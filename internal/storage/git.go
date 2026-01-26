@@ -160,7 +160,8 @@ func (s *Store) GetGitCommitsBySession(sessionID int64) ([]*GitCommit, error) {
 	rows, err := s.db.Query(`
 		SELECT id, timestamp, commit_hash, short_hash, repository_id, branch,
 		       message, message_subject, files_changed, insertions, deletions,
-		       author_name, author_email, is_merge, session_id, created_at
+		       author_name, author_email, is_merge, session_id, created_at,
+		       project_id, project_confidence, project_source
 		FROM git_commits
 		WHERE session_id = ?
 		ORDER BY timestamp ASC`, sessionID)
@@ -177,7 +178,8 @@ func (s *Store) GetGitCommitsByTimeRange(start, end int64) ([]*GitCommit, error)
 	rows, err := s.db.Query(`
 		SELECT id, timestamp, commit_hash, short_hash, repository_id, branch,
 		       message, message_subject, files_changed, insertions, deletions,
-		       author_name, author_email, is_merge, session_id, created_at
+		       author_name, author_email, is_merge, session_id, created_at,
+		       project_id, project_confidence, project_source
 		FROM git_commits
 		WHERE timestamp >= ? AND timestamp <= ?
 		ORDER BY timestamp ASC`, start, end)
@@ -194,7 +196,8 @@ func (s *Store) GetGitCommitsByRepository(repoID int64, limit int) ([]*GitCommit
 	rows, err := s.db.Query(`
 		SELECT id, timestamp, commit_hash, short_hash, repository_id, branch,
 		       message, message_subject, files_changed, insertions, deletions,
-		       author_name, author_email, is_merge, session_id, created_at
+		       author_name, author_email, is_merge, session_id, created_at,
+		       project_id, project_confidence, project_source
 		FROM git_commits
 		WHERE repository_id = ?
 		ORDER BY timestamp DESC
@@ -237,7 +240,8 @@ func (s *Store) GetAllGitCommits() ([]*GitCommit, error) {
 	rows, err := s.db.Query(`
 		SELECT id, timestamp, commit_hash, short_hash, repository_id, branch,
 		       message, message_subject, files_changed, insertions, deletions,
-		       author_name, author_email, is_merge, session_id, created_at
+		       author_name, author_email, is_merge, session_id, created_at,
+		       project_id, project_confidence, project_source
 		FROM git_commits
 		ORDER BY timestamp DESC`)
 	if err != nil {
@@ -311,6 +315,7 @@ func scanGitCommits(rows *sql.Rows) ([]*GitCommit, error) {
 			&commit.ID, &commit.Timestamp, &commit.CommitHash, &commit.ShortHash, &commit.RepositoryID, &commit.Branch,
 			&commit.Message, &commit.MessageSubject, &commit.FilesChanged, &commit.Insertions, &commit.Deletions,
 			&commit.AuthorName, &commit.AuthorEmail, &commit.IsMerge, &commit.SessionID, &commit.CreatedAt,
+			&commit.ProjectID, &commit.ProjectConfidence, &commit.ProjectSource,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan git commit: %w", err)
