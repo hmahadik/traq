@@ -157,7 +157,8 @@ export function AnalyticsPage() {
   };
 
   const handleDayClick = (date: string) => {
-    const clickedDate = new Date(date);
+    const [y, m, d] = date.split('-').map(Number);
+    const clickedDate = new Date(y, m - 1, d);
     setSelectedDate(clickedDate);
     navigate('/timeline');
   };
