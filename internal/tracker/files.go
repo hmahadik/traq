@@ -314,17 +314,18 @@ func (t *FileTracker) handleEvent(event fsnotify.Event) {
 		FilePath:  event.Name,
 		EventType: eventType,
 		SessionID: sql.NullInt64{Int64: sessionID, Valid: sessionID > 0},
+		FileName:  filepath.Base(event.Name),
+		Directory: filepath.Dir(event.Name),
 	}
 
-	// Get file info if exists
+	// Set file extension from path (doesn't need the file to exist)
+	if ext != "" {
+		fileEvent.FileExtension = sql.NullString{String: ext, Valid: true}
+	}
+
+	// Get file size if the file still exists (won't exist for delete/rename events)
 	if info, err := os.Stat(event.Name); err == nil {
 		fileEvent.FileSizeBytes = sql.NullInt64{Int64: info.Size(), Valid: true}
-		if ext != "" {
-			fileEvent.FileExtension = sql.NullString{String: ext, Valid: true}
-		}
-		// Extract file name and directory
-		fileEvent.FileName = filepath.Base(event.Name)
-		fileEvent.Directory = filepath.Dir(event.Name)
 	}
 
 	t.bufferMu.Lock()
