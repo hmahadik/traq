@@ -68,9 +68,12 @@ export function WeeklyAnalytics({ data, isLoading, onDayClick }: WeeklyAnalytics
 
   // Calculate metrics
   // Filter to only include completed workdays (not today, not weekends)
-  const today = new Date().toISOString().split('T')[0];
+  const now = new Date();
+  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
   const completedWorkdays = data.dailyStats.filter(d => {
-    const date = new Date(d.date);
+    // Parse date string as local time (new Date("YYYY-MM-DD") parses as UTC, causing wrong day-of-week)
+    const [y, m, dy] = d.date.split('-').map(Number);
+    const date = new Date(y, m - 1, dy);
     const dayOfWeek = date.getDay(); // 0 = Sunday, 6 = Saturday
     const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
     const isToday = d.date === today;
@@ -92,13 +95,16 @@ export function WeeklyAnalytics({ data, isLoading, onDayClick }: WeeklyAnalytics
     return sum + breakMinutes;
   }, 0);
 
-  // Chart data
-  const chartData = data.dailyStats.map(d => ({
-    date: d.date,
-    label: new Date(d.date).toLocaleDateString('en-US', { weekday: 'short' }),
-    activeMinutes: d.activeMinutes,
-    sessions: d.totalSessions,
-  }));
+  // Chart data - parse date strings as local time to get correct weekday labels
+  const chartData = data.dailyStats.map(d => {
+    const [y, m, dy] = d.date.split('-').map(Number);
+    return {
+      date: d.date,
+      label: new Date(y, m - 1, dy).toLocaleDateString('en-US', { weekday: 'short' }),
+      activeMinutes: d.activeMinutes,
+      sessions: d.totalSessions,
+    };
+  });
 
   return (
     <TooltipProvider>
@@ -273,11 +279,14 @@ export function WeeklyAnalytics({ data, isLoading, onDayClick }: WeeklyAnalytics
                     return (
                       <div className="rounded-lg border bg-background p-3 shadow-sm">
                         <p className="text-sm font-medium mb-1">
-                          {new Date(data.date).toLocaleDateString('en-US', {
-                            weekday: 'long',
-                            month: 'short',
-                            day: 'numeric',
-                          })}
+                          {(() => {
+                            const [y, m, d] = data.date.split('-').map(Number);
+                            return new Date(y, m - 1, d).toLocaleDateString('en-US', {
+                              weekday: 'long',
+                              month: 'short',
+                              day: 'numeric',
+                            });
+                          })()}
                         </p>
                         <p className="text-sm text-muted-foreground">
                           Active: {formatHours(data.activeMinutes)}
@@ -307,14 +316,13 @@ export function WeeklyAnalytics({ data, isLoading, onDayClick }: WeeklyAnalytics
       <Card>
         <CardContent className="pt-6">
           <div className="text-sm text-muted-foreground text-center">
-            Week of {new Date(data.startDate).toLocaleDateString('en-US', {
-              month: 'long',
-              day: 'numeric',
-            })} - {new Date(data.endDate).toLocaleDateString('en-US', {
-              month: 'long',
-              day: 'numeric',
-              year: 'numeric',
-            })}
+            Week of {(() => {
+              const [y, m, d] = data.startDate.split('-').map(Number);
+              return new Date(y, m - 1, d).toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
+            })()} - {(() => {
+              const [y, m, d] = data.endDate.split('-').map(Number);
+              return new Date(y, m - 1, d).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+            })()}
           </div>
         </CardContent>
       </Card>

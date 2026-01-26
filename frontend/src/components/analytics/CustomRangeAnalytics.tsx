@@ -162,12 +162,15 @@ export function CustomRangeAnalytics({ data, isLoading, onDayClick }: CustomRang
   const renderDailyChart = () => {
     if (!data.dailyBuckets) return null;
 
-    const chartData = data.dailyBuckets.map(d => ({
-      date: d.date,
-      label: new Date(d.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-      activeMinutes: d.activeMinutes,
-      sessions: d.totalSessions,
-    }));
+    const chartData = data.dailyBuckets.map(d => {
+      const [y, m, dy] = d.date.split('-').map(Number);
+      return {
+        date: d.date,
+        label: new Date(y, m - 1, dy).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+        activeMinutes: d.activeMinutes,
+        sessions: d.totalSessions,
+      };
+    });
 
     return (
       <Card>
@@ -203,11 +206,14 @@ export function CustomRangeAnalytics({ data, isLoading, onDayClick }: CustomRang
                     return (
                       <div className="rounded-lg border bg-background p-3 shadow-sm">
                         <p className="text-sm font-medium mb-1">
-                          {new Date(data.date).toLocaleDateString('en-US', {
-                            weekday: 'long',
-                            month: 'short',
-                            day: 'numeric',
-                          })}
+                          {(() => {
+                            const [y, m, d] = data.date.split('-').map(Number);
+                            return new Date(y, m - 1, d).toLocaleDateString('en-US', {
+                              weekday: 'long',
+                              month: 'short',
+                              day: 'numeric',
+                            });
+                          })()}
                         </p>
                         <p className="text-sm text-muted-foreground">
                           Active: {formatHours(data.activeMinutes)}

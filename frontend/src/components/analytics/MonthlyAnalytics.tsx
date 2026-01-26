@@ -97,12 +97,13 @@ export function MonthlyAnalytics({ data, isLoading, onDayClick }: MonthlyAnalyti
   const totalGitCommits = data.dailyStats.reduce((sum, d) => sum + d.gitCommits, 0);
 
   // Daily activity chart data (show all days in the month)
+  // Parse date strings as local time (new Date("YYYY-MM-DD") parses as UTC, causing wrong day numbers)
   const dailyChartData = data.dailyStats.map(d => {
-    const date = new Date(d.date);
+    const dayNum = parseInt(d.date.split('-')[2], 10);
     return {
       date: d.date,
-      day: date.getDate(),
-      dayLabel: `${date.getDate()}`,
+      day: dayNum,
+      dayLabel: `${dayNum}`,
       activeMinutes: d.activeMinutes,
       sessions: d.totalSessions,
       screenshots: d.totalScreenshots,
@@ -215,8 +216,8 @@ export function MonthlyAnalytics({ data, isLoading, onDayClick }: MonthlyAnalyti
               {dailyChartData.length > 0
                 ? (() => {
                     const peakDay = dailyChartData.reduce((max, d) => d.activeMinutes > max.activeMinutes ? d : max, dailyChartData[0]);
-                    const date = new Date(peakDay.date);
-                    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                    const [y, m, d] = peakDay.date.split('-').map(Number);
+                    return new Date(y, m - 1, d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
                   })()
                 : 'N/A'}
             </div>
@@ -284,8 +285,8 @@ export function MonthlyAnalytics({ data, isLoading, onDayClick }: MonthlyAnalyti
                 labelFormatter={(label) => {
                   const item = dailyChartData.find(d => d.dayLabel === label);
                   if (item) {
-                    const date = new Date(item.date);
-                    return date.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' });
+                    const [y, m, d] = item.date.split('-').map(Number);
+                    return new Date(y, m - 1, d).toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' });
                   }
                   return label;
                 }}
