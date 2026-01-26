@@ -672,6 +672,9 @@ html {
 }
 
 .footer-links {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
   display: flex;
   gap: 2rem;
 }
@@ -756,6 +759,11 @@ html {
     flex-direction: column;
     text-align: center;
     padding: 3rem 1.5rem;
+  }
+
+  .footer-links {
+    position: static;
+    transform: none;
   }
 
   .preview-tab {
