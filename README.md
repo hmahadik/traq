@@ -1,4 +1,8 @@
-# Traq - Activity Tracker v2
+# Traq - Activity Tracker
+
+Privacy-first desktop activity tracker that captures screenshots and tracks window focus to help you understand where your time goes.
+
+![Traq Timeline](./docs/public/screenshots/timeline-dark.png)
 
 ## Purpose
 
@@ -89,22 +93,53 @@ Screenshots capture what was on screen. Data sources capture what was actually h
 - **Perceptual Duplicate Detection**: Uses dhash algorithm to skip near-identical screenshots
 - **Window Context Tracking**: Records active window title and application name
 - **Session-Based Tracking**: Groups activity into sessions with AFK detection
-- **Timeline View**: Interactive calendar heatmap with session breakdown
-- **Analytics Dashboard**: Charts showing activity patterns and app usage
+- **Extended Data Sources**: Git commits, shell history, file modifications, browser history
+- **Timeline View**: Interactive hour-based grid with AI summaries and activity blocks
+- **Analytics Dashboard**: Charts showing activity patterns, app usage, and heatmaps
 - **Report Generation**: Natural language time ranges with multiple export formats
+- **Global Search**: Cross-data-source search with filtering
 - **Native Desktop App**: Cross-platform via Wails (Linux, macOS, Windows)
 
-## Tech Stack
+## Installation
 
-- **Backend**: Go 1.21+
-- **Frontend**: React 18, TypeScript, Vite, Tailwind CSS
-- **Desktop**: Wails v2
-- **Database**: SQLite
-- **UI Components**: Radix UI, Lucide icons, Recharts
+### Pre-built Binaries
 
-## Prerequisites
+Download the latest release for your platform:
 
-### Linux (Ubuntu/Debian)
+| Platform | Download |
+|----------|----------|
+| Linux (x64) | [traq-linux-amd64.AppImage](https://github.com/hmahadik/traq/releases/latest/download/traq-linux-amd64.AppImage) |
+| macOS (Universal) | [traq-macos-universal.zip](https://github.com/hmahadik/traq/releases/latest/download/traq-macos-universal.zip) |
+| Windows (x64) | [traq-windows-amd64-installer.exe](https://github.com/hmahadik/traq/releases/latest/download/traq-windows-amd64-installer.exe) |
+
+#### Linux
+
+```bash
+# Download the AppImage
+curl -L -o traq https://github.com/hmahadik/traq/releases/latest/download/traq-linux-amd64.AppImage
+chmod +x traq
+
+# Run it
+./traq
+```
+
+#### macOS
+
+1. Download and extract the zip file
+2. Move `traq.app` to your Applications folder
+3. Right-click and select "Open" (first launch only, to bypass Gatekeeper)
+
+#### Windows
+
+1. Download the `.exe` installer
+2. Run the installer
+3. Launch Traq from the Start Menu
+
+### Build from Source
+
+#### Prerequisites
+
+**Linux (Ubuntu/Debian)**
 
 ```bash
 # Install Go 1.21+
@@ -119,28 +154,12 @@ sudo apt install libgtk-3-dev libwebkit2gtk-4.1-dev
 
 # Install Wails CLI
 go install github.com/wailsapp/wails/v2/cmd/wails@latest
-```
 
-### X11 Tools (for window tracking)
-
-```bash
+# For window tracking
 sudo apt install xdotool
 ```
 
-## Installation
-
-### Quick Install (Pre-built Binary)
-
-```bash
-# Download the AppImage
-curl -L -o traq https://github.com/hmahadik/traq/releases/latest/download/traq-linux-amd64.AppImage
-chmod +x traq
-
-# Run it
-./traq
-```
-
-### Build from Source
+#### Build
 
 ```bash
 # Clone the repository
@@ -156,6 +175,12 @@ make build
 # Run the binary
 ./build/bin/traq
 ```
+
+::: tip Ubuntu 24.04+
+Ubuntu 24.04 and newer use `webkit2gtk-4.1`. The Makefile handles this automatically with `make build`.
+
+For older systems with `webkit2gtk-4.0`, use `make build-legacy`.
+:::
 
 ## Development
 
@@ -177,25 +202,13 @@ make bindings
 
 The app uses **hash-based routing** (e.g., `/#/session/37` instead of `/session/37`). This is required for Wails compatibility - browser history routing doesn't work reliably in Wails dev mode due to IPC initialization issues with direct URL access to non-root paths.
 
-## Build Notes
+## Tech Stack
 
-### Ubuntu 24.04+ (webkit2gtk-4.1)
-
-Ubuntu 24.04 and newer ship with `libwebkit2gtk-4.1` instead of `4.0`. The Makefile handles this automatically:
-
-```bash
-make build      # Uses -tags webkit2_41
-make dev        # Uses -tags webkit2_41
-```
-
-### Older Systems (webkit2gtk-4.0)
-
-For systems with the older webkit2gtk-4.0:
-
-```bash
-make build-legacy
-make dev-legacy
-```
+- **Backend**: Go 1.21+
+- **Frontend**: React 18, TypeScript, Vite, Tailwind CSS
+- **Desktop**: Wails v2
+- **Database**: SQLite
+- **UI Components**: Radix UI, Lucide icons, Recharts
 
 ## Project Structure
 
@@ -246,70 +259,11 @@ Configuration is stored in the database and managed through the Settings page in
 
 ---
 
-## Implementation Status
-
-**🎉 Version 2.0 - 100% COMPLETE - PRODUCTION READY 🎉**
-
-All 64 core features have been implemented and verified. The application is production-ready for deployment.
-
-### Core Features (P0) - ✅ Complete
-- [x] Screenshot capture with configurable intervals
-- [x] Perceptual duplicate detection (dHash)
-- [x] Window focus tracking (app name + title)
-- [x] Session-based organization with AFK detection
-- [x] SQLite database with migrations
-- [x] Timeline v3 grid (hour-based with app columns)
-- [x] Dark theme with professional polish
-- [x] Linux support (X11)
-
-### Essential Features (P1) - ✅ Complete
-- [x] Extended data sources (git, shell, files, browser, screenshots)
-- [x] Data source integration in Timeline view
-- [x] Event filtering (toggle data sources on/off)
-- [x] Global search across all data sources
-- [x] Advanced analytics (hourly charts, heatmaps, categories)
-- [x] Report generation with natural language dates
-- [x] Session detail view with screenshot gallery
-- [x] Activity clustering
-- [x] AI session summaries
-- [x] Keyboard navigation
-- [x] Issue reporting system
-- [x] App name mapping (150+ friendly names)
-- [x] Category visualization (Focus/Meetings/Comms/Other)
-
-### Key Accomplishments (January 2026)
-- **Timeline v3 Grid** - Hour-based grid with activity blocks, AI summaries, and event filtering
-- **Data Sources Integration** - 5 data sources (git, shell, files, browser, screenshots) displayed inline
-- **Activity Clustering** - Related activities grouped visually for better understanding
-- **Global Search** - Cross-data-source search with type-specific results
-- **Activity Heatmap** - Week × hour visualization of activity patterns
-- **Issue Reporting** - In-app bug reporting with context attachment and Slack webhook
-- **Professional UI** - Polished dark theme with responsive design
-
-### Test Coverage
-- **64/64 tests passing** (100% completion)
-- Browser automation verification complete
-- All user journeys functional
-- Zero console errors
-- Performance benchmarks met (< 2s page loads)
-
-### Future Enhancements (Optional)
-- [ ] Bundled local AI model (currently using external APIs)
-- [ ] macOS support (X11 equivalent for window tracking)
-- [ ] Windows support (Win32 API for window tracking)
-- [ ] Screenshot OCR search
-- [ ] Custom categories and tags
-- [ ] Data retention policies
-- [ ] Export to additional formats
-
----
-
 ## Documentation
 
+- [User Guide](https://hmahadik.github.io/traq/guide/getting-started)
 - [TRAQ_SPEC.md](./TRAQ_SPEC.md) - Full product specification
-- [UI_BACKLOG.md](./UI_BACKLOG.md) - Current UI/UX issues and priorities
 - [CLAUDE.md](./CLAUDE.md) - Development context and architecture
-- [docs/guide/](./docs/guide/) - User guide
 
 ## License
 
