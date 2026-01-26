@@ -64,6 +64,7 @@ interface TimelineProps {
   onEventDelete?: (event: EventDot) => void;
   onEventEdit?: (event: EventDot) => void;
   onViewScreenshot?: (event: EventDot) => void;
+  onViewSession?: (event: EventDot) => void;
 }
 
 // Layout constants
@@ -98,6 +99,7 @@ export function Timeline({
   onEventDelete,
   onEventEdit,
   onViewScreenshot,
+  onViewSession,
 }: TimelineProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
@@ -2051,6 +2053,7 @@ export function Timeline({
         onDelete={onEventDelete}
         onEdit={onEventEdit}
         onViewScreenshot={onViewScreenshot}
+        onViewSession={onViewSession}
         onClose={() => {
           setClickedEvent(null);
           setTooltipPosition(null);

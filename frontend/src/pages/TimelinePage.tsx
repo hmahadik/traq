@@ -269,6 +269,14 @@ export function TimelinePage() {
     }
   }, []);
 
+  // Handle viewing session details from tooltip
+  const handleViewSession = useCallback((event: EventDot) => {
+    if (event.type === 'session' && event.originalId) {
+      setSelectedSessionId(event.originalId);
+      setSessionDrawerOpen(true);
+    }
+  }, []);
+
   // Handle selection change from drops visualization or list
   const handleSelectionChange = useCallback((keys: Set<EventKey>) => {
     setSelectedEventKeys(keys);
@@ -618,6 +626,7 @@ export function TimelinePage() {
                 onEventDelete={handleEventDropDelete}
                 onEventEdit={handleEventDropEdit}
                 onViewScreenshot={handleEventDropViewScreenshot}
+                onViewSession={handleViewSession}
                 loadedDays={loadedDays}
                 multiDayTimeRange={timeRange}
                 onPlayheadChange={handlePlayheadChange}

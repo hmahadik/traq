@@ -3,7 +3,7 @@
 
 export type EventKey = string;
 
-export type EventType = 'activity' | 'browser' | 'git' | 'shell' | 'file' | 'afk' | 'screenshot';
+export type EventType = 'activity' | 'browser' | 'git' | 'shell' | 'file' | 'afk' | 'screenshot' | 'session';
 
 export function makeEventKey(type: EventType, id: number): EventKey {
   return `${type}:${id}`;

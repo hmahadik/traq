@@ -347,6 +347,40 @@ export function useMultiDayTimelineData({
           addToRow(rowName, dot);
         }
       }
+
+      // Process session summaries (AI summaries)
+      if (data.sessionSummaries && data.sessionSummaries.length > 0) {
+        for (const session of data.sessionSummaries) {
+          // Skip sessions that start in the future
+          if (isInFuture(session.startTime)) continue;
+
+          const rowName = 'Sessions';
+          const topApps = session.topApps || [];
+          const appList = topApps.slice(0, 3).join(', ');
+          const moreApps = topApps.length > 3 ? ` +${topApps.length - 3}` : '';
+
+          const dot: EventDot = {
+            id: makeEventKey('session', session.id),
+            originalId: session.id,
+            timestamp: new Date(session.startTime * 1000),
+            type: 'session',
+            row: rowName,
+            label: session.summary || `Session: ${appList}${moreApps}`,
+            duration: capDuration(dateStr, session.startTime, session.durationSeconds ?? undefined),
+            color: EVENT_TYPE_COLORS.session,
+            metadata: {
+              explanation: session.explanation,
+              tags: session.tags,
+              topApps: session.topApps,
+              isDraft: session.isDraft,
+              draftStatus: session.draftStatus,
+              confidence: session.confidence,
+              category: session.category,
+            },
+          };
+          addToRow(rowName, dot);
+        }
+      }
     }
 
     // Convert row map to sorted array

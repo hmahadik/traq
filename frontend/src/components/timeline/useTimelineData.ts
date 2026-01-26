@@ -415,7 +415,7 @@ export function useTimelineData({
       for (const session of data.sessionSummaries) {
         const rowName = 'Sessions';
         const topApps = session.topApps || [];
-        const appList = topApps.slice(0, 3).map(a => a.appName).join(', ');
+        const appList = topApps.slice(0, 3).join(', ');
         const moreApps = topApps.length > 3 ? ` +${topApps.length - 3}` : '';
 
         const dot: EventDot = {

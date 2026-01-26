@@ -35,6 +35,7 @@ import {
   Coffee,
   Monitor,
   Camera,
+  Sparkles,
   Play,
   Merge,
   Check,
@@ -57,6 +58,7 @@ const EVENT_TYPE_ICONS: Record<EventDropType, typeof GitCommit> = {
   afk: Coffee,
   screenshot: Camera,
   projects: FolderKanban,
+  session: Sparkles,
 };
 
 interface EventListProps {
@@ -209,6 +211,35 @@ function gridDataToEvents(data: TimelineGridData | undefined): EventDot[] {
       },
     });
   });
+
+  // Session summaries (AI summaries)
+  if (data.sessionSummaries) {
+    data.sessionSummaries.forEach((session) => {
+      const topApps = session.topApps || [];
+      const appList = topApps.slice(0, 3).join(', ');
+      const moreApps = topApps.length > 3 ? ` +${topApps.length - 3}` : '';
+
+      events.push({
+        id: makeEventKey('session', session.id),
+        originalId: session.id,
+        timestamp: new Date(session.startTime * 1000),
+        type: 'session',
+        row: 'Sessions',
+        label: session.summary || `Session: ${appList}${moreApps}`,
+        duration: session.durationSeconds ?? undefined,
+        color: '#f59e0b',
+        metadata: {
+          explanation: session.explanation,
+          tags: session.tags,
+          topApps: session.topApps,
+          isDraft: session.isDraft,
+          draftStatus: session.draftStatus,
+          confidence: session.confidence,
+          category: session.category,
+        },
+      });
+    });
+  }
 
   return events;
 }

@@ -1,5 +1,5 @@
 import { useMemo, forwardRef } from 'react';
-import { GitCommit, Terminal, Globe, FileText, Coffee, Monitor, Camera, Trash2, Pencil, FolderKanban, Sparkles, X } from 'lucide-react';
+import { GitCommit, Terminal, Globe, FileText, Coffee, Monitor, Camera, Trash2, Pencil, FolderKanban, Sparkles, ExternalLink, X } from 'lucide-react';
 import type { EventDot, EventDropType } from './timelineTypes';
 
 interface TimelineTooltipProps {
@@ -8,6 +8,7 @@ interface TimelineTooltipProps {
   onDelete?: (event: EventDot) => void;
   onEdit?: (event: EventDot) => void;
   onViewScreenshot?: (event: EventDot) => void;
+  onViewSession?: (event: EventDot) => void;
   onClose?: () => void;
 }
 
@@ -61,6 +62,7 @@ export const TimelineTooltip = forwardRef<HTMLDivElement, TimelineTooltipProps>(
   position,
   onDelete,
   onEdit,
+  onViewSession,
   onClose,
 }, ref) {
   const content = useMemo(() => {
@@ -273,8 +275,22 @@ export const TimelineTooltip = forwardRef<HTMLDivElement, TimelineTooltipProps>(
         )}
 
         {/* Action buttons - only show if there are actions available */}
-        {(onEdit && event.type === 'activity') || (onDelete && event.type !== 'screenshot') ? (
+        {(onEdit && event.type === 'activity') || (onDelete && event.type !== 'screenshot') || (onViewSession && event.type === 'session') ? (
           <div className="border-t border-border pt-2 mt-2 flex items-center gap-1">
+            {/* View Details button - only for sessions */}
+            {onViewSession && event.type === 'session' && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onViewSession(event);
+                }}
+                className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                title="View session details"
+              >
+                <ExternalLink className="h-4 w-4" />
+              </button>
+            )}
+
             {/* Edit button - only for activities */}
             {onEdit && event.type === 'activity' && (
               <button
