@@ -155,6 +155,9 @@ func (t *GitTracker) getNewCommits(repo *storage.GitRepository, sinceHash string
 		return nil, fmt.Errorf("git log failed: %w", err)
 	}
 
+	// Get current branch once for the entire batch, not per-commit
+	branch := t.getCurrentBranch(repo.Path)
+
 	var commits []*storage.GitCommit
 	scanner := bufio.NewScanner(strings.NewReader(string(output)))
 
@@ -167,24 +170,29 @@ func (t *GitTracker) getNewCommits(repo *storage.GitRepository, sinceHash string
 
 		timestamp, _ := strconv.ParseInt(parts[3], 10, 64)
 
+		shortHash := parts[0]
+		if len(shortHash) > 7 {
+			shortHash = shortHash[:7]
+		}
+
 		commit := &storage.GitCommit{
 			RepositoryID: repo.ID,
 			CommitHash:   parts[0],
-			ShortHash:    parts[0][:7],
+			ShortHash:    shortHash,
 			AuthorName:   sql.NullString{String: parts[1], Valid: parts[1] != ""},
 			AuthorEmail:  sql.NullString{String: parts[2], Valid: parts[2] != ""},
 			Timestamp:    timestamp,
 			Message:      parts[4],
 			MessageSubject: parts[4],
 			SessionID:    sql.NullInt64{Int64: sessionID, Valid: sessionID > 0},
+			Branch:       sql.NullString{String: branch, Valid: branch != ""},
 		}
 
-		// Get stats for this commit
-		stats := t.getCommitStats(repo.Path, parts[0])
+		// Get diff stats for this commit
+		stats := t.getCommitDiffStats(repo.Path, parts[0])
 		commit.FilesChanged = sql.NullInt64{Int64: int64(stats.files), Valid: true}
 		commit.Insertions = sql.NullInt64{Int64: int64(stats.insertions), Valid: true}
 		commit.Deletions = sql.NullInt64{Int64: int64(stats.deletions), Valid: true}
-		commit.Branch = sql.NullString{String: stats.branch, Valid: stats.branch != ""}
 
 		commits = append(commits, commit)
 	}
@@ -196,19 +204,21 @@ type commitStats struct {
 	files      int
 	insertions int
 	deletions  int
-	branch     string
 }
 
-// getCommitStats returns file change statistics for a commit.
-func (t *GitTracker) getCommitStats(repoPath, hash string) commitStats {
-	stats := commitStats{}
-
-	// Get current branch
+// getCurrentBranch returns the current branch name for a repository.
+func (t *GitTracker) getCurrentBranch(repoPath string) string {
 	branchCmd := exec.Command("git", "-C", repoPath, "rev-parse", "--abbrev-ref", "HEAD")
 	branchOutput, err := branchCmd.Output()
-	if err == nil {
-		stats.branch = strings.TrimSpace(string(branchOutput))
+	if err != nil {
+		return ""
 	}
+	return strings.TrimSpace(string(branchOutput))
+}
+
+// getCommitDiffStats returns file change statistics for a commit.
+func (t *GitTracker) getCommitDiffStats(repoPath, hash string) commitStats {
+	stats := commitStats{}
 
 	// Get diff stats
 	cmd := exec.Command("git", "-C", repoPath, "show", "--stat", "--format=", hash)
