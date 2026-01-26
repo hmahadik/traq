@@ -283,9 +283,15 @@ export function CustomRangeAnalytics({ data, isLoading, onDayClick }: CustomRang
                     return (
                       <div className="rounded-lg border bg-background p-3 shadow-sm">
                         <p className="text-sm font-medium mb-1">
-                          {new Date(data.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                          {(() => {
+                            const [y, m, d] = data.startDate.split('-').map(Number);
+                            return new Date(y, m - 1, d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                          })()}
                           {' - '}
-                          {new Date(data.endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                          {(() => {
+                            const [y, m, d] = data.endDate.split('-').map(Number);
+                            return new Date(y, m - 1, d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                          })()}
                         </p>
                         <p className="text-sm text-muted-foreground">
                           Active: {formatHours(data.totalActive)}
@@ -406,14 +412,20 @@ export function CustomRangeAnalytics({ data, isLoading, onDayClick }: CustomRang
       <Card>
         <CardContent className="pt-6">
           <div className="text-sm text-muted-foreground text-center">
-            {new Date(data.startDate).toLocaleDateString('en-US', {
-              month: 'long',
-              day: 'numeric',
-            })} - {new Date(data.endDate).toLocaleDateString('en-US', {
-              month: 'long',
-              day: 'numeric',
-              year: 'numeric',
-            })} ({data.bucketType} buckets)
+            {(() => {
+              const [y, m, d] = data.startDate.split('-').map(Number);
+              return new Date(y, m - 1, d).toLocaleDateString('en-US', {
+                month: 'long',
+                day: 'numeric',
+              });
+            })()} - {(() => {
+              const [y, m, d] = data.endDate.split('-').map(Number);
+              return new Date(y, m - 1, d).toLocaleDateString('en-US', {
+                month: 'long',
+                day: 'numeric',
+                year: 'numeric',
+              });
+            })()} ({data.bucketType} buckets)
           </div>
         </CardContent>
       </Card>
