@@ -51,7 +51,6 @@ Formatted for team standups:
 
 - **Markdown** - For docs or notes apps
 - **HTML** - Styled, shareable web page
-- **PDF** - Printable document
 - **JSON** - Structured data for processing
 
 ## Report History

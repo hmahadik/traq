@@ -2,10 +2,7 @@
 
 The Timeline is your daily activity log, showing sessions, app usage, and events in an hour-by-hour grid view.
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="/screenshots/timeline-dark.png">
-  <img src="/screenshots/timeline.png" alt="Timeline View">
-</picture>
+<img src="/screenshots/timeline-dark.png" alt="Timeline View">
 
 ## Daily Summary
 

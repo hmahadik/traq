@@ -2,10 +2,7 @@
 
 The Analytics dashboard provides deep insights into your activity patterns and application usage over multiple time periods.
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="/screenshots/analytics-dark.png">
-  <img src="/screenshots/analytics.png" alt="Analytics Dashboard">
-</picture>
+<img src="/screenshots/analytics-dark.png" alt="Analytics Dashboard">
 
 ## Time Period Views
 

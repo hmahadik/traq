@@ -21,10 +21,7 @@ The main view shows your activity timeline:
 - Click any day to see session breakdowns
 - Browse screenshots from specific time periods
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="/screenshots/timeline-dark.png">
-  <img src="/screenshots/timeline.png" alt="Timeline View">
-</picture>
+<img src="/screenshots/timeline-dark.png" alt="Timeline View">
 
 ### Analytics
 
@@ -33,10 +30,7 @@ The **Analytics** view provides:
 - Activity patterns by hour and day of week
 - Trends over time
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="/screenshots/analytics-dark.png">
-  <img src="/screenshots/analytics.png" alt="Analytics">
-</picture>
+<img src="/screenshots/analytics-dark.png" alt="Analytics">
 
 ### Settings
 
@@ -45,10 +39,7 @@ Access **Settings** to configure:
 - Image quality and format
 - AFK timeout duration
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="/screenshots/settings-dark.png">
-  <img src="/screenshots/settings.png" alt="Settings">
-</picture>
+<img src="/screenshots/settings-dark.png" alt="Settings">
 
 ## Stopping Capture
 
@@ -62,4 +53,5 @@ Or simply close the application - it only captures while running.
 
 - [Learn about the Timeline View](/guide/timeline)
 - [Explore Analytics](/guide/analytics)
+- [Generate Reports](/guide/reports)
 - [Configure Settings](/guide/settings)

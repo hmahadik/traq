@@ -4,9 +4,13 @@ export default defineConfig({
   title: 'Traq',
   description: 'Desktop activity tracker with automatic screenshots and analytics',
   base: '/traq/',
+  appearance: 'dark',
 
   head: [
     ['link', { rel: 'icon', type: 'image/svg+xml', href: '/traq/favicon.svg' }],
+    ['link', { rel: 'preconnect', href: 'https://fonts.googleapis.com' }],
+    ['link', { rel: 'preconnect', href: 'https://fonts.gstatic.com', crossorigin: '' }],
+    ['link', { href: 'https://fonts.googleapis.com/css2?family=Exo+2:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap', rel: 'stylesheet' }],
   ],
 
   themeConfig: {
@@ -15,6 +19,7 @@ export default defineConfig({
     nav: [
       { text: 'Guide', link: '/guide/getting-started' },
       { text: 'Download', link: '/download' },
+      { text: 'GitHub', link: 'https://github.com/hmahadik/traq' },
     ],
 
     sidebar: {

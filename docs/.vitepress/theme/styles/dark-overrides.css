@@ -1,0 +1,19 @@
+/* Force dark mode across VitePress */
+:root {
+  --vp-c-brand-1: #0066ff;
+  --vp-c-brand-2: #3385ff;
+  --vp-c-brand-3: #0055dd;
+  --vp-c-brand-soft: rgba(0, 102, 255, 0.14);
+
+  /* Override to dark */
+  color-scheme: dark;
+}
+
+html {
+  color-scheme: dark;
+}
+
+/* Hide theme toggle — we're dark-only */
+.VPSwitchAppearance {
+  display: none !important;
+}
