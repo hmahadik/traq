@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -43,6 +43,11 @@ export function CalendarWidget({
   onSelectDate,
 }: CalendarWidgetProps) {
   const [viewDate, setViewDate] = useState(selectedDate);
+
+  // Sync viewDate when selectedDate changes externally (e.g., keyboard navigation)
+  useEffect(() => {
+    setViewDate(selectedDate);
+  }, [selectedDate]);
 
   const year = viewDate.getFullYear();
   const month = viewDate.getMonth();
