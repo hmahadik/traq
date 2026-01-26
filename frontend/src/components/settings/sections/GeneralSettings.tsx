@@ -329,7 +329,7 @@ export function GeneralSettings() {
         <div className="pt-4 border-t flex items-center justify-between text-sm text-muted-foreground">
           <span>Version {version || 'dev'}</span>
           <a
-            href="https://github.com/hmahadik/activity-tracker/releases"
+            href="https://github.com/hmahadik/traq/releases"
             target="_blank"
             rel="noopener noreferrer"
             className="hover:text-foreground hover:underline"

@@ -6,15 +6,15 @@ Download the latest release for your platform:
 
 | Platform | Download |
 |----------|----------|
-| Linux (x64) | [traq-linux-amd64.AppImage](https://github.com/hmahadik/activity-tracker/releases/latest/download/traq-linux-amd64.AppImage) |
-| macOS (Universal) | [traq-macos-universal.zip](https://github.com/hmahadik/activity-tracker/releases/latest/download/traq-macos-universal.zip) |
-| Windows (x64) | [traq-windows-amd64-installer.exe](https://github.com/hmahadik/activity-tracker/releases/latest/download/traq-windows-amd64-installer.exe) |
+| Linux (x64) | [traq-linux-amd64.AppImage](https://github.com/hmahadik/traq/releases/latest/download/traq-linux-amd64.AppImage) |
+| macOS (Universal) | [traq-macos-universal.zip](https://github.com/hmahadik/traq/releases/latest/download/traq-macos-universal.zip) |
+| Windows (x64) | [traq-windows-amd64-installer.exe](https://github.com/hmahadik/traq/releases/latest/download/traq-windows-amd64-installer.exe) |
 
 ### Linux
 
 ```bash
 # Download the AppImage
-curl -L -o traq https://github.com/hmahadik/activity-tracker/releases/latest/download/traq-linux-amd64.AppImage
+curl -L -o traq https://github.com/hmahadik/traq/releases/latest/download/traq-linux-amd64.AppImage
 chmod +x traq
 
 # Run
@@ -60,8 +60,8 @@ sudo apt install xdotool
 
 ```bash
 # Clone the repository
-git clone https://github.com/hmahadik/activity-tracker.git
-cd activity-tracker
+git clone https://github.com/hmahadik/traq.git
+cd traq
 
 # Install dependencies
 make install-deps

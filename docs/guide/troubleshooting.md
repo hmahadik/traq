@@ -146,7 +146,7 @@ If corrupt, you may need to restore from backup or start fresh.
 
 If you're still stuck:
 
-1. Check the [GitHub Issues](https://github.com/hmahadik/activity-tracker/issues)
+1. Check the [GitHub Issues](https://github.com/hmahadik/traq/issues)
 2. Search for similar problems
 3. Open a new issue with:
    - OS and version

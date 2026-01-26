@@ -3,10 +3,10 @@ import { defineConfig } from 'vitepress'
 export default defineConfig({
   title: 'Traq',
   description: 'Desktop activity tracker with automatic screenshots and analytics',
-  base: '/activity-tracker/',
+  base: '/traq/',
 
   head: [
-    ['link', { rel: 'icon', type: 'image/svg+xml', href: '/activity-tracker/favicon.svg' }],
+    ['link', { rel: 'icon', type: 'image/svg+xml', href: '/traq/favicon.svg' }],
   ],
 
   themeConfig: {
@@ -52,7 +52,7 @@ export default defineConfig({
     },
 
     socialLinks: [
-      { icon: 'github', link: 'https://github.com/hmahadik/activity-tracker' }
+      { icon: 'github', link: 'https://github.com/hmahadik/traq' }
     ],
 
     footer: {
