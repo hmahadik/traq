@@ -1206,6 +1206,9 @@ func (s *TimelineService) GetWeekTimelineData(startDate string) (*WeekTimelineDa
 			// Calculate which blocks this event spans
 			startBlockIdx := eventStart.Hour()*2 + eventStart.Minute()/30
 			endBlockIdx := eventEnd.Hour()*2 + eventEnd.Minute()/30
+			if startBlockIdx >= 48 {
+				startBlockIdx = 47
+			}
 			if endBlockIdx >= 48 {
 				endBlockIdx = 47
 			}

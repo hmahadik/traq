@@ -126,8 +126,8 @@ export function AnalyticsPage() {
   const weekStartStr = getDateString(getWeekStart(selectedDate));
 
   // Calculate custom range timestamps
-  const customStartTs = Math.floor(customRange.start.setHours(0, 0, 0, 0) / 1000);
-  const customEndTs = Math.floor(customRange.end.setHours(23, 59, 59, 999) / 1000);
+  const customStartTs = Math.floor(new Date(customRange.start.getFullYear(), customRange.start.getMonth(), customRange.start.getDate(), 0, 0, 0, 0).getTime() / 1000);
+  const customEndTs = Math.floor(new Date(customRange.end.getFullYear(), customRange.end.getMonth(), customRange.end.getDate(), 23, 59, 59, 999).getTime() / 1000);
 
   // Day view data
   const { data: stats, isLoading: statsLoading } = useDailyStats(dateStr, true); // Enable comparison

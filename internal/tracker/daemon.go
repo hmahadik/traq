@@ -396,18 +396,18 @@ func (d *Daemon) onAFK() {
 	// Flush window focus
 	d.window.FlushCurrentFocus()
 
-	// End current session
-	d.session.HandleAFK()
-
-	// Clear duplicate detection
-	d.lastDHash = ""
-
-	// Create AFK event
+	// Capture session ID before ending the session (EndSession sets currentSession to nil)
 	session := d.session.GetCurrentSession()
 	var sessionID sql.NullInt64
 	if session != nil {
 		sessionID = sql.NullInt64{Int64: session.ID, Valid: true}
 	}
+
+	// End current session
+	d.session.HandleAFK()
+
+	// Clear duplicate detection
+	d.lastDHash = ""
 
 	afkEvent := &storage.AFKEvent{
 		StartTime:   time.Now().Unix(),

@@ -282,7 +282,7 @@ func (s *AnalyticsService) GetDailyStatsWithComparison(date string, withComparis
 	}
 
 	start := t.Unix()
-	end := t.Add(24 * time.Hour).Unix() - 1
+	end := t.AddDate(0, 0, 1).Unix() - 1
 
 	stats := &DailyStats{Date: date}
 
@@ -614,7 +614,7 @@ func (s *AnalyticsService) GetCalendarHeatmap(year, month int) (*CalendarData, e
 
 	for day := 1; day <= cal.TotalDays; day++ {
 		dayStart := time.Date(year, time.Month(month), day, 0, 0, 0, 0, time.Local)
-		dayEnd := dayStart.Add(24 * time.Hour)
+		dayEnd := dayStart.AddDate(0, 0, 1)
 
 		screenshots, _ := s.store.CountScreenshotsByTimeRange(dayStart.Unix(), dayEnd.Unix()-1)
 		sessions, _ := s.store.GetSessionsByTimeRange(dayStart.Unix(), dayEnd.Unix()-1)
@@ -785,15 +785,35 @@ func (s *AnalyticsService) GetHourlyActivityHeatmap() ([]*HeatmapData, error) {
 
 	// Aggregate by day-of-week and hour
 	// Key: "dayOfWeek-hour" -> total active seconds
+	// Events that span multiple hours are distributed across each hour they overlap.
 	activityMap := make(map[string]float64)
 
 	for _, evt := range focusEvents {
-		eventTime := time.Unix(evt.StartTime, 0)
-		dayOfWeek := int(eventTime.Weekday()) // 0 = Sunday
-		hour := eventTime.Hour()
+		evtStart := time.Unix(evt.StartTime, 0).In(time.Local)
+		evtEnd := time.Unix(evt.EndTime, 0).In(time.Local)
 
-		key := fmt.Sprintf("%d-%d", dayOfWeek, hour)
-		activityMap[key] += evt.DurationSeconds
+		// Walk through each hour the event spans
+		cursor := evtStart
+		for cursor.Before(evtEnd) {
+			// End of this clock hour
+			hourEnd := time.Date(cursor.Year(), cursor.Month(), cursor.Day(), cursor.Hour()+1, 0, 0, 0, time.Local)
+
+			// Clamp to event boundaries
+			segEnd := evtEnd
+			if hourEnd.Before(segEnd) {
+				segEnd = hourEnd
+			}
+
+			seconds := segEnd.Sub(cursor).Seconds()
+			if seconds > 0 {
+				dayOfWeek := int(cursor.Weekday()) // 0 = Sunday
+				hour := cursor.Hour()
+				key := fmt.Sprintf("%d-%d", dayOfWeek, hour)
+				activityMap[key] += seconds
+			}
+
+			cursor = hourEnd
+		}
 	}
 
 	// Convert to result slice
@@ -979,7 +999,7 @@ func (s *AnalyticsService) GetProductivityScore(date string) (*ProductivityScore
 	}
 
 	start := t.Unix()
-	end := t.Add(24 * time.Hour).Unix() - 1
+	end := t.AddDate(0, 0, 1).Unix() - 1
 
 	// Get all focus events for the day
 	focusEvents, err := s.store.GetWindowFocusEventsByTimeRange(start, end)
@@ -1170,7 +1190,7 @@ func (s *AnalyticsService) GetActivityTags(date string) ([]*TagUsage, error) {
 	}
 
 	start := t.Unix()
-	end := t.Add(24 * time.Hour).Unix() - 1
+	end := t.AddDate(0, 0, 1).Unix() - 1
 
 	// Get all sessions for the day
 	sessions, err := s.store.GetSessionsByTimeRange(start, end)
@@ -1335,7 +1355,7 @@ func (s *AnalyticsService) exportDailyAnalytics(date, format string) (string, er
 		return "", err
 	}
 	start := t.Unix()
-	end := t.Add(24 * time.Hour).Unix() - 1
+	end := t.AddDate(0, 0, 1).Unix() - 1
 
 	appUsage, err := s.GetAppUsage(start, end)
 	if err != nil {

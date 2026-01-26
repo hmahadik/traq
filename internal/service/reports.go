@@ -2197,12 +2197,12 @@ func (s *ReportsService) ParseTimeRange(input string) (*TimeRange, error) {
 	switch input {
 	case "today":
 		start = time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.Local)
-		end = start.Add(24 * time.Hour)
+		end = start.AddDate(0, 0, 1)
 		label = "Today"
 
 	case "yesterday":
 		start = time.Date(now.Year(), now.Month(), now.Day()-1, 0, 0, 0, 0, time.Local)
-		end = start.Add(24 * time.Hour)
+		end = start.AddDate(0, 0, 1)
 		label = "Yesterday"
 
 	case "this week":
@@ -2244,7 +2244,7 @@ func (s *ReportsService) ParseTimeRange(input string) (*TimeRange, error) {
 		} else if parsedStart, parsedEnd, rangeLabel, ok := parseDateRange(input); ok {
 			// Try parsing as date range (e.g., "jan 5, 2026 - jan 12, 2026")
 			start = parsedStart
-			end = parsedEnd.Add(24 * time.Hour) // Include the end date
+			end = parsedEnd.AddDate(0, 0, 1) // Include the end date
 			label = rangeLabel
 		} else {
 			// Try parsing as date
@@ -2264,7 +2264,7 @@ func (s *ReportsService) ParseTimeRange(input string) (*TimeRange, error) {
 				label = start.Format("January 2006")
 			} else {
 				start = parsed
-				end = start.Add(24 * time.Hour)
+				end = start.AddDate(0, 0, 1)
 				label = start.Format("January 2, 2006")
 			}
 		}

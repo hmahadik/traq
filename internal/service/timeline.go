@@ -134,7 +134,7 @@ func (s *TimelineService) GetSessionsForDate(date string) ([]*SessionSummary, er
 	}
 
 	start := t.Unix()
-	end := t.Add(24 * time.Hour).Unix() - 1
+	end := t.AddDate(0, 0, 1).Unix() - 1
 
 	sessions, err := s.store.GetSessionsByTimeRange(start, end)
 	if err != nil {
@@ -361,7 +361,7 @@ func (s *TimelineService) GetEntriesForDate(date string) ([]EntryBlock, error) {
 		return nil, err
 	}
 	startOfDay := t.Unix()
-	endOfDay := t.Add(24 * time.Hour).Unix()
+	endOfDay := t.AddDate(0, 0, 1).Unix()
 
 	// Get all projects for name/color lookup
 	projects, err := s.store.GetProjects()

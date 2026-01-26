@@ -53,7 +53,7 @@ func (s *BackfillService) processBackfill(startDate, endDate string, minConfiden
 		return nil, err
 	}
 	// Include the entire end date
-	end = end.Add(24 * time.Hour)
+	end = end.AddDate(0, 0, 1)
 
 	startUnix := start.Unix()
 	endUnix := end.Unix()
