@@ -176,6 +176,18 @@ func (t *ShellTracker) parseHistory(path, shellType string, offset int64) ([]*st
 	}
 	defer file.Close()
 
+	// Detect history file rotation/truncation: if the file is smaller than
+	// our saved offset, the file was rotated and we need to read from the start.
+	if offset > 0 {
+		info, err := file.Stat()
+		if err != nil {
+			return nil, 0, err
+		}
+		if info.Size() < offset {
+			offset = 0
+		}
+	}
+
 	// Seek to offset
 	if offset > 0 {
 		file.Seek(offset, 0)
