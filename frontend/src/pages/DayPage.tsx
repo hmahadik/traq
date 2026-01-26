@@ -30,10 +30,26 @@ export function DayPage() {
 
     const hoursSet = new Set<number>();
     sessions.forEach((session) => {
-      const startHour = new Date(session.startTime * 1000).getHours();
-      const endHour = session.endTime
-        ? new Date(session.endTime * 1000).getHours()
-        : startHour;
+      const startDate = new Date(session.startTime * 1000);
+      const endDate = session.endTime
+        ? new Date(session.endTime * 1000)
+        : new Date();
+
+      let startHour = startDate.getHours();
+      let endHour = endDate.getHours();
+
+      // Clamp to this day's boundaries for sessions that span midnight
+      const sessionStartDay = toDateString(startDate);
+      const sessionEndDay = toDateString(endDate);
+
+      if (sessionStartDay !== dateString) {
+        // Session started on a previous day — begin from midnight
+        startHour = 0;
+      }
+      if (sessionEndDay !== dateString) {
+        // Session ends on a later day — cap at hour 23
+        endHour = 23;
+      }
 
       for (let h = startHour; h <= endHour; h++) {
         hoursSet.add(h);
@@ -41,7 +57,7 @@ export function DayPage() {
     });
 
     return Array.from(hoursSet).sort((a, b) => a - b);
-  }, [sessions]);
+  }, [sessions, dateString]);
 
   const goToPreviousDay = useCallback(() => {
     const newDate = addDays(currentDate, -1);
