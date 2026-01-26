@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"sort"
 	"time"
 
 	"traq/internal/inference"
@@ -159,12 +160,23 @@ func (s *SummaryService) buildSessionContext(session *storage.Session) (*inferen
 		})
 	}
 
-	// Get top apps
-	for app := range appDurations {
-		ctx.TopApps = append(ctx.TopApps, app)
-		if len(ctx.TopApps) >= 5 {
+	// Get top apps sorted by duration (descending)
+	type appDur struct {
+		name string
+		dur  float64
+	}
+	var sorted []appDur
+	for app, dur := range appDurations {
+		sorted = append(sorted, appDur{app, dur})
+	}
+	sort.Slice(sorted, func(i, j int) bool {
+		return sorted[i].dur > sorted[j].dur
+	})
+	for i, ad := range sorted {
+		if i >= 5 {
 			break
 		}
+		ctx.TopApps = append(ctx.TopApps, ad.name)
 	}
 
 	// Get shell commands
