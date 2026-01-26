@@ -33,7 +33,9 @@ function safeEventsOn(eventName: string, callback: (...args: any[]) => void): ()
 function getDateRange(date: string): { start: number; end: number } {
   const [year, month, day] = date.split('-').map(Number);
   const start = new Date(year, month - 1, day).getTime() / 1000;
-  const end = start + 24 * 60 * 60 - 1; // End of day
+  // Use next calendar day's midnight minus 1 second instead of adding 86400,
+  // since DST transitions can make a day 23 or 25 hours long.
+  const end = new Date(year, month - 1, day + 1).getTime() / 1000 - 1;
   return { start, end };
 }
 
