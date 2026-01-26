@@ -167,7 +167,7 @@ export function YearlyAnalytics({ data, isLoading, onMonthClick }: YearlyAnalyti
           <CardContent>
             <div className="text-2xl font-bold">{totalScreenshots.toLocaleString()}</div>
             <p className="text-xs text-muted-foreground mt-1">
-              {Math.round(totalScreenshots / 12)} avg/month
+              {activeMonths > 0 ? Math.round(totalScreenshots / activeMonths) : 0} avg/month
             </p>
           </CardContent>
         </Card>
