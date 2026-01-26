@@ -161,11 +161,12 @@ export function DateProvider({ children }: { children: ReactNode }) {
         goToPreviousYear();
         break;
       case 'custom':
-        // For custom, move by the range duration
+        // For custom, move by the inclusive range length (duration + 1 day)
+        // so ranges tile without overlap: Mon-Sun → prev Mon-prev Sun
         if (dateRange) {
-          const duration = dateRange.end.getTime() - dateRange.start.getTime();
-          const newStart = new Date(dateRange.start.getTime() - duration);
-          const newEnd = new Date(dateRange.end.getTime() - duration);
+          const rangeDays = Math.round((dateRange.end.getTime() - dateRange.start.getTime()) / 86400000) + 1;
+          const newStart = addDays(dateRange.start, -rangeDays);
+          const newEnd = addDays(dateRange.end, -rangeDays);
           setDateRange({ start: newStart, end: newEnd });
         }
         break;
@@ -187,11 +188,12 @@ export function DateProvider({ children }: { children: ReactNode }) {
         goToNextYear();
         break;
       case 'custom':
-        // For custom, move by the range duration
+        // For custom, move by the inclusive range length (duration + 1 day)
+        // so ranges tile without overlap: Mon-Sun → next Mon-next Sun
         if (dateRange) {
-          const duration = dateRange.end.getTime() - dateRange.start.getTime();
-          const newStart = new Date(dateRange.start.getTime() + duration);
-          const newEnd = new Date(dateRange.end.getTime() + duration);
+          const rangeDays = Math.round((dateRange.end.getTime() - dateRange.start.getTime()) / 86400000) + 1;
+          const newStart = addDays(dateRange.start, rangeDays);
+          const newEnd = addDays(dateRange.end, rangeDays);
           const today = new Date();
           // Don't go past today
           if (getDateString(newEnd) <= getDateString(today)) {
@@ -222,8 +224,8 @@ export function DateProvider({ children }: { children: ReactNode }) {
       }
       case 'custom': {
         if (!dateRange) return false;
-        const duration = dateRange.end.getTime() - dateRange.start.getTime();
-        const newEnd = new Date(dateRange.end.getTime() + duration);
+        const rangeDays = Math.round((dateRange.end.getTime() - dateRange.start.getTime()) / 86400000) + 1;
+        const newEnd = addDays(dateRange.end, rangeDays);
         return getDateString(newEnd) <= getDateString(today);
       }
     }
