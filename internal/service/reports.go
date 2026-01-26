@@ -2,6 +2,7 @@ package service
 
 import (
 	"fmt"
+	"html"
 	"math"
 	"regexp"
 	"sort"
@@ -11,6 +12,11 @@ import (
 
 	"traq/internal/storage"
 )
+
+// esc escapes a string for safe embedding in HTML output.
+func esc(s string) string {
+	return html.EscapeString(s)
+}
 
 // ReportsService provides report generation.
 type ReportsService struct {
@@ -1271,7 +1277,7 @@ func (s *ReportsService) buildProjectReport(projectName string, tr *TimeRange, e
 			sb.WriteString(fmt.Sprintf(`<div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid rgba(51, 65, 85, 0.5);">
 				<span style="color: #e2e8f0;">%s</span>
 				<span style="color: #94a3b8;">%s (%.0f%%)</span>
-			</div>`, app.name, formatMinutes(int64(app.minutes)), pct))
+			</div>`, esc(app.name), formatMinutes(int64(app.minutes)), pct))
 		}
 
 		sb.WriteString(`</div></div>`)
@@ -1507,7 +1513,7 @@ func (s *ReportsService) generateDetailedReport(tr *TimeRange, includeScreenshot
 		timelineEvents = append(timelineEvents, TimelineEvent{
 			Timestamp: commit.Timestamp,
 			Type:      "git",
-			Summary:   fmt.Sprintf(`<span style="font-weight: 600; color: #f97316;">[Git]</span> <code style="font-size: 0.85em; background: rgba(249, 115, 22, 0.1); padding: 2px 6px; border-radius: 4px; color: #f97316;">%s</code> %s`, commit.ShortHash, commit.Message),
+			Summary:   fmt.Sprintf(`<span style="font-weight: 600; color: #f97316;">[Git]</span> <code style="font-size: 0.85em; background: rgba(249, 115, 22, 0.1); padding: 2px 6px; border-radius: 4px; color: #f97316;">%s</code> %s`, esc(commit.ShortHash), esc(commit.Message)),
 		})
 	}
 
@@ -1521,7 +1527,7 @@ func (s *ReportsService) generateDetailedReport(tr *TimeRange, includeScreenshot
 		timelineEvents = append(timelineEvents, TimelineEvent{
 			Timestamp: cmd.Timestamp,
 			Type:      "shell",
-			Summary:   fmt.Sprintf(`<span style="font-weight: 600; color: #3b82f6;">[Shell]</span> <code style="font-size: 0.85em; background: rgba(59, 130, 246, 0.1); padding: 2px 6px; border-radius: 4px; color: #60a5fa;">%s</code>`, cmdText),
+			Summary:   fmt.Sprintf(`<span style="font-weight: 600; color: #3b82f6;">[Shell]</span> <code style="font-size: 0.85em; background: rgba(59, 130, 246, 0.1); padding: 2px 6px; border-radius: 4px; color: #60a5fa;">%s</code>`, esc(cmdText)),
 		})
 	}
 
@@ -1535,7 +1541,7 @@ func (s *ReportsService) generateDetailedReport(tr *TimeRange, includeScreenshot
 		timelineEvents = append(timelineEvents, TimelineEvent{
 			Timestamp: fileEvt.Timestamp,
 			Type:      "file",
-			Summary:   fmt.Sprintf(`<span style="font-weight: 600; color: #22c55e;">[File]</span> %s: <code style="font-size: 0.85em; background: rgba(34, 197, 94, 0.1); padding: 2px 6px; border-radius: 4px; color: #4ade80;">%s</code>`, fileEvt.EventType, fileName),
+			Summary:   fmt.Sprintf(`<span style="font-weight: 600; color: #22c55e;">[File]</span> %s: <code style="font-size: 0.85em; background: rgba(34, 197, 94, 0.1); padding: 2px 6px; border-radius: 4px; color: #4ade80;">%s</code>`, esc(fileEvt.EventType), esc(fileName)),
 		})
 	}
 
@@ -1594,14 +1600,14 @@ func (s *ReportsService) generateDetailedReport(tr *TimeRange, includeScreenshot
 			if ctx.Summary != nil {
 				sb.WriteString(`<div style="margin-bottom: 16px; padding: 12px; background: rgba(59, 130, 246, 0.1); border-radius: 6px;">
 					<div style="font-size: 0.85rem; font-weight: 600; color: #3b82f6; margin-bottom: 6px;">Summary</div>`)
-				sb.WriteString(fmt.Sprintf(`<p style="color: #cbd5e1; font-size: 0.9rem; margin: 0;">%s</p>`, ctx.Summary.Summary))
+				sb.WriteString(fmt.Sprintf(`<p style="color: #cbd5e1; font-size: 0.9rem; margin: 0;">%s</p>`, esc(ctx.Summary.Summary)))
 				if ctx.Summary.Explanation.Valid && ctx.Summary.Explanation.String != "" {
-					sb.WriteString(fmt.Sprintf(`<p style="color: #94a3b8; font-size: 0.85rem; margin-top: 8px; margin-bottom: 0;"><strong>Explanation:</strong> %s</p>`, ctx.Summary.Explanation.String))
+					sb.WriteString(fmt.Sprintf(`<p style="color: #94a3b8; font-size: 0.85rem; margin-top: 8px; margin-bottom: 0;"><strong>Explanation:</strong> %s</p>`, esc(ctx.Summary.Explanation.String)))
 				}
 				if len(ctx.Summary.Tags) > 0 {
 					sb.WriteString(`<div style="margin-top: 8px; display: flex; gap: 6px; flex-wrap: wrap;">`)
 					for _, tag := range ctx.Summary.Tags {
-						sb.WriteString(fmt.Sprintf(`<span style="background: rgba(59, 130, 246, 0.2); color: #60a5fa; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem;">%s</span>`, tag))
+						sb.WriteString(fmt.Sprintf(`<span style="background: rgba(59, 130, 246, 0.2); color: #60a5fa; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem;">%s</span>`, esc(tag)))
 					}
 					sb.WriteString(`</div>`)
 				}
@@ -1631,7 +1637,7 @@ func (s *ReportsService) generateDetailedReport(tr *TimeRange, includeScreenshot
 					sb.WriteString(fmt.Sprintf(`<tr style="border-bottom: 1px solid rgba(148, 163, 184, 0.05);">
 						<td style="padding: 8px 12px; font-size: 0.85rem; color: #e2e8f0;">%s</td>
 						<td style="padding: 8px 12px; font-size: 0.85rem; color: #94a3b8; text-align: right;">%dm</td>
-					</tr>`, GetFriendlyAppName(app), minutes))
+					</tr>`, esc(GetFriendlyAppName(app)), minutes))
 				}
 
 				sb.WriteString(`</tbody></table></div></div>`)
@@ -1654,7 +1660,7 @@ func (s *ReportsService) generateDetailedReport(tr *TimeRange, includeScreenshot
 					for appName, windows := range appWindows {
 						sb.WriteString(fmt.Sprintf(`<div style="margin-bottom: 8px;">
 							<div style="font-size: 0.8rem; color: #e2e8f0; font-weight: 500;">%s</div>`,
-							GetFriendlyAppName(appName)))
+							esc(GetFriendlyAppName(appName))))
 
 						// Sort windows by duration
 						type wdur struct {
@@ -1684,7 +1690,7 @@ func (s *ReportsService) generateDetailedReport(tr *TimeRange, includeScreenshot
 							sb.WriteString(fmt.Sprintf(`
 								<div style="font-size: 0.75rem; color: #94a3b8; padding-left: 12px;">
 									• %s (%s)
-								</div>`, title, formatMinutes(mins)))
+								</div>`, esc(title), formatMinutes(mins)))
 						}
 						sb.WriteString(`</div>`)
 					}
@@ -1698,7 +1704,7 @@ func (s *ReportsService) generateDetailedReport(tr *TimeRange, includeScreenshot
 					<div style="font-size: 0.85rem; font-weight: 600; color: #f1f5f9; margin-bottom: 8px;">Shell Commands</div>
 					<div style="background: rgba(0, 0, 0, 0.3); border-radius: 6px; padding: 12px; font-family: monospace; font-size: 0.8rem; color: #94a3b8; overflow-x: auto;">`)
 				for _, cmd := range ctx.ShellCommands {
-					sb.WriteString(fmt.Sprintf(`<div style="margin-bottom: 4px;">%s</div>`, cmd.Command))
+					sb.WriteString(fmt.Sprintf(`<div style="margin-bottom: 4px;">%s</div>`, esc(cmd.Command)))
 				}
 				sb.WriteString(`</div></div>`)
 			}
@@ -1711,7 +1717,7 @@ func (s *ReportsService) generateDetailedReport(tr *TimeRange, includeScreenshot
 					sb.WriteString(fmt.Sprintf(`<div style="display: flex; gap: 8px; margin-bottom: 6px; align-items: baseline;">
 						<code style="font-size: 0.75rem; color: #f97316; background: rgba(249, 115, 22, 0.15); padding: 2px 6px; border-radius: 4px; flex-shrink: 0;">%s</code>
 						<span style="font-size: 0.85rem; color: #cbd5e1;">%s</span>
-					</div>`, commit.ShortHash, commit.Message))
+					</div>`, esc(commit.ShortHash), esc(commit.Message)))
 				}
 				sb.WriteString(`</div>`)
 			}
@@ -1767,7 +1773,7 @@ func (s *ReportsService) generateStandupReport(tr *TimeRange, includeScreenshots
 	accomplishments := s.extractAccomplishmentsOptimized(sessions, summariesMap)
 	if len(accomplishments) > 0 {
 		for _, acc := range accomplishments {
-			sb.WriteString(fmt.Sprintf(`<div style="font-size: 0.85rem; color: #cbd5e1; margin-bottom: 6px; padding-left: 8px;">• %s</div>`, acc))
+			sb.WriteString(fmt.Sprintf(`<div style="font-size: 0.85rem; color: #cbd5e1; margin-bottom: 6px; padding-left: 8px;">• %s</div>`, esc(acc)))
 		}
 	} else if len(commits) > 0 {
 		sb.WriteString(`<div style="font-size: 0.75rem; color: #64748b; margin-bottom: 6px;">Based on commits:</div>`)
@@ -1776,7 +1782,7 @@ func (s *ReportsService) generateStandupReport(tr *TimeRange, includeScreenshots
 		for _, commit := range commits {
 			if !seen[commit.Message] && count < 5 {
 				seen[commit.Message] = true
-				sb.WriteString(fmt.Sprintf(`<div style="font-size: 0.85rem; color: #cbd5e1; margin-bottom: 6px; padding-left: 8px;">• %s</div>`, commit.Message))
+				sb.WriteString(fmt.Sprintf(`<div style="font-size: 0.85rem; color: #cbd5e1; margin-bottom: 6px; padding-left: 8px;">• %s</div>`, esc(commit.Message)))
 				count++
 			}
 		}
@@ -1811,7 +1817,7 @@ func (s *ReportsService) generateStandupReport(tr *TimeRange, includeScreenshots
 
 			sb.WriteString(fmt.Sprintf(`<div style="font-size: 0.85rem; color: #cbd5e1; margin-bottom: 6px; padding-left: 8px;">
 				%s %s: %s (%s)
-			</div>`, icon, meeting.Platform, meeting.Title, formatMinutes(mins)))
+			</div>`, icon, esc(meeting.Platform), esc(meeting.Title), formatMinutes(mins)))
 		}
 
 		sb.WriteString(`</div>`)
@@ -1828,7 +1834,7 @@ func (s *ReportsService) generateStandupReport(tr *TimeRange, includeScreenshots
 				sb.WriteString(fmt.Sprintf(`<div style="display: flex; gap: 8px; margin-bottom: 6px; align-items: baseline;">
 					<code style="font-size: 0.7rem; color: #f97316; background: rgba(249, 115, 22, 0.15); padding: 2px 6px; border-radius: 4px; flex-shrink: 0;">%s</code>
 					<span style="font-size: 0.85rem; color: #cbd5e1;">%s</span>
-				</div>`, commit.ShortHash, commit.Message))
+				</div>`, esc(commit.ShortHash), esc(commit.Message)))
 			}
 		}
 		sb.WriteString(`</div>`)
@@ -1842,7 +1848,7 @@ func (s *ReportsService) generateStandupReport(tr *TimeRange, includeScreenshots
 		lastCommit := commits[len(commits)-1]
 		if strings.Contains(strings.ToLower(lastCommit.Message), "wip") ||
 			strings.Contains(strings.ToLower(lastCommit.Message), "in progress") {
-			sb.WriteString(fmt.Sprintf(`<div style="font-size: 0.85rem; color: #cbd5e1; padding-left: 8px;">• Continue work on: %s</div>`, lastCommit.Message))
+			sb.WriteString(fmt.Sprintf(`<div style="font-size: 0.85rem; color: #cbd5e1; padding-left: 8px;">• Continue work on: %s</div>`, esc(lastCommit.Message)))
 		} else {
 			sb.WriteString(`<div style="font-size: 0.85rem; color: #64748b; font-style: italic; padding-left: 8px;">Add your planned tasks here</div>`)
 		}
@@ -1885,7 +1891,7 @@ func (s *ReportsService) generateStandupReport(tr *TimeRange, includeScreenshots
 					<div style="height: 100%%; width: %d%%; background: %s; border-radius: 4px;"></div>
 				</div>
 				<div style="width: 45px; text-align: right; font-size: 0.8rem; color: #94a3b8;">%s</div>
-			</div>`, appName, barWidth, barColor, formatMinutes(int64(app.DurationSeconds/60))))
+			</div>`, esc(appName), barWidth, barColor, formatMinutes(int64(app.DurationSeconds/60))))
 			count++
 		}
 		sb.WriteString(`</div>`)
@@ -3209,7 +3215,7 @@ func (s *ReportsService) formatWeeklySummaryHTML(data *WeeklySummaryData) string
 			continue
 		}
 		// Found a meaningful project
-		primaryProject = fmt.Sprintf("<strong>%s</strong>", project.Name)
+		primaryProject = fmt.Sprintf("<strong>%s</strong>", esc(project.Name))
 		break
 	}
 	execSummary := fmt.Sprintf("This period was focused on %s.", primaryProject)
@@ -3285,7 +3291,7 @@ func (s *ReportsService) formatWeeklySummaryHTML(data *WeeklySummaryData) string
 						<td style="text-align: right;">%s</td>
 						<td style="text-align: right;" class="report-stat-meta">%d</td>
 						<td style="text-align: left;" class="report-stat-meta">%s</td>
-					</tr>`, day.DayName, formatHoursMinutesShort(day.Hours), day.SessionCount, focus))
+					</tr>`, esc(day.DayName), formatHoursMinutesShort(day.Hours), day.SessionCount, esc(focus)))
 			}
 		}
 		sb.WriteString(`</tbody></table></div></div>`)
@@ -3327,7 +3333,7 @@ func (s *ReportsService) formatWeeklySummaryHTML(data *WeeklySummaryData) string
 					<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
 						<span class="report-project-title">%d. %s</span>
 						<span class="report-project-stats">~%.0fh (%.0f%%)</span>
-					</div>`, projectNum, project.Name, project.Hours, project.Percentage))
+					</div>`, projectNum, esc(project.Name), project.Hours, project.Percentage))
 
 			// Commit count
 			if project.CommitCount > 0 {
@@ -3362,7 +3368,7 @@ func (s *ReportsService) formatWeeklySummaryHTML(data *WeeklySummaryData) string
 						if len(acc) > 100 {
 							acc = acc[:97] + "..."
 						}
-						sb.WriteString(fmt.Sprintf(`<div class="report-accomplishment">• %s</div>`, acc))
+						sb.WriteString(fmt.Sprintf(`<div class="report-accomplishment">• %s</div>`, esc(acc)))
 					}
 				}
 				sb.WriteString(`</div>`)
@@ -3389,7 +3395,7 @@ func (s *ReportsService) formatWeeklySummaryHTML(data *WeeklySummaryData) string
 				if ch.IsHuddle {
 					huddle = " (huddle)"
 				}
-				sb.WriteString(fmt.Sprintf(`<div style="font-size: 0.8rem; color: #94a3b8; padding-left: 8px;">• %s%s: %dm</div>`, ch.Name, huddle, ch.DurationMins))
+				sb.WriteString(fmt.Sprintf(`<div style="font-size: 0.8rem; color: #94a3b8; padding-left: 8px;">• %s%s: %dm</div>`, esc(ch.Name), huddle, ch.DurationMins))
 			}
 			sb.WriteString(`</div>`)
 		}
@@ -3401,7 +3407,7 @@ func (s *ReportsService) formatWeeklySummaryHTML(data *WeeklySummaryData) string
 					<div style="font-size: 0.85rem; font-weight: 500; color: #3b82f6; margin-bottom: 6px;">📹 Video Calls: ~%d minutes</div>`, data.TotalZoomMins))
 			for _, m := range data.Meetings {
 				mins := int64(m.DurationSeconds / 60)
-				sb.WriteString(fmt.Sprintf(`<div style="font-size: 0.8rem; color: #94a3b8; padding-left: 8px;">• %s (%s): %dm</div>`, m.Title, m.Platform, mins))
+				sb.WriteString(fmt.Sprintf(`<div style="font-size: 0.8rem; color: #94a3b8; padding-left: 8px;">• %s (%s): %dm</div>`, esc(m.Title), esc(m.Platform), mins))
 			}
 			sb.WriteString(`</div>`)
 		}
@@ -3419,7 +3425,7 @@ func (s *ReportsService) formatWeeklySummaryHTML(data *WeeklySummaryData) string
 			sb.WriteString(fmt.Sprintf(`<div style="display: flex; gap: 8px; margin-bottom: 8px;">
 				<div style="color: #22c55e; font-size: 0.9rem;">✓</div>
 				<div style="font-size: 0.85rem; color: #cbd5e1;">%s</div>
-			</div>`, acc))
+			</div>`, esc(acc)))
 		}
 		sb.WriteString(`</div>`)
 	}
@@ -3432,7 +3438,7 @@ func (s *ReportsService) formatWeeklySummaryHTML(data *WeeklySummaryData) string
 		for _, repo := range data.CommitsByRepo {
 			sb.WriteString(fmt.Sprintf(`
 				<div style="margin-bottom: 12px;">
-					<div style="font-size: 0.8rem; font-weight: 500; color: #3b82f6; margin-bottom: 6px;">%s (%d commits)</div>`, repo.RepoName, repo.CommitCount))
+					<div style="font-size: 0.8rem; font-weight: 500; color: #3b82f6; margin-bottom: 6px;">%s (%d commits)</div>`, esc(repo.RepoName), repo.CommitCount))
 
 			shown := 0
 			seen := make(map[string]bool)
@@ -3452,7 +3458,7 @@ func (s *ReportsService) formatWeeklySummaryHTML(data *WeeklySummaryData) string
 				if len(msg) > 60 {
 					msg = msg[:57] + "..."
 				}
-				sb.WriteString(fmt.Sprintf(`<div style="font-size: 0.8rem; color: #94a3b8; padding-left: 8px; margin-bottom: 4px;">• %s</div>`, msg))
+				sb.WriteString(fmt.Sprintf(`<div style="font-size: 0.8rem; color: #94a3b8; padding-left: 8px; margin-bottom: 4px;">• %s</div>`, esc(msg)))
 				shown++
 			}
 			sb.WriteString(`</div>`)
@@ -3468,7 +3474,7 @@ func (s *ReportsService) formatWeeklySummaryHTML(data *WeeklySummaryData) string
 			sb.WriteString(fmt.Sprintf(`
 				<div style="margin-bottom: 6px; padding: 6px 0; border-bottom: 1px solid rgba(148, 163, 184, 0.1);">
 					<span style="font-size: 0.8rem; color: #e2e8f0;">%s</span>
-				</div>`, topic.Topic))
+				</div>`, esc(topic.Topic)))
 		}
 		sb.WriteString(`</div>`)
 	}
@@ -3489,7 +3495,7 @@ func (s *ReportsService) formatWeeklySummaryHTML(data *WeeklySummaryData) string
 				<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; padding: 6px 0; border-bottom: 1px solid rgba(148, 163, 184, 0.1);">
 					<span style="font-size: 0.8rem; color: #e2e8f0;">%s</span>
 					<span style="font-size: 0.75rem; color: #94a3b8;">%dm</span>
-				</div>`, domain.Domain, mins))
+				</div>`, esc(domain.Domain), mins))
 		}
 		sb.WriteString(`</div>`)
 	}
@@ -3499,7 +3505,7 @@ func (s *ReportsService) formatWeeklySummaryHTML(data *WeeklySummaryData) string
 		sb.WriteString(`<div style="margin-bottom: 24px;">
 			<div style="font-size: 0.85rem; font-weight: 600; color: #f1f5f9; margin-bottom: 12px;">Files Downloaded</div>`)
 		for _, dl := range data.Downloads {
-			sb.WriteString(fmt.Sprintf(`<div style="font-size: 0.8rem; color: #94a3b8; margin-bottom: 4px;">• %s</div>`, dl.FileName))
+			sb.WriteString(fmt.Sprintf(`<div style="font-size: 0.8rem; color: #94a3b8; margin-bottom: 4px;">• %s</div>`, esc(dl.FileName)))
 		}
 		sb.WriteString(`</div>`)
 	}
