@@ -3183,11 +3183,15 @@ func (s *ReportsService) formatWeeklySummaryHTML(data *WeeklySummaryData) string
 	var title string
 	if isSingleDay {
 		title = fmt.Sprintf("Activity Summary: %s", startDate.Format("Monday, January 2, 2006"))
-	} else {
+	} else if startDate.Month() == endDate.Month() && startDate.Year() == endDate.Year() {
 		title = fmt.Sprintf("Activity Summary: %s - %s, %d",
 			startDate.Format("January 2"),
 			endDate.Format("2"),
 			startDate.Year())
+	} else {
+		title = fmt.Sprintf("Activity Summary: %s - %s",
+			startDate.Format("January 2, 2006"),
+			endDate.Format("January 2, 2006"))
 	}
 	sb.WriteString(fmt.Sprintf(`<h1 class="report-title">%s</h1>`, title))
 
@@ -3524,10 +3528,16 @@ func (s *ReportsService) formatWeeklySummaryMarkdown(data *WeeklySummaryData) st
 	endDate, _ := time.Parse("2006-01-02", data.EndDate)
 
 	// Title
-	sb.WriteString(fmt.Sprintf("# Weekly Activity Summary: %s-%s, %d\n\n",
-		startDate.Format("January 2"),
-		endDate.Format("2"),
-		startDate.Year()))
+	if startDate.Month() == endDate.Month() && startDate.Year() == endDate.Year() {
+		sb.WriteString(fmt.Sprintf("# Weekly Activity Summary: %s-%s, %d\n\n",
+			startDate.Format("January 2"),
+			endDate.Format("2"),
+			startDate.Year()))
+	} else {
+		sb.WriteString(fmt.Sprintf("# Weekly Activity Summary: %s - %s\n\n",
+			startDate.Format("January 2, 2006"),
+			endDate.Format("January 2, 2006")))
+	}
 
 	// Executive Summary
 	sb.WriteString("## Executive Summary\n\n")
