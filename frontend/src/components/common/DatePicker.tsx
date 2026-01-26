@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ChevronLeft, ChevronRight, Calendar } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -27,6 +27,11 @@ const MONTHS = [
 export function DatePicker({ value, onChange, minDate, maxDate, trigger }: DatePickerProps) {
   const [open, setOpen] = useState(false);
   const [viewDate, setViewDate] = useState(value);
+
+  // Sync viewDate when value changes externally (e.g., keyboard navigation)
+  useEffect(() => {
+    setViewDate(value);
+  }, [value]);
 
   const year = viewDate.getFullYear();
   const month = viewDate.getMonth();
