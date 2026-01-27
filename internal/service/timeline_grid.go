@@ -706,7 +706,7 @@ func (s *TimelineService) GetTimelineGridDataWithOptions(date string, opts Timel
 			URL:                  visit.URL,
 			Title:                title,
 			Domain:               visit.Domain,
-			Browser:              visit.Browser,
+			Browser:              GetFriendlyAppName(visit.Browser),
 			VisitDurationSeconds: 0, // Duration tracked by focus events, not browser visits
 			TransitionType:       transitionType,
 			HourOffset:           hour,

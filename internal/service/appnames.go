@@ -9,6 +9,7 @@ import (
 // This improves UX by showing "Chrome" instead of "google-chrome".
 var AppNameMapping = map[string]string{
 	// Browsers
+	"chrome":               "Chrome",
 	"google-chrome":        "Chrome",
 	"google-chrome-stable": "Chrome",
 	"chromium":             "Chromium",
