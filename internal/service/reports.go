@@ -574,14 +574,15 @@ func (s *ReportsService) inferDomainTopic(domain string) string {
 }
 
 // detectProjectFromLearnedPatterns attempts to match using learned project patterns.
-// Returns project name if matched with sufficient confidence, empty string otherwise.
+// Returns project name if matched, empty string otherwise.
+// Uses confidence > 0 threshold to match auto-assign behavior (app.go).
 func (s *ReportsService) detectProjectFromLearnedPatterns(ctx *storage.AssignmentContext) string {
 	if s.projects == nil {
 		return ""
 	}
 
 	result := s.projects.matchPatterns(ctx)
-	if result != nil && result.Confidence >= 0.5 {
+	if result != nil && result.Confidence > 0 {
 		// Get project name from storage
 		project, err := s.store.GetProject(result.ProjectID)
 		if err == nil && project != nil {
@@ -2735,13 +2736,20 @@ func (s *ReportsService) buildProjectSummaries(focusEvents []*storage.WindowFocu
 }
 
 // buildProjectSummariesFromAI builds project summaries using a hybrid approach:
-// - Time tracking from heuristics (focus events) for accurate hours
+// - Time tracking from database project assignments (matches Analytics page)
 // - AI-detected activities for granular accomplishments
 // This ensures accurate time while capturing work that doesn't show up in git.
 func (s *ReportsService) buildProjectSummariesFromAI(sessions []*storage.Session, focusEvents []*storage.WindowFocusEvent, commits []*storage.GitCommit, browserVisits []*storage.BrowserVisit) []ProjectSummary {
-	// STEP 1: Build base project map from heuristic detection (accurate time)
+	// STEP 1: Build base project map from database assignments (matches Analytics)
 	projectMap := make(map[string]*ProjectSummary)
 	repoPathCache := make(map[int64]string)
+
+	// Load all projects for ID -> name lookup (same approach as Analytics.GetProjectUsage)
+	allProjects, _ := s.store.GetProjects()
+	projectByID := make(map[int64]storage.Project)
+	for _, p := range allProjects {
+		projectByID[p.ID] = p
+	}
 
 	// Helper to get or create project
 	getProject := func(name string) *ProjectSummary {
@@ -2805,9 +2813,22 @@ func (s *ReportsService) buildProjectSummariesFromAI(sessions []*storage.Session
 		}
 	}
 
-	// From focus events - TIME TRACKING (this is the accurate source)
+	// From focus events - TIME TRACKING (use database project assignments to match Analytics)
 	for _, evt := range focusEvents {
-		projectName := s.DetectProjectFromWindowTitle(evt.WindowTitle, evt.AppName)
+		var projectName string
+
+		// Use database-assigned project_id if available (matches Analytics page behavior)
+		if evt.ProjectID.Valid && evt.ProjectID.Int64 > 0 {
+			if p, ok := projectByID[evt.ProjectID.Int64]; ok {
+				projectName = p.Name
+			}
+		}
+
+		// Fall back to heuristic detection only if no DB assignment
+		if projectName == "" {
+			projectName = s.DetectProjectFromWindowTitle(evt.WindowTitle, evt.AppName)
+		}
+
 		if projectName == "" {
 			continue
 		}
