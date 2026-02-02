@@ -181,7 +181,7 @@ export function CaptureSettings() {
       <SettingsCard title="AFK Detection">
         <SettingsRow
           label="AFK Timeout"
-          description={`${Math.floor(config.afk.timeoutSeconds / 60)} minutes of inactivity`}
+          description={`${Math.floor(config.afk.timeoutSeconds / 60)} ${Math.floor(config.afk.timeoutSeconds / 60) === 1 ? 'minute' : 'minutes'} of inactivity`}
           vertical
         >
           <Slider
@@ -203,7 +203,7 @@ export function CaptureSettings() {
 
         <SettingsRow
           label="Min Session Duration"
-          description={`Sessions shorter than ${config.afk.minSessionMinutes} minutes won't be saved`}
+          description={`Sessions shorter than ${config.afk.minSessionMinutes} ${config.afk.minSessionMinutes === 1 ? 'minute' : 'minutes'} won't be saved`}
           vertical
         >
           <Slider

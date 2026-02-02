@@ -1,3 +1,5 @@
+//go:build ignore
+
 package main
 
 import (
@@ -28,7 +30,8 @@ func main() {
 	// Create services
 	timelineService := service.NewTimelineService(store)
 	analyticsService := service.NewAnalyticsService(store)
-	reportsService := service.NewReportsService(store, timelineService, analyticsService)
+	projectService := service.NewProjectAssignmentService(store)
+	reportsService := service.NewReportsService(store, timelineService, analyticsService, projectService)
 
 	fmt.Println("🔬 Generating Reports for Comparison")
 	fmt.Println("=====================================\n")

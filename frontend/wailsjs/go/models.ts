@@ -272,6 +272,32 @@ export namespace service {
 	        this.projectConfidence = source["projectConfidence"];
 	    }
 	}
+	export class ActivityState {
+	    startTime: number;
+	    endTime: number;
+	    durationSeconds: number;
+	    state: string;
+	    hourOffset: number;
+	    minuteOffset: number;
+	    pixelPosition: number;
+	    pixelHeight: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new ActivityState(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.startTime = source["startTime"];
+	        this.endTime = source["endTime"];
+	        this.durationSeconds = source["durationSeconds"];
+	        this.state = source["state"];
+	        this.hourOffset = source["hourOffset"];
+	        this.minuteOffset = source["minuteOffset"];
+	        this.pixelPosition = source["pixelPosition"];
+	        this.pixelHeight = source["pixelHeight"];
+	    }
+	}
 	export class AppUsage {
 	    appName: string;
 	    durationSeconds: number;
@@ -2051,6 +2077,7 @@ export namespace service {
 	    fileEvents: Record<number, Array<FileEventDisplay>>;
 	    browserEvents: Record<number, Array<BrowserEventDisplay>>;
 	    afkBlocks: Record<number, Array<AFKBlock>>;
+	    activityStates: ActivityState[];
 	
 	    static createFrom(source: any = {}) {
 	        return new TimelineGridData(source);
@@ -2069,6 +2096,7 @@ export namespace service {
 	        this.fileEvents = this.convertValues(source["fileEvents"], Array<FileEventDisplay>, true);
 	        this.browserEvents = this.convertValues(source["browserEvents"], Array<BrowserEventDisplay>, true);
 	        this.afkBlocks = this.convertValues(source["afkBlocks"], Array<AFKBlock>, true);
+	        this.activityStates = this.convertValues(source["activityStates"], ActivityState);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

@@ -23,9 +23,13 @@ const PRESETS = [
 ];
 
 function formatDateRangeForInput(range: DateRange): string {
-  const opts: Intl.DateTimeFormatOptions = { month: 'short', day: 'numeric', year: 'numeric' };
-  const start = range.start.toLocaleDateString('en-US', opts);
-  const end = range.end.toLocaleDateString('en-US', opts);
+  const sameYear = range.start.getFullYear() === range.end.getFullYear();
+  const startOpts: Intl.DateTimeFormatOptions = sameYear
+    ? { month: 'short', day: 'numeric' }
+    : { month: 'short', day: 'numeric', year: 'numeric' };
+  const endOpts: Intl.DateTimeFormatOptions = { month: 'short', day: 'numeric', year: 'numeric' };
+  const start = range.start.toLocaleDateString('en-US', startOpts);
+  const end = range.end.toLocaleDateString('en-US', endOpts);
   return `${start} - ${end}`;
 }
 
@@ -84,7 +88,7 @@ export function TimeRangeSelector({ value, onChange, parsedRange }: TimeRangeSel
             onBlur={handleInputBlur}
             onKeyDown={handleKeyDown}
             placeholder="today, yesterday, Jan 1 - Jan 15..."
-            className="font-mono text-sm flex-1"
+            className="text-sm flex-1"
           />
           <DateRangePicker
             value={defaultRange}

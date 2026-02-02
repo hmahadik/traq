@@ -46,3 +46,24 @@ func (s *DraftService) BulkAcceptDrafts(summaryIDs, assignmentIDs []int64) error
 	}
 	return nil
 }
+
+// BulkAcceptDraftsBySession accepts drafts using session IDs and activity IDs.
+// Session IDs are resolved to their corresponding summary IDs internally.
+// Activities that don't have drafts are silently skipped.
+func (s *DraftService) BulkAcceptDraftsBySession(sessionIDs, activityIDs []int64) error {
+	for _, sessionID := range sessionIDs {
+		sum, err := s.store.GetSummaryBySession(sessionID)
+		if err != nil || sum == nil {
+			continue // Skip sessions without summaries
+		}
+		if err := s.AcceptSummaryDraft(sum.ID); err != nil {
+			return err
+		}
+	}
+	for _, id := range activityIDs {
+		if err := s.AcceptAssignmentDraft(id); err != nil {
+			return err
+		}
+	}
+	return nil
+}

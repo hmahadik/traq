@@ -149,7 +149,7 @@ export function CustomRangeAnalytics({ data, isLoading, onDayClick }: CustomRang
               />
               <Bar
                 dataKey="activeMinutes"
-                fill="hsl(var(--primary))"
+                fill="hsl(var(--chart-1))"
                 radius={[4, 4, 0, 0]}
               />
             </BarChart>
@@ -181,7 +181,7 @@ export function CustomRangeAnalytics({ data, isLoading, onDayClick }: CustomRang
           </p>
         </CardHeader>
         <CardContent>
-          <ResponsiveContainer width="100%" height={300}>
+          <ResponsiveContainer width="100%" height={350}>
             <BarChart data={chartData}>
               <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
               <XAxis
@@ -191,13 +191,13 @@ export function CustomRangeAnalytics({ data, isLoading, onDayClick }: CustomRang
                 axisLine={false}
                 angle={-45}
                 textAnchor="end"
-                height={60}
+                height={80}
               />
               <YAxis
                 fontSize={12}
                 tickLine={false}
                 axisLine={false}
-                tickFormatter={(v) => `${v}m`}
+                tickFormatter={(v) => formatHours(v)}
               />
               <RechartsTooltip
                 content={({ active, payload }) => {
@@ -229,7 +229,7 @@ export function CustomRangeAnalytics({ data, isLoading, onDayClick }: CustomRang
               />
               <Bar
                 dataKey="activeMinutes"
-                fill="hsl(var(--primary))"
+                fill="hsl(var(--chart-1))"
                 radius={[4, 4, 0, 0]}
                 onClick={(data) => onDayClick?.(data.date)}
                 cursor="pointer"
@@ -274,7 +274,7 @@ export function CustomRangeAnalytics({ data, isLoading, onDayClick }: CustomRang
                 fontSize={12}
                 tickLine={false}
                 axisLine={false}
-                tickFormatter={(v) => `${v}m`}
+                tickFormatter={(v) => formatHours(v)}
               />
               <RechartsTooltip
                 content={({ active, payload }) => {
@@ -307,7 +307,7 @@ export function CustomRangeAnalytics({ data, isLoading, onDayClick }: CustomRang
               />
               <Bar
                 dataKey="totalActive"
-                fill="hsl(var(--primary))"
+                fill="hsl(var(--chart-1))"
                 radius={[4, 4, 0, 0]}
               />
             </BarChart>
@@ -346,8 +346,8 @@ export function CustomRangeAnalytics({ data, isLoading, onDayClick }: CustomRang
             <div className="text-2xl font-bold">{formatHours(data.totalActive)}</div>
             <p className="text-xs text-muted-foreground mt-1">
               {data.bucketType === 'hourly' ? 'Aggregated hours' :
-               data.bucketType === 'daily' ? `Across ${activeDays} days` :
-               `Across ${data.weeklyBuckets?.length} weeks`}
+               data.bucketType === 'daily' ? `Across ${activeDays} ${activeDays === 1 ? 'day' : 'days'}` :
+               `Across ${data.weeklyBuckets?.length} ${data.weeklyBuckets?.length === 1 ? 'week' : 'weeks'}`}
             </p>
           </CardContent>
         </Card>
@@ -364,7 +364,7 @@ export function CustomRangeAnalytics({ data, isLoading, onDayClick }: CustomRang
                 {formatHours(data.averages.activeMinutes)}
               </div>
               <p className="text-xs text-muted-foreground mt-1">
-                Per active day
+                Per active day{activeDays > 0 ? ` (${activeDays} ${activeDays === 1 ? 'day' : 'days'})` : ''}
               </p>
             </CardContent>
           </Card>
@@ -425,7 +425,7 @@ export function CustomRangeAnalytics({ data, isLoading, onDayClick }: CustomRang
                 day: 'numeric',
                 year: 'numeric',
               });
-            })()} ({data.bucketType} buckets)
+            })()}
           </div>
         </CardContent>
       </Card>

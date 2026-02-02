@@ -87,6 +87,10 @@ interface EventListProps {
   // Collapse state - can be controlled externally
   collapsed?: boolean;
   onCollapsedChange?: (collapsed: boolean) => void;
+
+  // App filter - can be set externally (e.g., from URL param)
+  appFilter?: string | null;
+  onAppFilterChange?: (app: string | null) => void;
 }
 
 // Convert TimelineGridData to EventDot array (similar to useTimelineData but simpler)
@@ -166,7 +170,7 @@ function gridDataToEvents(data: TimelineGridData | undefined): EventDot[] {
       timestamp: new Date(evt.timestamp * 1000),
       type: 'browser',
       row: evt.browser,
-      label: evt.title,
+      label: evt.title || evt.domain || evt.url || 'Untitled page',
       duration: evt.visitDurationSeconds,
       color: '#10b981',
       metadata: {
@@ -262,7 +266,17 @@ export function EventList({
   className,
   collapsed: collapsedProp,
   onCollapsedChange,
+  appFilter,
+  onAppFilterChange,
 }: EventListProps) {
+  // Whether to show all events beyond maxItems limit
+  const [showAll, setShowAll] = useState(false);
+
+  // Reset showAll when the underlying data changes (e.g., date navigation)
+  useEffect(() => {
+    setShowAll(false);
+  }, [eventsProp, gridData]);
+
   // Internal collapsed state with localStorage persistence (used when not controlled)
   const [internalCollapsed, setInternalCollapsed] = useState(() => {
     try {
@@ -343,8 +357,21 @@ export function EventList({
   const [sortMode, setSortMode] = useState<SortMode>('playhead');
   const [columnSort, setColumnSort] = useState<ListViewSort>({ column: 'time', direction: 'asc' });
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedApps, setSelectedApps] = useState<Set<string>>(new Set());
+  const [selectedApps, setSelectedApps] = useState<Set<string>>(() => {
+    // Initialize from external appFilter prop if provided
+    return appFilter ? new Set([appFilter]) : new Set();
+  });
   const lastSelectedIndex = useRef<number | null>(null);
+
+  // Sync selectedApps when external appFilter changes
+  useEffect(() => {
+    if (appFilter) {
+      setSelectedApps(new Set([appFilter]));
+    } else if (appFilter === null) {
+      // Explicitly cleared
+      setSelectedApps(new Set());
+    }
+  }, [appFilter]);
 
   // Filter events by search query and selected apps
   const filteredEvents = useMemo(() => {
@@ -409,9 +436,9 @@ export function EventList({
     return events;
   }, [filteredEvents, sortMode, playheadTimestamp, columnSort]);
 
-  // Limit display
-  const displayEvents = sortedEvents.slice(0, maxItems);
-  const hasMore = sortedEvents.length > maxItems;
+  // Limit display (unless user clicked "Show all")
+  const displayEvents = showAll ? sortedEvents : sortedEvents.slice(0, maxItems);
+  const hasMore = !showAll && sortedEvents.length > maxItems;
 
   // Toggle column sort
   const handleColumnSort = (column: SortColumn) => {
@@ -442,6 +469,10 @@ export function EventList({
       } else {
         newSet.add(app);
       }
+      // Notify parent if we're clearing the external filter
+      if (newSet.size === 0 && onAppFilterChange) {
+        onAppFilterChange(null);
+      }
       return newSet;
     });
   };
@@ -449,6 +480,10 @@ export function EventList({
   // Clear app filters
   const clearAppFilters = () => {
     setSelectedApps(new Set());
+    // Notify parent that filter is cleared
+    if (onAppFilterChange) {
+      onAppFilterChange(null);
+    }
   };
 
   // Selection handlers
@@ -511,8 +546,8 @@ export function EventList({
 
   // Can only edit single activity selection
   const canEdit = selectedEvents.length === 1 && selectedEvents[0].type === 'activity';
-  // Can delete non-screenshot events
-  const canDelete = selectedEvents.length > 0 && selectedEvents.every((e) => e.type !== 'screenshot');
+  // Can delete any event type including screenshots
+  const canDelete = selectedEvents.length > 0;
   // Can assign any selected events
   const canAssign = selectedEvents.length > 0;
   // Can merge 2+ items
@@ -581,10 +616,14 @@ export function EventList({
     );
   };
 
-  // Reset last selected index when events change
+  // Reset last selected index when the underlying event data changes
+  // (new data loaded or filters changed). We intentionally do NOT reset
+  // on sort/playhead changes — sortedEvents rebuilds on every playhead
+  // tick, which would constantly nuke the shift-click anchor index and
+  // break range selection while the playhead is moving.
   useEffect(() => {
     lastSelectedIndex.current = null;
-  }, [rawEvents]);
+  }, [filteredEvents]);
 
   // Format playhead time for display
   const formatPlayheadTime = (date: Date) => {
@@ -834,14 +873,14 @@ export function EventList({
           onClick={() => {
             if (sortMode === 'playhead') {
               handleColumnSort('time');
-            } else if (columnSort.column === 'time') {
+            } else if (columnSort.column === 'time' && columnSort.direction === 'desc') {
               handlePlayheadMode();
             } else {
               handleColumnSort('time');
             }
           }}
           className="flex items-center gap-0.5 w-16 px-1 py-1 hover:bg-muted"
-          title={sortMode === 'playhead' ? 'Click to sort by time' : 'Click to return to playhead order'}
+          title={sortMode === 'playhead' ? 'Click to sort by time ascending' : columnSort.column === 'time' && columnSort.direction === 'asc' ? 'Click to sort by time descending' : 'Click to return to playhead order'}
         >
           Time <SortIcon column="time" />
         </button>
@@ -878,7 +917,7 @@ export function EventList({
             const isSelected = selectedIds.has(event.id);
             const isAtPlayhead = sortMode === 'playhead' && index === 0;
             const canEditRow = event.type === 'activity';
-            const canDeleteRow = event.type !== 'screenshot';
+            const canDeleteRow = true;
             const projectColor = event.metadata?.projectColor;
             const projectName = event.metadata?.projectName;
 
@@ -981,9 +1020,12 @@ export function EventList({
           })
         )}
         {hasMore && (
-          <div className="px-2 py-1 text-[10px] text-muted-foreground text-center border-b">
-            Showing first {maxItems} of {sortedEvents.length} events
-          </div>
+          <button
+            onClick={() => setShowAll(true)}
+            className="w-full px-2 py-1.5 text-[10px] text-muted-foreground text-center border-b hover:bg-muted/50 hover:text-foreground transition-colors cursor-pointer"
+          >
+            Showing {maxItems} of {sortedEvents.length} events · <span className="underline">Show all</span>
+          </button>
         )}
       </div>
       </>

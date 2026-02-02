@@ -9,12 +9,13 @@ interface TimeRange {
 interface DailySummaryCardProps {
   stats: DayStats | null;
   onHighlightTimeRange?: (range: TimeRange | null) => void;
+  isToday?: boolean;
 }
 
 // Standard workday in seconds (8 hours)
 const WORKDAY_SECONDS = 8 * 60 * 60;
 
-export const DailySummaryCard: React.FC<DailySummaryCardProps> = ({ stats, onHighlightTimeRange }) => {
+export const DailySummaryCard: React.FC<DailySummaryCardProps> = ({ stats, onHighlightTimeRange, isToday = false }) => {
   if (!stats) {
     return (
       <div className="text-center text-muted-foreground py-4">No activity today</div>
@@ -109,13 +110,15 @@ export const DailySummaryCard: React.FC<DailySummaryCardProps> = ({ stats, onHig
           <div className="text-lg font-semibold">{formatDuration(stats.longestFocus)}</div>
         </div>
 
-        {/* Time Since Last Break */}
+        {/* Time Since Last Break (today) / Last Focus Streak (past days) */}
         <div>
-          <div className="text-xs text-muted-foreground uppercase tracking-wide mb-0.5">Since Last Break</div>
+          <div className="text-xs text-muted-foreground uppercase tracking-wide mb-0.5">
+            {isToday ? 'Since Last Break' : 'Last Focus Streak'}
+          </div>
           {stats.timeSinceLastBreak < 0 ? (
             <div className="text-lg font-semibold text-muted-foreground">No breaks</div>
           ) : (
-            <div className={`text-lg font-semibold ${getBreakStatusColor(stats.timeSinceLastBreak)}`}>
+            <div className={`text-lg font-semibold ${isToday ? getBreakStatusColor(stats.timeSinceLastBreak) : 'text-foreground'}`}>
               {formatDuration(stats.timeSinceLastBreak)}
             </div>
           )}

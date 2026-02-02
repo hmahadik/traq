@@ -181,6 +181,7 @@ export function GeneralSettings() {
         <SettingsRow
           label="Visible Columns"
           description="Choose which columns to show in the timeline"
+          vertical
         >
           <div className="flex flex-wrap gap-2">
             {AVAILABLE_COLUMNS.map((col) => (

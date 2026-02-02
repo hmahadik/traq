@@ -181,18 +181,30 @@ func (s *TimelineService) GetSessionsForDate(date string) ([]*SessionSummary, er
 			}
 		}
 
-		// Get top apps from focus events
+		// Get top apps from focus events (use friendly names, deduplicated)
 		focusEvents, _ := s.store.GetWindowFocusEventsBySession(sess.ID)
 		appDurations := make(map[string]float64)
 		for _, evt := range focusEvents {
-			appDurations[evt.AppName] += evt.DurationSeconds
+			friendlyName := GetFriendlyAppName(evt.AppName)
+			appDurations[friendlyName] += evt.DurationSeconds
 		}
-		// Sort and take top 3
-		for app := range appDurations {
-			summary.TopApps = append(summary.TopApps, app)
-			if len(summary.TopApps) >= 3 {
+		// Sort by duration descending and take top 3
+		type appDur struct {
+			name     string
+			duration float64
+		}
+		appList := make([]appDur, 0, len(appDurations))
+		for app, dur := range appDurations {
+			appList = append(appList, appDur{app, dur})
+		}
+		sort.Slice(appList, func(i, j int) bool {
+			return appList[i].duration > appList[j].duration
+		})
+		for i, app := range appList {
+			if i >= 3 {
 				break
 			}
+			summary.TopApps = append(summary.TopApps, app.name)
 		}
 
 		// Check for data source presence

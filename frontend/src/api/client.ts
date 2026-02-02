@@ -270,12 +270,22 @@ export const analytics = {
 
   getTopWindows: async (date: string, limit: number) => {
     if (isMockMode()) return [
-      { windowTitle: 'main.go - VS Code', appName: 'VS Code', durationSeconds: 3600 },
-      { windowTitle: 'GitHub - Pull Request #42', appName: 'Firefox', durationSeconds: 1800 },
-      { windowTitle: 'Terminal - ~/projects', appName: 'Terminal', durationSeconds: 1200 },
+      { windowTitle: 'main.go - VS Code', appName: 'VS Code', durationSeconds: 3600, percentage: 40, focusCount: 12 },
+      { windowTitle: 'GitHub - Pull Request #42', appName: 'Firefox', durationSeconds: 1800, percentage: 25, focusCount: 8 },
+      { windowTitle: 'Terminal - ~/projects', appName: 'Terminal', durationSeconds: 1200, percentage: 20, focusCount: 15 },
     ].slice(0, limit);
     await waitForReady();
     return withRetry(() => App.GetTopWindows(date, limit));
+  },
+
+  getTopWindowsRange: async (start: number, end: number, limit: number) => {
+    if (isMockMode()) return [
+      { windowTitle: 'main.go - VS Code', appName: 'VS Code', durationSeconds: 14400, percentage: 40, focusCount: 48 },
+      { windowTitle: 'GitHub - Pull Request #42', appName: 'Firefox', durationSeconds: 7200, percentage: 25, focusCount: 32 },
+      { windowTitle: 'Terminal - ~/projects', appName: 'Terminal', durationSeconds: 4800, percentage: 20, focusCount: 60 },
+    ].slice(0, limit);
+    await waitForReady();
+    return withRetry(() => App.GetTopWindowsRange(start, end, limit));
   },
 
   exportAnalytics: async (date: string, viewMode: string, format: string) => {
@@ -818,6 +828,12 @@ export const drafts = {
   bulkAccept: async (summaryIds: number[], assignmentIds: number[]): Promise<void> => {
     await waitForReady();
     await App.BulkAcceptDrafts(summaryIds, assignmentIds);
+  },
+
+  /** Bulk accept drafts using session IDs and activity IDs (resolves session→summary internally) */
+  bulkAcceptBySession: async (sessionIds: number[], activityIds: number[]): Promise<void> => {
+    await waitForReady();
+    await App.BulkAcceptDraftsBySession(sessionIds, activityIds);
   },
 };
 

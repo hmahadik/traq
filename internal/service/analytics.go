@@ -351,51 +351,43 @@ func (s *AnalyticsService) GetDailyStatsWithComparison(date string, withComparis
 	return stats, nil
 }
 
+// percentChange calculates the percentage change from prev to curr.
+// When prev is 0 and curr is non-zero, returns 100 (all new activity).
+// When both are 0, returns 0.
+func percentChange(diff, prev int64) float64 {
+	if prev > 0 {
+		return (float64(diff) / float64(prev)) * 100
+	}
+	if diff > 0 {
+		return 100
+	}
+	return 0
+}
+
 // calculateComparison calculates the difference between current and previous stats.
 func (s *AnalyticsService) calculateComparison(current, previous *DailyStats) *Comparison {
 	comp := &Comparison{}
 
-	// Screenshots
 	comp.ScreenshotsDiff = current.TotalScreenshots - previous.TotalScreenshots
-	if previous.TotalScreenshots > 0 {
-		comp.ScreenshotsPercent = (float64(comp.ScreenshotsDiff) / float64(previous.TotalScreenshots)) * 100
-	}
+	comp.ScreenshotsPercent = percentChange(comp.ScreenshotsDiff, previous.TotalScreenshots)
 
-	// Sessions
 	comp.SessionsDiff = current.TotalSessions - previous.TotalSessions
-	if previous.TotalSessions > 0 {
-		comp.SessionsPercent = (float64(comp.SessionsDiff) / float64(previous.TotalSessions)) * 100
-	}
+	comp.SessionsPercent = percentChange(comp.SessionsDiff, previous.TotalSessions)
 
-	// Active Minutes
 	comp.ActiveMinutesDiff = current.ActiveMinutes - previous.ActiveMinutes
-	if previous.ActiveMinutes > 0 {
-		comp.ActiveMinutesPercent = (float64(comp.ActiveMinutesDiff) / float64(previous.ActiveMinutes)) * 100
-	}
+	comp.ActiveMinutesPercent = percentChange(comp.ActiveMinutesDiff, previous.ActiveMinutes)
 
-	// Shell Commands
 	comp.ShellCommandsDiff = current.ShellCommands - previous.ShellCommands
-	if previous.ShellCommands > 0 {
-		comp.ShellCommandsPercent = (float64(comp.ShellCommandsDiff) / float64(previous.ShellCommands)) * 100
-	}
+	comp.ShellCommandsPercent = percentChange(comp.ShellCommandsDiff, previous.ShellCommands)
 
-	// Git Commits
 	comp.GitCommitsDiff = current.GitCommits - previous.GitCommits
-	if previous.GitCommits > 0 {
-		comp.GitCommitsPercent = (float64(comp.GitCommitsDiff) / float64(previous.GitCommits)) * 100
-	}
+	comp.GitCommitsPercent = percentChange(comp.GitCommitsDiff, previous.GitCommits)
 
-	// Files Modified
 	comp.FilesModifiedDiff = current.FilesModified - previous.FilesModified
-	if previous.FilesModified > 0 {
-		comp.FilesModifiedPercent = (float64(comp.FilesModifiedDiff) / float64(previous.FilesModified)) * 100
-	}
+	comp.FilesModifiedPercent = percentChange(comp.FilesModifiedDiff, previous.FilesModified)
 
-	// Sites Visited
 	comp.SitesVisitedDiff = current.SitesVisited - previous.SitesVisited
-	if previous.SitesVisited > 0 {
-		comp.SitesVisitedPercent = (float64(comp.SitesVisitedDiff) / float64(previous.SitesVisited)) * 100
-	}
+	comp.SitesVisitedPercent = percentChange(comp.SitesVisitedDiff, previous.SitesVisited)
 
 	return comp
 }
@@ -1055,27 +1047,37 @@ func (s *AnalyticsService) sortAppUsage(appDurations map[string]float64) []*AppU
 }
 
 // sortAppUsageWithCounts converts duration map to sorted slice with percentages and focus counts.
+// It aggregates entries that share the same friendly app name (e.g. "chrome", "google-chrome",
+// and "google-chrome-stable" all map to "Chrome" and get merged into one entry).
 func (s *AnalyticsService) sortAppUsageWithCounts(appDurations map[string]float64, appCounts map[string]int64) []*AppUsage {
+	// Aggregate by friendly name first, since multiple raw process names
+	// can map to the same friendly name (e.g. chrome, google-chrome -> "Chrome")
+	friendlyDurations := make(map[string]float64)
+	friendlyCounts := make(map[string]int64)
+	for app, dur := range appDurations {
+		friendly := GetFriendlyAppName(app)
+		friendlyDurations[friendly] += dur
+		if appCounts != nil {
+			friendlyCounts[friendly] += appCounts[app]
+		}
+	}
+
 	var totalDuration float64
-	for _, dur := range appDurations {
+	for _, dur := range friendlyDurations {
 		totalDuration += dur
 	}
 
 	var apps []*AppUsage
-	for app, dur := range appDurations {
+	for friendly, dur := range friendlyDurations {
 		pct := 0.0
 		if totalDuration > 0 {
 			pct = (dur / totalDuration) * 100
 		}
-		focusCount := int64(0)
-		if appCounts != nil {
-			focusCount = appCounts[app]
-		}
 		apps = append(apps, &AppUsage{
-			AppName:         GetFriendlyAppName(app),
+			AppName:         friendly,
 			DurationSeconds: dur,
 			Percentage:      pct,
-			FocusCount:      focusCount,
+			FocusCount:      friendlyCounts[friendly],
 		})
 	}
 

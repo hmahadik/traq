@@ -39,7 +39,10 @@ func toProjectsJSON(projects []ProjectBreakdown) string {
 	if len(projects) == 0 {
 		return "[]"
 	}
-	b, _ := json.Marshal(projects)
+	b, err := json.Marshal(projects)
+	if err != nil {
+		return "[]"
+	}
 	return string(b)
 }
 
@@ -49,7 +52,9 @@ func parseProjectsJSON(s sql.NullString) []ProjectBreakdown {
 		return []ProjectBreakdown{}
 	}
 	var projects []ProjectBreakdown
-	json.Unmarshal([]byte(s.String), &projects)
+	if err := json.Unmarshal([]byte(s.String), &projects); err != nil {
+		return []ProjectBreakdown{}
+	}
 	return projects
 }
 
@@ -221,7 +226,7 @@ func (s *Store) UpdateSummaryDraftStatus(summaryID int64, isDraft bool, status s
 		isDraftInt = 1
 	}
 	_, err := s.db.Exec(
-		"UPDATE summaries SET is_draft = ?, draft_status = ? WHERE id = ?",
+		"UPDATE summaries SET is_draft = ?, draft_status = ? WHERE id = ? AND is_draft = 1",
 		isDraftInt, status, summaryID,
 	)
 	if err != nil {
@@ -237,7 +242,7 @@ func (s *Store) UpdateFocusEventDraftStatus(activityID int64, isDraft bool, stat
 		isDraftInt = 1
 	}
 	_, err := s.db.Exec(
-		"UPDATE window_focus_events SET is_draft = ?, draft_status = ? WHERE id = ?",
+		"UPDATE window_focus_events SET is_draft = ?, draft_status = ? WHERE id = ? AND is_draft = 1",
 		isDraftInt, status, activityID,
 	)
 	if err != nil {

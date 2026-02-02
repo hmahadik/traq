@@ -319,19 +319,19 @@ func TestCalculateComparison(t *testing.T) {
 			},
 			expect: &Comparison{
 				ScreenshotsDiff:      100,
-				ScreenshotsPercent:   0.0, // No previous value, so percentage is 0
+				ScreenshotsPercent:   100.0, // No previous value, all activity is new
 				SessionsDiff:         10,
-				SessionsPercent:      0.0,
+				SessionsPercent:      100.0,
 				ActiveMinutesDiff:    300,
-				ActiveMinutesPercent: 0.0,
+				ActiveMinutesPercent: 100.0,
 				ShellCommandsDiff:    50,
-				ShellCommandsPercent: 0.0,
+				ShellCommandsPercent: 100.0,
 				GitCommitsDiff:       5,
-				GitCommitsPercent:    0.0,
+				GitCommitsPercent:    100.0,
 				FilesModifiedDiff:    20,
-				FilesModifiedPercent: 0.0,
+				FilesModifiedPercent: 100.0,
 				SitesVisitedDiff:     15,
-				SitesVisitedPercent:  0.0,
+				SitesVisitedPercent:  100.0,
 			},
 		},
 	}

@@ -95,11 +95,6 @@ export function YearlyAnalytics({ data, isLoading, onMonthClick }: YearlyAnalyti
 
   return (
     <div className="space-y-4">
-      {/* Year Info */}
-      <div className="text-sm text-muted-foreground">
-        {data.year} • {data.startDate} to {data.endDate}
-      </div>
-
       {/* Yearly Metrics Grid */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>
@@ -111,7 +106,7 @@ export function YearlyAnalytics({ data, isLoading, onMonthClick }: YearlyAnalyti
           <CardContent>
             <div className="text-2xl font-bold">{formatHours(totalActiveMinutes)}</div>
             <p className="text-xs text-muted-foreground mt-1">
-              Across {activeMonths} months
+              Across {activeMonths} {activeMonths === 1 ? 'month' : 'months'}
             </p>
           </CardContent>
         </Card>
@@ -139,7 +134,7 @@ export function YearlyAnalytics({ data, isLoading, onMonthClick }: YearlyAnalyti
           <CardContent>
             <div className="text-2xl font-bold">{formatHours(Math.round(avgDailyMinutes))}</div>
             <p className="text-xs text-muted-foreground mt-1">
-              Across {totalActiveDays} days
+              Across {totalActiveDays} {totalActiveDays === 1 ? 'day' : 'days'}
             </p>
           </CardContent>
         </Card>
@@ -167,7 +162,7 @@ export function YearlyAnalytics({ data, isLoading, onMonthClick }: YearlyAnalyti
           <CardContent>
             <div className="text-2xl font-bold">{totalScreenshots.toLocaleString()}</div>
             <p className="text-xs text-muted-foreground mt-1">
-              {activeMonths > 0 ? Math.round(totalScreenshots / activeMonths) : 0} avg/month
+              {activeMonths > 0 ? Math.round(totalScreenshots / activeMonths).toLocaleString() : 0} avg/month
             </p>
           </CardContent>
         </Card>
@@ -233,7 +228,7 @@ export function YearlyAnalytics({ data, isLoading, onMonthClick }: YearlyAnalyti
               <YAxis
                 className="text-xs"
                 tick={{ fill: 'hsl(var(--muted-foreground))' }}
-                tickFormatter={(value) => `${Math.round(value / 60)}h`}
+                tickFormatter={(value) => formatHours(value)}
               />
               <Tooltip
                 content={({ active, payload }) => {
@@ -259,7 +254,7 @@ export function YearlyAnalytics({ data, isLoading, onMonthClick }: YearlyAnalyti
               />
               <Bar
                 dataKey="activeMinutes"
-                fill="hsl(var(--primary))"
+                fill="hsl(var(--chart-1))"
                 radius={[4, 4, 0, 0]}
                 onClick={(data) => {
                   if (onMonthClick && data && data.monthNumber) {

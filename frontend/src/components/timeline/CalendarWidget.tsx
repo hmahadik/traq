@@ -11,6 +11,7 @@ interface CalendarWidgetProps {
   isLoading: boolean;
   selectedDate: Date;
   onSelectDate: (date: Date) => void;
+  onMonthChange?: (year: number, month: number) => void;
 }
 
 const DAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
@@ -41,6 +42,7 @@ export function CalendarWidget({
   isLoading,
   selectedDate,
   onSelectDate,
+  onMonthChange,
 }: CalendarWidgetProps) {
   const [viewDate, setViewDate] = useState(selectedDate);
 
@@ -51,6 +53,8 @@ export function CalendarWidget({
 
   const year = viewDate.getFullYear();
   const month = viewDate.getMonth();
+  const now = new Date();
+  const isCurrentMonth = year === now.getFullYear() && month === now.getMonth();
 
   const firstDay = new Date(year, month, 1);
   const lastDay = new Date(year, month + 1, 0);
@@ -71,11 +75,16 @@ export function CalendarWidget({
   }, [data]);
 
   const goToPreviousMonth = () => {
-    setViewDate(new Date(year, month - 1, 1));
+    const newDate = new Date(year, month - 1, 1);
+    setViewDate(newDate);
+    onMonthChange?.(newDate.getFullYear(), newDate.getMonth() + 1);
   };
 
   const goToNextMonth = () => {
-    setViewDate(new Date(year, month + 1, 1));
+    if (isCurrentMonth) return;
+    const newDate = new Date(year, month + 1, 1);
+    setViewDate(newDate);
+    onMonthChange?.(newDate.getFullYear(), newDate.getMonth() + 1);
   };
 
   const handleDateClick = (day: number) => {
@@ -134,7 +143,13 @@ export function CalendarWidget({
             <span className="text-sm font-medium min-w-[7rem] text-center whitespace-nowrap">
               {MONTHS[month]} {year}
             </span>
-            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={goToNextMonth}>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7"
+              onClick={goToNextMonth}
+              disabled={isCurrentMonth}
+            >
               <ChevronRight className="h-4 w-4" />
             </Button>
           </div>

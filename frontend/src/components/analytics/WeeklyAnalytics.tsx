@@ -67,25 +67,9 @@ export function WeeklyAnalytics({ data, isLoading, onDayClick }: WeeklyAnalytics
   }
 
   // Calculate metrics
-  // Filter to only include completed workdays (not today, not weekends)
-  const now = new Date();
-  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-  const completedWorkdays = data.dailyStats.filter(d => {
-    // Parse date string as local time (new Date("YYYY-MM-DD") parses as UTC, causing wrong day-of-week)
-    const [y, m, dy] = d.date.split('-').map(Number);
-    const date = new Date(y, m - 1, dy);
-    const dayOfWeek = date.getDay(); // 0 = Sunday, 6 = Saturday
-    const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
-    const isToday = d.date === today;
-    return !isWeekend && !isToday && d.activeMinutes > 0;
-  });
-
-  const totalActiveMinutesWorkdays = completedWorkdays.reduce((sum, d) => sum + d.activeMinutes, 0);
-  const avgDailyMinutes = completedWorkdays.length > 0 ? totalActiveMinutesWorkdays / completedWorkdays.length : 0;
-
-  // For display purposes, we still show total active time for all days
   const totalActiveMinutes = data.totalActive;
   const activeDays = data.dailyStats.filter(d => d.activeMinutes > 0).length;
+  const avgDailyMinutes = activeDays > 0 ? totalActiveMinutes / activeDays : 0;
 
   // Calculate total break time (assuming work time is 8 hours, breaks are the rest)
   // This is a simplified calculation - in reality you'd track breaks separately
@@ -120,29 +104,21 @@ export function WeeklyAnalytics({ data, isLoading, onDayClick }: WeeklyAnalytics
           <CardContent>
             <div className="text-2xl font-bold">{formatHours(totalActiveMinutes)}</div>
             <p className="text-xs text-muted-foreground mt-1">
-              Across {activeDays} days
+              Across {activeDays} {activeDays === 1 ? 'day' : 'days'}
             </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-1.5">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
               Avg Daily Hours
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Info className="h-3.5 w-3.5 cursor-help" />
-                </TooltipTrigger>
-                <TooltipContent className="max-w-xs">
-                  <p>Average hours per completed workday (Monday-Friday, excluding today and days with no activity)</p>
-                </TooltipContent>
-              </Tooltip>
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{formatHours(Math.round(avgDailyMinutes))}</div>
             <p className="text-xs text-muted-foreground mt-1">
-              Per completed workday ({completedWorkdays.length} days)
+              Per active day ({activeDays} {activeDays === 1 ? 'day' : 'days'})
             </p>
           </CardContent>
         </Card>
@@ -270,7 +246,7 @@ export function WeeklyAnalytics({ data, isLoading, onDayClick }: WeeklyAnalytics
                 fontSize={12}
                 tickLine={false}
                 axisLine={false}
-                tickFormatter={(v) => `${v}m`}
+                tickFormatter={(v) => formatHours(v)}
               />
               <RechartsTooltip
                 content={({ active, payload }) => {
@@ -302,7 +278,7 @@ export function WeeklyAnalytics({ data, isLoading, onDayClick }: WeeklyAnalytics
               />
               <Bar
                 dataKey="activeMinutes"
-                fill="hsl(var(--primary))"
+                fill="hsl(var(--chart-1))"
                 radius={[4, 4, 0, 0]}
                 onClick={(data) => onDayClick?.(data.date)}
                 cursor="pointer"

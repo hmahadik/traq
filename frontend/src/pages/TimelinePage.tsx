@@ -1,7 +1,8 @@
 import { useState, useCallback, useMemo, useEffect } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Calendar, Sparkles, Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Calendar, Sparkles, Loader2, ChevronLeft, ChevronRight, X } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 import { SplitPanel } from '@/components/common/SplitPanel';
 import { EventList } from '@/components/timeline/EventList';
 import { CalendarWidget } from '@/components/timeline';
@@ -15,7 +16,10 @@ import {
   useDeleteShellCommands,
   useDeleteFileEvents,
   useDeleteAFKEvents,
+  useDeleteScreenshot,
+  useDeleteSession,
   useBulkAssignProject,
+  useBulkAcceptDraftsBySession,
 } from '@/api/hooks';
 import { useMultiDayTimeline } from '@/hooks/useMultiDayTimeline';
 import { Timeline, EventDot } from '@/components/timeline';
@@ -48,9 +52,25 @@ const FILTER_STORAGE_KEY = 'timeline-filters';
 
 export function TimelinePage() {
   const location = useLocation();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [showCalendar, setShowCalendar] = useState(false);
   const [isBatchGenerating, setIsBatchGenerating] = useState(false);
+
+  // App filter from URL (e.g., ?app=Chrome)
+  const appFilter = searchParams.get('app');
+
+  // Handle clearing the app filter (called when EventList clears filter or user clicks X)
+  const handleClearAppFilter = useCallback((_app?: string | null) => {
+    const newParams = new URLSearchParams(searchParams);
+    newParams.delete('app');
+    navigate({ search: newParams.toString() }, { replace: true });
+  }, [searchParams, navigate]);
+
+  // Calendar heatmap month (tracks which month the calendar widget is showing)
+  const [calendarYear, setCalendarYear] = useState(selectedDate.getFullYear());
+  const [calendarMonth, setCalendarMonth] = useState(selectedDate.getMonth() + 1);
 
   // Session detail drawer state
   const [sessionDrawerOpen, setSessionDrawerOpen] = useState(false);
@@ -70,7 +90,10 @@ export function TimelinePage() {
   const deleteShellCommands = useDeleteShellCommands();
   const deleteFileEvents = useDeleteFileEvents();
   const deleteAFKEvents = useDeleteAFKEvents();
+  const deleteScreenshot = useDeleteScreenshot();
+  const deleteSession = useDeleteSession();
   const bulkAssignProject = useBulkAssignProject();
+  const bulkAcceptDrafts = useBulkAcceptDraftsBySession();
 
   // State for multi-type event selection (works in both grid and list views)
   const [selectedEventKeys, setSelectedEventKeys] = useState<Set<EventKey>>(new Set());
@@ -155,8 +178,8 @@ export function TimelinePage() {
   const isLoading = isLoadingAny && !gridData;
 
   const { data: calendarData, isLoading: calendarLoading } = useCalendarHeatmap(
-    selectedDate.getFullYear(),
-    selectedDate.getMonth() + 1
+    calendarYear,
+    calendarMonth
   );
   // Fetch entries (project-assigned activities) for EventDrops view
   const { data: entriesData } = useEntriesForDate(dateStr);
@@ -226,11 +249,13 @@ export function TimelinePage() {
         deleteAFKEvents.mutate([id], { onSuccess, onError });
         break;
       case 'screenshot':
-        // Screenshots don't have a delete mutation yet
-        toast.info('Screenshot deletion not yet implemented');
+        deleteScreenshot.mutate(id, { onSuccess, onError });
+        break;
+      case 'session':
+        deleteSession.mutate(id, { onSuccess, onError });
         break;
     }
-  }, [deleteActivities, deleteBrowserVisits, deleteGitCommits, deleteShellCommands, deleteFileEvents, deleteAFKEvents]);
+  }, [deleteActivities, deleteBrowserVisits, deleteGitCommits, deleteShellCommands, deleteFileEvents, deleteAFKEvents, deleteScreenshot, deleteSession]);
 
   // Handle EventDrops event edit
   const handleEventDropEdit = useCallback((event: EventDot) => {
@@ -321,55 +346,17 @@ export function TimelinePage() {
       if (byType['afk']?.length) {
         promises.push(deleteAFKEvents.mutateAsync(byType['afk']));
       }
-
-      await Promise.all(promises);
-      toast.success(`Deleted ${totalCount} ${totalCount === 1 ? 'item' : 'items'}`);
-    } catch (error) {
-      console.error('Failed to delete items:', error);
-      toast.error('Failed to delete selected items');
-    }
-  }, [
-    deleteActivities,
-    deleteBrowserVisits,
-    deleteGitCommits,
-    deleteShellCommands,
-    deleteFileEvents,
-    deleteAFKEvents,
-  ]);
-
-  // Handle bulk delete - supports all event types (uses current selection)
-  const handleDeleteSelected = useCallback(async () => {
-    // Group selected items by type
-    const byType: Record<string, number[]> = {};
-    selectedEventKeys.forEach((key) => {
-      const { type, id } = parseEventKey(key);
-      if (!byType[type]) byType[type] = [];
-      byType[type].push(id);
-    });
-
-    const totalCount = Object.values(byType).reduce((sum, ids) => sum + ids.length, 0);
-    if (totalCount === 0) return;
-
-    try {
-      const promises: Promise<void>[] = [];
-
-      if (byType['activity']?.length) {
-        promises.push(deleteActivities.mutateAsync(byType['activity']));
+      if (byType['screenshot']?.length) {
+        // Screenshots are deleted one at a time (API takes single ID)
+        for (const id of byType['screenshot']) {
+          promises.push(deleteScreenshot.mutateAsync(id));
+        }
       }
-      if (byType['browser']?.length) {
-        promises.push(deleteBrowserVisits.mutateAsync(byType['browser']));
-      }
-      if (byType['git']?.length) {
-        promises.push(deleteGitCommits.mutateAsync(byType['git']));
-      }
-      if (byType['shell']?.length) {
-        promises.push(deleteShellCommands.mutateAsync(byType['shell']));
-      }
-      if (byType['file']?.length) {
-        promises.push(deleteFileEvents.mutateAsync(byType['file']));
-      }
-      if (byType['afk']?.length) {
-        promises.push(deleteAFKEvents.mutateAsync(byType['afk']));
+      if (byType['session']?.length) {
+        // Sessions are deleted one at a time (API takes single ID)
+        for (const id of byType['session']) {
+          promises.push(deleteSession.mutateAsync(id));
+        }
       }
 
       await Promise.all(promises);
@@ -380,13 +367,14 @@ export function TimelinePage() {
       toast.error('Failed to delete selected items');
     }
   }, [
-    selectedEventKeys,
     deleteActivities,
     deleteBrowserVisits,
     deleteGitCommits,
     deleteShellCommands,
     deleteFileEvents,
     deleteAFKEvents,
+    deleteScreenshot,
+    deleteSession,
     clearAllSelections,
   ]);
 
@@ -414,10 +402,22 @@ export function TimelinePage() {
     toast.info('Merge functionality coming soon');
   }, []);
 
-  const handleAcceptDrafts = useCallback((_keys: Set<EventKey>) => {
-    // TODO: Implement draft acceptance
-    toast.info('Accept drafts functionality coming soon');
-  }, []);
+  const handleAcceptDrafts = useCallback((keys: Set<EventKey>) => {
+    const sessionIds: number[] = [];
+    const activityIds: number[] = [];
+    keys.forEach((key) => {
+      const { type, id } = parseEventKey(key);
+      if (type === 'session') {
+        sessionIds.push(id);
+      } else if (type === 'activity') {
+        activityIds.push(id);
+      }
+    });
+    if (sessionIds.length === 0 && activityIds.length === 0) return;
+    bulkAcceptDrafts.mutate({ sessionIds, activityIds }, {
+      onSuccess: () => clearAllSelections(),
+    });
+  }, [bulkAcceptDrafts, clearAllSelections]);
 
   // Wrapper for playhead change - captures timestamp for EventList ordering
   const handlePlayheadChange = useCallback((timestamp: Date, visibleRange?: { start: Date; end: Date }, zoomLevel?: number) => {
@@ -433,17 +433,24 @@ export function TimelinePage() {
   // Navigation handlers
   const handleDateSelect = useCallback((date: Date) => {
     setSelectedDate(date);
+    setCalendarYear(date.getFullYear());
+    setCalendarMonth(date.getMonth() + 1);
     goToDate(date);
   }, [goToDate]);
 
   const handleGoToToday = useCallback(() => {
-    setSelectedDate(new Date());
+    const today = new Date();
+    setSelectedDate(today);
+    setCalendarYear(today.getFullYear());
+    setCalendarMonth(today.getMonth() + 1);
     goToToday();
   }, [goToToday]);
 
   const handleGoToYesterday = useCallback(() => {
     const yesterday = addDays(new Date(), -1);
     setSelectedDate(yesterday);
+    setCalendarYear(yesterday.getFullYear());
+    setCalendarMonth(yesterday.getMonth() + 1);
     goToDate(yesterday);
   }, [goToDate]);
 
@@ -470,7 +477,15 @@ export function TimelinePage() {
     const [year, month, day] = dateString.split('-').map(Number);
     const date = new Date(year, month - 1, day);
     setSelectedDate(date);
+    setCalendarYear(year);
+    setCalendarMonth(month);
+    goToDate(date);
     setShowCalendar(false);
+  }, [goToDate]);
+
+  const handleCalendarMonthChange = useCallback((year: number, month: number) => {
+    setCalendarYear(year);
+    setCalendarMonth(month);
   }, []);
 
   // Format header date based on centerDate (follows playhead)
@@ -523,7 +538,7 @@ export function TimelinePage() {
         {/* Left Sidebar */}
         <div className="xl:w-72 xl:flex-shrink-0">
           <div className="xl:sticky xl:top-0 space-y-3">
-            <DailySummaryCard stats={gridData.dayStats || null} />
+            <DailySummaryCard stats={gridData.dayStats || null} isToday={centerDate === todayStr} />
             <BreakdownBar stats={gridData.dayStats || null} />
             <TopAppsSection topApps={gridData.topApps || []} />
           </div>
@@ -575,6 +590,20 @@ export function TimelinePage() {
                   Yesterday
                 </Button>
               </div>
+
+              {/* Active app filter badge */}
+              {appFilter && (
+                <Badge variant="secondary" className="ml-2 gap-1 pr-1">
+                  Filtered: {appFilter}
+                  <button
+                    onClick={handleClearAppFilter}
+                    className="ml-1 rounded-full hover:bg-muted p-0.5"
+                    aria-label="Clear filter"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </Badge>
+              )}
             </div>
             <div className="flex items-center gap-2">
               <FilterControls filters={filters} onFiltersChange={setFilters} />
@@ -648,6 +677,8 @@ export function TimelinePage() {
                 onAcceptDrafts={handleAcceptDrafts}
                 collapsed={listCollapsed}
                 onCollapsedChange={setListCollapsed}
+                appFilter={appFilter}
+                onAppFilterChange={handleClearAppFilter}
               />
             }
           />
@@ -689,6 +720,19 @@ export function TimelinePage() {
           >
             Today
           </Button>
+          {/* Active app filter badge - mobile */}
+          {appFilter && (
+            <Badge variant="secondary" className="gap-1 pr-1">
+              {appFilter}
+              <button
+                onClick={handleClearAppFilter}
+                className="ml-1 rounded-full hover:bg-muted p-0.5"
+                aria-label="Clear filter"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </Badge>
+          )}
         </div>
         <div className="flex items-center gap-2">
           <FilterControls filters={filters} onFiltersChange={setFilters} />
@@ -755,6 +799,7 @@ export function TimelinePage() {
               isLoading={calendarLoading}
               selectedDate={selectedDate}
               onSelectDate={handleDateSelect}
+              onMonthChange={handleCalendarMonthChange}
             />
           </div>
         </div>

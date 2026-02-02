@@ -38,6 +38,10 @@ export function BulkAcceptDrafts(arg1, arg2) {
   return window['go']['main']['App']['BulkAcceptDrafts'](arg1, arg2);
 }
 
+export function BulkAcceptDraftsBySession(arg1, arg2) {
+  return window['go']['main']['App']['BulkAcceptDraftsBySession'](arg1, arg2);
+}
+
 export function BulkAssignProject(arg1) {
   return window['go']['main']['App']['BulkAssignProject'](arg1);
 }
@@ -424,6 +428,10 @@ export function GetTimelineGridData(arg1) {
 
 export function GetTopWindows(arg1, arg2) {
   return window['go']['main']['App']['GetTopWindows'](arg1, arg2);
+}
+
+export function GetTopWindowsRange(arg1, arg2, arg3) {
+  return window['go']['main']['App']['GetTopWindowsRange'](arg1, arg2, arg3);
 }
 
 export function GetTrackedRepositories() {

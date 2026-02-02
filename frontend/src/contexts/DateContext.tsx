@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback, ReactNode } from 'react';
+import { createContext, useContext, useState, useCallback, useMemo, ReactNode } from 'react';
 
 export type TimeframeType = 'day' | 'week' | 'month' | 'year' | 'custom';
 
@@ -205,7 +205,7 @@ export function DateProvider({ children }: { children: ReactNode }) {
   }, [timeframeType, goToNextDay, goToNextWeek, goToNextMonth, goToNextYear, dateRange]);
 
   // Calculate if we can go to next period
-  const canGoNext = useCallback(() => {
+  const canGoNext = useMemo(() => {
     const today = new Date();
     switch (timeframeType) {
       case 'day':
@@ -230,7 +230,7 @@ export function DateProvider({ children }: { children: ReactNode }) {
       }
     }
     return false;
-  }, [timeframeType, selectedDate, dateRange])();
+  }, [timeframeType, selectedDate, dateRange]);
 
   const goToToday = useCallback(() => {
     setSelectedDate(new Date());

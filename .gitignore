@@ -66,6 +66,10 @@ Thumbs.db
 # Binary
 traq
 
+# Compiled script binaries
+compare_reports
+test_report_with_projects
+
 # Python
 .venv/
 __pycache__/

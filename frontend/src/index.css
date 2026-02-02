@@ -32,6 +32,7 @@
     --input: 214.3 31.8% 91.4%;
     --ring: 222.2 84% 4.9%;
     --radius: 0.5rem;
+    --chart-1: 217 91% 60%;
   }
 
   .dark {
@@ -54,6 +55,7 @@
     --border: 217.2 32.6% 25%;
     --input: 217.2 32.6% 17.5%;
     --ring: 212.7 26.8% 83.9%;
+    --chart-1: 217 91% 60%;
   }
 }
 
@@ -79,6 +81,7 @@
     --border: 217.2 32.6% 25%;
     --input: 217.2 32.6% 17.5%;
     --ring: 212.7 26.8% 83.9%;
+    --chart-1: 217 91% 60%;
   }
 }
 
@@ -134,4 +137,106 @@
 
 *::-webkit-scrollbar-corner {
   background: transparent;
+}
+
+/* React Grid Layout customizations */
+.react-grid-item.react-grid-placeholder {
+  background: hsl(var(--primary) / 0.2);
+  border: 2px dashed hsl(var(--primary) / 0.4);
+  border-radius: 0.5rem;
+}
+
+.react-grid-item > .react-resizable-handle {
+  position: absolute;
+}
+
+/* Southeast (corner) handle */
+.react-grid-item > .react-resizable-handle-se {
+  width: 20px;
+  height: 20px;
+  bottom: 0;
+  right: 0;
+  cursor: se-resize;
+}
+
+.react-grid-item > .react-resizable-handle-se::after {
+  content: '';
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid hsl(var(--primary) / 0.4);
+  border-bottom: 2px solid hsl(var(--primary) / 0.4);
+  border-radius: 0 0 2px 0;
+}
+
+/* South (bottom) handle */
+.react-grid-item > .react-resizable-handle-s {
+  width: calc(100% - 40px);
+  height: 10px;
+  bottom: 0;
+  left: 20px;
+  cursor: s-resize;
+}
+
+.react-grid-item > .react-resizable-handle-s::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: 2px;
+  transform: translateX(-50%);
+  width: 40px;
+  height: 4px;
+  background: hsl(var(--primary) / 0.3);
+  border-radius: 2px;
+}
+
+/* East (right) handle */
+.react-grid-item > .react-resizable-handle-e {
+  width: 10px;
+  height: calc(100% - 40px);
+  right: 0;
+  top: 20px;
+  cursor: e-resize;
+}
+
+.react-grid-item > .react-resizable-handle-e::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  right: 2px;
+  transform: translateY(-50%);
+  width: 4px;
+  height: 40px;
+  background: hsl(var(--primary) / 0.3);
+  border-radius: 2px;
+}
+
+.react-grid-item > .react-resizable-handle:hover::after {
+  background: hsl(var(--primary) / 0.6);
+  border-color: hsl(var(--primary) / 0.8);
+}
+
+.react-grid-item.resizing {
+  z-index: 10;
+}
+
+.react-grid-item.react-draggable-dragging {
+  z-index: 10;
+  opacity: 0.9;
+}
+
+/* Make cards fill their grid containers */
+.dashboard-widget-content > div {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Card content should flex to fill space */
+.dashboard-widget-content > div > div:last-child {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
 }

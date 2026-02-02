@@ -13,6 +13,7 @@ export interface TimelineGridData {
   fileEvents: Record<number, FileEventDisplay[]>; // hour -> file events
   browserEvents: Record<number, BrowserEventDisplay[]>; // hour -> browser visits
   afkBlocks: Record<number, AFKBlock[]>; // hour -> AFK blocks
+  activityStates: ActivityState[]; // unified activity lane states (active/break/afk)
 }
 
 export interface DayStats {
@@ -159,6 +160,19 @@ export interface AFKBlock {
   minuteOffset: number; // Minute within hour (0-59)
   pixelPosition: number; // Vertical position in pixels (0-60)
   pixelHeight: number; // Height in pixels
+}
+
+// ActivityState represents a unified activity state for the Activity lane
+// States: "active" (focus events), "break" (short gaps), "afk" (explicit AFK events)
+export interface ActivityState {
+  startTime: number; // Unix timestamp
+  endTime: number; // Unix timestamp
+  durationSeconds: number;
+  state: 'active' | 'break' | 'afk';
+  hourOffset: number;
+  minuteOffset: number;
+  pixelPosition: number;
+  pixelHeight: number;
 }
 
 export interface CategorizationRule {

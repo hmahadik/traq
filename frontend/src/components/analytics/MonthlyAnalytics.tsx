@@ -114,11 +114,6 @@ export function MonthlyAnalytics({ data, isLoading, onDayClick }: MonthlyAnalyti
 
   return (
     <div className="space-y-4">
-      {/* Month Info */}
-      <div className="text-sm text-muted-foreground">
-        {monthName} {data.year} • {data.startDate} to {data.endDate}
-      </div>
-
       {/* Monthly Metrics Grid */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>
@@ -130,7 +125,7 @@ export function MonthlyAnalytics({ data, isLoading, onDayClick }: MonthlyAnalyti
           <CardContent>
             <div className="text-2xl font-bold">{formatHours(totalActiveMinutes)}</div>
             <p className="text-xs text-muted-foreground mt-1">
-              Across {activeDays} days
+              Across {activeDays} {activeDays === 1 ? 'day' : 'days'}
             </p>
           </CardContent>
         </Card>
@@ -172,7 +167,7 @@ export function MonthlyAnalytics({ data, isLoading, onDayClick }: MonthlyAnalyti
           <CardContent>
             <div className="text-2xl font-bold">{totalSessions}</div>
             <p className="text-xs text-muted-foreground mt-1">
-              {totalScreenshots} screenshots
+              {activeDays > 0 ? (totalSessions / activeDays).toFixed(1) : 0} avg/day
             </p>
           </CardContent>
         </Card>
@@ -253,7 +248,7 @@ export function MonthlyAnalytics({ data, isLoading, onDayClick }: MonthlyAnalyti
           </p>
         </CardHeader>
         <CardContent>
-          <ResponsiveContainer width="100%" height={300}>
+          <ResponsiveContainer width="100%" height={350}>
             <BarChart data={dailyChartData}>
               <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
               <XAxis
@@ -262,38 +257,45 @@ export function MonthlyAnalytics({ data, isLoading, onDayClick }: MonthlyAnalyti
                 tick={{ fill: 'currentColor', fontSize: 10 }}
                 angle={-45}
                 textAnchor="end"
-                height={60}
-                label={{ value: `Day of ${monthName}`, position: 'insideBottom', offset: -10 }}
+                height={80}
+                label={{ value: `Day of ${monthName}`, position: 'insideBottom', offset: -5 }}
               />
               <YAxis
                 className="text-sm"
                 tick={{ fill: 'currentColor' }}
-                label={{ value: 'Minutes', angle: -90, position: 'insideLeft' }}
+                tickFormatter={(v) => formatHours(v)}
               />
               <Tooltip
-                contentStyle={{
-                  backgroundColor: 'hsl(var(--background))',
-                  border: '1px solid hsl(var(--border))',
-                  borderRadius: '6px',
-                }}
-                formatter={(value: number, name: string) => {
-                  if (name === 'activeMinutes') return [formatHours(value), 'Active Time'];
-                  if (name === 'sessions') return [value, 'Sessions'];
-                  if (name === 'screenshots') return [value, 'Screenshots'];
-                  return [value, name];
-                }}
-                labelFormatter={(label) => {
-                  const item = dailyChartData.find(d => d.dayLabel === label);
-                  if (item) {
-                    const [y, m, d] = item.date.split('-').map(Number);
-                    return new Date(y, m - 1, d).toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' });
+                content={({ active, payload }) => {
+                  if (active && payload?.[0]) {
+                    const data = payload[0].payload;
+                    return (
+                      <div className="rounded-lg border bg-background p-3 shadow-sm">
+                        <p className="text-sm font-medium mb-1">
+                          {(() => {
+                            const [y, m, d] = data.date.split('-').map(Number);
+                            return new Date(y, m - 1, d).toLocaleDateString('en-US', {
+                              weekday: 'long',
+                              month: 'short',
+                              day: 'numeric',
+                            });
+                          })()}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          Active: {formatHours(data.activeMinutes)}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          Sessions: {data.sessions}
+                        </p>
+                      </div>
+                    );
                   }
-                  return label;
+                  return null;
                 }}
               />
               <Bar
                 dataKey="activeMinutes"
-                fill="hsl(var(--primary))"
+                fill="hsl(var(--chart-1))"
                 radius={[4, 4, 0, 0]}
                 cursor={onDayClick ? 'pointer' : 'default'}
                 onClick={(data) => {

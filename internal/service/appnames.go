@@ -2,6 +2,7 @@ package service
 
 import (
 	"path/filepath"
+	"regexp"
 	"strings"
 )
 
@@ -211,6 +212,13 @@ func GetFriendlyAppName(processName string) string {
 		return friendly
 	}
 
+	// Detect Chrome subprocess patterns:
+	// - "google-chrome (/path/to/mcp-chrome-HASH)" — Playwright/MCP Chrome profiles
+	// - "crx_EXTENSIONID" — Chrome extension app windows
+	if friendly := detectChromeSubprocess(normalized); friendly != "" {
+		return friendly
+	}
+
 	// Check if it's a path and extract the basename
 	if strings.Contains(processName, "/") || strings.Contains(processName, "\\") {
 		baseName := filepath.Base(processName)
@@ -276,4 +284,29 @@ func titleCase(s string) string {
 	}
 
 	return strings.Join(words, " ")
+}
+
+// chromeProfilePattern matches Chrome WM_CLASS instance names that include a profile path,
+// e.g. "google-chrome (/home/user/.cache/ms-playwright/mcp-chrome-93a1952)"
+var chromeProfilePattern = regexp.MustCompile(`^(google-chrome|chromium|chrome)\s*\(`)
+
+// crxPattern matches Chrome extension app window instance names,
+// e.g. "crx_fcoeoabgfenejglbffodgkkbkcdhcgfn"
+var crxPattern = regexp.MustCompile(`^crx_[a-p]{32}$`)
+
+// detectChromeSubprocess checks if a normalized process name matches known
+// Chrome subprocess patterns (MCP profiles, extension app windows, etc.)
+// and returns the appropriate friendly name, or "" if no match.
+func detectChromeSubprocess(normalized string) string {
+	// Chrome with profile path in parens: "google-chrome (/path/to/profile)"
+	if chromeProfilePattern.MatchString(normalized) {
+		return "Chrome"
+	}
+
+	// Chrome extension app windows: "crx_<32-char-extension-id>"
+	if crxPattern.MatchString(normalized) {
+		return "Chrome Extension"
+	}
+
+	return ""
 }

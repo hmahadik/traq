@@ -1,6 +1,6 @@
 import { useRef, useEffect, useState, useCallback, useMemo } from 'react';
 import * as d3 from 'd3';
-import { ChevronDown, Eye, Camera } from 'lucide-react';
+import { ChevronDown, ChevronRight, Eye, Camera } from 'lucide-react';
 import type { TimelineGridData } from '@/types/timeline';
 import type { Screenshot as ScreenshotType } from '@/types/screenshot';
 import type { TimelineFilters } from '../FilterControls';
@@ -105,8 +105,10 @@ export function Timeline({
   const svgRef = useRef<SVGSVGElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ width: 800, height: 400 });
-  const [clickedEvent, setClickedEvent] = useState<EventDot | null>(null);
+  const [hoveredEvent, setHoveredEvent] = useState<EventDot | null>(null);
   const [tooltipPosition, setTooltipPosition] = useState<{ x: number; y: number } | null>(null);
+  const tooltipHideTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isMouseOverTooltipRef = useRef(false);
   const [currentZoom, setCurrentZoom] = useState<d3.ZoomTransform>(d3.zoomIdentity);
   const [visibleTimeRange, setVisibleTimeRange] = useState<{ start: Date; end: Date } | null>(null);
   const [playheadTimestamp, setPlayheadTimestamp] = useState<Date | null>(null);
@@ -149,6 +151,8 @@ export function Timeline({
   const onSelectionChangeRef = useRef(onSelectionChange);
   const selectedEventKeysRef = useRef(selectedEventKeys);
   const onTargetReachedRef = useRef(onTargetReached);
+  const showTooltipRef = useRef<(event: EventDot, clientX: number, clientY: number) => void>(() => {});
+  const hideTooltipWithDelayRef = useRef<() => void>(() => {});
 
   // Gallery state for fullscreen screenshot viewer
   const [galleryOpen, setGalleryOpen] = useState(false);
@@ -262,34 +266,53 @@ export function Timeline({
     };
   }, []);
 
-  // Click outside to dismiss tooltip
+  // Cleanup tooltip hide timeout on unmount
   useEffect(() => {
-    if (!clickedEvent) return;
-
-    const handleClickOutside = (e: MouseEvent) => {
-      // Don't dismiss if clicking inside the tooltip
-      if (tooltipRef.current?.contains(e.target as Node)) {
-        return;
-      }
-      // Don't dismiss if clicking on an event dot or bar (those have their own handlers)
-      const target = e.target as Element;
-      if (target.classList.contains('event-dot') || target.classList.contains('event-bar')) {
-        return;
-      }
-      setClickedEvent(null);
-      setTooltipPosition(null);
-    };
-
-    // Delay adding listener to avoid immediate dismissal from the click that opened the tooltip
-    const timeoutId = setTimeout(() => {
-      document.addEventListener('click', handleClickOutside);
-    }, 0);
-
     return () => {
-      clearTimeout(timeoutId);
-      document.removeEventListener('click', handleClickOutside);
+      if (tooltipHideTimeoutRef.current) {
+        clearTimeout(tooltipHideTimeoutRef.current);
+      }
     };
-  }, [clickedEvent]);
+  }, []);
+
+  // Handler to show tooltip on hover
+  const showTooltip = useCallback((event: EventDot, clientX: number, clientY: number) => {
+    // Cancel any pending hide
+    if (tooltipHideTimeoutRef.current) {
+      clearTimeout(tooltipHideTimeoutRef.current);
+      tooltipHideTimeoutRef.current = null;
+    }
+    setHoveredEvent(event);
+    setTooltipPosition({ x: clientX, y: clientY });
+  }, []);
+
+  // Handler to hide tooltip with delay (allows moving mouse to tooltip)
+  const hideTooltipWithDelay = useCallback(() => {
+    // Don't hide if mouse moved to tooltip
+    if (isMouseOverTooltipRef.current) return;
+
+    tooltipHideTimeoutRef.current = setTimeout(() => {
+      if (!isMouseOverTooltipRef.current) {
+        setHoveredEvent(null);
+        setTooltipPosition(null);
+      }
+    }, 150); // 150ms delay to allow moving to tooltip
+  }, []);
+
+  // Handlers for tooltip hover state
+  const handleTooltipMouseEnter = useCallback(() => {
+    isMouseOverTooltipRef.current = true;
+    if (tooltipHideTimeoutRef.current) {
+      clearTimeout(tooltipHideTimeoutRef.current);
+      tooltipHideTimeoutRef.current = null;
+    }
+  }, []);
+
+  const handleTooltipMouseLeave = useCallback(() => {
+    isMouseOverTooltipRef.current = false;
+    setHoveredEvent(null);
+    setTooltipPosition(null);
+  }, []);
 
   // === KEEP CALLBACK REFS IN SYNC: Update refs when props change (no re-render) ===
   useEffect(() => {
@@ -311,6 +334,14 @@ export function Timeline({
   useEffect(() => {
     onTargetReachedRef.current = onTargetReached;
   }, [onTargetReached]);
+
+  useEffect(() => {
+    showTooltipRef.current = showTooltip;
+  }, [showTooltip]);
+
+  useEffect(() => {
+    hideTooltipWithDelayRef.current = hideTooltipWithDelay;
+  }, [hideTooltipWithDelay]);
 
   // Track targetPlayheadDate in a ref so D3 effect can check for pending navigation
   const targetPlayheadDateRef = useRef(targetPlayheadDate);
@@ -1144,29 +1175,30 @@ export function Timeline({
       .attr('stroke', (d) => isSelected(d) ? '#fff' : getDarkerColor(d.color))
       .attr('stroke-width', (d) => isSelected(d) ? 2.5 : 1)
       .style('cursor', 'pointer')
-      .on('mouseenter', function () {
+      .on('mouseenter', function (event, d) {
         // Use transformed scale from current zoom to avoid position jumping
         const currentScale = zoomTransformRef.current.rescaleX(xScaleRef.current!);
         d3.select(this)
           .transition()
           .duration(100)
           .attr('width', BAR_WIDTH + 2)
-          .attr('x', (d: EventDot) => currentScale(d.timestamp) - (BAR_WIDTH + 2) / 2);
+          .attr('x', () => currentScale(d.timestamp) - (BAR_WIDTH + 2) / 2);
+        // Show tooltip on hover
+        showTooltipRef.current(d, event.clientX, event.clientY);
       })
-      .on('mouseleave', function () {
+      .on('mouseleave', function (_event, d) {
         // Use transformed scale from current zoom to avoid position jumping
         const currentScale = zoomTransformRef.current.rescaleX(xScaleRef.current!);
         d3.select(this)
           .transition()
           .duration(100)
           .attr('width', BAR_WIDTH)
-          .attr('x', (d: EventDot) => currentScale(d.timestamp) - BAR_WIDTH / 2);
+          .attr('x', () => currentScale(d.timestamp) - BAR_WIDTH / 2);
+        // Hide tooltip with delay
+        hideTooltipWithDelayRef.current();
       })
       .on('click', function (event, d) {
         event.stopPropagation();
-        // Show tooltip on click
-        setClickedEvent(d);
-        setTooltipPosition({ x: event.clientX, y: event.clientY });
         // Handle selection (use refs to avoid stale closures)
         if (onSelectionChangeRef.current) {
           const newSelection = new Set(selectedEventKeysRef.current || []);
@@ -1206,23 +1238,24 @@ export function Timeline({
       .attr('stroke', (d) => isSelected(d) ? '#fff' : getDarkerColor(d.color))
       .attr('stroke-width', (d) => isSelected(d) ? 2.5 : 1.5)
       .style('cursor', 'pointer')
-      .on('mouseenter', function () {
+      .on('mouseenter', function (event, d) {
         d3.select(this)
           .transition()
           .duration(100)
           .attr('fill-opacity', 0.9);
+        // Show tooltip on hover
+        showTooltipRef.current(d, event.clientX, event.clientY);
       })
       .on('mouseleave', function () {
         d3.select(this)
           .transition()
           .duration(100)
           .attr('fill-opacity', 0.7);
+        // Hide tooltip with delay
+        hideTooltipWithDelayRef.current();
       })
       .on('click', function (event, d) {
         event.stopPropagation();
-        // Show tooltip on click
-        setClickedEvent(d);
-        setTooltipPosition({ x: event.clientX, y: event.clientY });
         // Handle selection (use refs to avoid stale closures)
         if (onSelectionChangeRef.current) {
           const newSelection = new Set(selectedEventKeysRef.current || []);
@@ -2046,19 +2079,24 @@ export function Timeline({
         </div>
       </div>
 
-      <TimelineTooltip
-        ref={tooltipRef}
-        event={clickedEvent}
-        position={tooltipPosition}
-        onDelete={onEventDelete}
-        onEdit={onEventEdit}
-        onViewScreenshot={onViewScreenshot}
-        onViewSession={onViewSession}
-        onClose={() => {
-          setClickedEvent(null);
-          setTooltipPosition(null);
-        }}
-      />
+      <div
+        onMouseEnter={handleTooltipMouseEnter}
+        onMouseLeave={handleTooltipMouseLeave}
+      >
+        <TimelineTooltip
+          ref={tooltipRef}
+          event={hoveredEvent}
+          position={tooltipPosition}
+          onDelete={onEventDelete}
+          onEdit={onEventEdit}
+          onViewScreenshot={onViewScreenshot}
+          onViewSession={onViewSession}
+          onClose={() => {
+            setHoveredEvent(null);
+            setTooltipPosition(null);
+          }}
+        />
+      </div>
 
       {/* Fullscreen image gallery */}
       <ImageGallery

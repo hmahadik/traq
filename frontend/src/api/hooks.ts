@@ -66,8 +66,6 @@ export const queryKeys = {
     hourScreenshots: (date: string, hour: number) =>
       ['timeline', 'hourScreenshots', date, hour] as const,
     context: (sessionId: number) => ['timeline', 'context', sessionId] as const,
-    events: (startTime: number, endTime: number, eventTypes?: string[]) =>
-      ['timeline', 'events', startTime, endTime, eventTypes] as const,
     gridData: (date: string) => ['timeline', 'gridData', date] as const,
     weekGridData: (startDate: string) => ['timeline', 'weekGridData', startDate] as const,
   },
@@ -240,6 +238,14 @@ export function useTopWindows(date: string, limit: number = 10) {
   });
 }
 
+export function useTopWindowsRange(start: number, end: number, limit: number = 10) {
+  return useQuery({
+    queryKey: ['analytics', 'topWindowsRange', start, end, limit] as const,
+    queryFn: () => api.analytics.getTopWindowsRange(start, end, limit),
+    staleTime: 60_000,
+  });
+}
+
 // ============================================================================
 // Timeline Hooks
 // ============================================================================
@@ -305,21 +311,6 @@ export function useSessionContext(sessionId: number) {
     queryFn: () => api.timeline.getSessionContext(sessionId),
     staleTime: 30_000,
     enabled: sessionId > 0, // Don't fetch for invalid session IDs
-  });
-}
-
-export function useTimelineEvents(query: {
-  startTime: number;
-  endTime: number;
-  eventTypes?: string[];
-  collapseFileEvents?: boolean;
-  limit?: number;
-  offset?: number;
-}) {
-  return useQuery({
-    queryKey: queryKeys.timeline.events(query.startTime, query.endTime, query.eventTypes),
-    queryFn: () => api.timeline.getTimelineEvents(query),
-    staleTime: 30_000,
   });
 }
 
@@ -816,6 +807,30 @@ export function useBulkAcceptDrafts() {
       queryClient.invalidateQueries({ queryKey: ['entries'] });
       const total = summaryIds.length + assignmentIds.length;
       toast.success(`${total} drafts accepted`);
+    },
+    onError: (error: unknown) => {
+      console.error('Bulk accept drafts failed:', error);
+      const message = error instanceof Error ? error.message : String(error);
+      toast.error(`Failed to accept drafts: ${message}`);
+    },
+  });
+}
+
+/**
+ * Bulk accept drafts using session IDs and activity IDs.
+ * Session IDs are resolved to summary IDs on the backend.
+ */
+export function useBulkAcceptDraftsBySession() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ sessionIds, activityIds }: { sessionIds: number[]; activityIds: number[] }) =>
+      api.drafts.bulkAcceptBySession(sessionIds, activityIds),
+    onSuccess: (_, { sessionIds, activityIds }) => {
+      queryClient.invalidateQueries({ queryKey: ['timeline'] });
+      queryClient.invalidateQueries({ queryKey: ['entries'] });
+      const total = sessionIds.length + activityIds.length;
+      toast.success(`${total} draft${total === 1 ? '' : 's'} accepted`);
     },
     onError: (error: unknown) => {
       console.error('Bulk accept drafts failed:', error);

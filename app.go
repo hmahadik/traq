@@ -583,6 +583,14 @@ func (a *App) GetTopWindows(date string, limit int) ([]*service.WindowUsage, err
 	return a.Analytics.GetTopWindows(start, end, limit)
 }
 
+// GetTopWindowsRange returns the most used windows for a timestamp range, grouped by window title.
+func (a *App) GetTopWindowsRange(start, end int64, limit int) ([]*service.WindowUsage, error) {
+	if a.Analytics == nil {
+		return nil, nil
+	}
+	return a.Analytics.GetTopWindows(start, end, limit)
+}
+
 // ============================================================================
 // Timeline Methods (exposed to frontend)
 // ============================================================================
@@ -998,6 +1006,15 @@ func (a *App) BulkAcceptDrafts(summaryIDs, assignmentIDs []int64) error {
 		return fmt.Errorf("draft service not initialized")
 	}
 	return a.Draft.BulkAcceptDrafts(summaryIDs, assignmentIDs)
+}
+
+// BulkAcceptDraftsBySession accepts drafts using session IDs and activity IDs.
+// Session IDs are resolved to their corresponding summary IDs internally.
+func (a *App) BulkAcceptDraftsBySession(sessionIDs, activityIDs []int64) error {
+	if a.Draft == nil {
+		return fmt.Errorf("draft service not initialized")
+	}
+	return a.Draft.BulkAcceptDraftsBySession(sessionIDs, activityIDs)
 }
 
 // ============================================================================

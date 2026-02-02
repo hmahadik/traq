@@ -105,7 +105,7 @@ export function ActivityChart({ data, isLoading }: ActivityChartProps) {
               />
               <Bar
                 dataKey="activeMinutes"
-                fill="hsl(var(--primary))"
+                fill="hsl(var(--chart-1))"
                 radius={[4, 4, 0, 0]}
               />
             </BarChart>
@@ -134,6 +134,9 @@ export function ActivityChart({ data, isLoading }: ActivityChartProps) {
                         <p className="text-sm text-muted-foreground">
                           {payload[0].value} min active
                         </p>
+                        <p className="text-sm text-muted-foreground">
+                          {payload[0].payload.screenshotCount} screenshots
+                        </p>
                       </div>
                     );
                   }
@@ -143,8 +146,8 @@ export function ActivityChart({ data, isLoading }: ActivityChartProps) {
               <Area
                 type="monotone"
                 dataKey="activeMinutes"
-                stroke="hsl(var(--primary))"
-                fill="hsl(var(--primary))"
+                stroke="hsl(var(--chart-1))"
+                fill="hsl(var(--chart-1))"
                 fillOpacity={0.2}
               />
             </AreaChart>

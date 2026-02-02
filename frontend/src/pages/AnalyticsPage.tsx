@@ -11,6 +11,8 @@ import {
   AppUsageTable,
   ProjectUsageChart,
   ProjectUsageTable,
+  WindowTitlesChart,
+  TopWindowsList,
   WeeklyAnalytics,
   MonthlyAnalytics,
   YearlyAnalytics,
@@ -22,6 +24,9 @@ import {
   useAppUsage,
   useAppUsageRange,
   useProjectUsage,
+  useProjectUsageRange,
+  useTopWindows,
+  useTopWindowsRange,
   useWeeklyStats,
   useMonthlyStats,
   useYearlyStats,
@@ -134,9 +139,17 @@ export function AnalyticsPage() {
   const { data: hourlyActivity, isLoading: hourlyLoading } = useHourlyActivity(dateStr);
   const { data: appUsage, isLoading: appUsageLoading } = useAppUsage(dateStr);
   const { data: projectUsage, isLoading: projectUsageLoading } = useProjectUsage(dateStr);
+  const { data: topWindows, isLoading: topWindowsLoading } = useTopWindows(dateStr, 10);
 
   // Week view data
   const { data: weeklyStats, isLoading: weeklyStatsLoading } = useWeeklyStats(weekStartStr);
+  const weekStart = getWeekStart(selectedDate);
+  const weekEnd = getWeekEnd(selectedDate);
+  const weekStartTs = Math.floor(new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate(), 0, 0, 0, 0).getTime() / 1000);
+  const weekEndTs = Math.floor(new Date(weekEnd.getFullYear(), weekEnd.getMonth(), weekEnd.getDate(), 23, 59, 59, 999).getTime() / 1000);
+  const { data: weeklyAppUsage, isLoading: weeklyAppUsageLoading } = useAppUsageRange(weekStartTs, weekEndTs);
+  const { data: weeklyProjectUsage, isLoading: weeklyProjectUsageLoading } = useProjectUsageRange(weekStartTs, weekEndTs);
+  const { data: weeklyTopWindows, isLoading: weeklyTopWindowsLoading } = useTopWindowsRange(weekStartTs, weekEndTs, 10);
 
   // Month view data
   const year = selectedDate.getFullYear();
@@ -151,9 +164,11 @@ export function AnalyticsPage() {
   const customEndDate = getDateString(customRange.end);
   const { data: customRangeStats, isLoading: customRangeLoading } = useCustomRangeStats(customStartDate, customEndDate);
   const { data: customAppUsage, isLoading: customAppUsageLoading } = useAppUsageRange(customStartTs, customEndTs);
+  const { data: customProjectUsage, isLoading: customProjectUsageLoading } = useProjectUsageRange(customStartTs, customEndTs);
+  const { data: customTopWindows, isLoading: customTopWindowsLoading } = useTopWindowsRange(customStartTs, customEndTs, 10);
 
   const handleAppClick = (appName: string) => {
-    navigate(`/day/${dateStr}?app=${encodeURIComponent(appName)}`);
+    navigate(`/timeline?app=${encodeURIComponent(appName)}`);
   };
 
   const handleDayClick = (date: string) => {
@@ -192,17 +207,35 @@ export function AnalyticsPage() {
     }
   };
 
-  const formattedDateShort = selectedDate.toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  });
-  const formattedDateFull = selectedDate.toLocaleDateString('en-US', {
-    weekday: 'long',
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  });
+  const getSubtitle = (): string => {
+    switch (viewMode) {
+      case 'day':
+        return selectedDate.toLocaleDateString('en-US', {
+          weekday: 'long',
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric',
+        });
+      case 'week': {
+        const ws = getWeekStart(selectedDate);
+        const we = getWeekEnd(selectedDate);
+        const startStr = ws.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        const endStr = we.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        return `Week of ${startStr} - ${endStr}`;
+      }
+      case 'month':
+        return selectedDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+      case 'year':
+        return String(selectedDate.getFullYear());
+      case 'custom': {
+        const startStr = customRange.start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        const endStr = customRange.end.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        return `${startStr} - ${endStr}`;
+      }
+      default:
+        return '';
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -210,16 +243,7 @@ export function AnalyticsPage() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Analytics</h1>
-          <p className="text-muted-foreground">
-            {viewMode === 'custom' ? (
-              `${customRange.start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${customRange.end.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`
-            ) : (
-              <>
-                <span className="sm:hidden">{formattedDateShort}</span>
-                <span className="hidden sm:inline">{formattedDateFull}</span>
-              </>
-            )}
-          </p>
+          <p className="text-muted-foreground">{getSubtitle()}</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as ViewMode)}>
@@ -267,9 +291,14 @@ export function AnalyticsPage() {
       {/* Day View */}
       {viewMode === 'day' && (
         <div className="space-y-6">
-          <StatsGrid className="grid gap-4 grid-cols-1 lg:grid-cols-2 2xl:grid-cols-4" stats={stats} isLoading={statsLoading} />
-
-          <ActivityChart data={hourlyActivity} isLoading={hourlyLoading} />
+          <div className="grid gap-4 lg:grid-cols-2">
+            <StatsGrid
+              stats={stats}
+              isLoading={statsLoading}
+              className="grid gap-3 sm:gap-4 grid-cols-2 sm:grid-cols-4"
+            />
+            <ActivityChart data={hourlyActivity} isLoading={hourlyLoading} />
+          </div>
 
           <div className="grid gap-4 md:grid-cols-2">
             <ProjectUsageChart data={projectUsage} isLoading={projectUsageLoading} />
@@ -280,12 +309,40 @@ export function AnalyticsPage() {
             <AppUsageChart data={appUsage} isLoading={appUsageLoading} />
             <AppUsageTable data={appUsage} isLoading={appUsageLoading} onAppClick={handleAppClick} />
           </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <WindowTitlesChart data={topWindows} isLoading={topWindowsLoading} />
+            <TopWindowsList data={topWindows} isLoading={topWindowsLoading} />
+          </div>
         </div>
       )}
 
       {/* Week View */}
       {viewMode === 'week' && (
-        <WeeklyAnalytics data={weeklyStats} isLoading={weeklyStatsLoading} onDayClick={handleDayClick} />
+        <div className="space-y-6">
+          <WeeklyAnalytics data={weeklyStats} isLoading={weeklyStatsLoading} onDayClick={handleDayClick} />
+
+          {(weeklyProjectUsageLoading || (weeklyProjectUsage && weeklyProjectUsage.length > 0)) && (
+            <div className="grid gap-4 md:grid-cols-2">
+              <ProjectUsageChart data={weeklyProjectUsage} isLoading={weeklyProjectUsageLoading} />
+              <ProjectUsageTable data={weeklyProjectUsage} isLoading={weeklyProjectUsageLoading} />
+            </div>
+          )}
+
+          {(weeklyAppUsageLoading || (weeklyAppUsage && weeklyAppUsage.length > 0)) && (
+            <div className="grid gap-4 md:grid-cols-2">
+              <AppUsageChart data={weeklyAppUsage} isLoading={weeklyAppUsageLoading} />
+              <AppUsageTable data={weeklyAppUsage} isLoading={weeklyAppUsageLoading} onAppClick={handleAppClick} />
+            </div>
+          )}
+
+          {(weeklyTopWindowsLoading || (weeklyTopWindows && weeklyTopWindows.length > 0)) && (
+            <div className="grid gap-4 md:grid-cols-2">
+              <WindowTitlesChart data={weeklyTopWindows} isLoading={weeklyTopWindowsLoading} />
+              <TopWindowsList data={weeklyTopWindows} isLoading={weeklyTopWindowsLoading} />
+            </div>
+          )}
+        </div>
       )}
 
       {/* Month View */}
@@ -307,10 +364,26 @@ export function AnalyticsPage() {
             onDayClick={handleDayClick}
           />
 
-          <div className="grid gap-4 md:grid-cols-2">
-            <AppUsageChart data={customAppUsage} isLoading={customAppUsageLoading} />
-            <AppUsageTable data={customAppUsage} isLoading={customAppUsageLoading} onAppClick={handleAppClick} />
-          </div>
+          {(customProjectUsageLoading || (customProjectUsage && customProjectUsage.length > 0)) && (
+            <div className="grid gap-4 md:grid-cols-2">
+              <ProjectUsageChart data={customProjectUsage} isLoading={customProjectUsageLoading} />
+              <ProjectUsageTable data={customProjectUsage} isLoading={customProjectUsageLoading} />
+            </div>
+          )}
+
+          {(customAppUsageLoading || (customAppUsage && customAppUsage.length > 0)) && (
+            <div className="grid gap-4 md:grid-cols-2">
+              <AppUsageChart data={customAppUsage} isLoading={customAppUsageLoading} />
+              <AppUsageTable data={customAppUsage} isLoading={customAppUsageLoading} onAppClick={handleAppClick} />
+            </div>
+          )}
+
+          {(customTopWindowsLoading || (customTopWindows && customTopWindows.length > 0)) && (
+            <div className="grid gap-4 md:grid-cols-2">
+              <WindowTitlesChart data={customTopWindows} isLoading={customTopWindowsLoading} />
+              <TopWindowsList data={customTopWindows} isLoading={customTopWindowsLoading} />
+            </div>
+          )}
         </div>
       )}
     </div>

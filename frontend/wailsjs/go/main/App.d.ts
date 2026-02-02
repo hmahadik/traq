@@ -24,6 +24,8 @@ export function BackfillProjects(arg1:string,arg2:string,arg3:number):Promise<se
 
 export function BulkAcceptDrafts(arg1:Array<number>,arg2:Array<number>):Promise<void>;
 
+export function BulkAcceptDraftsBySession(arg1:Array<number>,arg2:Array<number>):Promise<void>;
+
 export function BulkAssignProject(arg1:Array<main.BulkAssignment>):Promise<void>;
 
 export function CheckForUpdate():Promise<service.UpdateInfo>;
@@ -217,6 +219,8 @@ export function GetThumbnailPath(arg1:number):Promise<string>;
 export function GetTimelineGridData(arg1:string):Promise<service.TimelineGridData>;
 
 export function GetTopWindows(arg1:string,arg2:number):Promise<Array<service.WindowUsage>>;
+
+export function GetTopWindowsRange(arg1:number,arg2:number,arg3:number):Promise<Array<service.WindowUsage>>;
 
 export function GetTrackedRepositories():Promise<Array<storage.GitRepository>>;
 

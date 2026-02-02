@@ -11,7 +11,7 @@ import {
   GitCommit,
   FileText,
   Globe,
-  Info,
+  Trophy,
   TrendingUp,
   TrendingDown,
 } from 'lucide-react';
@@ -20,6 +20,7 @@ import type { DailyStats, Comparison } from '@/types';
 interface StatsGridProps {
   stats: DailyStats | undefined;
   isLoading: boolean;
+  className?: string;
 }
 
 interface StatCardProps {
@@ -53,20 +54,19 @@ function StatCard({ title, value, icon, description, tooltip, comparisonPercent,
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <div className="flex items-center gap-1.5">
-          <CardTitle className="text-sm font-medium">{title}</CardTitle>
-          {tooltip && (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Info className="h-3.5 w-3.5 cursor-help text-muted-foreground" />
-              </TooltipTrigger>
-              <TooltipContent className="max-w-xs">
-                <p>{tooltip}</p>
-              </TooltipContent>
-            </Tooltip>
-          )}
-        </div>
-        <div className="h-4 w-4 text-muted-foreground">{icon}</div>
+        <CardTitle className="text-sm font-medium leading-tight min-w-0">{title}</CardTitle>
+        {tooltip ? (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className="h-4 w-4 shrink-0 text-muted-foreground cursor-help">{icon}</div>
+            </TooltipTrigger>
+            <TooltipContent className="max-w-xs">
+              <p>{tooltip}</p>
+            </TooltipContent>
+          </Tooltip>
+        ) : (
+          <div className="h-4 w-4 shrink-0 text-muted-foreground">{icon}</div>
+        )}
       </CardHeader>
       <CardContent>
         <div className="text-2xl font-bold">{value}</div>
@@ -88,7 +88,7 @@ function StatCard({ title, value, icon, description, tooltip, comparisonPercent,
               {isPositive ? '+' : ''}{comparisonPercent.toFixed(0)}%
             </Badge>
             <span className="text-xs text-muted-foreground">
-              {isPositive ? '+' : ''}{formatComparisonValue(comparisonDiff, isActiveTime)} vs yesterday
+              {isPositive ? '+' : isNegative ? '-' : ''}{formatComparisonValue(comparisonDiff, isActiveTime)} vs yesterday
             </span>
           </div>
         )}
@@ -115,10 +115,12 @@ function StatCardSkeleton() {
   );
 }
 
-export function StatsGrid({ stats, isLoading }: StatsGridProps) {
+export function StatsGrid({ stats, isLoading, className }: StatsGridProps) {
+  const gridClassName = className ?? "grid gap-3 sm:gap-4 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 2xl:grid-cols-8";
+
   if (isLoading) {
     return (
-      <div className="grid gap-3 sm:gap-4 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 2xl:grid-cols-8">
+      <div className={gridClassName}>
         {Array.from({ length: 8 }).map((_, i) => (
           <StatCardSkeleton key={i} />
         ))}
@@ -134,7 +136,7 @@ export function StatsGrid({ stats, isLoading }: StatsGridProps) {
 
   return (
     <TooltipProvider>
-      <div className="grid gap-3 sm:gap-4 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 2xl:grid-cols-8">
+      <div className={gridClassName}>
         <StatCard
           title="Screenshots"
           value={stats.totalScreenshots}
@@ -195,7 +197,7 @@ export function StatsGrid({ stats, isLoading }: StatsGridProps) {
       <StatCard
         title="Top App"
         value={stats.topApps?.[0]?.appName || 'N/A'}
-        icon={<Camera className="h-4 w-4" />}
+        icon={<Trophy className="h-4 w-4" />}
         description={stats.topApps?.[0] ? `${stats.topApps[0].percentage.toFixed(1)}% of time` : ''}
       />
       </div>

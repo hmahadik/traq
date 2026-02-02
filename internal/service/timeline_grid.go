@@ -21,6 +21,7 @@ type TimelineGridData struct {
 	FileEvents       map[int][]FileEventDisplay                `json:"fileEvents"` // hour -> file events
 	BrowserEvents    map[int][]BrowserEventDisplay             `json:"browserEvents"` // hour -> browser visits
 	AFKBlocks        map[int][]AFKBlock                        `json:"afkBlocks"` // hour -> AFK blocks
+	ActivityStates   []ActivityState                           `json:"activityStates"` // unified activity lane states
 }
 
 // DayStats contains aggregated statistics for a day.
@@ -157,6 +158,19 @@ type AFKBlock struct {
 	PixelHeight     float64 `json:"pixelHeight"`  // Height in pixels
 }
 
+// ActivityState represents a unified activity state block for the Activity lane.
+// States: "active" (focus events), "break" (short gaps), "afk" (explicit AFK events)
+type ActivityState struct {
+	StartTime       int64   `json:"startTime"`
+	EndTime         int64   `json:"endTime"`
+	DurationSeconds int     `json:"durationSeconds"`
+	State           string  `json:"state"` // "active", "break", "afk"
+	HourOffset      int     `json:"hourOffset"`
+	MinuteOffset    int     `json:"minuteOffset"`
+	PixelPosition   float64 `json:"pixelPosition"`
+	PixelHeight     float64 `json:"pixelHeight"`
+}
+
 // TimelineOptions configures timeline data generation.
 type TimelineOptions struct {
 	MinDurationSeconds     int  // Filter out activities shorter than this duration (0 = no filter)
@@ -197,6 +211,156 @@ func groupConsecutiveActivities(blocks []ActivityBlock, gapTolerance int) []Acti
 	grouped = append(grouped, current)
 
 	return grouped
+}
+
+// ============================================================================
+// Activity State Calculation
+// ============================================================================
+
+// calculateActivityStates builds a unified timeline of activity states for the Activity lane.
+// Returns states:
+//   - "active" (merged focus events)
+//   - "break" (gaps between active periods, 1 min to 2 hr)
+//   - "afk" (gaps between active periods > 2 hr)
+//
+// This uses gaps between focus events to determine breaks, matching the DayStats calculation.
+// AFK database events are NOT used - they're idle detector triggers, not actual breaks.
+func (s *TimelineService) calculateActivityStates(
+	focusEvents []*storage.WindowFocusEvent,
+	afkBlocks []AFKBlock, // kept for API compatibility but not used
+	dayStart, dayEnd int64,
+) []ActivityState {
+	const minBreakSeconds = 60   // 1 minute - gaps shorter than this are ignored
+	const maxBreakSeconds = 3600 // 1 hour - gaps longer than this are "afk"
+
+	var states []ActivityState
+
+	// Step 1: Merge adjacent/overlapping focus events into continuous active periods
+	activePeriods := mergeActivePeriods(focusEvents, dayStart, dayEnd)
+
+	if len(activePeriods) == 0 {
+		return states
+	}
+
+	// Step 2: Add active periods and gaps between them
+	for i, period := range activePeriods {
+		// Add the active period
+		states = append(states, ActivityState{
+			StartTime:       period.start,
+			EndTime:         period.end,
+			DurationSeconds: int(period.end - period.start),
+			State:           "active",
+		})
+
+		// Check gap to next period (if there is one)
+		if i < len(activePeriods)-1 {
+			nextPeriod := activePeriods[i+1]
+			gap := nextPeriod.start - period.end
+
+			// Classify gap as break or afk
+			if gap >= minBreakSeconds {
+				state := "break"
+				if gap > int64(maxBreakSeconds) {
+					state = "afk"
+				}
+				states = append(states, ActivityState{
+					StartTime:       period.end,
+					EndTime:         nextPeriod.start,
+					DurationSeconds: int(gap),
+					State:           state,
+				})
+			}
+		}
+	}
+
+	// Step 3: Calculate positioning for each state
+	for i := range states {
+		startTime := time.Unix(states[i].StartTime, 0).In(time.Local)
+		states[i].HourOffset = startTime.Hour()
+		states[i].MinuteOffset = startTime.Minute()
+		states[i].PixelPosition = (float64(startTime.Minute()) / 60.0) * 60.0
+		states[i].PixelHeight = (float64(states[i].DurationSeconds) / 3600.0) * 60.0
+
+		// Ensure minimum visibility (4px)
+		if states[i].PixelHeight < 4 {
+			states[i].PixelHeight = 4
+		}
+	}
+
+	return states
+}
+
+// timePeriod represents a continuous time period.
+type timePeriod struct {
+	start int64
+	end   int64
+}
+
+// mergeActivePeriods consolidates overlapping/adjacent focus events into continuous active periods.
+func mergeActivePeriods(events []*storage.WindowFocusEvent, dayStart, dayEnd int64) []timePeriod {
+	if len(events) == 0 {
+		return nil
+	}
+
+	// Clip events to day boundaries and collect as periods
+	var periods []timePeriod
+	for _, e := range events {
+		start := e.StartTime
+		end := e.EndTime
+
+		// Clip to day boundaries
+		if start < dayStart {
+			start = dayStart
+		}
+		if end > dayEnd {
+			end = dayEnd
+		}
+		if start >= end {
+			continue
+		}
+
+		periods = append(periods, timePeriod{start: start, end: end})
+	}
+
+	if len(periods) == 0 {
+		return nil
+	}
+
+	// Sort by start time
+	sort.Slice(periods, func(i, j int) bool {
+		return periods[i].start < periods[j].start
+	})
+
+	// Merge overlapping/adjacent periods (with 5 minute gap tolerance)
+	// This means small gaps during active work (app switches, bathroom breaks <5min)
+	// are considered part of continuous activity, not separate breaks
+	const gapTolerance = 300 // 5 minutes
+	merged := []timePeriod{periods[0]}
+
+	for i := 1; i < len(periods); i++ {
+		current := &merged[len(merged)-1]
+		next := periods[i]
+
+		// If next starts within gapTolerance of current's end, merge them
+		if next.start <= current.end+gapTolerance {
+			if next.end > current.end {
+				current.end = next.end
+			}
+		} else {
+			merged = append(merged, next)
+		}
+	}
+
+	return merged
+}
+
+// flattenAFKBlocks converts the hour-keyed AFKBlocks map to a flat slice.
+func flattenAFKBlocks(afkBlocks map[int][]AFKBlock) []AFKBlock {
+	var result []AFKBlock
+	for _, blocks := range afkBlocks {
+		result = append(result, blocks...)
+	}
+	return result
 }
 
 // ============================================================================
@@ -282,10 +446,27 @@ func (s *TimelineService) GetTimelineGridDataWithOptions(date string, opts Timel
 		focusEvents = filtered
 	}
 
-	// Fetch top apps
-	topAppsData, err := s.store.GetTopApps(dayStart.Unix(), dayEnd.Unix(), 6)
-	if err != nil {
-		return nil, fmt.Errorf("failed to fetch top apps: %w", err)
+	// Compute top apps from already-fetched focus events with clamped durations.
+	// We avoid store.GetTopApps() because its SQL SUM(duration_seconds) counts
+	// the full event duration even when the event spans outside the day boundary
+	// (e.g., an event from 11:30 PM to 12:30 AM would count 60 min instead of 30).
+	topAppsDurations := make(map[string]float64)
+	for _, evt := range focusEvents {
+		topAppsDurations[evt.AppName] += clampedEventDuration(evt, dayStart.Unix(), dayEnd.Unix())
+	}
+	type appDuration struct {
+		AppName  string
+		Duration float64
+	}
+	topAppsData := make([]appDuration, 0, len(topAppsDurations))
+	for name, dur := range topAppsDurations {
+		topAppsData = append(topAppsData, appDuration{AppName: name, Duration: dur})
+	}
+	sort.Slice(topAppsData, func(i, j int) bool {
+		return topAppsData[i].Duration > topAppsData[j].Duration
+	})
+	if len(topAppsData) > 6 {
+		topAppsData = topAppsData[:6]
 	}
 
 	// Get all unique app names for categorization
@@ -778,6 +959,9 @@ func (s *TimelineService) GetTimelineGridDataWithOptions(date string, opts Timel
 		afkBlocks[hour] = append(afkBlocks[hour], block)
 	}
 
+	// Calculate activity states for the unified Activity lane
+	activityStates := s.calculateActivityStates(focusEvents, flattenAFKBlocks(afkBlocks), dayStart.Unix(), dayEnd.Unix())
+
 	return &TimelineGridData{
 		Date:             date,
 		DayStats:         dayStats,
@@ -790,6 +974,7 @@ func (s *TimelineService) GetTimelineGridDataWithOptions(date string, opts Timel
 		FileEvents:       fileEvents,
 		BrowserEvents:    browserEvents,
 		AFKBlocks:        afkBlocks,
+		ActivityStates:   activityStates,
 	}, nil
 }
 
@@ -906,9 +1091,9 @@ func (s *TimelineService) calculateDayStats(focusEvents []*storage.WindowFocusEv
 		return sortedEvents[i].StartTime < sortedEvents[j].StartTime
 	})
 
-	// Calculate breaks between sessions (v1 logic: gaps 1min-2hr are breaks)
-	const minBreakSeconds = 60    // 1 minute (matches v1)
-	const maxBreakSeconds = 7200  // 2 hours
+	// Calculate breaks between sessions (gaps 1min-1hr are breaks)
+	const minBreakSeconds = 60   // 1 minute
+	const maxBreakSeconds = 3600 // 1 hour - matches Activity lane threshold
 
 	var breakCount int
 	var breakDuration float64
@@ -1038,29 +1223,38 @@ func (s *TimelineService) calculateDayStats(focusEvents []*storage.WindowFocusEv
 		}
 	}
 
-	// Calculate time since last break
-	// Find the most recent AFK end time and calculate time elapsed
+	// Calculate time since last break / last focus streak
+	// This tracks the final focus streak of the day. For today, it represents
+	// "time since last break". For past days, it represents "last focus streak"
+	// (the focus period the user ended the day with).
+	//
+	// We iterate all events and track the current streak using the same gap logic
+	// as Longest Focus (gaps < 5 min don't reset). This gives us the last
+	// contiguous focus period, which is meaningful whether the day ended mid-work
+	// or after a break.
 	timeSinceLastBreak := float64(-1) // -1 means no breaks taken
 	if len(afkEvents) > 0 {
-		// Find the latest AFK event that has ended
-		var latestBreakEnd int64 = 0
-		for _, afk := range afkEvents {
-			if afk.EndTime.Valid && afk.EndTime.Int64 > latestBreakEnd {
-				latestBreakEnd = afk.EndTime.Int64
+		var currentStreak float64
+		var previousStreak float64
+		var streakLastEnd int64
+		for _, event := range sortedEvents {
+			if isOverlappingAFK(event.StartTime, event.EndTime) {
+				continue
 			}
+			if streakLastEnd > 0 && event.StartTime-streakLastEnd >= 300 {
+				// Gap >= 5 min resets the streak, but save the previous value
+				previousStreak = currentStreak
+				currentStreak = 0
+			}
+			currentStreak += event.DurationSeconds
+			streakLastEnd = event.EndTime
 		}
-		if latestBreakEnd > 0 {
-			// Use current time for today, or day end for historical days
-			now := time.Now().Unix()
-			referenceTime := now
-			if now > dayEnd.Unix() {
-				// Historical day - use day end
-				referenceTime = dayEnd.Unix()
-			}
-			timeSinceLastBreak = float64(referenceTime - latestBreakEnd)
-			if timeSinceLastBreak < 0 {
-				timeSinceLastBreak = 0
-			}
+		// Use the current streak if it's non-zero (day ended mid-work),
+		// otherwise fall back to the previous streak (day ended with a break/gap)
+		if currentStreak > 0 {
+			timeSinceLastBreak = currentStreak
+		} else {
+			timeSinceLastBreak = previousStreak
 		}
 	}
 

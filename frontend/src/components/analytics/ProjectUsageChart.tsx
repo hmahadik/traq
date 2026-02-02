@@ -67,8 +67,34 @@ export function ProjectUsageChart({ data, isLoading }: ProjectUsageChartProps) {
               outerRadius={90}
               paddingAngle={2}
               dataKey="value"
-              label={({ name, percentage }) => `${name} (${percentage.toFixed(1)}%)`}
-              labelLine={{ stroke: 'hsl(var(--muted-foreground))', strokeWidth: 1 }}
+              label={({ name, percentage, cx, cy, midAngle, outerRadius, x, y }) => {
+                if (percentage < 5) return null;
+                const RADIAN = Math.PI / 180;
+                const sin = Math.sin(-RADIAN * midAngle);
+                const cos = Math.cos(-RADIAN * midAngle);
+                const textAnchor = cos >= 0 ? 'start' : 'end';
+                return (
+                  <text
+                    x={x}
+                    y={y}
+                    textAnchor={textAnchor}
+                    fill="hsl(var(--muted-foreground))"
+                    fontSize={12}
+                  >
+                    {`${name} (${percentage.toFixed(1)}%)`}
+                  </text>
+                );
+              }}
+              labelLine={({ percentage, ...props }: any) => {
+                if (percentage < 5) return <path />;
+                return (
+                  <path
+                    stroke="hsl(var(--muted-foreground))"
+                    strokeWidth={1}
+                    d={`M${props.points[0].x},${props.points[0].y}L${props.points[1].x},${props.points[1].y}`}
+                  />
+                );
+              }}
             >
               {chartData.map((entry, index) => (
                 <Cell

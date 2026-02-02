@@ -230,82 +230,51 @@ export function useTimelineData({
       }
     }
 
-    // Process Activity periods (inverse of AFK blocks) - show when user was active
-    if (data.dayStats?.daySpan) {
-      const dayStart = data.dayStats.daySpan.startTime;
-      const dayEnd = data.dayStats.daySpan.endTime;
+    // Process Activity states from backend (active, break, afk)
+    // Backend provides unified activity states instead of us computing from AFK blocks
+    if (data.activityStates && data.activityStates.length > 0) {
+      const stateColors: Record<string, string> = {
+        active: '#22c55e', // green-500
+        break: '#f59e0b',  // amber-500
+        afk: '#6b7280',    // gray-500
+      };
 
-      // Collect and sort all AFK blocks
-      const allAfkBlocks = Object.values(data.afkBlocks)
-        .flat()
-        .sort((a, b) => a.startTime - b.startTime);
+      const stateLabels: Record<string, string> = {
+        active: 'Active',
+        break: 'Break',
+        afk: 'AFK',
+      };
 
-      // Calculate activity periods as gaps between AFK periods
-      let currentStart = dayStart;
-      let activityId = 0;
-
-      for (const afk of allAfkBlocks) {
-        // If there's a gap before this AFK period, that's an activity period
-        if (afk.startTime > currentStart) {
-          const activityEnd = afk.startTime;
-          const durationSeconds = activityEnd - currentStart;
-
-          // Only include if duration is at least 60 seconds
-          if (durationSeconds >= 60) {
-            const rowName = 'Activity';
-            const dot: EventDot = {
-              id: `activity-${activityId}`,
-              originalId: activityId,
-              timestamp: new Date(currentStart * 1000),
-              type: 'activity',
-              row: rowName,
-              label: `Active (${Math.round(durationSeconds / 60)}m)`,
-              duration: durationSeconds,
-              color: '#22c55e', // green-500 for activity
-              metadata: { startTime: currentStart, endTime: activityEnd, durationSeconds },
-            };
-            addToRow(rowName, dot);
-            activityId++;
-          }
+      const formatDuration = (seconds: number): string => {
+        if (seconds < 3600) {
+          return `${Math.round(seconds / 60)}m`;
         }
-        // Move past this AFK period
-        currentStart = Math.max(currentStart, afk.endTime);
-      }
+        const hours = Math.floor(seconds / 3600);
+        const mins = Math.round((seconds % 3600) / 60);
+        return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
+      };
 
-      // Add final activity period after last AFK
-      if (currentStart < dayEnd) {
-        const durationSeconds = dayEnd - currentStart;
-        if (durationSeconds >= 60) {
-          const rowName = 'Activity';
-          const dot: EventDot = {
-            id: `activity-${activityId}`,
-            originalId: activityId,
-            timestamp: new Date(currentStart * 1000),
-            type: 'activity',
-            row: rowName,
-            label: `Active (${Math.round(durationSeconds / 60)}m)`,
-            duration: durationSeconds,
-            color: '#22c55e',
-            metadata: { startTime: currentStart, endTime: dayEnd, durationSeconds },
-          };
-          addToRow(rowName, dot);
-        }
-      }
-
-      // If no AFK blocks, the entire day span is active
-      if (allAfkBlocks.length === 0) {
-        const durationSeconds = dayEnd - dayStart;
+      for (let i = 0; i < data.activityStates.length; i++) {
+        const state = data.activityStates[i];
         const rowName = 'Activity';
+        const label = `${stateLabels[state.state] || state.state} (${formatDuration(state.durationSeconds)})`;
+        const color = stateColors[state.state] || stateColors.afk;
+
         const dot: EventDot = {
-          id: 'activity-0',
-          originalId: 0,
-          timestamp: new Date(dayStart * 1000),
+          id: `activity-state-${i}`,
+          originalId: i,
+          timestamp: new Date(state.startTime * 1000),
           type: 'activity',
           row: rowName,
-          label: `Active (${Math.round(durationSeconds / 60)}m)`,
-          duration: durationSeconds,
-          color: '#22c55e',
-          metadata: { startTime: dayStart, endTime: dayEnd, durationSeconds },
+          label,
+          duration: state.durationSeconds,
+          color,
+          metadata: {
+            startTime: state.startTime,
+            endTime: state.endTime,
+            durationSeconds: state.durationSeconds,
+            state: state.state,
+          },
         };
         addToRow(rowName, dot);
       }
