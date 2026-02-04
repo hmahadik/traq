@@ -24,10 +24,10 @@ const (
 
 // Config contains inference configuration
 type Config struct {
-	Engine   Engine
-	Bundled  *BundledConfig
-	Ollama   *OllamaConfig
-	Cloud    *CloudConfig
+	Engine  Engine
+	Bundled *BundledConfig
+	Ollama  *OllamaConfig
+	Cloud   *CloudConfig
 }
 
 // OllamaConfig contains Ollama-specific settings
@@ -46,13 +46,13 @@ type CloudConfig struct {
 
 // SummaryResult contains the generated summary
 type SummaryResult struct {
-	Summary       string
-	Explanation   string
-	Tags          []string
-	Confidence    string
-	ModelUsed     string
-	InferenceMs   int64
-	Projects      []ProjectBreakdown
+	Summary     string
+	Explanation string
+	Tags        []string
+	Confidence  string
+	ModelUsed   string
+	InferenceMs int64
+	Projects    []ProjectBreakdown
 }
 
 // ProjectBreakdown represents time spent on a project within a session.
@@ -96,6 +96,17 @@ func NewService(config *Config) *Service {
 
 // UpdateConfig updates the inference configuration
 func (s *Service) UpdateConfig(config *Config) {
+	var hadBundled bool
+	var bundledRunning bool
+	var prevModelPath string
+	var prevServerPath string
+	if s.bundled != nil {
+		hadBundled = true
+		bundledRunning = s.bundled.IsRunning()
+		prevModelPath = s.bundled.config.ModelPath
+		prevServerPath = s.bundled.config.ServerPath
+	}
+
 	// Stop existing bundled engine if switching away
 	if s.bundled != nil && config.Engine != EngineBundled {
 		s.bundled.Stop()
@@ -114,6 +125,21 @@ func (s *Service) UpdateConfig(config *Config) {
 			}
 		}
 		s.bundled = NewBundledEngine(config.Bundled)
+	} else if config.Engine == EngineBundled && s.bundled != nil {
+		if config.Bundled == nil {
+			serverPath, modelPath := GetDefaultPaths()
+			config.Bundled = &BundledConfig{
+				ServerPath: serverPath,
+				ModelPath:  modelPath,
+			}
+		}
+		if !hadBundled || prevModelPath != config.Bundled.ModelPath || prevServerPath != config.Bundled.ServerPath {
+			s.bundled.Stop()
+			s.bundled = NewBundledEngine(config.Bundled)
+			if bundledRunning {
+				_ = s.bundled.Start()
+			}
+		}
 	}
 }
 
@@ -665,8 +691,8 @@ func (s *Service) callAnthropic(prompt string) (string, error) {
 
 // OpenAI API types
 type openaiRequest struct {
-	Model    string           `json:"model"`
-	Messages []openaiMessage  `json:"messages"`
+	Model    string          `json:"model"`
+	Messages []openaiMessage `json:"messages"`
 }
 
 type openaiMessage struct {

@@ -236,38 +236,74 @@ export function AISettings() {
           {/* Available Models */}
           <div className="space-y-2">
             <label className="text-sm font-medium">Available Models</label>
-            {models?.map((model) => (
-              <div
-                key={model.id}
-                className="flex items-center justify-between rounded-lg border p-3"
-              >
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate">{model.name}</p>
-                  <p className="text-xs text-muted-foreground truncate">
-                    {model.description}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {formatBytes(model.size)}
-                  </p>
-                </div>
-                <div className="ml-3">
-                  {model.downloaded ? (
-                    <span className="text-xs text-green-600 dark:text-green-400">
-                      Downloaded
-                    </span>
-                  ) : (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      disabled={isDownloading}
-                      onClick={() => downloadModel(model.id)}
-                    >
-                      Download
-                    </Button>
-                  )}
-                </div>
-              </div>
-            ))}
+            {models
+              ?.slice()
+              .sort((a, b) => {
+                if (a.downloaded !== b.downloaded) return a.downloaded ? -1 : 1;
+                return a.size - b.size;
+              })
+              .map((model) => {
+                const isActive = inference.bundled.model === model.id;
+                const isRecommended = model.id === 'qwen2.5-3b-q4';
+                return (
+                  <div
+                    key={model.id}
+                    className="flex items-start justify-between rounded-lg border p-3"
+                  >
+                    <div className="flex-1 min-w-0 space-y-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="text-sm font-medium truncate">{model.name}</p>
+                        {isRecommended && (
+                          <span className="rounded-full bg-blue-500/10 px-2 py-0.5 text-[10px] font-medium text-blue-600 dark:text-blue-400">
+                            Recommended
+                          </span>
+                        )}
+                        {isActive && (
+                          <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-600 dark:text-emerald-400">
+                            Active
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {model.description}
+                      </p>
+                      <div className="flex flex-wrap gap-3 text-[11px] text-muted-foreground">
+                        <span>Size: {formatBytes(model.size)}</span>
+                        <span>
+                          Speed: {model.size < 1_000_000_000 ? 'Ultra fast' : model.size < 1_800_000_000 ? 'Fast' : model.size < 2_600_000_000 ? 'Balanced' : 'Thorough'}
+                        </span>
+                        <span>
+                          RAM: {model.size < 1_000_000_000 ? '2-4GB' : model.size < 1_800_000_000 ? '4-6GB' : model.size < 2_600_000_000 ? '6-8GB' : '8-12GB'}
+                        </span>
+                      </div>
+                      {isDownloading && downloadingModelId === model.id && downloadProgress !== null && (
+                        <div className="space-y-1">
+                          <Progress value={downloadProgress} />
+                          <p className="text-xs text-muted-foreground">
+                            Downloading... {downloadProgress}%
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                    <div className="ml-3">
+                      {model.downloaded ? (
+                        <span className="text-xs text-green-600 dark:text-green-400">
+                          Downloaded
+                        </span>
+                      ) : (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={isDownloading}
+                          onClick={() => downloadModel(model.id)}
+                        >
+                          Download
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
           </div>
 
           {/* Status */}

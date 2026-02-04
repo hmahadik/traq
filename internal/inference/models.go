@@ -26,44 +26,36 @@ type ModelInfo struct {
 // AvailableModels returns the list of models that can be used with the bundled engine
 var AvailableModels = []ModelInfo{
 	{
-		ID:          "gemma-2-2b-it-q4",
-		Name:        "Gemma 2 2B (Q4)",
-		Description: "Google's Gemma 2 2B instruction-tuned, quantized to Q4_K_M. Fast and efficient.",
-		Size:        1_500_000_000, // ~1.5GB
-		DownloadURL: "https://huggingface.co/google/gemma-2-2b-it-GGUF/resolve/main/gemma-2-2b-it-q4_k_m.gguf",
-		Filename:    "gemma-2-2b-it-q4_k_m.gguf",
-	},
-	{
-		ID:          "gemma-2-9b-it-q4",
-		Name:        "Gemma 2 9B (Q4)",
-		Description: "Google's Gemma 2 9B instruction-tuned, quantized to Q4_K_M. Better quality, slower.",
-		Size:        5_400_000_000, // ~5.4GB
-		DownloadURL: "https://huggingface.co/google/gemma-2-9b-it-GGUF/resolve/main/gemma-2-9b-it-q4_k_m.gguf",
-		Filename:    "gemma-2-9b-it-q4_k_m.gguf",
-	},
-	{
-		ID:          "phi-3-mini-4k-q4",
-		Name:        "Phi 3 Mini (Q4)",
-		Description: "Microsoft's Phi 3 Mini 4K context, quantized to Q4_K_M. Very compact.",
-		Size:        2_200_000_000, // ~2.2GB
-		DownloadURL: "https://huggingface.co/microsoft/Phi-3-mini-4k-instruct-gguf/resolve/main/Phi-3-mini-4k-instruct-q4.gguf",
-		Filename:    "Phi-3-mini-4k-instruct-q4.gguf",
+		ID:          "qwen2.5-0.5b-q4",
+		Name:        "Qwen 2.5 0.5B (Q4)",
+		Description: "Ultra-lightweight Qwen 2.5 0.5B, Q4_K_M. Fastest option for quick summaries.",
+		Size:        491_400_032, // ~0.49GB
+		DownloadURL: "https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q4_k_m.gguf",
+		Filename:    "qwen2.5-0.5b-instruct-q4_k_m.gguf",
 	},
 	{
 		ID:          "qwen2.5-1.5b-q4",
 		Name:        "Qwen 2.5 1.5B (Q4)",
-		Description: "Alibaba's Qwen 2.5 1.5B, quantized to Q4_K_M. Very fast, good for simple summaries.",
-		Size:        1_100_000_000, // ~1.1GB
+		Description: "Balanced Qwen 2.5 1.5B, Q4_K_M. Fast with solid quality for daily summaries.",
+		Size:        1_117_320_736, // ~1.12GB
 		DownloadURL: "https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/qwen2.5-1.5b-instruct-q4_k_m.gguf",
 		Filename:    "qwen2.5-1.5b-instruct-q4_k_m.gguf",
 	},
 	{
-		ID:          "qwen2.5-7b-q4",
-		Name:        "Qwen 2.5 7B (Q4) ⭐ Recommended",
-		Description: "Alibaba's Qwen 2.5 7B, quantized to Q4_K_M. Excellent instruction-following, great for summaries.",
-		Size:        4_700_000_000, // ~4.7GB
-		DownloadURL: "https://huggingface.co/Qwen/Qwen2.5-7B-Instruct-GGUF/resolve/main/qwen2.5-7b-instruct-q4_k_m.gguf",
-		Filename:    "qwen2.5-7b-instruct-q4_k_m.gguf",
+		ID:          "qwen2.5-3b-q4",
+		Name:        "Qwen 2.5 3B (Q4)",
+		Description: "Qwen 2.5 3B, Q4_K_M. Best quality without huge size or split downloads.",
+		Size:        2_104_932_768, // ~2.10GB
+		DownloadURL: "https://huggingface.co/Qwen/Qwen2.5-3B-Instruct-GGUF/resolve/main/qwen2.5-3b-instruct-q4_k_m.gguf",
+		Filename:    "qwen2.5-3b-instruct-q4_k_m.gguf",
+	},
+	{
+		ID:          "phi-3-mini-4k-q4",
+		Name:        "Phi 3 Mini (Q4)",
+		Description: "Microsoft Phi-3 Mini 4K, Q4. Strong reasoning with compact footprint.",
+		Size:        2_393_231_072, // ~2.39GB
+		DownloadURL: "https://huggingface.co/microsoft/Phi-3-mini-4k-instruct-gguf/resolve/main/Phi-3-mini-4k-instruct-q4.gguf",
+		Filename:    "Phi-3-mini-4k-instruct-q4.gguf",
 	},
 }
 

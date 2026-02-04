@@ -123,6 +123,8 @@ export function Timeline({
   const zoomSyncTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const dragSafetyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isZoomingRef = useRef(false);
+  const zoomRafRef = useRef<number | null>(null);
+  const lastAxisUpdateRef = useRef<number>(0);
 
   // === SCALE REF: Store xScale for use in other effects ===
   const xScaleRef = useRef<d3.ScaleTime<number, number> | null>(null);
@@ -259,6 +261,9 @@ export function Timeline({
       }
       if (dragSafetyTimeoutRef.current) {
         clearTimeout(dragSafetyTimeoutRef.current);
+      }
+      if (zoomRafRef.current) {
+        cancelAnimationFrame(zoomRafRef.current);
       }
       // Reset chart refs on unmount so fresh mount creates structure anew
       chartInitializedRef.current = false;
@@ -630,175 +635,131 @@ export function Timeline({
         // Calculate center timestamp (playhead position)
         const centerTimestamp = newXScale.invert(centerX);
 
-        // === PERFORMANCE: Update refs immediately (no React re-render) ===
         zoomTransformRef.current = transform;
-
-        // Calculate visible time range and playhead - store in refs
         const visibleStart = newXScale.invert(MARGIN.left);
         const visibleEnd = newXScale.invert(width - MARGIN.right);
         visibleTimeRangeRef.current = { start: visibleStart, end: visibleEnd };
 
         playheadTimestampRef.current = centerTimestamp;
 
-        // === DEBOUNCED STATE SYNC: Only update React state after zoom settles ===
-        // This prevents React re-renders during active panning/zooming
-        if (zoomSyncTimeoutRef.current) {
-          clearTimeout(zoomSyncTimeoutRef.current);
+        if (zoomRafRef.current) {
+          cancelAnimationFrame(zoomRafRef.current);
         }
-        zoomSyncTimeoutRef.current = setTimeout(() => {
-          // Sync refs to React state (triggers re-render for UI elements that need it)
-          setCurrentZoom(zoomTransformRef.current);
-          setVisibleTimeRange(visibleTimeRangeRef.current);
-          setPlayheadTimestamp(playheadTimestampRef.current);
-          // Only notify parent if this is a real user interaction, not state restoration
-          if (playheadTimestampRef.current && visibleTimeRangeRef.current && !isRestoringStateRef.current) {
-            onPlayheadChangeRef.current?.(playheadTimestampRef.current, visibleTimeRangeRef.current, zoomTransformRef.current.k);
+        zoomRafRef.current = requestAnimationFrame(() => {
+          const latestTransform = zoomTransformRef.current;
+          const latestScale = latestTransform.rescaleX(currentScale);
+          const latestCenterTimestamp = latestScale.invert(centerX);
+          const latestVisibleStart = latestScale.invert(MARGIN.left);
+          const latestVisibleEnd = latestScale.invert(width - MARGIN.right);
+
+          const now = performance.now();
+          if (now - lastAxisUpdateRef.current > 100) {
+            lastAxisUpdateRef.current = now;
+            const xAxisGroup = svg.select<SVGGElement>('.x-axis');
+            const chartWidth = width - MARGIN.left - MARGIN.right;
+            const numTicks = Math.max(3, Math.floor(chartWidth / 100));
+            xAxisGroup.call(
+              d3.axisTop(latestScale)
+                .ticks(numTicks)
+                .tickFormat((d) => multiScaleFormat(d as Date)) as any
+            );
+            xAxisGroup.select('.domain').attr('stroke', borderColor);
+            xAxisGroup.selectAll('.tick line').attr('stroke', borderColor);
+            xAxisGroup.selectAll('.tick text').attr('fill', mutedForeground).attr('font-size', '11px');
           }
-        }, 150); // 150ms debounce - syncs state after zoom gesture settles
 
-        // Update x-axis with multi-scale formatting (marmelab style)
-        const xAxisGroup = svg.select<SVGGElement>('.x-axis');
-        // Use fixed tick count based on width - D3 auto-picks optimal positions
-        // This ensures legibility at all zoom levels
-        const chartWidth = width - MARGIN.left - MARGIN.right;
-        const numTicks = Math.max(3, Math.floor(chartWidth / 100));
-        xAxisGroup.call(
-          d3.axisTop(newXScale)
-            .ticks(numTicks)
-            .tickFormat((d) => multiScaleFormat(d as Date)) as any
-        );
-        xAxisGroup.select('.domain').attr('stroke', borderColor);
-        xAxisGroup.selectAll('.tick line').attr('stroke', borderColor);
-        xAxisGroup.selectAll('.tick text').attr('fill', mutedForeground).attr('font-size', '11px');
+          svg.select('.grid-lines')
+            .selectAll<SVGLineElement, Date>('line')
+            .attr('x1', (d) => latestScale(d))
+            .attr('x2', (d) => latestScale(d));
 
-        // Update grid lines
-        const gridLines = d3.timeHour.range(timeRange.start, timeRange.end);
-        svg.select('.grid-lines')
-          .selectAll<SVGLineElement, Date>('line')
-          .data(gridLines)
-          .attr('x1', (d) => newXScale(d))
-          .attr('x2', (d) => newXScale(d));
+          svg.select('.day-boundaries')
+            .selectAll<SVGGElement, Date>('.day-boundary')
+            .each(function(d) {
+              const g = d3.select(this);
+              const x = latestScale(d);
+              g.select('line').attr('x1', x).attr('x2', x);
+              g.select('rect').attr('x', x - 45);
+              g.select('text').attr('x', x);
+            });
 
-        // Update day boundary positions
-        svg.select('.day-boundaries')
-          .selectAll<SVGGElement, Date>('.day-boundary')
-          .each(function(d) {
-            const g = d3.select(this);
-            const x = newXScale(d);
-            g.select('line')
-              .attr('x1', x)
-              .attr('x2', x);
-            g.select('rect')
-              .attr('x', x - 45);
-            g.select('text')
-              .attr('x', x);
-          });
+          svg.select('.loading-indicators')
+            .selectAll<SVGRectElement, unknown>('.loading-shimmer-bg')
+            .each(function() {
+              const rect = d3.select(this);
+              const dayStart = new Date(parseFloat(rect.attr('data-day-start') || '0'));
+              if (!isNaN(dayStart.getTime())) {
+                const dayEnd = new Date(dayStart);
+                dayEnd.setDate(dayEnd.getDate() + 1);
+                rect.attr('x', latestScale(dayStart)).attr('width', Math.abs(latestScale(dayEnd) - latestScale(dayStart)));
+              }
+            });
 
-        // Update loading indicator positions
-        svg.select('.loading-indicators')
-          .selectAll<SVGRectElement, unknown>('.loading-shimmer-bg')
-          .each(function() {
-            const rect = d3.select(this);
-            const dayStart = new Date(parseFloat(rect.attr('data-day-start') || '0'));
-            if (!isNaN(dayStart.getTime())) {
-              const dayEnd = new Date(dayStart);
-              dayEnd.setDate(dayEnd.getDate() + 1);
-              const startX = newXScale(dayStart);
-              const endX = newXScale(dayEnd);
-              rect.attr('x', startX).attr('width', Math.abs(endX - startX));
-            }
-          });
+          svg.select('.loading-indicators')
+            .selectAll<SVGLineElement, unknown>('.loading-pulse-line')
+            .each(function() {
+              const line = d3.select(this);
+              const dayStart = new Date(parseFloat(line.attr('data-day-start') || '0'));
+              if (!isNaN(dayStart.getTime())) {
+                const x = latestScale(dayStart);
+                line.attr('x1', x).attr('x2', x);
+              }
+            });
 
-        svg.select('.loading-indicators')
-          .selectAll<SVGLineElement, unknown>('.loading-pulse-line')
-          .each(function() {
-            const line = d3.select(this);
-            const dayStart = new Date(parseFloat(line.attr('data-day-start') || '0'));
-            if (!isNaN(dayStart.getTime())) {
-              const x = newXScale(dayStart);
-              line.attr('x1', x).attr('x2', x);
-            }
-          });
+          svg.selectAll<SVGRectElement, EventDot>('.event-dot')
+            .attr('x', (d) => latestScale(d.timestamp) - BAR_WIDTH / 2);
 
-        // Update dots (rendered as thin rect elements, not circles)
-        svg.selectAll<SVGRectElement, EventDot>('.event-dot')
-          .attr('x', (d) => newXScale(d.timestamp) - BAR_WIDTH / 2);
+          svg.selectAll<SVGRectElement, EventDot>('.event-bar')
+            .attr('x', (d) => latestScale(d.timestamp))
+            .attr('width', (d) => {
+              const endT = d.timestamp.getTime() + ((d.duration || 0) * 1000);
+              const endTime = Math.min(endT, nowTimeRef.current);
+              return Math.max(BAR_MIN_PIXELS, latestScale(new Date(endTime)) - latestScale(d.timestamp));
+            });
 
-        // Update bars - use consistent nowTimeRef to match NOW line position
-        svg.selectAll<SVGRectElement, EventDot>('.event-bar')
-          .attr('x', (d) => newXScale(d.timestamp))
-          .attr('width', (d) => {
-            const startTime = d.timestamp.getTime();
-            const rawEndTime = startTime + ((d.duration || 0) * 1000);
-            // Cap end time at "now" to prevent bars extending into the future
-            // Use nowTimeRef for consistency with NOW line position
-            const endTime = Math.min(rawEndTime, nowTimeRef.current);
-            return Math.max(BAR_MIN_PIXELS, newXScale(new Date(endTime)) - newXScale(d.timestamp));
-          });
+          svg.select('.now-line')
+            .attr('x1', (d: any) => latestScale(d))
+            .attr('x2', (d: any) => latestScale(d));
 
-        // Update now line if exists
-        svg.select('.now-line')
-          .attr('x1', (d: any) => newXScale(d))
-          .attr('x2', (d: any) => newXScale(d));
+          svg.select('.now-text')
+            .attr('x', (d: any) => latestScale(d));
 
-        svg.select('.now-text')
-          .attr('x', (d: any) => newXScale(d));
+          const formatDateLabel = (date: Date): string => {
+            return date.toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' });
+          };
 
-        // Update bottom date labels
-        const formatDateLabel = (date: Date): string => {
-          return date.toLocaleDateString('en-US', {
-            day: 'numeric',
-            month: 'long',
-            year: 'numeric',
-          });
-        };
+          const formatCenterLabel = (date: Date): string => {
+            const dayPart = date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+            const timePart = date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+            return `${dayPart} • ${timePart}`;
+          };
 
-        const formatCenterLabel = (date: Date): string => {
-          const dayPart = date.toLocaleDateString('en-US', {
-            weekday: 'short',
-            month: 'short',
-            day: 'numeric',
-          });
-          const timePart = date.toLocaleTimeString('en-US', {
-            hour: 'numeric',
-            minute: '2-digit',
-            hour12: true,
-          });
-          return `${dayPart} • ${timePart}`;
-        };
-
-        svg.select('.date-label-left')
-          .text(formatDateLabel(visibleStart));
-
-        svg.select('.date-label-right')
-          .text(formatDateLabel(visibleEnd));
-
-        svg.select('.date-label-center')
-          .text(formatCenterLabel(centerTimestamp));
+          svg.select('.date-label-left').text(formatDateLabel(latestVisibleStart));
+          svg.select('.date-label-right').text(formatDateLabel(latestVisibleEnd));
+          svg.select('.date-label-center').text(formatCenterLabel(latestCenterTimestamp));
+        });
       })
       .on('end', () => {
-        // Zoom gesture ended - mark as not zooming and force final state sync
         isZoomingRef.current = false;
+        lastAxisUpdateRef.current = 0;
 
-        // Clear any pending debounce and sync immediately
-        if (zoomSyncTimeoutRef.current) {
-          clearTimeout(zoomSyncTimeoutRef.current);
-          zoomSyncTimeoutRef.current = null;
-        }
-        // Clear drag safety timeout since we properly ended
         if (dragSafetyTimeoutRef.current) {
           clearTimeout(dragSafetyTimeoutRef.current);
           dragSafetyTimeoutRef.current = null;
         }
 
-        // Final sync to React state
-        setCurrentZoom(zoomTransformRef.current);
-        setVisibleTimeRange(visibleTimeRangeRef.current);
-        setPlayheadTimestamp(playheadTimestampRef.current);
-        // Only notify parent if this is a real user interaction, not state restoration
-        if (playheadTimestampRef.current && visibleTimeRangeRef.current && !isRestoringStateRef.current) {
-          onPlayheadChangeRef.current?.(playheadTimestampRef.current, visibleTimeRangeRef.current, zoomTransformRef.current.k);
+        if (zoomSyncTimeoutRef.current) {
+          clearTimeout(zoomSyncTimeoutRef.current);
         }
+        zoomSyncTimeoutRef.current = setTimeout(() => {
+          zoomSyncTimeoutRef.current = null;
+          setCurrentZoom(zoomTransformRef.current);
+          setVisibleTimeRange(visibleTimeRangeRef.current);
+          setPlayheadTimestamp(playheadTimestampRef.current);
+          if (playheadTimestampRef.current && visibleTimeRangeRef.current && !isRestoringStateRef.current) {
+            onPlayheadChangeRef.current?.(playheadTimestampRef.current, visibleTimeRangeRef.current, zoomTransformRef.current.k);
+          }
+        }, 150);
       });
 
       // Store zoom reference
@@ -808,6 +769,7 @@ export function Timeline({
       svg.call(zoom);
 
       // Override wheel behavior to zoom centered on playhead instead of mouse position
+      // PERFORMANCE: No transition on wheel - direct zoom for instant response
       svg.on('wheel.zoom', function(event: WheelEvent) {
         event.preventDefault();
         // Larger zoom steps: 0.75x zoom out, 1.33x zoom in (was 0.9/1.1)
@@ -815,7 +777,8 @@ export function Timeline({
         const svgNode = svg.node();
         if (svgNode && zoomRef.current) {
           // Use ref for chartCenterX to avoid stale closure after resize
-          svg.transition().duration(100).call(
+          // Direct call without transition - prevents stacking animations that kill perf
+          svg.call(
             zoomRef.current.scaleBy as any,
             direction,
             [chartCenterXRef.current, height / 2]

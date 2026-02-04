@@ -111,6 +111,13 @@ func (a *App) startup(ctx context.Context) {
 	a.Timeline = service.NewTimelineService(a.store)
 	a.Screenshots = service.NewScreenshotService(a.store, dataDir)
 	a.Config = service.NewConfigService(a.store, a.platform, nil) // daemon set later
+	a.Config.SetInferenceUpdater(func(cfg *service.Config) {
+		if a.inference == nil {
+			return
+		}
+		inferenceConfig := buildInferenceConfig(cfg)
+		a.inference.UpdateConfig(inferenceConfig)
+	})
 
 	// Initialize daemon with default config
 	daemonConfig := tracker.DefaultDaemonConfig(dataDir)
@@ -578,7 +585,7 @@ func (a *App) GetTopWindows(date string, limit int) ([]*service.WindowUsage, err
 	}
 
 	start := t.Unix()
-	end := t.Add(24 * time.Hour).Unix() - 1
+	end := t.Add(24*time.Hour).Unix() - 1
 
 	return a.Analytics.GetTopWindows(start, end, limit)
 }

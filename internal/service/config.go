@@ -15,9 +15,10 @@ import (
 
 // ConfigService manages application configuration.
 type ConfigService struct {
-	store    *storage.Store
-	platform platform.Platform
-	daemon   *tracker.Daemon
+	store           *storage.Store
+	platform        platform.Platform
+	daemon          *tracker.Daemon
+	updateInference func(*Config)
 }
 
 // NewConfigService creates a new ConfigService.
@@ -27,6 +28,11 @@ func NewConfigService(store *storage.Store, plat platform.Platform, daemon *trac
 		platform: plat,
 		daemon:   daemon,
 	}
+}
+
+// SetInferenceUpdater registers a callback to refresh the inference service after config changes.
+func (s *ConfigService) SetInferenceUpdater(update func(*Config)) {
+	s.updateInference = update
 }
 
 // SetDaemon sets the daemon reference (for late initialization).
@@ -93,9 +99,9 @@ type AIConfig struct {
 
 // UpdateConfig contains auto-update settings.
 type UpdateConfig struct {
-	AutoUpdate        bool `json:"autoUpdate"`        // Default: true
+	AutoUpdate         bool `json:"autoUpdate"`         // Default: true
 	CheckIntervalHours int  `json:"checkIntervalHours"` // Default: 5
-	AFKRestartMinutes int  `json:"afkRestartMinutes"` // Default: 10
+	AFKRestartMinutes  int  `json:"afkRestartMinutes"`  // Default: 10
 }
 
 // IssuesConfig contains issue reporting settings.
@@ -107,10 +113,10 @@ type IssuesConfig struct {
 
 // InferenceConfig contains AI inference settings.
 type InferenceConfig struct {
-	Engine  string                 `json:"engine"` // "bundled", "ollama", "cloud"
+	Engine  string                  `json:"engine"` // "bundled", "ollama", "cloud"
 	Bundled *BundledInferenceConfig `json:"bundled"`
-	Ollama  *OllamaConfig          `json:"ollama"`
-	Cloud   *CloudConfig           `json:"cloud"`
+	Ollama  *OllamaConfig           `json:"ollama"`
+	Cloud   *CloudConfig            `json:"cloud"`
 }
 
 // BundledInferenceConfig contains bundled model settings.
@@ -159,8 +165,8 @@ type DataSourcesConfig struct {
 // ShellConfig contains shell history settings.
 type ShellConfig struct {
 	Enabled         bool     `json:"enabled"`
-	ShellType       string   `json:"shellType"`       // "auto", "bash", "zsh", "fish", "powershell"
-	HistoryPath     string   `json:"historyPath"`     // Custom path to history file (empty = auto-detect)
+	ShellType       string   `json:"shellType"`   // "auto", "bash", "zsh", "fish", "powershell"
+	HistoryPath     string   `json:"historyPath"` // Custom path to history file (empty = auto-detect)
 	ExcludePatterns []string `json:"excludePatterns"`
 }
 
@@ -173,10 +179,10 @@ type GitConfig struct {
 
 // FilesConfig contains file watching settings.
 type FilesConfig struct {
-	Enabled           bool          `json:"enabled"`
-	Watches           []*WatchPath  `json:"watches"`
-	ExcludePatterns   []string      `json:"excludePatterns"`   // Directory patterns to exclude
-	AllowedExtensions []string      `json:"allowedExtensions"` // File extensions to track (empty = all)
+	Enabled           bool         `json:"enabled"`
+	Watches           []*WatchPath `json:"watches"`
+	ExcludePatterns   []string     `json:"excludePatterns"`   // Directory patterns to exclude
+	AllowedExtensions []string     `json:"allowedExtensions"` // File extensions to track (empty = all)
 }
 
 // WatchPath represents a path to watch.
@@ -210,12 +216,12 @@ type SystemConfig struct {
 
 // DaemonStatus represents the current daemon status.
 type DaemonStatus struct {
-	Running         bool   `json:"running"`
-	Paused          bool   `json:"paused"`
-	IsAFK           bool   `json:"isAFK"`
-	SessionID       int64  `json:"sessionId"`
-	SessionDuration int64  `json:"sessionDuration"` // seconds
-	IdleDuration    int64  `json:"idleDuration"`    // seconds
+	Running         bool  `json:"running"`
+	Paused          bool  `json:"paused"`
+	IsAFK           bool  `json:"isAFK"`
+	SessionID       int64 `json:"sessionId"`
+	SessionDuration int64 `json:"sessionDuration"` // seconds
+	IdleDuration    int64 `json:"idleDuration"`    // seconds
 }
 
 // GetConfig returns the current configuration.
@@ -477,6 +483,14 @@ func (s *ConfigService) handleConfigSideEffect(key string, value interface{}) er
 		if err := s.platform.SetAutoStart(enabled); err != nil {
 			return fmt.Errorf("failed to set autostart: %w", err)
 		}
+	case "inference.engine", "inference.bundled.model", "inference.ollama.host", "inference.ollama.model", "inference.cloud.provider", "inference.cloud.apiKey", "inference.cloud.model", "inference.cloud.endpoint":
+		if s.updateInference != nil {
+			config, err := s.GetConfig()
+			if err != nil {
+				return fmt.Errorf("failed to refresh inference config: %w", err)
+			}
+			s.updateInference(config)
+		}
 	}
 	return nil
 }
@@ -523,15 +537,15 @@ func mapToStorageKey(frontendKey string) string {
 		"system.autoStart":    "system.autoStart",
 
 		// Data sources
-		"dataSources.shell.enabled":     "shell.enabled",
-		"dataSources.shell.shellType":   "shell.shellType",
-		"dataSources.shell.historyPath":     "shell.historyPath",
-		"dataSources.shell.excludePatterns": "shell.excludePatterns",
-		"dataSources.git.enabled":           "git.enabled",
-		"dataSources.git.searchPaths":       "git.searchPaths",
-		"dataSources.git.maxDepth":          "git.maxDepth",
-		"dataSources.files.enabled":         "files.enabled",
-		"dataSources.files.excludePatterns": "files.excludePatterns",
+		"dataSources.shell.enabled":            "shell.enabled",
+		"dataSources.shell.shellType":          "shell.shellType",
+		"dataSources.shell.historyPath":        "shell.historyPath",
+		"dataSources.shell.excludePatterns":    "shell.excludePatterns",
+		"dataSources.git.enabled":              "git.enabled",
+		"dataSources.git.searchPaths":          "git.searchPaths",
+		"dataSources.git.maxDepth":             "git.maxDepth",
+		"dataSources.files.enabled":            "files.enabled",
+		"dataSources.files.excludePatterns":    "files.excludePatterns",
 		"dataSources.browser.enabled":          "browser.enabled",
 		"dataSources.browser.browsers":         "browser.browsers",
 		"dataSources.browser.excludedDomains":  "browser.excludedDomains",
@@ -750,8 +764,8 @@ type StorageStats struct {
 	GitCommitCount    int64 `json:"gitCommitCount"`
 	FileEventCount    int64 `json:"fileEventCount"`
 	BrowserVisitCount int64 `json:"browserVisitCount"`
-	DatabaseSize      int64 `json:"databaseSize"`      // bytes
-	ScreenshotsSize   int64 `json:"screenshotsSize"`   // bytes
+	DatabaseSize      int64 `json:"databaseSize"`    // bytes
+	ScreenshotsSize   int64 `json:"screenshotsSize"` // bytes
 }
 
 func (s *ConfigService) getDefaultCaptureConfig() *CaptureConfig {
@@ -819,7 +833,7 @@ func (s *ConfigService) getDefaultInferenceConfig() *InferenceConfig {
 	return &InferenceConfig{
 		Engine: "bundled",
 		Bundled: &BundledInferenceConfig{
-			Model: "gemma-2-2b-it-q4",
+			Model: "qwen2.5-1.5b-q4",
 		},
 		Ollama: &OllamaConfig{
 			Host:  "http://localhost:11434",

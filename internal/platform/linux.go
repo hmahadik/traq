@@ -10,11 +10,21 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
+
+	"github.com/jezek/xgb"
+	"github.com/jezek/xgb/screensaver"
+	"github.com/jezek/xgb/xproto"
 )
 
 // Linux implements Platform for Linux systems.
-type Linux struct{}
+type Linux struct {
+	x11Conn     *xgb.Conn
+	x11Root     xproto.Window
+	x11InitOnce sync.Once
+	x11InitErr  error
+}
 
 // New returns the platform implementation for Linux.
 func New() Platform {
@@ -169,39 +179,47 @@ func (l *Linux) getWindowPID(windowID string) (int, error) {
 	return strconv.Atoi(strings.TrimSpace(string(out)))
 }
 
-// GetLastInputTime returns the time of the last user input.
-func (l *Linux) GetLastInputTime() (time.Time, error) {
-	// Use xprintidle to get idle time in milliseconds
-	cmd := exec.Command("xprintidle")
-	out, err := cmd.Output()
-	if err != nil {
-		// Fall back to reading X11 screensaver info
-		return l.getLastInputTimeXSS()
-	}
+func (l *Linux) initX11() {
+	l.x11InitOnce.Do(func() {
+		conn, err := xgb.NewConn()
+		if err != nil {
+			l.x11InitErr = fmt.Errorf("failed to connect to X11: %w", err)
+			return
+		}
 
-	idleMs, err := strconv.ParseInt(strings.TrimSpace(string(out)), 10, 64)
-	if err != nil {
-		return time.Time{}, err
-	}
+		if err := screensaver.Init(conn); err != nil {
+			conn.Close()
+			l.x11InitErr = fmt.Errorf("failed to init screensaver extension: %w", err)
+			return
+		}
 
-	return time.Now().Add(-time.Duration(idleMs) * time.Millisecond), nil
+		setup := xproto.Setup(conn)
+		l.x11Root = setup.DefaultScreen(conn).Root
+		l.x11Conn = conn
+	})
 }
 
-func (l *Linux) getLastInputTimeXSS() (time.Time, error) {
-	// Fallback using xssstate
-	cmd := exec.Command("xssstate", "-i")
-	out, err := cmd.Output()
-	if err != nil {
-		// Last resort: assume not idle
-		return time.Now(), nil
+// GetLastInputTime returns the time of the last user input.
+func (l *Linux) GetLastInputTime() (time.Time, error) {
+	l.initX11()
+
+	if l.x11Conn != nil {
+		info, err := screensaver.QueryInfo(l.x11Conn, xproto.Drawable(l.x11Root)).Reply()
+		if err == nil {
+			return time.Now().Add(-time.Duration(info.MsSinceUserInput) * time.Millisecond), nil
+		}
 	}
 
-	idleMs, err := strconv.ParseInt(strings.TrimSpace(string(out)), 10, 64)
-	if err != nil {
-		return time.Now(), nil
+	if out, err := exec.Command("xprintidle").Output(); err == nil {
+		if idleMs, err := strconv.ParseInt(strings.TrimSpace(string(out)), 10, 64); err == nil {
+			return time.Now().Add(-time.Duration(idleMs) * time.Millisecond), nil
+		}
 	}
 
-	return time.Now().Add(-time.Duration(idleMs) * time.Millisecond), nil
+	if l.x11InitErr != nil {
+		return time.Time{}, l.x11InitErr
+	}
+	return time.Time{}, fmt.Errorf("unable to detect idle time: X11 screensaver extension unavailable and xprintidle not installed")
 }
 
 // GetShellHistoryPath returns the path to the shell history file.
