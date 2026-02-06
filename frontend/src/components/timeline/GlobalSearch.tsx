@@ -7,7 +7,7 @@ import {
   DropdownMenuContent,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { SearchAllDataSources } from '../../../wailsjs/go/main/App';
+import { api } from '@/api/client';
 import { cn } from '@/lib/utils';
 
 export interface SearchResult {
@@ -31,6 +31,13 @@ export function GlobalSearch({ onNavigateToDate }: GlobalSearchProps) {
   const [results, setResults] = useState<SearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout>>();
+
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, []);
 
   useEffect(() => {
     if (open) {
@@ -49,7 +56,7 @@ export function GlobalSearch({ onNavigateToDate }: GlobalSearchProps) {
 
     setIsSearching(true);
     try {
-      const searchResults = await SearchAllDataSources(searchQuery, 50);
+      const searchResults = await api.search.all(searchQuery, 50);
       setResults(searchResults || []);
     } catch (error) {
       console.error('Search failed:', error);
@@ -62,8 +69,8 @@ export function GlobalSearch({ onNavigateToDate }: GlobalSearchProps) {
   const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     setQuery(value);
-    const timeoutId = setTimeout(() => performSearch(value), 300);
-    return () => clearTimeout(timeoutId);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => performSearch(value), 300);
   }, [performSearch]);
 
   const handleResultClick = useCallback((result: SearchResult) => {

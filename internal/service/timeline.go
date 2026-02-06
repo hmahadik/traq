@@ -2,6 +2,7 @@ package service
 
 import (
 	"sort"
+	"sync"
 	"time"
 
 	"traq/internal/storage"
@@ -107,6 +108,30 @@ type SessionContext struct {
 	GitCommits    []*storage.GitCommit         `json:"gitCommits"`
 	FileEvents    []*storage.FileEvent         `json:"fileEvents"`
 	BrowserVisits []*storage.BrowserVisit      `json:"browserVisits"`
+}
+
+// SessionContextSummary contains session metadata and counts only (no arrays).
+// This is the lightweight alternative to SessionContext for the frontend drawer.
+type SessionContextSummary struct {
+	Session            *storage.Session  `json:"session"`
+	Summary            *storage.Summary  `json:"summary"`
+	ScreenshotCount    int64             `json:"screenshotCount"`
+	FocusEventCount    int64             `json:"focusEventCount"`
+	ShellCommandCount  int64             `json:"shellCommandCount"`
+	GitCommitCount     int64             `json:"gitCommitCount"`
+	FileEventCount     int64             `json:"fileEventCount"`
+	BrowserVisitCount  int64             `json:"browserVisitCount"`
+}
+
+// FocusEventDisplay is the service-layer type for focus events with friendly app names.
+type FocusEventDisplay struct {
+	ID              int64   `json:"id"`
+	WindowTitle     string  `json:"windowTitle"`
+	AppName         string  `json:"appName"`
+	StartTime       int64   `json:"startTime"`
+	EndTime         int64   `json:"endTime"`
+	DurationSeconds float64 `json:"durationSeconds"`
+	SessionID       int64   `json:"sessionId"`
 }
 
 // EntryBlock represents an activity with project assignment for the Entries lane
@@ -235,20 +260,16 @@ func (s *TimelineService) GetScreenshotsForSession(sessionID int64, page, perPag
 		perPage = 20
 	}
 
-	screenshots, err := s.store.GetScreenshotsBySession(sessionID)
+	// Get total count from DB (cheap query)
+	total, err := s.store.CountScreenshotsBySession(sessionID)
 	if err != nil {
 		return nil, err
 	}
 
-	// Convert to display screenshots with friendly app names
-	displayScreenshots := toScreenshotDisplaySlice(screenshots)
-
-	total := int64(len(displayScreenshots))
 	totalPages := int((total + int64(perPage) - 1) / int64(perPage))
+	offset := (page - 1) * perPage
 
-	start := (page - 1) * perPage
-	end := start + perPage
-	if start >= len(displayScreenshots) {
+	if int64(offset) >= total {
 		return &ScreenshotPage{
 			Screenshots: []*ScreenshotDisplay{},
 			Total:       total,
@@ -258,12 +279,15 @@ func (s *TimelineService) GetScreenshotsForSession(sessionID int64, page, perPag
 			HasMore:     false,
 		}, nil
 	}
-	if end > len(displayScreenshots) {
-		end = len(displayScreenshots)
+
+	// Only fetch the page we need from DB
+	screenshots, err := s.store.GetScreenshotsBySessionPaginated(sessionID, perPage, offset)
+	if err != nil {
+		return nil, err
 	}
 
 	return &ScreenshotPage{
-		Screenshots: displayScreenshots[start:end],
+		Screenshots: toScreenshotDisplaySlice(screenshots),
 		Total:       total,
 		Page:        page,
 		PerPage:     perPage,
@@ -341,6 +365,84 @@ func (s *TimelineService) GetSessionContext(sessionID int64) (*SessionContext, e
 	ctx.BrowserVisits, _ = s.store.GetBrowserVisitsBySession(sessionID)
 
 	return ctx, nil
+}
+
+// GetSessionContextSummary returns lightweight session context with counts only.
+// This avoids loading all arrays upfront - tabs lazy-load their data individually.
+func (s *TimelineService) GetSessionContextSummary(sessionID int64) (*SessionContextSummary, error) {
+	session, err := s.store.GetSession(sessionID)
+	if err != nil {
+		return nil, err
+	}
+
+	ctx := &SessionContextSummary{
+		Session: session,
+	}
+
+	// Get summary
+	if session.SummaryID.Valid {
+		ctx.Summary, _ = s.store.GetSummary(session.SummaryID.Int64)
+	}
+
+	// Run all count queries in parallel
+	var wg sync.WaitGroup
+	wg.Add(6)
+
+	go func() { defer wg.Done(); ctx.ScreenshotCount, _ = s.store.CountScreenshotsBySession(sessionID) }()
+	go func() { defer wg.Done(); ctx.FocusEventCount, _ = s.store.CountFocusEventsBySession(sessionID) }()
+	go func() { defer wg.Done(); ctx.ShellCommandCount, _ = s.store.CountShellCommandsBySession(sessionID) }()
+	go func() { defer wg.Done(); ctx.GitCommitCount, _ = s.store.CountGitCommitsBySession(sessionID) }()
+	go func() { defer wg.Done(); ctx.FileEventCount, _ = s.store.CountFileEventsBySession(sessionID) }()
+	go func() { defer wg.Done(); ctx.BrowserVisitCount, _ = s.store.CountBrowserVisitsBySession(sessionID) }()
+
+	wg.Wait()
+
+	return ctx, nil
+}
+
+// GetFocusEventsForSession returns focus events for a session with friendly app names.
+func (s *TimelineService) GetFocusEventsForSession(sessionID int64) ([]*FocusEventDisplay, error) {
+	events, err := s.store.GetWindowFocusEventsBySession(sessionID)
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]*FocusEventDisplay, len(events))
+	for i, e := range events {
+		d := &FocusEventDisplay{
+			ID:              e.ID,
+			WindowTitle:     e.WindowTitle,
+			AppName:         GetFriendlyAppName(e.AppName),
+			StartTime:       e.StartTime,
+			EndTime:         e.EndTime,
+			DurationSeconds: e.DurationSeconds,
+		}
+		if e.SessionID.Valid {
+			d.SessionID = e.SessionID.Int64
+		}
+		result[i] = d
+	}
+	return result, nil
+}
+
+// GetShellCommandsForSession returns shell commands for a session.
+func (s *TimelineService) GetShellCommandsForSession(sessionID int64) ([]*storage.ShellCommand, error) {
+	return s.store.GetShellCommandsBySession(sessionID)
+}
+
+// GetGitCommitsForSession returns git commits for a session.
+func (s *TimelineService) GetGitCommitsForSession(sessionID int64) ([]*storage.GitCommit, error) {
+	return s.store.GetGitCommitsBySession(sessionID)
+}
+
+// GetFileEventsForSession returns file events for a session.
+func (s *TimelineService) GetFileEventsForSession(sessionID int64) ([]*storage.FileEvent, error) {
+	return s.store.GetFileEventsBySession(sessionID)
+}
+
+// GetBrowserVisitsForSession returns browser visits for a session.
+func (s *TimelineService) GetBrowserVisitsForSession(sessionID int64) ([]*storage.BrowserVisit, error) {
+	return s.store.GetBrowserVisitsBySession(sessionID)
 }
 
 // GetRecentSessions returns the most recent sessions.

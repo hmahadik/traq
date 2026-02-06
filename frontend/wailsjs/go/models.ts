@@ -1378,6 +1378,30 @@ export namespace service {
 	}
 	
 	
+	export class FocusEventDisplay {
+	    id: number;
+	    windowTitle: string;
+	    appName: string;
+	    startTime: number;
+	    endTime: number;
+	    durationSeconds: number;
+	    sessionId: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new FocusEventDisplay(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.windowTitle = source["windowTitle"];
+	        this.appName = source["appName"];
+	        this.startTime = source["startTime"];
+	        this.endTime = source["endTime"];
+	        this.durationSeconds = source["durationSeconds"];
+	        this.sessionId = source["sessionId"];
+	    }
+	}
 	
 	export class GitEventDisplay {
 	    id: number;
@@ -1807,30 +1831,30 @@ export namespace service {
 	        this.appName = source["appName"];
 	    }
 	}
-	export class SessionContext {
+	export class SessionContextSummary {
 	    session?: storage.Session;
 	    summary?: storage.Summary;
-	    screenshots: storage.Screenshot[];
-	    focusEvents: storage.WindowFocusEvent[];
-	    shellCommands: storage.ShellCommand[];
-	    gitCommits: storage.GitCommit[];
-	    fileEvents: storage.FileEvent[];
-	    browserVisits: storage.BrowserVisit[];
+	    screenshotCount: number;
+	    focusEventCount: number;
+	    shellCommandCount: number;
+	    gitCommitCount: number;
+	    fileEventCount: number;
+	    browserVisitCount: number;
 	
 	    static createFrom(source: any = {}) {
-	        return new SessionContext(source);
+	        return new SessionContextSummary(source);
 	    }
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.session = this.convertValues(source["session"], storage.Session);
 	        this.summary = this.convertValues(source["summary"], storage.Summary);
-	        this.screenshots = this.convertValues(source["screenshots"], storage.Screenshot);
-	        this.focusEvents = this.convertValues(source["focusEvents"], storage.WindowFocusEvent);
-	        this.shellCommands = this.convertValues(source["shellCommands"], storage.ShellCommand);
-	        this.gitCommits = this.convertValues(source["gitCommits"], storage.GitCommit);
-	        this.fileEvents = this.convertValues(source["fileEvents"], storage.FileEvent);
-	        this.browserVisits = this.convertValues(source["browserVisits"], storage.BrowserVisit);
+	        this.screenshotCount = source["screenshotCount"];
+	        this.focusEventCount = source["focusEventCount"];
+	        this.shellCommandCount = source["shellCommandCount"];
+	        this.gitCommitCount = source["gitCommitCount"];
+	        this.fileEventCount = source["fileEventCount"];
+	        this.browserVisitCount = source["browserVisitCount"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

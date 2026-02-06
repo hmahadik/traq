@@ -108,6 +108,8 @@ export function GetAvailableModels():Promise<Array<inference.ModelInfo>>;
 
 export function GetAvailableMonitors():Promise<Array<tracker.MonitorInfo>>;
 
+export function GetBrowserVisitsForSession(arg1:number):Promise<Array<storage.BrowserVisit>>;
+
 export function GetBundledStatus():Promise<inference.BundledStatus>;
 
 export function GetCalendarHeatmap(arg1:number,arg2:number):Promise<service.CalendarData>;
@@ -136,9 +138,15 @@ export function GetEntriesForDate(arg1:string):Promise<Array<service.EntryBlock>
 
 export function GetFileAllowedExtensions():Promise<Array<string>>;
 
+export function GetFileEventsForSession(arg1:number):Promise<Array<storage.FileEvent>>;
+
 export function GetFocusDistribution(arg1:string):Promise<Array<service.HourlyFocus>>;
 
 export function GetFocusEventByID(arg1:number):Promise<storage.WindowFocusEvent>;
+
+export function GetFocusEventsForSession(arg1:number):Promise<Array<service.FocusEventDisplay>>;
+
+export function GetGitCommitsForSession(arg1:number):Promise<Array<storage.GitCommit>>;
 
 export function GetHierarchicalSummary(arg1:string,arg2:string):Promise<storage.HierarchicalSummary>;
 
@@ -200,9 +208,11 @@ export function GetScreenshotsForSession(arg1:number,arg2:number,arg3:number):Pr
 
 export function GetServerStatus():Promise<inference.ServerDownloadStatus>;
 
-export function GetSessionContext(arg1:number):Promise<service.SessionContext>;
+export function GetSessionContextSummary(arg1:number):Promise<service.SessionContextSummary>;
 
 export function GetSessionsForDate(arg1:string):Promise<Array<service.SessionSummary>>;
+
+export function GetShellCommandsForSession(arg1:number):Promise<Array<storage.ShellCommand>>;
 
 export function GetStorageStats():Promise<service.StorageStats>;
 

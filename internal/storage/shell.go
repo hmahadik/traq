@@ -84,6 +84,13 @@ func (s *Store) CommandExists(timestamp int64, command string) (bool, error) {
 	return exists, err
 }
 
+// CountShellCommandsBySession returns the count of shell commands for a session.
+func (s *Store) CountShellCommandsBySession(sessionID int64) (int64, error) {
+	var count int64
+	err := s.db.QueryRow("SELECT COUNT(*) FROM shell_commands WHERE session_id = ?", sessionID).Scan(&count)
+	return count, err
+}
+
 // CountShellCommands returns the total number of shell commands.
 func (s *Store) CountShellCommands() (int64, error) {
 	var count int64
@@ -109,6 +116,24 @@ func (s *Store) GetAllShellCommands() ([]*ShellCommand, error) {
 		ORDER BY timestamp DESC`)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query all shell commands: %w", err)
+	}
+	defer rows.Close()
+
+	return scanShellCommands(rows)
+}
+
+// SearchShellCommands searches shell commands by command text using SQL LIKE.
+func (s *Store) SearchShellCommands(query string, limit int) ([]*ShellCommand, error) {
+	likeQuery := "%" + query + "%"
+	rows, err := s.db.Query(`
+		SELECT id, timestamp, command, shell_type, working_directory,
+		       exit_code, duration_seconds, hostname, session_id, created_at
+		FROM shell_commands
+		WHERE command LIKE ?
+		ORDER BY timestamp DESC
+		LIMIT ?`, likeQuery, limit)
+	if err != nil {
+		return nil, fmt.Errorf("failed to search shell commands: %w", err)
 	}
 	defer rows.Close()
 

@@ -4,6 +4,7 @@ package platform
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -100,7 +101,9 @@ func (l *Linux) GetActiveWindow() (*WindowInfo, error) {
 }
 
 func (l *Linux) getActiveWindowID() (string, error) {
-	cmd := exec.Command("xdotool", "getactivewindow")
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "xdotool", "getactivewindow")
 	out, err := cmd.Output()
 	if err != nil {
 		return "", err
@@ -109,7 +112,9 @@ func (l *Linux) getActiveWindowID() (string, error) {
 }
 
 func (l *Linux) getWindowTitle(windowID string) (string, error) {
-	cmd := exec.Command("xdotool", "getwindowname", windowID)
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "xdotool", "getwindowname", windowID)
 	out, err := cmd.Output()
 	if err != nil {
 		return "", err
@@ -118,7 +123,9 @@ func (l *Linux) getWindowTitle(windowID string) (string, error) {
 }
 
 func (l *Linux) getWindowClass(windowID string) (appName, class string, err error) {
-	cmd := exec.Command("xprop", "-id", windowID, "WM_CLASS")
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "xprop", "-id", windowID, "WM_CLASS")
 	out, err := cmd.Output()
 	if err != nil {
 		return "", "", err
@@ -147,7 +154,9 @@ func (l *Linux) getWindowClass(windowID string) (appName, class string, err erro
 }
 
 func (l *Linux) getWindowGeometry(windowID string) (x, y, w, h int, err error) {
-	cmd := exec.Command("xdotool", "getwindowgeometry", "--shell", windowID)
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "xdotool", "getwindowgeometry", "--shell", windowID)
 	out, err := cmd.Output()
 	if err != nil {
 		return 0, 0, 0, 0, err
@@ -171,7 +180,9 @@ func (l *Linux) getWindowGeometry(windowID string) (x, y, w, h int, err error) {
 }
 
 func (l *Linux) getWindowPID(windowID string) (int, error) {
-	cmd := exec.Command("xdotool", "getwindowpid", windowID)
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "xdotool", "getwindowpid", windowID)
 	out, err := cmd.Output()
 	if err != nil {
 		return 0, err

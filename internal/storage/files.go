@@ -116,6 +116,13 @@ func (s *Store) GetFileEventStats(start, end int64) (map[string]int64, error) {
 	return stats, rows.Err()
 }
 
+// CountFileEventsBySession returns the count of file events for a session.
+func (s *Store) CountFileEventsBySession(sessionID int64) (int64, error) {
+	var count int64
+	err := s.db.QueryRow("SELECT COUNT(*) FROM file_events WHERE session_id = ?", sessionID).Scan(&count)
+	return count, err
+}
+
 // CountFileEvents returns the total number of file events.
 func (s *Store) CountFileEvents() (int64, error) {
 	var count int64
@@ -132,6 +139,24 @@ func (s *Store) GetAllFileEvents() ([]*FileEvent, error) {
 		ORDER BY timestamp DESC`)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query all file events: %w", err)
+	}
+	defer rows.Close()
+
+	return scanFileEvents(rows)
+}
+
+// SearchFileEvents searches file events by name or path using SQL LIKE.
+func (s *Store) SearchFileEvents(query string, limit int) ([]*FileEvent, error) {
+	likeQuery := "%" + query + "%"
+	rows, err := s.db.Query(`
+		SELECT id, timestamp, event_type, file_path, file_name, directory,
+		       file_extension, file_size_bytes, watch_category, old_path, session_id, created_at
+		FROM file_events
+		WHERE file_name LIKE ? OR file_path LIKE ?
+		ORDER BY timestamp DESC
+		LIMIT ?`, likeQuery, likeQuery, limit)
+	if err != nil {
+		return nil, fmt.Errorf("failed to search file events: %w", err)
 	}
 	defer rows.Close()
 

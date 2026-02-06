@@ -14,32 +14,42 @@ import {
 } from '@/pages';
 
 // Custom focus detection for Wails webkit views
-// The default browser focus events don't fire reliably in embedded webkit
+// Debounced to prevent refetch storms on rapid alt-tab cycles
 focusManager.setEventListener((handleFocus) => {
-  const onFocus = () => handleFocus(true);
-  const onBlur = () => handleFocus(false);
-  const onVisibilityChange = () => handleFocus(document.visibilityState === 'visible');
+  let focusTimeout: ReturnType<typeof setTimeout>;
 
-  // Listen to multiple events to catch focus in webkit
-  window.addEventListener('focus', onFocus, false);
+  const debouncedFocus = () => {
+    clearTimeout(focusTimeout);
+    focusTimeout = setTimeout(() => handleFocus(true), 1000);
+  };
+  const onBlur = () => {
+    clearTimeout(focusTimeout);
+    handleFocus(false);
+  };
+  const onVisibilityChange = () => {
+    if (document.visibilityState === 'visible') {
+      debouncedFocus();
+    } else {
+      onBlur();
+    }
+  };
+
+  window.addEventListener('focus', debouncedFocus, false);
   window.addEventListener('blur', onBlur, false);
   document.addEventListener('visibilitychange', onVisibilityChange, false);
 
-  // Also check on mouse enter - catches webkit edge cases
-  document.addEventListener('mouseenter', onFocus, false);
-
   return () => {
-    window.removeEventListener('focus', onFocus);
+    clearTimeout(focusTimeout);
+    window.removeEventListener('focus', debouncedFocus);
     window.removeEventListener('blur', onBlur);
     document.removeEventListener('visibilitychange', onVisibilityChange);
-    document.removeEventListener('mouseenter', onFocus);
   };
 });
 
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 30_000, // 30 seconds
+      staleTime: 60_000, // 60 seconds
       refetchOnWindowFocus: true,
       retry: 1,
     },

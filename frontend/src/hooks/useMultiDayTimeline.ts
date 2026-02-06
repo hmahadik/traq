@@ -116,22 +116,22 @@ export function useMultiDayTimeline(initialDate: string) {
   }, [allPossibleDates, centerDate, daysNeeded]);
 
   // Pre-allocate 7 day hooks (React requires consistent hook calls)
-  // Pass empty string for unused slots - the hook handles this gracefully
-  const day0 = useTimelineGridData(allPossibleDates[0] || '');
-  const day1 = useTimelineGridData(allPossibleDates[1] || '');
-  const day2 = useTimelineGridData(allPossibleDates[2] || '');
-  const day3 = useTimelineGridData(allPossibleDates[3] || '');
-  const day4 = useTimelineGridData(allPossibleDates[4] || '');
-  const day5 = useTimelineGridData(allPossibleDates[5] || '');
-  const day6 = useTimelineGridData(allPossibleDates[6] || '');
+  // Only enable fetches for dates that are actually needed based on zoom level
+  const day0 = useTimelineGridData(allPossibleDates[0] || '', { enabled: !!allPossibleDates[0] && datesToLoad.includes(allPossibleDates[0]) });
+  const day1 = useTimelineGridData(allPossibleDates[1] || '', { enabled: !!allPossibleDates[1] && datesToLoad.includes(allPossibleDates[1]) });
+  const day2 = useTimelineGridData(allPossibleDates[2] || '', { enabled: !!allPossibleDates[2] && datesToLoad.includes(allPossibleDates[2]) });
+  const day3 = useTimelineGridData(allPossibleDates[3] || '', { enabled: !!allPossibleDates[3] && datesToLoad.includes(allPossibleDates[3]) });
+  const day4 = useTimelineGridData(allPossibleDates[4] || '', { enabled: !!allPossibleDates[4] && datesToLoad.includes(allPossibleDates[4]) });
+  const day5 = useTimelineGridData(allPossibleDates[5] || '', { enabled: !!allPossibleDates[5] && datesToLoad.includes(allPossibleDates[5]) });
+  const day6 = useTimelineGridData(allPossibleDates[6] || '', { enabled: !!allPossibleDates[6] && datesToLoad.includes(allPossibleDates[6]) });
 
-  const screenshots0 = useScreenshotsForDate(allPossibleDates[0] || '');
-  const screenshots1 = useScreenshotsForDate(allPossibleDates[1] || '');
-  const screenshots2 = useScreenshotsForDate(allPossibleDates[2] || '');
-  const screenshots3 = useScreenshotsForDate(allPossibleDates[3] || '');
-  const screenshots4 = useScreenshotsForDate(allPossibleDates[4] || '');
-  const screenshots5 = useScreenshotsForDate(allPossibleDates[5] || '');
-  const screenshots6 = useScreenshotsForDate(allPossibleDates[6] || '');
+  const screenshots0 = useScreenshotsForDate(allPossibleDates[0] || '', { enabled: !!allPossibleDates[0] && datesToLoad.includes(allPossibleDates[0]) });
+  const screenshots1 = useScreenshotsForDate(allPossibleDates[1] || '', { enabled: !!allPossibleDates[1] && datesToLoad.includes(allPossibleDates[1]) });
+  const screenshots2 = useScreenshotsForDate(allPossibleDates[2] || '', { enabled: !!allPossibleDates[2] && datesToLoad.includes(allPossibleDates[2]) });
+  const screenshots3 = useScreenshotsForDate(allPossibleDates[3] || '', { enabled: !!allPossibleDates[3] && datesToLoad.includes(allPossibleDates[3]) });
+  const screenshots4 = useScreenshotsForDate(allPossibleDates[4] || '', { enabled: !!allPossibleDates[4] && datesToLoad.includes(allPossibleDates[4]) });
+  const screenshots5 = useScreenshotsForDate(allPossibleDates[5] || '', { enabled: !!allPossibleDates[5] && datesToLoad.includes(allPossibleDates[5]) });
+  const screenshots6 = useScreenshotsForDate(allPossibleDates[6] || '', { enabled: !!allPossibleDates[6] && datesToLoad.includes(allPossibleDates[6]) });
 
   // Bundle all day data for easy access
   const allDayData = useMemo(() => [

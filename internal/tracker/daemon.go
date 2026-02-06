@@ -63,6 +63,7 @@ type Daemon struct {
 	running         bool
 	paused          bool
 	stopCh          chan struct{}
+	wg              sync.WaitGroup
 	mu              sync.RWMutex
 	lastDHash       string
 	currentAFKID    int64 // Track ongoing AFK event ID
@@ -155,6 +156,7 @@ func (d *Daemon) Start() error {
 		d.files.Start()
 	}
 
+	d.wg.Add(1)
 	go d.run()
 	return nil
 }
@@ -169,6 +171,9 @@ func (d *Daemon) Stop() error {
 	d.mu.Unlock()
 
 	close(d.stopCh)
+
+	// Wait for run() goroutine to exit before cleanup
+	d.wg.Wait()
 
 	// Stop file tracker (flushes buffered events)
 	if d.files != nil {
@@ -243,6 +248,8 @@ type DaemonStatus struct {
 }
 
 func (d *Daemon) run() {
+	defer d.wg.Done()
+
 	// Recover from panics and report to Sentry
 	defer func() {
 		if r := recover(); r != nil {

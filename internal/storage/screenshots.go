@@ -79,6 +79,25 @@ func (s *Store) GetScreenshots(start, end int64) ([]*Screenshot, error) {
 	return scanScreenshots(rows)
 }
 
+// SearchScreenshots searches screenshots by window title or app name using SQL LIKE.
+func (s *Store) SearchScreenshots(query string, limit int) ([]*Screenshot, error) {
+	likeQuery := "%" + query + "%"
+	rows, err := s.db.Query(`
+		SELECT id, timestamp, filepath, dhash, window_title, app_name, window_class, process_pid,
+		       window_x, window_y, window_width, window_height,
+		       monitor_name, monitor_width, monitor_height, session_id, created_at
+		FROM screenshots
+		WHERE window_title LIKE ? OR app_name LIKE ?
+		ORDER BY timestamp DESC
+		LIMIT ?`, likeQuery, likeQuery, limit)
+	if err != nil {
+		return nil, fmt.Errorf("failed to search screenshots: %w", err)
+	}
+	defer rows.Close()
+
+	return scanScreenshots(rows)
+}
+
 // GetScreenshotsBySession retrieves all screenshots for a session.
 func (s *Store) GetScreenshotsBySession(sessionID int64) ([]*Screenshot, error) {
 	rows, err := s.db.Query(`
@@ -115,6 +134,31 @@ func (s *Store) CountScreenshots() (int64, error) {
 // GetScreenshotsByTimeRange retrieves screenshots within a time range.
 func (s *Store) GetScreenshotsByTimeRange(start, end int64) ([]*Screenshot, error) {
 	return s.GetScreenshots(start, end)
+}
+
+// CountScreenshotsBySession returns the count of screenshots for a session.
+func (s *Store) CountScreenshotsBySession(sessionID int64) (int64, error) {
+	var count int64
+	err := s.db.QueryRow("SELECT COUNT(*) FROM screenshots WHERE session_id = ?", sessionID).Scan(&count)
+	return count, err
+}
+
+// GetScreenshotsBySessionPaginated retrieves screenshots for a session with LIMIT/OFFSET.
+func (s *Store) GetScreenshotsBySessionPaginated(sessionID int64, limit, offset int) ([]*Screenshot, error) {
+	rows, err := s.db.Query(`
+		SELECT id, timestamp, filepath, dhash, window_title, app_name, window_class, process_pid,
+		       window_x, window_y, window_width, window_height,
+		       monitor_name, monitor_width, monitor_height, session_id, created_at
+		FROM screenshots
+		WHERE session_id = ?
+		ORDER BY timestamp ASC
+		LIMIT ? OFFSET ?`, sessionID, limit, offset)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query paginated screenshots: %w", err)
+	}
+	defer rows.Close()
+
+	return scanScreenshots(rows)
 }
 
 // CountScreenshotsByTimeRange returns the count of screenshots in a time range.

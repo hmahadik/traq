@@ -687,13 +687,55 @@ func (a *App) GetScreenshotsForDate(date string) ([]*service.ScreenshotDisplay, 
 	return a.Timeline.GetScreenshotsForDate(date)
 }
 
-// GetSessionContext returns all context for a session.
-func (a *App) GetSessionContext(sessionID int64) (*service.SessionContext, error) {
-	// Return empty context for not-ready state or invalid session ID
+// GetSessionContextSummary returns lightweight session context with counts only.
+// Use this instead of GetSessionContext when you only need counts for tab badges.
+// Note: GetSessionContext is kept as an internal Go method (used by reports.go)
+// but is no longer exposed as a Wails binding to prevent frontend misuse.
+func (a *App) GetSessionContextSummary(sessionID int64) (*service.SessionContextSummary, error) {
 	if a == nil || !a.ready || a.Timeline == nil || sessionID <= 0 {
-		return &service.SessionContext{}, nil
+		return &service.SessionContextSummary{}, nil
 	}
-	return a.Timeline.GetSessionContext(sessionID)
+	return a.Timeline.GetSessionContextSummary(sessionID)
+}
+
+// GetFocusEventsForSession returns focus events for a session with friendly app names.
+func (a *App) GetFocusEventsForSession(sessionID int64) ([]*service.FocusEventDisplay, error) {
+	if a.Timeline == nil {
+		return nil, nil
+	}
+	return a.Timeline.GetFocusEventsForSession(sessionID)
+}
+
+// GetShellCommandsForSession returns shell commands for a session.
+func (a *App) GetShellCommandsForSession(sessionID int64) ([]*storage.ShellCommand, error) {
+	if a.Timeline == nil {
+		return nil, nil
+	}
+	return a.Timeline.GetShellCommandsForSession(sessionID)
+}
+
+// GetGitCommitsForSession returns git commits for a session.
+func (a *App) GetGitCommitsForSession(sessionID int64) ([]*storage.GitCommit, error) {
+	if a.Timeline == nil {
+		return nil, nil
+	}
+	return a.Timeline.GetGitCommitsForSession(sessionID)
+}
+
+// GetFileEventsForSession returns file events for a session.
+func (a *App) GetFileEventsForSession(sessionID int64) ([]*storage.FileEvent, error) {
+	if a.Timeline == nil {
+		return nil, nil
+	}
+	return a.Timeline.GetFileEventsForSession(sessionID)
+}
+
+// GetBrowserVisitsForSession returns browser visits for a session.
+func (a *App) GetBrowserVisitsForSession(sessionID int64) ([]*storage.BrowserVisit, error) {
+	if a.Timeline == nil {
+		return nil, nil
+	}
+	return a.Timeline.GetBrowserVisitsForSession(sessionID)
 }
 
 // GetRecentSessions returns the most recent sessions.

@@ -219,6 +219,13 @@ func (s *Store) CommitExists(commitHash string, repoID int64) (bool, error) {
 	return exists, err
 }
 
+// CountGitCommitsBySession returns the count of git commits for a session.
+func (s *Store) CountGitCommitsBySession(sessionID int64) (int64, error) {
+	var count int64
+	err := s.db.QueryRow("SELECT COUNT(*) FROM git_commits WHERE session_id = ?", sessionID).Scan(&count)
+	return count, err
+}
+
 // CountGitCommits returns the total number of git commits.
 func (s *Store) CountGitCommits() (int64, error) {
 	var count int64
@@ -246,6 +253,26 @@ func (s *Store) GetAllGitCommits() ([]*GitCommit, error) {
 		ORDER BY timestamp DESC`)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query all git commits: %w", err)
+	}
+	defer rows.Close()
+
+	return scanGitCommits(rows)
+}
+
+// SearchGitCommits searches git commits by message or hash using SQL LIKE.
+func (s *Store) SearchGitCommits(query string, limit int) ([]*GitCommit, error) {
+	likeQuery := "%" + query + "%"
+	rows, err := s.db.Query(`
+		SELECT id, timestamp, commit_hash, short_hash, repository_id, branch,
+		       message, message_subject, files_changed, insertions, deletions,
+		       author_name, author_email, is_merge, session_id, created_at,
+		       project_id, project_confidence, project_source
+		FROM git_commits
+		WHERE message LIKE ? OR commit_hash LIKE ?
+		ORDER BY timestamp DESC
+		LIMIT ?`, likeQuery, likeQuery, limit)
+	if err != nil {
+		return nil, fmt.Errorf("failed to search git commits: %w", err)
 	}
 	defer rows.Close()
 

@@ -254,7 +254,7 @@ export function useSessionsForDate(date: string) {
   return useQuery({
     queryKey: queryKeys.timeline.sessions(date),
     queryFn: () => api.timeline.getSessionsForDate(date),
-    staleTime: 30_000, // 30 seconds
+    staleTime: 60_000, // 60 seconds
   });
 }
 
@@ -288,11 +288,12 @@ export function useScreenshotsForDate(date: string, options?: { enabled?: boolea
   });
 }
 
-export function useTimelineGridData(date: string) {
+export function useTimelineGridData(date: string, options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: queryKeys.timeline.gridData(date),
     queryFn: () => api.timeline.getTimelineGridData(date),
-    staleTime: 30_000, // 30 seconds
+    staleTime: 120_000, // 2 minutes - grid data changes slowly
+    enabled: options?.enabled !== false && !!date,
   });
 }
 
@@ -300,17 +301,62 @@ export function useWeekTimelineData(startDate: string, enabled = true) {
   return useQuery({
     queryKey: queryKeys.timeline.weekGridData(startDate),
     queryFn: () => api.timeline.getWeekTimelineData(startDate),
-    staleTime: 30_000, // 30 seconds
+    staleTime: 120_000, // 2 minutes - grid data changes slowly
     enabled,
   });
 }
 
-export function useSessionContext(sessionId: number) {
+export function useSessionContextSummary(sessionId: number) {
   return useQuery({
-    queryKey: queryKeys.timeline.context(sessionId),
-    queryFn: () => api.timeline.getSessionContext(sessionId),
-    staleTime: 30_000,
-    enabled: sessionId > 0, // Don't fetch for invalid session IDs
+    queryKey: ['timeline', 'contextSummary', sessionId] as const,
+    queryFn: () => api.timeline.getSessionContextSummary(sessionId),
+    staleTime: 60_000,
+    enabled: sessionId > 0,
+  });
+}
+
+export function useFocusEventsForSession(sessionId: number, options?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: ['timeline', 'focusEvents', sessionId] as const,
+    queryFn: () => api.timeline.getFocusEventsForSession(sessionId),
+    staleTime: 60_000,
+    enabled: (options?.enabled ?? true) && sessionId > 0,
+  });
+}
+
+export function useShellCommandsForSession(sessionId: number, options?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: ['timeline', 'shellCommands', sessionId] as const,
+    queryFn: () => api.timeline.getShellCommandsForSession(sessionId),
+    staleTime: 60_000,
+    enabled: (options?.enabled ?? true) && sessionId > 0,
+  });
+}
+
+export function useGitCommitsForSession(sessionId: number, options?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: ['timeline', 'gitCommits', sessionId] as const,
+    queryFn: () => api.timeline.getGitCommitsForSession(sessionId),
+    staleTime: 60_000,
+    enabled: (options?.enabled ?? true) && sessionId > 0,
+  });
+}
+
+export function useFileEventsForSession(sessionId: number, options?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: ['timeline', 'fileEvents', sessionId] as const,
+    queryFn: () => api.timeline.getFileEventsForSession(sessionId),
+    staleTime: 60_000,
+    enabled: (options?.enabled ?? true) && sessionId > 0,
+  });
+}
+
+export function useBrowserVisitsForSession(sessionId: number, options?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: ['timeline', 'browserVisits', sessionId] as const,
+    queryFn: () => api.timeline.getBrowserVisitsForSession(sessionId),
+    staleTime: 60_000,
+    enabled: (options?.enabled ?? true) && sessionId > 0,
   });
 }
 

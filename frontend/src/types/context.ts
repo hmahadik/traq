@@ -13,6 +13,27 @@ export interface SessionContext {
   browserVisits: BrowserVisit[];
 }
 
+export interface SessionContextSummary {
+  session: Session;
+  summary: Summary | null;
+  screenshotCount: number;
+  focusEventCount: number;
+  shellCommandCount: number;
+  gitCommitCount: number;
+  fileEventCount: number;
+  browserVisitCount: number;
+}
+
+export interface FocusEventDisplay {
+  id: number;
+  windowTitle: string;
+  appName: string;
+  startTime: number;
+  endTime: number;
+  durationSeconds: number;
+  sessionId: number;
+}
+
 export interface ShellCommand {
   id: number;
   timestamp: number;

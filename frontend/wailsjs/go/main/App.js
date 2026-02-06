@@ -206,6 +206,10 @@ export function GetAvailableMonitors() {
   return window['go']['main']['App']['GetAvailableMonitors']();
 }
 
+export function GetBrowserVisitsForSession(arg1) {
+  return window['go']['main']['App']['GetBrowserVisitsForSession'](arg1);
+}
+
 export function GetBundledStatus() {
   return window['go']['main']['App']['GetBundledStatus']();
 }
@@ -262,12 +266,24 @@ export function GetFileAllowedExtensions() {
   return window['go']['main']['App']['GetFileAllowedExtensions']();
 }
 
+export function GetFileEventsForSession(arg1) {
+  return window['go']['main']['App']['GetFileEventsForSession'](arg1);
+}
+
 export function GetFocusDistribution(arg1) {
   return window['go']['main']['App']['GetFocusDistribution'](arg1);
 }
 
 export function GetFocusEventByID(arg1) {
   return window['go']['main']['App']['GetFocusEventByID'](arg1);
+}
+
+export function GetFocusEventsForSession(arg1) {
+  return window['go']['main']['App']['GetFocusEventsForSession'](arg1);
+}
+
+export function GetGitCommitsForSession(arg1) {
+  return window['go']['main']['App']['GetGitCommitsForSession'](arg1);
 }
 
 export function GetHierarchicalSummary(arg1, arg2) {
@@ -390,12 +406,16 @@ export function GetServerStatus() {
   return window['go']['main']['App']['GetServerStatus']();
 }
 
-export function GetSessionContext(arg1) {
-  return window['go']['main']['App']['GetSessionContext'](arg1);
+export function GetSessionContextSummary(arg1) {
+  return window['go']['main']['App']['GetSessionContextSummary'](arg1);
 }
 
 export function GetSessionsForDate(arg1) {
   return window['go']['main']['App']['GetSessionsForDate'](arg1);
+}
+
+export function GetShellCommandsForSession(arg1) {
+  return window['go']['main']['App']['GetShellCommandsForSession'](arg1);
 }
 
 export function GetStorageStats() {

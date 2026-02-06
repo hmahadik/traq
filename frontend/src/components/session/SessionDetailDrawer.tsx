@@ -7,7 +7,19 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
-import { useSessionContext, useScreenshotsForSession, useRegenerateSummary, useDeleteSummary, useDeleteSession, useDeleteScreenshot } from '@/api/hooks';
+import {
+  useSessionContextSummary,
+  useScreenshotsForSession,
+  useFocusEventsForSession,
+  useShellCommandsForSession,
+  useGitCommitsForSession,
+  useFileEventsForSession,
+  useBrowserVisitsForSession,
+  useRegenerateSummary,
+  useDeleteSummary,
+  useDeleteSession,
+  useDeleteScreenshot,
+} from '@/api/hooks';
 import { formatTimeRange, formatDuration, formatTimestamp, getNullableInt, getNullableString, isNullableValid } from '@/lib/utils';
 import { Terminal, GitCommit, FileText, Globe, RefreshCw, Trash2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Screenshot } from '@/components/common/Screenshot';
@@ -22,7 +34,8 @@ interface SessionDetailDrawerProps {
 }
 
 export function SessionDetailDrawer({ open, onOpenChange, sessionId }: SessionDetailDrawerProps) {
-  const { data: context, isLoading, refetch } = useSessionContext(sessionId || 0);
+  // Lightweight summary with counts only (no arrays loaded)
+  const { data: context, isLoading, refetch } = useSessionContextSummary(sessionId || 0);
   const regenerateMutation = useRegenerateSummary();
   const deleteSummaryMutation = useDeleteSummary();
   const deleteMutation = useDeleteSession();
@@ -38,6 +51,22 @@ export function SessionDetailDrawer({ open, onOpenChange, sessionId }: SessionDe
     screenshotPage,
     screenshotsPerPage
   );
+
+  // Track active tab for lazy loading
+  const [activeTab, setActiveTab] = useState('focus');
+
+  // Lazy-loaded tab data - only fetches when tab is selected
+  const { data: focusEvents } = useFocusEventsForSession(sessionId || 0, { enabled: activeTab === 'focus' });
+  const { data: shellCommands } = useShellCommandsForSession(sessionId || 0, { enabled: activeTab === 'shell' });
+  const { data: gitCommits } = useGitCommitsForSession(sessionId || 0, { enabled: activeTab === 'git' });
+  const { data: fileEvents } = useFileEventsForSession(sessionId || 0, { enabled: activeTab === 'files' });
+  const { data: browserVisits } = useBrowserVisitsForSession(sessionId || 0, { enabled: activeTab === 'browser' });
+
+  const safeFocusEvents = focusEvents || [];
+  const safeShellCommands = shellCommands || [];
+  const safeGitCommits = gitCommits || [];
+  const safeFileEvents = fileEvents || [];
+  const safeBrowserVisits = browserVisits || [];
 
   const handleRegenerateSummary = async () => {
     if (!sessionId) return;
@@ -115,12 +144,6 @@ export function SessionDetailDrawer({ open, onOpenChange, sessionId }: SessionDe
 
   const session = context?.session;
   const summary = context?.summary;
-  const safeScreenshots = context?.screenshots || [];
-  const safeFocusEvents = context?.focusEvents || [];
-  const safeShellCommands = context?.shellCommands || [];
-  const safeGitCommits = context?.gitCommits || [];
-  const safeFileEvents = context?.fileEvents || [];
-  const safeBrowserVisits = context?.browserVisits || [];
 
   return (
     <>
@@ -382,7 +405,7 @@ export function SessionDetailDrawer({ open, onOpenChange, sessionId }: SessionDe
                 <Card>
                   <CardHeader>
                     <div className="flex items-center justify-between">
-                      <CardTitle>Screenshots ({screenshotData?.total ?? safeScreenshots.length})</CardTitle>
+                      <CardTitle>Screenshots ({screenshotData?.total ?? context?.screenshotCount ?? 0})</CardTitle>
                       <div className="flex items-center gap-4">
                         <div className="flex items-center gap-2">
                           <span className="text-sm text-muted-foreground">Per page:</span>
@@ -432,7 +455,7 @@ export function SessionDetailDrawer({ open, onOpenChange, sessionId }: SessionDe
                       </div>
                     ) : (
                       <div className="grid grid-cols-4 gap-2">
-                        {(screenshotData?.screenshots ?? safeScreenshots).map((screenshot) => (
+                        {(screenshotData?.screenshots ?? []).map((screenshot) => (
                           <Screenshot
                             key={screenshot.id}
                             screenshot={screenshot}
@@ -447,19 +470,19 @@ export function SessionDetailDrawer({ open, onOpenChange, sessionId }: SessionDe
                   </CardContent>
                 </Card>
 
-                {/* Activity Tabs */}
+                {/* Activity Tabs - lazy loaded */}
                 <Card>
                   <CardHeader>
                     <CardTitle>Activity</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <Tabs defaultValue="focus">
+                    <Tabs value={activeTab} onValueChange={setActiveTab}>
                       <TabsList>
-                        <TabsTrigger value="focus">Focus ({safeFocusEvents.length})</TabsTrigger>
-                        <TabsTrigger value="shell">Shell ({safeShellCommands.length})</TabsTrigger>
-                        <TabsTrigger value="git">Git ({safeGitCommits.length})</TabsTrigger>
-                        <TabsTrigger value="files">Files ({safeFileEvents.length})</TabsTrigger>
-                        <TabsTrigger value="browser">Browser ({safeBrowserVisits.length})</TabsTrigger>
+                        <TabsTrigger value="focus">Focus ({context?.focusEventCount ?? 0})</TabsTrigger>
+                        <TabsTrigger value="shell">Shell ({context?.shellCommandCount ?? 0})</TabsTrigger>
+                        <TabsTrigger value="git">Git ({context?.gitCommitCount ?? 0})</TabsTrigger>
+                        <TabsTrigger value="files">Files ({context?.fileEventCount ?? 0})</TabsTrigger>
+                        <TabsTrigger value="browser">Browser ({context?.browserVisitCount ?? 0})</TabsTrigger>
                       </TabsList>
 
                       <TabsContent value="focus" className="mt-4">

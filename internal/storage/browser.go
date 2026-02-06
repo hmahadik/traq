@@ -141,6 +141,13 @@ func (s *Store) GetLastVisitTimestamp(browser string) (int64, error) {
 	return timestamp.Int64, nil
 }
 
+// CountBrowserVisitsBySession returns the count of browser visits for a session.
+func (s *Store) CountBrowserVisitsBySession(sessionID int64) (int64, error) {
+	var count int64
+	err := s.db.QueryRow("SELECT COUNT(*) FROM browser_history WHERE session_id = ?", sessionID).Scan(&count)
+	return count, err
+}
+
 // CountBrowserVisits returns the total number of browser visits.
 func (s *Store) CountBrowserVisits() (int64, error) {
 	var count int64
@@ -166,6 +173,24 @@ func (s *Store) GetAllBrowserVisits() ([]*BrowserVisit, error) {
 		ORDER BY timestamp DESC`)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query all browser visits: %w", err)
+	}
+	defer rows.Close()
+
+	return scanBrowserVisits(rows)
+}
+
+// SearchBrowserVisits searches browser visits by title or URL using SQL LIKE.
+func (s *Store) SearchBrowserVisits(query string, limit int) ([]*BrowserVisit, error) {
+	likeQuery := "%" + query + "%"
+	rows, err := s.db.Query(`
+		SELECT id, timestamp, url, title, domain, browser, visit_duration_seconds,
+		       transition_type, session_id, created_at
+		FROM browser_history
+		WHERE title LIKE ? OR url LIKE ?
+		ORDER BY timestamp DESC
+		LIMIT ?`, likeQuery, likeQuery, limit)
+	if err != nil {
+		return nil, fmt.Errorf("failed to search browser visits: %w", err)
 	}
 	defer rows.Close()
 

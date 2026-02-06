@@ -334,10 +334,35 @@ export const timeline = {
     return withRetry(() => App.GetScreenshotsForDate(date));
   },
 
-  getSessionContext: async (sessionId: number) => {
+  getSessionContextSummary: async (sessionId: number) => {
     if (isMockMode()) return mockData.getSessionContext(sessionId);
     await waitForReady();
-    return withRetry(() => App.GetSessionContext(sessionId));
+    return withRetry(() => App.GetSessionContextSummary(sessionId));
+  },
+
+  getFocusEventsForSession: async (sessionId: number) => {
+    await waitForReady();
+    return withRetry(() => App.GetFocusEventsForSession(sessionId));
+  },
+
+  getShellCommandsForSession: async (sessionId: number) => {
+    await waitForReady();
+    return withRetry(() => App.GetShellCommandsForSession(sessionId));
+  },
+
+  getGitCommitsForSession: async (sessionId: number) => {
+    await waitForReady();
+    return withRetry(() => App.GetGitCommitsForSession(sessionId));
+  },
+
+  getFileEventsForSession: async (sessionId: number) => {
+    await waitForReady();
+    return withRetry(() => App.GetFileEventsForSession(sessionId));
+  },
+
+  getBrowserVisitsForSession: async (sessionId: number) => {
+    await waitForReady();
+    return withRetry(() => App.GetBrowserVisitsForSession(sessionId));
   },
 
   getTimelineGridData: async (date: string) => {
@@ -1194,6 +1219,17 @@ export const issues = {
   },
 };
 
+/**
+ * Search API
+ */
+const search = {
+  all: async (query: string, maxResults: number = 50) => {
+    if (isMockMode()) return [];
+    await waitForReady();
+    return withRetry(() => App.SearchAllDataSources(query, maxResults));
+  },
+};
+
 // Unified API export
 export const api = {
   analytics,
@@ -1216,4 +1252,5 @@ export const api = {
   hierarchicalSummaries,
   issues,
   projects,
+  search,
 };

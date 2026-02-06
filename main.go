@@ -122,15 +122,25 @@ func main() {
 			// Now that app is initialized, set the data directory
 			handler.dataDir = app.platform.DataDir()
 
+			// Marshal systray window operations to the main thread via Wails events.
+			// Systray callbacks run on a separate goroutine, but Wails runtime methods
+			// (WindowShow, WindowSetAlwaysOnTop, Quit) are NOT goroutine-safe on Linux/GTK.
+			runtime.EventsOn(wailsCtx, "systray:show", func(optionalData ...interface{}) {
+				runtime.WindowShow(wailsCtx)
+				runtime.WindowSetAlwaysOnTop(wailsCtx, true)
+				runtime.WindowSetAlwaysOnTop(wailsCtx, false)
+			})
+			runtime.EventsOn(wailsCtx, "systray:quit", func(optionalData ...interface{}) {
+				runtime.Quit(wailsCtx)
+			})
+
 			// Initialize and start system tray
 			sysTray = tray.New(tray.Config{
 				OnShowWindow: func() {
-					runtime.WindowShow(wailsCtx)
-					runtime.WindowSetAlwaysOnTop(wailsCtx, true)
-					runtime.WindowSetAlwaysOnTop(wailsCtx, false)
+					runtime.EventsEmit(wailsCtx, "systray:show")
 				},
 				OnQuit: func() {
-					runtime.Quit(wailsCtx)
+					runtime.EventsEmit(wailsCtx, "systray:quit")
 				},
 				OnPause: func() {
 					app.PauseCapture()

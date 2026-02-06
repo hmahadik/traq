@@ -135,6 +135,13 @@ func (s *Store) GetWindowFocusEventsBySession(sessionID int64) ([]*WindowFocusEv
 	return s.GetFocusEventsBySession(sessionID)
 }
 
+// CountFocusEventsBySession returns the count of focus events for a session.
+func (s *Store) CountFocusEventsBySession(sessionID int64) (int64, error) {
+	var count int64
+	err := s.db.QueryRow("SELECT COUNT(*) FROM window_focus_events WHERE session_id = ?", sessionID).Scan(&count)
+	return count, err
+}
+
 // GetFocusEventByID retrieves a single focus event by ID.
 func (s *Store) GetFocusEventByID(id int64) (*WindowFocusEvent, error) {
 	event := &WindowFocusEvent{}
