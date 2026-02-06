@@ -535,8 +535,13 @@ export function Timeline({
     // Create/recreate zoom behavior when needed - use refs in handlers to avoid stale closures
     let zoom = zoomRef.current;
     if (shouldRecreateZoom) {
+      // Cap zoom-out so at most 3 days are visible (prevents freezing)
+      const totalDomainMs = timeRange.end.getTime() - timeRange.start.getTime();
+      const maxVisibleMs = 3 * 24 * 60 * 60 * 1000; // 3 days
+      const minScale = Math.max(1, totalDomainMs / maxVisibleMs);
+
       zoom = d3.zoom<SVGSVGElement, unknown>()
-        .scaleExtent([0.5, 1440])
+        .scaleExtent([minScale, 1440])
         .extent([[MARGIN.left, 0], [width - MARGIN.right, height]])
         // Constrain panning: playhead can't go before data start or past "now"
         .constrain((transform, _extent, _translateExtent) => {
@@ -597,8 +602,8 @@ export function Timeline({
         })
       // Center zoom on the playhead (center of chart) instead of mouse position
       .wheelDelta((event) => {
-        // Standard wheel delta calculation
-        return -event.deltaY * (event.deltaMode === 1 ? 0.05 : event.deltaMode ? 1 : 0.002);
+        // Halved multipliers for smoother, more granular zoom stepping
+        return -event.deltaY * (event.deltaMode === 1 ? 0.025 : event.deltaMode ? 1 : 0.001);
       })
       .on('start', () => {
         // Mark that we're actively zooming - prevents unnecessary React re-renders

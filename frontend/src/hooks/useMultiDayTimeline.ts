@@ -54,20 +54,17 @@ function dateToEndOfDay(dateStr: string): Date {
   return new Date(year, month - 1, day, 23, 59, 59);
 }
 
-// Calculate how many days to load based on zoom level
-// k=1 is default (24h visible), k<1 is zoomed out
-// Uses thresholds with hysteresis to prevent oscillation
-function getDaysToLoadCount(zoomLevel: number): number {
-  if (zoomLevel >= 0.9) return 3;      // Normal: center ± 1
-  if (zoomLevel >= 0.4) return 5;      // ~48h visible: center ± 2
-  return 7;                             // ~96h+ visible: center ± 3
+// Always load 3 days (center ± 1). More days cause freezing from excessive
+// D3 rendering and backend calls. The zoom scaleExtent in Timeline.tsx
+// prevents zooming out beyond 3 days visible.
+function getDaysToLoadCount(_zoomLevel: number): number {
+  return 3;
 }
 
-// Get the "bucket" for zoom level to detect meaningful changes
-function getZoomBucket(zoomLevel: number): number {
-  if (zoomLevel >= 0.9) return 3;
-  if (zoomLevel >= 0.4) return 5;
-  return 7;
+// Single bucket since we always load 3 days. Kept as a function for the
+// bucket-change detection in updateCenterFromPlayhead.
+function getZoomBucket(_zoomLevel: number): number {
+  return 3;
 }
 
 export function useMultiDayTimeline(initialDate: string) {
