@@ -112,14 +112,20 @@ function shouldRenderAsBar(
 
 // Pixel-level deduplication: collapse events at the same pixel+row to one element.
 // At wide zoom, this reduces DOM elements from O(total_events) to O(pixels x rows).
+// Bug #8 fix: includes end pixel for bars so events with different visual extents
+// aren't collapsed (a 5-min and 2-hour bar at the same start pixel both survive).
 function deduplicateByPixel(
   events: EventDot[],
   scale: d3.ScaleTime<number, number>
 ): EventDot[] {
   const seen = new Set<string>();
   return events.filter(event => {
-    const px = Math.round(scale(event.timestamp));
-    const key = `${event.row}:${px}`;
+    const startPx = Math.round(scale(event.timestamp));
+    // For bars, include end pixel in key; for dots, endPx === startPx
+    const endPx = event.endTimeMs
+      ? Math.round(scale(event.endTimeMs))
+      : startPx;
+    const key = `${event.row}:${startPx}:${endPx}`;
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
@@ -235,6 +241,8 @@ export function Timeline({
 
   // === TRACKING REFS: Detect when to recreate zoom ===
   const prevDimensionsRef = useRef({ width: 0, height: 0 });
+  // Bug #9 fix: live dimensions ref for zoom handler (avoids stale closure on < 10px resizes)
+  const dimensionsRef = useRef(dimensions);
   const prevTimeRangeRef = useRef<{ start: number; end: number } | null>(null);
 
   // Counter to skip callbacks during internal state restoration (prevents feedback loops).
@@ -570,7 +578,9 @@ export function Timeline({
         // Calculate height based on fixed row height
         const numRows = timelineData?.rows.length || 1;
         const calculatedHeight = MARGIN.top + MARGIN.bottom + numRows * rowHeight;
-        setDimensions({ width, height: calculatedHeight });
+        const newDims = { width, height: calculatedHeight };
+        dimensionsRef.current = newDims; // Bug #9 fix: sync ref immediately
+        setDimensions(newDims);
       }
     });
 
@@ -699,8 +709,10 @@ export function Timeline({
       const centerTimestamp = newXScale.invert(centerX);
 
       zoomTransformRef.current = transform;
+      // Bug #9 fix: read width from ref instead of stale closure
+      const liveWidth = dimensionsRef.current.width;
       const visibleStart = newXScale.invert(MARGIN.left);
-      const visibleEnd = newXScale.invert(width - MARGIN.right);
+      const visibleEnd = newXScale.invert(liveWidth - MARGIN.right);
       visibleTimeRangeRef.current = { start: visibleStart, end: visibleEnd };
 
       playheadTimestampRef.current = centerTimestamp;
@@ -711,15 +723,17 @@ export function Timeline({
       zoomRafRef.current = requestAnimationFrame(() => {
         const latestTransform = zoomTransformRef.current;
         const latestScale = latestTransform.rescaleX(currentScale);
+        // Bug #9 fix: use live dimensions from ref
+        const rafWidth = dimensionsRef.current.width;
         const latestCenterTimestamp = latestScale.invert(centerX);
         const latestVisibleStart = latestScale.invert(MARGIN.left);
-        const latestVisibleEnd = latestScale.invert(width - MARGIN.right);
+        const latestVisibleEnd = latestScale.invert(rafWidth - MARGIN.right);
 
         const now = performance.now();
         if (now - lastAxisUpdateRef.current > 100) {
           lastAxisUpdateRef.current = now;
           const xAxisGroup = svg.select<SVGGElement>('.x-axis');
-          const chartWidth = width - MARGIN.left - MARGIN.right;
+          const chartWidth = rafWidth - MARGIN.left - MARGIN.right;
           const numTicks = Math.max(3, Math.floor(chartWidth / 100));
           xAxisGroup.call(
             d3.axisTop(latestScale)
@@ -845,7 +859,7 @@ export function Timeline({
         svg.call(
           zoomRef.current.scaleBy as any,
           direction,
-          [chartCenterXRef.current, height / 2]
+          [chartCenterXRef.current, dimensionsRef.current.height / 2]
         );
       }
     });
@@ -1553,10 +1567,11 @@ export function Timeline({
     const { height } = dimensions;
     const { timeRange } = timelineData;
     const baseScale = xScaleRef.current;
-    // Use zoomed scale for correct positioning when zoomed in (Bug 4 fix).
-    // Without this, shimmers appear at the unzoomed position.
+    // Use zoomed scale for correct positioning when zoomed in.
+    // Bug #25 fix: always use transform when it exists (k===1 with translation
+    // is still a different scale than base). Same pattern as Bug #11 fix.
     const zoomTransform = zoomTransformRef.current;
-    const xScale = (zoomTransform && zoomTransform.k !== 1)
+    const xScale = zoomTransform
       ? zoomTransform.rescaleX(baseScale)
       : baseScale;
     const chartGroup = svg.select<SVGGElement>('.chart-group');

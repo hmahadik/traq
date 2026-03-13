@@ -129,6 +129,9 @@ export function useMultiDayTimeline(initialDate: string) {
   // Always generate 7 dates (max window) but only use what we need
   const allPossibleDates = useMemo(() => {
     const today = getDateString(new Date());
+    // Bug #26 fix: add lower bound — don't query for dates before 2020
+    // (no data can exist before the app was created)
+    const minDate = '2020-01-01';
     return [
       addDays(centerDate, -3),
       addDays(centerDate, -2),
@@ -137,7 +140,7 @@ export function useMultiDayTimeline(initialDate: string) {
       addDays(centerDate, 1),
       addDays(centerDate, 2),
       addDays(centerDate, 3),
-    ].filter(d => d <= today);
+    ].filter(d => d >= minDate && d <= today);
   }, [centerDate]);
 
   // Determine how many days we actually need based on zoom

@@ -44,14 +44,18 @@ export function useMultiDayTimelineData({
     const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 
     // Helper to cap duration at "now" for today's events
+    // Bug #31 fix: returns undefined (not 0) when capped duration would be 0,
+    // since 0 is falsy and makes endTimeMs undefined downstream, causing
+    // a bar to flicker to a dot at the current second.
     const capDuration = (dateStr: string, startTimeSec: number, durationSec: number | undefined): number | undefined => {
       if (!durationSec) return durationSec;
       // Only cap for today's events
       if (dateStr !== todayStr) return durationSec;
       const endTimeSec = startTimeSec + durationSec;
       if (endTimeSec > nowTimestamp) {
-        // Cap at now
-        return Math.max(0, nowTimestamp - startTimeSec);
+        const capped = nowTimestamp - startTimeSec;
+        // If capped to 0 or negative, return undefined (render as dot, not zero-width bar)
+        return capped > 0 ? capped : undefined;
       }
       return durationSec;
     };
@@ -63,6 +67,9 @@ export function useMultiDayTimelineData({
 
     const allEvents: EventDot[] = [];
     const rowMap = new Map<string, EventDot[]>();
+    // Bug #30 fix: track seen event IDs to prevent duplicates when backend
+    // buckets long activities into multiple hourlyGrid hours
+    const seenEventIds = new Set<string>();
     // Track normalized names to display names mapping
     const normalizedToDisplay = new Map<string, string>();
 
@@ -117,6 +124,12 @@ export function useMultiDayTimelineData({
               // Skip events that start in the future (shouldn't happen, but defensive)
               if (isInFuture(activity.startTime)) continue;
 
+              // Bug #30 fix: skip if we've already processed this activity
+              // (backend may bucket long activities into multiple hours)
+              const activityKey = makeEventKey('activity', activity.id);
+              if (seenEventIds.has(activityKey)) continue;
+              seenEventIds.add(activityKey);
+
               // When collapsed, all activities go to "In Focus" row
               // When expanded, each app gets its own row
               const rowName = collapseActivityRows
@@ -154,6 +167,10 @@ export function useMultiDayTimelineData({
             // Skip events that are in the future
             if (isInFuture(event.timestamp)) continue;
 
+            const gitKey = makeEventKey('git', event.id);
+            if (seenEventIds.has(gitKey)) continue;
+            seenEventIds.add(gitKey);
+
             const rowName = 'Git';
             const dot: EventDot = {
               id: makeEventKey('git', event.id),
@@ -176,6 +193,10 @@ export function useMultiDayTimelineData({
           for (const event of hourEvents) {
             // Skip events that start in the future
             if (isInFuture(event.timestamp)) continue;
+
+            const shellKey = makeEventKey('shell', event.id);
+            if (seenEventIds.has(shellKey)) continue;
+            seenEventIds.add(shellKey);
 
             const rowName = 'Shell';
             const shellDur = capDuration(dateStr, event.timestamp, event.durationSeconds);
@@ -203,6 +224,10 @@ export function useMultiDayTimelineData({
             // Skip events that start in the future
             if (isInFuture(event.timestamp)) continue;
 
+            const browserKey = makeEventKey('browser', event.id);
+            if (seenEventIds.has(browserKey)) continue;
+            seenEventIds.add(browserKey);
+
             const rowName = event.browser || 'Browser';
             const browserDur = capDuration(dateStr, event.timestamp, event.visitDurationSeconds);
             const dot: EventDot = {
@@ -228,6 +253,10 @@ export function useMultiDayTimelineData({
           for (const event of hourEvents) {
             // Skip events that start in the future
             if (isInFuture(event.timestamp)) continue;
+
+            const fileKey = makeEventKey('file', event.id);
+            if (seenEventIds.has(fileKey)) continue;
+            seenEventIds.add(fileKey);
 
             const rowName = 'Files';
             const dot: EventDot = {
