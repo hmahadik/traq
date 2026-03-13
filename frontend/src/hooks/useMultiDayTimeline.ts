@@ -125,12 +125,15 @@ export function useMultiDayTimeline(initialDate: string) {
   // Keep zoomLevel ref in sync for stale-closure-free access (Bug #7 fix)
   useEffect(() => { zoomLevelRef.current = zoomLevel; }, [zoomLevel]);
 
+  // Bug #27 fix: compute today's date string outside the memo.
+  // At midnight this value changes (on next render), triggering recalculation.
+  // Within the same day it's the same string, so memo won't fire unnecessarily.
+  const todayStr = getDateString(new Date());
+
   // Calculate which dates should be loaded based on center and zoom level
   // Always generate 7 dates (max window) but only use what we need
   const allPossibleDates = useMemo(() => {
-    const today = getDateString(new Date());
     // Bug #26 fix: add lower bound — don't query for dates before 2020
-    // (no data can exist before the app was created)
     const minDate = '2020-01-01';
     return [
       addDays(centerDate, -3),
@@ -140,8 +143,8 @@ export function useMultiDayTimeline(initialDate: string) {
       addDays(centerDate, 1),
       addDays(centerDate, 2),
       addDays(centerDate, 3),
-    ].filter(d => d >= minDate && d <= today);
-  }, [centerDate]);
+    ].filter(d => d >= minDate && d <= todayStr);
+  }, [centerDate, todayStr]);
 
   // Determine how many days we actually need based on zoom
   const daysNeeded = getDaysToLoadCount(zoomLevel);

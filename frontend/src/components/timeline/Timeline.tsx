@@ -1973,17 +1973,33 @@ export function Timeline({
                       const itemWidth = thumbnailWidth + gap;
                       const playheadScreenshotCenter = playheadScreenshotIndex * itemWidth + thumbnailWidth / 2;
 
+                      // Bug #5 fix: virtualize filmstrip — only render screenshots
+                      // within the visible window (± buffer). Without this, 200+ <img>
+                      // elements are mounted for a single day, creating a 26,000px container.
+                      const chartWidth = dimensions.width - MARGIN.left - MARGIN.right;
+                      const halfVisible = Math.ceil(chartWidth / itemWidth / 2);
+                      const buffer = 3; // Extra items beyond visible edge for smooth scrolling
+                      const windowStart = Math.max(0, playheadScreenshotIndex - halfVisible - buffer);
+                      const windowEnd = Math.min(filmstripScreenshots.length, playheadScreenshotIndex + halfVisible + buffer + 1);
+                      const virtualizedScreenshots = filmstripScreenshots.slice(windowStart, windowEnd);
+
+                      // Offset the container to account for skipped items
+                      const skipOffset = windowStart * itemWidth;
+
                       return (
                         <div
                           className="flex items-center gap-1 absolute"
                           style={{
                             height: filmstripHeight,
                             left: MARGIN.left,
-                            transform: `translateX(calc((${dimensions.width - MARGIN.left - MARGIN.right}px / 2) - ${playheadScreenshotCenter}px))`,
+                            // Translate so playhead screenshot centers on the chart playhead line,
+                            // then add skipOffset to compensate for virtualized items before windowStart
+                            transform: `translateX(calc((${chartWidth}px / 2) - ${playheadScreenshotCenter}px + ${skipOffset}px))`,
                           }}
                         >
-                          {filmstripScreenshots.map((ss, index) => {
-                            const isAtPlayhead = index === playheadScreenshotIndex;
+                          {virtualizedScreenshots.map((ss, virtualIndex) => {
+                            const actualIndex = windowStart + virtualIndex;
+                            const isAtPlayhead = actualIndex === playheadScreenshotIndex;
                             return (
                               <div
                                 key={ss.id}
@@ -1992,7 +2008,7 @@ export function Timeline({
                                     ? 'ring-2 ring-blue-500 ring-offset-1 ring-offset-background z-10'
                                     : 'opacity-60 hover:opacity-100'
                                 }`}
-                                onClick={() => handleFilmstripClick(index)}
+                                onClick={() => handleFilmstripClick(actualIndex)}
                                 title={`${formatEventTime(new Date(ss.timestamp * 1000))} - ${
                                   typeof ss.appName === 'object' ? ss.appName?.String : ss.appName || 'Unknown'
                                 }`}
