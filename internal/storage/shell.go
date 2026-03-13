@@ -195,6 +195,39 @@ func (s *Store) DeleteShellCommands(ids []int64) error {
 	return nil
 }
 
+// HasShellBySessionIDs checks which sessions have shell command data.
+// Returns a map of sessionID -> true for sessions that have at least one shell command.
+func (s *Store) HasShellBySessionIDs(sessionIDs []int64) (map[int64]bool, error) {
+	if len(sessionIDs) == 0 {
+		return make(map[int64]bool), nil
+	}
+
+	placeholders := make([]interface{}, len(sessionIDs))
+	for i, id := range sessionIDs {
+		placeholders[i] = id
+	}
+
+	query := fmt.Sprintf(
+		"SELECT DISTINCT session_id FROM shell_commands WHERE session_id IN (?%s)",
+		repeatPlaceholder(len(sessionIDs)-1))
+
+	rows, err := s.db.Query(query, placeholders...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query shell commands by session IDs: %w", err)
+	}
+	defer rows.Close()
+
+	result := make(map[int64]bool)
+	for rows.Next() {
+		var sessionID int64
+		if err := rows.Scan(&sessionID); err != nil {
+			return nil, fmt.Errorf("failed to scan session ID: %w", err)
+		}
+		result[sessionID] = true
+	}
+	return result, rows.Err()
+}
+
 func scanShellCommands(rows *sql.Rows) ([]*ShellCommand, error) {
 	var commands []*ShellCommand
 	for rows.Next() {

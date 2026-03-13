@@ -969,6 +969,14 @@ func (a *App) GenerateWeeklySummaryMarkdown(startDate, endDate string) (string, 
 	return a.Reports.GenerateWeeklySummaryMarkdown(startDate, endDate)
 }
 
+// GenerateEnhancedWeeklyHTML generates a visual-rich HTML report for team presentations.
+func (a *App) GenerateEnhancedWeeklyHTML(startDate, endDate string) (string, error) {
+	if a.Reports == nil {
+		return "", nil
+	}
+	return a.Reports.GenerateEnhancedWeeklyHTML(startDate, endDate)
+}
+
 // ============================================================================
 // Summary Methods (exposed to frontend)
 // ============================================================================

@@ -162,6 +162,8 @@ export function TimelinePage() {
     // Navigation functions
     targetPlayheadDate,
     goToDate,
+    goToPrevDay,
+    goToNextDay,
     goToToday,
     clearTargetPlayhead,
   } = useMultiDayTimeline(dateStr);
@@ -455,23 +457,22 @@ export function TimelinePage() {
   }, [goToDate]);
 
   const handlePrevDay = useCallback(() => {
-    const [year, month, day] = centerDate.split('-').map(Number);
-    const currentCenterDate = new Date(year, month - 1, day);
-    const prevDate = addDays(currentCenterDate, -1);
-    setSelectedDate(prevDate);
-    goToDate(prevDate);
-  }, [centerDate, goToDate]);
+    // goToPrevDay reads from a synchronous ref, not stale React state.
+    // This prevents the race condition where rapid Prev+Next clicks
+    // read the same centerDate from their closures.
+    goToPrevDay();
+    // selectedDate is only used for calendar widget highlight, not navigation
+    setSelectedDate(prev => addDays(prev, -1));
+  }, [goToPrevDay]);
 
   const handleNextDay = useCallback(() => {
-    const [year, month, day] = centerDate.split('-').map(Number);
-    const currentCenterDate = new Date(year, month - 1, day);
-    const nextDate = addDays(currentCenterDate, 1);
-    // Don't allow navigating past today
-    if (getDateString(nextDate) <= todayStr) {
-      setSelectedDate(nextDate);
-      goToDate(nextDate);
-    }
-  }, [centerDate, goToDate, todayStr]);
+    // goToNextDay reads from a synchronous ref and won't go past today
+    goToNextDay();
+    setSelectedDate(prev => {
+      const next = addDays(prev, 1);
+      return getDateString(next) <= todayStr ? next : prev;
+    });
+  }, [goToNextDay, todayStr]);
 
   const handleSearchNavigateToDate = useCallback((dateString: string) => {
     const [year, month, day] = dateString.split('-').map(Number);
@@ -499,21 +500,7 @@ export function TimelinePage() {
     });
   }, [centerDate]);
 
-  // Keyboard shortcuts for navigation
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Only trigger if not in an input/textarea
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
-        return;
-      }
-
-      // Arrow keys now reserved for timeline panning (handled by D3 zoom)
-      // Day navigation removed - users pan the timeline instead
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  // Bug #19 fix: removed empty keyboard handler (was a no-op event listener)
 
   // Render timeline content
   const renderContent = () => {
@@ -563,9 +550,9 @@ export function TimelinePage() {
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-7 w-7"
+                className={`h-7 w-7 ${centerDate === todayStr ? 'opacity-40 cursor-not-allowed' : ''}`}
                 onClick={handleNextDay}
-                disabled={centerDate === todayStr}
+                aria-disabled={centerDate === todayStr}
                 title="Next day"
               >
                 <ChevronRight className="h-4 w-4" />
@@ -705,9 +692,9 @@ export function TimelinePage() {
           <Button
             variant="ghost"
             size="icon"
-            className="h-7 w-7"
+            className={`h-7 w-7 ${centerDate === todayStr ? 'opacity-40 cursor-not-allowed' : ''}`}
             onClick={handleNextDay}
-            disabled={centerDate === todayStr}
+            aria-disabled={centerDate === todayStr}
             title="Next day"
           >
             <ChevronRight className="h-4 w-4" />

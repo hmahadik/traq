@@ -227,6 +227,39 @@ func (s *Store) DeleteFileEvents(ids []int64) error {
 	return nil
 }
 
+// HasFilesBySessionIDs checks which sessions have file event data.
+// Returns a map of sessionID -> true for sessions that have at least one file event.
+func (s *Store) HasFilesBySessionIDs(sessionIDs []int64) (map[int64]bool, error) {
+	if len(sessionIDs) == 0 {
+		return make(map[int64]bool), nil
+	}
+
+	placeholders := make([]interface{}, len(sessionIDs))
+	for i, id := range sessionIDs {
+		placeholders[i] = id
+	}
+
+	query := fmt.Sprintf(
+		"SELECT DISTINCT session_id FROM file_events WHERE session_id IN (?%s)",
+		repeatPlaceholder(len(sessionIDs)-1))
+
+	rows, err := s.db.Query(query, placeholders...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query file events by session IDs: %w", err)
+	}
+	defer rows.Close()
+
+	result := make(map[int64]bool)
+	for rows.Next() {
+		var sessionID int64
+		if err := rows.Scan(&sessionID); err != nil {
+			return nil, fmt.Errorf("failed to scan session ID: %w", err)
+		}
+		result[sessionID] = true
+	}
+	return result, rows.Err()
+}
+
 func scanFileEvents(rows *sql.Rows) ([]*FileEvent, error) {
 	var events []*FileEvent
 	for rows.Next() {

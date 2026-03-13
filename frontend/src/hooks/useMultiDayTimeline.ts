@@ -67,15 +67,63 @@ function getZoomBucket(_zoomLevel: number): number {
   return 3;
 }
 
+// Pure function — normalize screenshots to common shape (no closures, safe at module level)
+function normalizeScreenshots(data: ScreenshotsResult): ScreenshotItem[] {
+  if (!data) return [];
+  return data.map(s => ({
+    id: s.id,
+    timestamp: s.timestamp,
+    filepath: s.filepath,
+    windowTitle: s.windowTitle ?? null,
+    appName: s.appName ?? null,
+    sessionId: s.sessionId ?? null,
+  }));
+}
+
+// Extracts only stable values from a day's queries into a single memoized object.
+// gridQuery.data is referentially stable (React Query structuralSharing) so the
+// useMemo only fires when actual data changes, not on status/fetchStatus flickers.
+function useDaySlot(
+  gridQuery: ReturnType<typeof useTimelineGridData>,
+  screenshotsQuery: ReturnType<typeof useScreenshotsForDate>,
+  date: string | undefined,
+  datesToLoad: string[],
+) {
+  const gridData = gridQuery.data;
+  const screenshotsData = screenshotsQuery.data;
+  const shouldInclude = !!date && datesToLoad.includes(date);
+  const isLoading = shouldInclude && (gridQuery.isLoading || screenshotsQuery.isLoading);
+
+  return useMemo(() => ({
+    date,
+    gridData: gridData ?? null,
+    screenshots: normalizeScreenshots(screenshotsData),
+    isLoading,
+    shouldInclude,
+  }), [date, gridData, screenshotsData, isLoading, shouldInclude]);
+}
+
 export function useMultiDayTimeline(initialDate: string) {
   const [centerDate, setCenterDate] = useState(initialDate);
   const [zoomLevel, setZoomLevel] = useState(1);
+  const zoomLevelRef = useRef(zoomLevel);
+
+  // === REF FOR SYNCHRONOUS CENTER DATE ACCESS ===
+  // React state updates are async (batched). When user clicks Prev then Next rapidly,
+  // the second handler's closure still sees the OLD centerDate. This ref is updated
+  // synchronously in goToDate/goToPrevDay/goToNextDay so rapid clicks always read
+  // the latest value.
+  const centerDateRef = useRef(centerDate);
 
   // Sync centerDate when initialDate changes (e.g., user clicks "Today" button)
   // This is critical - useState only uses initialDate on first mount
   useEffect(() => {
     setCenterDate(initialDate);
+    centerDateRef.current = initialDate;
   }, [initialDate]);
+
+  // Keep zoomLevel ref in sync for stale-closure-free access (Bug #7 fix)
+  useEffect(() => { zoomLevelRef.current = zoomLevel; }, [zoomLevel]);
 
   // Calculate which dates should be loaded based on center and zoom level
   // Always generate 7 dates (max window) but only use what we need
@@ -130,48 +178,32 @@ export function useMultiDayTimeline(initialDate: string) {
   const screenshots5 = useScreenshotsForDate(allPossibleDates[5] || '', { enabled: !!allPossibleDates[5] && datesToLoad.includes(allPossibleDates[5]) });
   const screenshots6 = useScreenshotsForDate(allPossibleDates[6] || '', { enabled: !!allPossibleDates[6] && datesToLoad.includes(allPossibleDates[6]) });
 
-  // Bundle all day data for easy access
-  const allDayData = useMemo(() => [
-    { date: allPossibleDates[0], grid: day0, screenshots: screenshots0 },
-    { date: allPossibleDates[1], grid: day1, screenshots: screenshots1 },
-    { date: allPossibleDates[2], grid: day2, screenshots: screenshots2 },
-    { date: allPossibleDates[3], grid: day3, screenshots: screenshots3 },
-    { date: allPossibleDates[4], grid: day4, screenshots: screenshots4 },
-    { date: allPossibleDates[5], grid: day5, screenshots: screenshots5 },
-    { date: allPossibleDates[6], grid: day6, screenshots: screenshots6 },
-  ], [allPossibleDates, day0, day1, day2, day3, day4, day5, day6,
-      screenshots0, screenshots1, screenshots2, screenshots3, screenshots4, screenshots5, screenshots6]);
+  // Stable per-day slots: each slot only recalculates when its own .data changes.
+  // React Query's structuralSharing ensures .data is referentially stable unless
+  // actual data changed. This prevents the old allDayData array from recreating
+  // a new Map on every status flicker across any of the 14 hooks.
+  const slot0 = useDaySlot(day0, screenshots0, allPossibleDates[0], datesToLoad);
+  const slot1 = useDaySlot(day1, screenshots1, allPossibleDates[1], datesToLoad);
+  const slot2 = useDaySlot(day2, screenshots2, allPossibleDates[2], datesToLoad);
+  const slot3 = useDaySlot(day3, screenshots3, allPossibleDates[3], datesToLoad);
+  const slot4 = useDaySlot(day4, screenshots4, allPossibleDates[4], datesToLoad);
+  const slot5 = useDaySlot(day5, screenshots5, allPossibleDates[5], datesToLoad);
+  const slot6 = useDaySlot(day6, screenshots6, allPossibleDates[6], datesToLoad);
 
-  // Helper to normalize screenshots to common shape
-  const normalizeScreenshots = (data: ScreenshotsResult): ScreenshotItem[] => {
-    if (!data) return [];
-    return data.map(s => ({
-      id: s.id,
-      timestamp: s.timestamp,
-      filepath: s.filepath,
-      windowTitle: s.windowTitle ?? null,
-      appName: s.appName ?? null,
-      sessionId: s.sessionId ?? null,
-    }));
-  };
-
-  // Build loaded days map - only include days we actually need
+  // Build loaded days map from stable slots
   const loadedDays = useMemo(() => {
     const map = new Map<string, DayData>();
-
-    for (const dayInfo of allDayData) {
-      // Only include if this date is in our "needed" list
-      if (dayInfo.date && datesToLoad.includes(dayInfo.date)) {
-        map.set(dayInfo.date, {
-          gridData: dayInfo.grid.data,
-          screenshots: normalizeScreenshots(dayInfo.screenshots.data),
-          isLoading: dayInfo.grid.isLoading || dayInfo.screenshots.isLoading,
+    for (const slot of [slot0, slot1, slot2, slot3, slot4, slot5, slot6]) {
+      if (slot.date && slot.shouldInclude && slot.gridData) {
+        map.set(slot.date, {
+          gridData: slot.gridData,
+          screenshots: slot.screenshots,
+          isLoading: slot.isLoading,
         });
       }
     }
-
     return map;
-  }, [allDayData, datesToLoad]);
+  }, [slot0, slot1, slot2, slot3, slot4, slot5, slot6]);
 
   // Calculate combined time range
   // Cap end time at "now" if today is included to prevent timeline extending into future
@@ -210,6 +242,22 @@ export function useMultiDayTimeline(initialDate: string) {
   // Track if navigation is in progress (to avoid conflicts with manual panning)
   const navigationInProgressRef = useRef<boolean>(false);
 
+  // Safety timeout ref: auto-resets navigationInProgressRef after 5s.
+  // Prevents permanent deadlock if navigation effect bails (Bug #1 fix).
+  const navigationSafetyRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Helper: mark navigation in progress with auto-reset safety (Bug #1 fix).
+  // If clearTargetPlayhead is never called (e.g., navigation effect bails because
+  // target is outside domain and data never arrives), this prevents permanent deadlock.
+  const startNavigation = useCallback(() => {
+    navigationInProgressRef.current = true;
+    if (navigationSafetyRef.current) clearTimeout(navigationSafetyRef.current);
+    navigationSafetyRef.current = setTimeout(() => {
+      navigationInProgressRef.current = false;
+      navigationSafetyRef.current = null;
+    }, 5000);
+  }, []);
+
   // Track visible time range to load data for edges when zoomed out
   const visibleRangeRef = useRef<{ start: Date; end: Date } | null>(null);
 
@@ -218,16 +266,21 @@ export function useMultiDayTimeline(initialDate: string) {
 
   // Update center date and zoom level when playhead/view changes
   // SKIP if navigation is in progress (button click, etc.)
+  // Bug #7 fix: reads from refs (centerDateRef, zoomLevelRef) instead of state
+  // to avoid stale closures during the window between render and ref-sync effect.
   const updateCenterFromPlayhead = useCallback((
     playheadTimestamp: Date,
     visibleRange?: { start: Date; end: Date },
     newZoomLevel?: number
   ) => {
+    const currentCenterDate = centerDateRef.current;
+    const currentZoomLevel = zoomLevelRef.current;
+
     // Only update zoom level if it changes the "bucket" (affects days loaded)
     // This prevents oscillation from small zoom changes
     if (newZoomLevel !== undefined) {
       const newBucket = getZoomBucket(newZoomLevel);
-      const currentBucket = getZoomBucket(zoomLevel);
+      const currentBucket = getZoomBucket(currentZoomLevel);
       if (newBucket !== currentBucket) {
         setZoomLevel(newZoomLevel);
       }
@@ -246,15 +299,15 @@ export function useMultiDayTimeline(initialDate: string) {
     const now = Date.now();
 
     // Debounce: don't update more than once per 500ms
-    // Use longer cooldown (1.5s) after an actual center change to let data settle
-    const cooldown = prevCenterRef.current !== centerDate ? 1500 : 500;
+    // Use longer cooldown (1s) after an actual center change to let data arrive.
+    const cooldown = prevCenterRef.current !== currentCenterDate ? 1000 : 500;
     if (now - lastCenterUpdateRef.current < cooldown) {
       return;
     }
-    prevCenterRef.current = centerDate;
+    prevCenterRef.current = currentCenterDate;
 
     // Calculate the center of the current centerDate (noon)
-    const [year, month, day] = centerDate.split('-').map(Number);
+    const [year, month, day] = currentCenterDate.split('-').map(Number);
     const centerNoon = new Date(year, month - 1, day, 12, 0, 0);
 
     // Calculate hours from center
@@ -263,29 +316,36 @@ export function useMultiDayTimeline(initialDate: string) {
     // Check if visible edges are outside our loaded window
     // This handles the zoomed-out case where edges need data before playhead reaches them
     const currentRange = visibleRange || visibleRangeRef.current;
-    const currentDaysNeeded = getDaysToLoadCount(newZoomLevel ?? zoomLevel);
+    const currentDaysNeeded = getDaysToLoadCount(newZoomLevel ?? currentZoomLevel);
     const halfWindow = Math.floor(currentDaysNeeded / 2);
 
     let needsEdgeLoad = false;
     let edgeTargetDate: string | null = null;
 
     if (currentRange) {
-      const loadedStart = dateToStartOfDay(addDays(centerDate, -halfWindow));
-      const loadedEnd = dateToEndOfDay(addDays(centerDate, halfWindow));
+      const loadedStart = dateToStartOfDay(addDays(currentCenterDate, -halfWindow));
+      const loadedEnd = dateToEndOfDay(addDays(currentCenterDate, halfWindow));
+      const loadedSpanMs = loadedEnd.getTime() - loadedStart.getTime();
+      const visibleSpanMs = currentRange.end.getTime() - currentRange.start.getTime();
 
-      // If visible start is before loaded start (with 2hr buffer), shift center left
+      // Only consider edge-loading when the viewport is narrower than the loaded window.
+      // When zoomed out so the viewport is wider than the loaded 3-day window,
+      // edge detection would fire on every pan and cause oscillating center shifts.
       const bufferMs = 2 * 60 * 60 * 1000; // 2 hours
-      if (currentRange.start.getTime() < loadedStart.getTime() + bufferMs) {
-        needsEdgeLoad = true;
-        edgeTargetDate = getDateString(currentRange.start);
-      }
-      // If visible end is after loaded end (with 2hr buffer), shift center right
-      else if (currentRange.end.getTime() > loadedEnd.getTime() - bufferMs) {
-        needsEdgeLoad = true;
-        // For right edge, use the day before the edge to keep it centered
-        const edgeDate = new Date(currentRange.end);
-        edgeDate.setDate(edgeDate.getDate() - 1);
-        edgeTargetDate = getDateString(edgeDate);
+      if (visibleSpanMs < loadedSpanMs - 2 * bufferMs) {
+        // If visible start is before loaded start (with 2hr buffer), shift center left
+        if (currentRange.start.getTime() < loadedStart.getTime() + bufferMs) {
+          needsEdgeLoad = true;
+          edgeTargetDate = getDateString(currentRange.start);
+        }
+        // If visible end is after loaded end (with 2hr buffer), shift center right
+        else if (currentRange.end.getTime() > loadedEnd.getTime() - bufferMs) {
+          needsEdgeLoad = true;
+          // For right edge, use the day before the edge to keep it centered
+          const edgeDate = new Date(currentRange.end);
+          edgeDate.setDate(edgeDate.getDate() - 1);
+          edgeTargetDate = getDateString(edgeDate);
+        }
       }
     }
 
@@ -293,18 +353,20 @@ export function useMultiDayTimeline(initialDate: string) {
     const shouldUpdateFromPlayhead = hoursFromCenter > 12;
     const playheadDateStr = getDateString(playheadTimestamp);
 
-    if (needsEdgeLoad && edgeTargetDate && edgeTargetDate !== centerDate) {
+    if (needsEdgeLoad && edgeTargetDate && edgeTargetDate !== currentCenterDate) {
       // Prioritize edge loading when zoomed out
       const today = getDateString(new Date());
       if (edgeTargetDate <= today) {
         lastCenterUpdateRef.current = now;
         setCenterDate(edgeTargetDate);
+        centerDateRef.current = edgeTargetDate;
       }
-    } else if (shouldUpdateFromPlayhead && playheadDateStr !== centerDate) {
+    } else if (shouldUpdateFromPlayhead && playheadDateStr !== currentCenterDate) {
       lastCenterUpdateRef.current = now;
       setCenterDate(playheadDateStr);
+      centerDateRef.current = playheadDateStr;
     }
-  }, [centerDate, zoomLevel]);
+  }, []); // No deps — reads from refs for always-current values
 
   // Check if any day is loading
   const isLoadingAny = useMemo(() => {
@@ -332,36 +394,93 @@ export function useMultiDayTimeline(initialDate: string) {
   // Go to a specific date - used by navigation buttons
   // Sets the center date for data loading AND sets target for timeline panning
   const goToDate = useCallback((date: Date) => {
-    // Mark navigation in progress to prevent updateCenterFromPlayhead interference
-    navigationInProgressRef.current = true;
+    startNavigation(); // Bug #1 fix: uses safety timeout
 
+    const now = new Date();
     const dateStr = getDateString(date);
+    centerDateRef.current = dateStr; // Sync ref immediately (before React re-render)
     setCenterDate(dateStr);
-    // Set target to noon of that day for a centered view
+    // Target noon, but clamp to "now" for today (scale domain is capped at current time)
     const targetDate = new Date(date);
     targetDate.setHours(12, 0, 0, 0);
-    setTargetPlayheadDate(targetDate);
-  }, []);
+    setTargetPlayheadDate(targetDate > now ? now : targetDate);
+  }, [startNavigation]);
+
+  // Go to previous day — reads from ref (not stale closure) for rapid click safety
+  const goToPrevDay = useCallback(() => {
+    startNavigation(); // Bug #1 fix: uses safety timeout
+
+    const prevDateStr = addDays(centerDateRef.current, -1);
+    centerDateRef.current = prevDateStr;
+    setCenterDate(prevDateStr);
+    const [y, m, d] = prevDateStr.split('-').map(Number);
+    setTargetPlayheadDate(new Date(y, m - 1, d, 12, 0, 0));
+  }, [startNavigation]);
+
+  // Go to next day — reads from ref, won't go past today
+  const goToNextDay = useCallback(() => {
+    const now = new Date();
+    const today = getDateString(now);
+    const nextDateStr = addDays(centerDateRef.current, 1);
+    if (nextDateStr > today) return; // Can't navigate into the future
+
+    startNavigation(); // Bug #1 fix: uses safety timeout
+    centerDateRef.current = nextDateStr;
+    setCenterDate(nextDateStr);
+
+    // If next day is today, target current time (not noon) because the scale
+    // domain is capped at "now". Targeting noon would be outside the domain
+    // if it's before noon, causing the navigation effect to bail.
+    if (nextDateStr === today) {
+      setTargetPlayheadDate(now);
+    } else {
+      const [y, m, d] = nextDateStr.split('-').map(Number);
+      setTargetPlayheadDate(new Date(y, m - 1, d, 12, 0, 0));
+    }
+  }, [startNavigation]);
 
   // Go to today (convenience function)
   const goToToday = useCallback(() => {
-    // Mark navigation in progress to prevent updateCenterFromPlayhead interference
-    navigationInProgressRef.current = true;
+    startNavigation(); // Bug #1 fix: uses safety timeout
 
     const now = new Date();
-    setCenterDate(getDateString(now));
+    const dateStr = getDateString(now);
+    centerDateRef.current = dateStr;
+    setCenterDate(dateStr);
     // For today, pan to current time (or slightly before to show recent activity)
     setTargetPlayheadDate(now);
-  }, []);
+  }, [startNavigation]);
+
+  // Ref for the 300ms delay timeout so we can clean it up on unmount (Bug #15 fix)
+  const clearNavTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Clear the target after timeline has navigated to it
   const clearTargetPlayhead = useCallback(() => {
     setTargetPlayheadDate(null);
-    // Delay re-enabling updateCenterFromPlayhead to avoid race with final zoom events
-    // The D3 zoom handlers may fire slightly after animation 'end' event
-    setTimeout(() => {
+
+    // Cancel safety timeout since navigation completed successfully (Bug #1 fix)
+    if (navigationSafetyRef.current) {
+      clearTimeout(navigationSafetyRef.current);
+      navigationSafetyRef.current = null;
+    }
+
+    // Delay re-enabling updateCenterFromPlayhead to avoid race with zoom-end debounce.
+    // The zoom-end handler has 150ms debounce + triggers updateCenterFromPlayhead.
+    // We need to stay in "navigation mode" until that fires, otherwise it reverts
+    // centerDate based on stale playhead position. 300ms > 150ms debounce with margin.
+    if (clearNavTimeoutRef.current) clearTimeout(clearNavTimeoutRef.current);
+    clearNavTimeoutRef.current = setTimeout(() => {
       navigationInProgressRef.current = false;
-    }, 100);
+      clearNavTimeoutRef.current = null;
+    }, 300);
+  }, []);
+
+  // Cleanup timeouts on unmount (Bug #15 fix)
+  useEffect(() => {
+    return () => {
+      if (navigationSafetyRef.current) clearTimeout(navigationSafetyRef.current);
+      if (clearNavTimeoutRef.current) clearTimeout(clearNavTimeoutRef.current);
+    };
   }, []);
 
   return {
@@ -378,6 +497,8 @@ export function useMultiDayTimeline(initialDate: string) {
     // Navigation helpers
     targetPlayheadDate,
     goToDate,
+    goToPrevDay,
+    goToNextDay,
     goToToday,
     clearTargetPlayhead,
   };

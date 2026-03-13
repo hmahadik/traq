@@ -11,6 +11,7 @@ export interface EventDot {
   row: string; // Row name (app name or event type)
   label: string; // For tooltip
   duration?: number; // Optional duration in seconds
+  endTimeMs?: number; // Pre-computed end time in ms (avoids new Date() in zoom hot path)
   color: string; // Dot fill color
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   metadata: any; // Original event data - can be ActivityBlock, GitEventDisplay, etc.

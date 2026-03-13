@@ -158,6 +158,10 @@ export function ForceCapture() {
   return window['go']['main']['App']['ForceCapture']();
 }
 
+export function GenerateEnhancedWeeklyHTML(arg1, arg2) {
+  return window['go']['main']['App']['GenerateEnhancedWeeklyHTML'](arg1, arg2);
+}
+
 export function GenerateProjectReport(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['GenerateProjectReport'](arg1, arg2, arg3, arg4);
 }

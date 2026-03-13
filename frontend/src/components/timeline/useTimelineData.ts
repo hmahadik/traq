@@ -97,19 +97,18 @@ export function useTimelineData({
       return name;
     };
 
-    // Helper to add event to appropriate row
+    // Helper to add event to appropriate row (immutable — creates new object instead of mutating)
     const addToRow = (rowName: string, event: EventDot) => {
       const displayName = getDisplayName(rowName);
       const normalized = normalizeRowName(rowName);
 
-      // Update event's row to use display name
-      event.row = displayName;
+      const eventWithRow = event.row !== displayName ? { ...event, row: displayName } : event;
 
       if (!rowMap.has(normalized)) {
         rowMap.set(normalized, []);
       }
-      rowMap.get(normalized)!.push(event);
-      allEvents.push(event);
+      rowMap.get(normalized)!.push(eventWithRow);
+      allEvents.push(eventWithRow);
     };
 
     // Process activity blocks (always shown)
@@ -130,6 +129,7 @@ export function useTimelineData({
                 ? getAppHexColor(appName)
                 : CATEGORY_HEX_COLORS[activity.category] || CATEGORY_HEX_COLORS.other);
 
+            const actDur = capDuration(activity.startTime, activity.durationSeconds);
             const event: EventDot = {
               id: makeEventKey('activity', activity.id),
               originalId: activity.id,
@@ -137,7 +137,8 @@ export function useTimelineData({
               type: 'activity',
               row: rowName,
               label: activity.windowTitle || appName,
-              duration: capDuration(activity.startTime, activity.durationSeconds),
+              duration: actDur,
+              endTimeMs: actDur ? activity.startTime * 1000 + actDur * 1000 : undefined,
               color,
               metadata: activity,
             };
@@ -173,6 +174,7 @@ export function useTimelineData({
       for (const [, hourEvents] of Object.entries(data.shellEvents)) {
         for (const event of hourEvents) {
           const rowName = groupBy === 'app' ? 'Shell' : 'Shell';
+          const shellDur = capDuration(event.timestamp, event.durationSeconds);
           const dot: EventDot = {
             id: makeEventKey('shell', event.id),
             originalId: event.id,
@@ -180,7 +182,8 @@ export function useTimelineData({
             type: 'shell',
             row: rowName,
             label: event.command,
-            duration: capDuration(event.timestamp, event.durationSeconds),
+            duration: shellDur,
+            endTimeMs: shellDur ? event.timestamp * 1000 + shellDur * 1000 : undefined,
             color: EVENT_TYPE_COLORS.shell,
             metadata: event,
           };
@@ -194,6 +197,7 @@ export function useTimelineData({
       for (const [, hourEvents] of Object.entries(data.browserEvents)) {
         for (const event of hourEvents) {
           const rowName = groupBy === 'app' ? event.browser || 'Browser' : 'Browser';
+          const browserDur = capDuration(event.timestamp, event.visitDurationSeconds);
           const dot: EventDot = {
             id: makeEventKey('browser', event.id),
             originalId: event.id,
@@ -201,7 +205,8 @@ export function useTimelineData({
             type: 'browser',
             row: rowName,
             label: event.title || event.domain,
-            duration: capDuration(event.timestamp, event.visitDurationSeconds),
+            duration: browserDur,
+            endTimeMs: browserDur ? event.timestamp * 1000 + browserDur * 1000 : undefined,
             color: getAppHexColor(event.browser || 'browser'),
             metadata: event,
           };
@@ -261,13 +266,14 @@ export function useTimelineData({
         const color = stateColors[state.state] || stateColors.afk;
 
         const dot: EventDot = {
-          id: `activity-state-${i}`,
-          originalId: i,
+          id: `activity-state-${state.startTime}`,
+          originalId: state.startTime, // Use startTime as stable ID (not loop index)
           timestamp: new Date(state.startTime * 1000),
           type: 'activity',
           row: rowName,
           label,
           duration: state.durationSeconds,
+          endTimeMs: state.startTime * 1000 + state.durationSeconds * 1000,
           color,
           metadata: {
             startTime: state.startTime,
@@ -364,6 +370,7 @@ export function useTimelineData({
             row: rowName,
             label: `${merged.projectName}: ${appList}${moreApps}`,
             duration: duration,
+            endTimeMs: duration ? merged.startTime * 1000 + duration * 1000 : undefined,
             color: merged.projectColor || EVENT_TYPE_COLORS.projects,
             metadata: {
               projectId: projectId,
@@ -387,6 +394,7 @@ export function useTimelineData({
         const appList = topApps.slice(0, 3).join(', ');
         const moreApps = topApps.length > 3 ? ` +${topApps.length - 3}` : '';
 
+        const sessDur = capDuration(session.startTime, session.durationSeconds);
         const dot: EventDot = {
           id: makeEventKey('session', session.id),
           originalId: session.id,
@@ -394,7 +402,8 @@ export function useTimelineData({
           type: 'session',
           row: rowName,
           label: session.summary || `Session: ${appList}${moreApps}`,
-          duration: capDuration(session.startTime, session.durationSeconds),
+          duration: sessDur,
+          endTimeMs: sessDur ? session.startTime * 1000 + sessDur * 1000 : undefined,
           color: EVENT_TYPE_COLORS.session,
           metadata: {
             explanation: session.explanation,

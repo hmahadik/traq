@@ -606,6 +606,21 @@ func (s *TimelineService) GetTimelineGridDataWithOptions(date string, opts Timel
 		return topApps[i].Duration > topApps[j].Duration
 	})
 
+	// Pre-index focus events by session ID for O(1) dominant category lookup.
+	// This eliminates N per-session queries from getSessionDominantCategory.
+	focusBySession := make(map[int64][]*storage.WindowFocusEvent)
+	for _, evt := range focusEvents {
+		if evt.SessionID.Valid {
+			focusBySession[evt.SessionID.Int64] = append(focusBySession[evt.SessionID.Int64], evt)
+		}
+	}
+
+	// Fetch AFK events once — shared by calculateDayStats and afkBlocks display
+	afkEvents, err := s.store.GetAFKEventsByTimeRange(dayStart.Unix(), dayEnd.Unix())
+	if err != nil {
+		afkEvents = []*storage.AFKEvent{}
+	}
+
 	// Fetch sessions for the day
 	sessions, err := s.GetSessionsForDate(date)
 	if err != nil {
@@ -660,8 +675,8 @@ func (s *TimelineService) GetTimelineGridDataWithOptions(date string, opts Timel
 			pixelHeight = 10 // Minimum height for session blocks
 		}
 
-		// Determine dominant category for the session based on focus events
-		sessionCategory := s.getSessionDominantCategory(sess.ID, categories)
+		// Determine dominant category using pre-indexed focus events (no extra query)
+		sessionCategory := getSessionDominantCategoryFromEvents(focusBySession[sess.ID], categories)
 
 		sessionSummaries = append(sessionSummaries, &SessionSummaryWithPosition{
 			SessionSummary: *sess,
@@ -673,8 +688,8 @@ func (s *TimelineService) GetTimelineGridDataWithOptions(date string, opts Timel
 		})
 	}
 
-	// Calculate day stats
-	dayStats := s.calculateDayStats(focusEvents, categories, dayStart, dayEnd)
+	// Calculate day stats (pass pre-fetched afkEvents to avoid duplicate query)
+	dayStats := s.calculateDayStats(focusEvents, categories, dayStart, dayEnd, afkEvents)
 
 	// Transform categories to use friendly names as keys (for frontend matching)
 	friendlyCategories := make(map[string]string)
@@ -898,14 +913,7 @@ func (s *TimelineService) GetTimelineGridDataWithOptions(date string, opts Timel
 		browserEvents[hour] = append(browserEvents[hour], browserEvent)
 	}
 
-	// Fetch AFK events for the day
-	afkEvents, err := s.store.GetAFKEventsByTimeRange(dayStart.Unix(), dayEnd.Unix())
-	if err != nil {
-		// Non-fatal: log and continue with empty AFK blocks
-		afkEvents = []*storage.AFKEvent{}
-	}
-
-	// Build AFK blocks map: hour -> blocks
+	// Build AFK blocks map: hour -> blocks (afkEvents already fetched above)
 	afkBlocks := make(map[int][]AFKBlock)
 
 	for _, afk := range afkEvents {
@@ -978,20 +986,19 @@ func (s *TimelineService) GetTimelineGridDataWithOptions(date string, opts Timel
 	}, nil
 }
 
-// getSessionDominantCategory determines the dominant category for a session based on focus events.
-func (s *TimelineService) getSessionDominantCategory(sessionID int64, categories map[string]string) string {
-	focusEvents, err := s.store.GetWindowFocusEventsBySession(sessionID)
-	if err != nil || len(focusEvents) == 0 {
+// getSessionDominantCategoryFromEvents determines the dominant category from pre-fetched events.
+// This avoids the N+1 query pattern of the old getSessionDominantCategory method.
+func getSessionDominantCategoryFromEvents(events []*storage.WindowFocusEvent, categories map[string]string) string {
+	if len(events) == 0 {
 		return "other"
 	}
 
 	categoryDurations := make(map[string]float64)
-	for _, event := range focusEvents {
+	for _, event := range events {
 		category := categories[event.AppName]
 		categoryDurations[category] += event.DurationSeconds
 	}
 
-	// Find the category with the most time
 	var dominantCategory string
 	var maxDuration float64
 	for category, duration := range categoryDurations {
@@ -1008,7 +1015,8 @@ func (s *TimelineService) getSessionDominantCategory(sessionID int64, categories
 }
 
 // calculateDayStats computes aggregated statistics for the day.
-func (s *TimelineService) calculateDayStats(focusEvents []*storage.WindowFocusEvent, categories map[string]string, dayStart, dayEnd time.Time) *DayStats {
+// afkEvents are passed in to avoid re-fetching (already fetched by caller).
+func (s *TimelineService) calculateDayStats(focusEvents []*storage.WindowFocusEvent, categories map[string]string, dayStart, dayEnd time.Time, afkEvents []*storage.AFKEvent) *DayStats {
 	if len(focusEvents) == 0 {
 		return &DayStats{
 			TotalSeconds:       0,
@@ -1021,9 +1029,6 @@ func (s *TimelineService) calculateDayStats(focusEvents []*storage.WindowFocusEv
 			BreakdownPercent:   make(map[string]float64),
 		}
 	}
-
-	// Get AFK events first to filter out inactive periods
-	afkEvents, _ := s.store.GetAFKEventsByTimeRange(dayStart.Unix(), dayEnd.Unix())
 
 	// Helper function to check if a time range overlaps with any AFK period
 	isOverlappingAFK := func(start, end int64) bool {

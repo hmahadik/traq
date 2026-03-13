@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState, useCallback, useMemo } from 'react';
+import { useRef, useEffect, useState, useCallback, useMemo, useId } from 'react';
 import * as d3 from 'd3';
 import { ChevronDown, ChevronRight, Eye, Camera } from 'lucide-react';
 import type { TimelineGridData } from '@/types/timeline';
@@ -76,6 +76,96 @@ const BAR_MIN_DURATION = 10; // Minimum duration (seconds) to render as bar
 const BAR_MIN_PIXELS = 6; // Minimum pixel width to render as bar
 const BAR_WIDTH = 1; // Width of thin bars for instant/brief events (event-dot)
 
+// Multi-scale time formatting (marmelab EventDrops style) — pure function, no closures
+const formatMillisecond = d3.timeFormat('.%L');
+const formatSecond = d3.timeFormat(':%S');
+const formatMinute = d3.timeFormat('%-I:%M %p');
+const formatHour = d3.timeFormat('%-I %p');
+const formatDay = d3.timeFormat('%a %d');
+const formatWeek = d3.timeFormat('%b %d');
+const formatMonth = d3.timeFormat('%B');
+const formatYear = d3.timeFormat('%Y');
+
+const multiScaleFormat = (date: Date): string => {
+  return (d3.timeSecond(date) < date ? formatMillisecond
+    : d3.timeMinute(date) < date ? formatSecond
+    : d3.timeHour(date) < date ? formatMinute
+    : d3.timeDay(date) < date ? formatHour
+    : d3.timeMonth(date) < date ? (d3.timeWeek(date) < date ? formatDay : formatWeek)
+    : d3.timeYear(date) < date ? formatMonth
+    : formatYear)(date);
+};
+
+
+// === PURE HELPER FUNCTIONS (extracted from main effect to module level) ===
+
+// Determine if event should render as bar vs thin line based on duration and pixel width
+function shouldRenderAsBar(
+  event: EventDot,
+  scale: d3.ScaleTime<number, number>
+): boolean {
+  if (!event.duration || event.duration < BAR_MIN_DURATION) return false;
+  const endTime = event.endTimeMs || (event.timestamp.getTime() + event.duration * 1000);
+  const pixelWidth = scale(endTime) - scale(event.timestamp);
+  return pixelWidth >= BAR_MIN_PIXELS;
+}
+
+// Pixel-level deduplication: collapse events at the same pixel+row to one element.
+// At wide zoom, this reduces DOM elements from O(total_events) to O(pixels x rows).
+function deduplicateByPixel(
+  events: EventDot[],
+  scale: d3.ScaleTime<number, number>
+): EventDot[] {
+  const seen = new Set<string>();
+  return events.filter(event => {
+    const px = Math.round(scale(event.timestamp));
+    const key = `${event.row}:${px}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+// Simple color darkening for stroke effects
+function getDarkerColor(color: string): string {
+  const c = d3.color(color);
+  if (c) {
+    return c.darker(0.5).toString();
+  }
+  return color;
+}
+
+// Format date label: "22 January 2026"
+function formatDateLabel(date: Date): string {
+  return date.toLocaleDateString('en-US', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  });
+}
+
+// Format center label: "Thu, Jan 22 • 11:59 AM"
+function formatCenterLabel(date: Date): string {
+  const dayPart = date.toLocaleDateString('en-US', {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+  });
+  const timePart = date.toLocaleTimeString('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  });
+  return `${dayPart} • ${timePart}`;
+}
+
+// Convert Date to YYYY-MM-DD string
+function getDateStr(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
 
 export function Timeline({
   // Multi-day props
@@ -101,6 +191,12 @@ export function Timeline({
   onViewScreenshot,
   onViewSession,
 }: TimelineProps) {
+  // Bug #24 fix: scope SVG IDs to this instance (document-global IDs collide during HMR)
+  const instanceId = useId();
+  const idSuffix = instanceId.replace(/:/g, '');
+  const clipId = `chart-clip-${idSuffix}`;
+  const shimmerId = `loading-shimmer-${idSuffix}`;
+
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
@@ -112,9 +208,6 @@ export function Timeline({
   const [currentZoom, setCurrentZoom] = useState<d3.ZoomTransform>(d3.zoomIdentity);
   const [visibleTimeRange, setVisibleTimeRange] = useState<{ start: Date; end: Date } | null>(null);
   const [playheadTimestamp, setPlayheadTimestamp] = useState<Date | null>(null);
-  // Track previous time range to detect domain changes and preserve visible area
-  const previousTimeRangeRef = useRef<{ start: number; end: number } | null>(null);
-
   // === ZOOM DECOUPLING: Use refs during active zoom, sync to state on zoom end ===
   // These refs hold "live" values during zoom/pan - updated synchronously without React re-renders
   const zoomTransformRef = useRef<d3.ZoomTransform>(d3.zoomIdentity);
@@ -144,8 +237,10 @@ export function Timeline({
   const prevDimensionsRef = useRef({ width: 0, height: 0 });
   const prevTimeRangeRef = useRef<{ start: number; end: number } | null>(null);
 
-  // Flag to skip callbacks during internal state restoration (prevents feedback loops)
-  const isRestoringStateRef = useRef(false);
+  // Counter to skip callbacks during internal state restoration (prevents feedback loops).
+  // Uses a counter instead of boolean so concurrent restores don't swallow real user zooms
+  // (Bug 8 fix): increment on restore start, decrement on zoom-end. Only skip when > 0.
+  const restoreCountRef = useRef(0);
 
   // === CALLBACK REFS: Store callbacks in refs to avoid dependency array issues ===
   const onPlayheadChangeRef = useRef(onPlayheadChange);
@@ -280,6 +375,17 @@ export function Timeline({
     };
   }, []);
 
+  // Periodically update NOW time to prevent drift (Bug 6 fix).
+  // Without this, the NOW line and active bar caps become stale after ~30min idle.
+  const [, setNowTick] = useState(0);
+  useEffect(() => {
+    const interval = setInterval(() => {
+      nowTimeRef.current = Date.now();
+      setNowTick(t => t + 1); // Force re-render to update NOW line position
+    }, 60_000); // Every minute
+    return () => clearInterval(interval);
+  }, []);
+
   // Handler to show tooltip on hover
   const showTooltip = useCallback((event: EventDot, clientX: number, clientY: number) => {
     // Cancel any pending hide
@@ -404,9 +510,18 @@ export function Timeline({
       setResizingTarget(null);
     };
 
+    // Safety timeout: auto-release stuck resize after 5s of no mouseup (Bug 10 fix).
+    // This handles the case where mouseup fires outside the window (e.g., Alt-Tab).
+    let safetyTimeout: NodeJS.Timeout | null = null;
+
     if (isResizing) {
       document.addEventListener('mousemove', handleMouseMove);
       document.addEventListener('mouseup', handleMouseUp);
+      safetyTimeout = setTimeout(() => {
+        if (isResizing) {
+          handleMouseUp();
+        }
+      }, 5000);
       document.body.style.cursor = 'ns-resize';
       document.body.style.userSelect = 'none';
     }
@@ -414,6 +529,9 @@ export function Timeline({
     return () => {
       if (rafId !== null) {
         cancelAnimationFrame(rafId);
+      }
+      if (safetyTimeout) {
+        clearTimeout(safetyTimeout);
       }
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
@@ -460,7 +578,289 @@ export function Timeline({
     return () => resizeObserver.disconnect();
   }, [timelineData?.rows.length, rowHeight]);
 
-  // D3 rendering with zoom - uses enter/update/exit pattern to preserve zoom state
+  // === ZOOM SETUP EFFECT ===
+  // Separated from rendering so zoom behavior isn't recreated on every data change.
+  // Only recreates on dimension changes or first mount.
+  useEffect(() => {
+    const svg = d3.select(svgRef.current);
+    if (!svg.node()) return;
+
+    const { width, height } = dimensions;
+
+    // Get colors for axis styling in zoom handler
+    const borderColor = getComputedColor('--border', '#404040');
+    const mutedForeground = getComputedColor('--muted-foreground', '#a3a3a3');
+
+    // Detect if zoom needs recreation
+    const dimensionsChanged = Math.abs(prevDimensionsRef.current.width - width) > 10;
+    const needsZoom = !zoomRef.current || dimensionsChanged;
+    if (!needsZoom) return;
+
+    // No zoom cap needed — pixel dedup bounds element count at any zoom level
+    const minScale = 1;
+
+    const zoom = d3.zoom<SVGSVGElement, unknown>()
+      .scaleExtent([minScale, 1440])
+      .extent([[MARGIN.left, 0], [width - MARGIN.right, height]])
+      .constrain((transform, _extent, _translateExtent) => {
+        // During programmatic zoom restore (domain shift), skip constraints to avoid
+        // clamping a transform that was computed for the new scale but gets evaluated
+        // against stale domain boundaries, causing visible position snaps.
+        if (restoreCountRef.current > 0) return transform;
+
+        const now = new Date();
+        const currentScale = xScaleRef.current;
+        if (!currentScale) return transform;
+
+        if (!isFinite(transform.x) || !isFinite(transform.k) || transform.k <= 0) {
+          return transform;
+        }
+
+        const centerX = chartCenterXRef.current;
+        if (!isFinite(centerX)) return transform;
+
+        // Get the current data boundaries from the scale's domain
+        const [domainStart] = currentScale.domain();
+
+        // Calculate what the center timestamp would be with this transform
+        const testScale = transform.rescaleX(currentScale);
+        const centerTimestamp = testScale.invert(centerX);
+
+        // Validate calculations
+        if (!centerTimestamp || !isFinite(centerTimestamp.getTime())) {
+          return transform;
+        }
+
+        let newTransform = transform;
+
+        // If center would be before data start, clamp it
+        if (centerTimestamp < domainStart) {
+          const startX = testScale(domainStart);
+          if (isFinite(startX)) {
+            const shiftNeeded = centerX - startX;
+            newTransform = d3.zoomIdentity
+              .translate(newTransform.x + shiftNeeded, newTransform.y)
+              .scale(newTransform.k);
+          }
+        }
+
+        // Recalculate center with potentially adjusted transform
+        const adjustedScale = newTransform.rescaleX(currentScale);
+        const adjustedCenter = adjustedScale.invert(centerX);
+
+        // If center would be in the future, clamp it
+        if (adjustedCenter && adjustedCenter > now) {
+          const nowX = adjustedScale(now);
+          if (isFinite(nowX)) {
+            const shiftNeeded = centerX - nowX;
+            newTransform = d3.zoomIdentity
+              .translate(newTransform.x + shiftNeeded, newTransform.y)
+              .scale(newTransform.k);
+          }
+        }
+
+        return newTransform;
+      })
+    // NOTE: .wheelDelta() not configured here — the custom svg.on('wheel.zoom', ...) below
+    // replaces D3's internal wheel handler entirely, so wheelDelta would be dead code (Bug #23).
+    .on('start', () => {
+      // Mark that we're actively zooming - prevents unnecessary React re-renders
+      isZoomingRef.current = true;
+      // Safety: set a timeout to auto-release stuck drag after 5 seconds of no 'end' event
+      if (dragSafetyTimeoutRef.current) {
+        clearTimeout(dragSafetyTimeoutRef.current);
+      }
+      dragSafetyTimeoutRef.current = setTimeout(() => {
+        if (isZoomingRef.current) {
+          console.warn('Drag safety: auto-releasing stuck drag state');
+          isZoomingRef.current = false;
+          // Force sync state
+          setCurrentZoom(zoomTransformRef.current);
+          setVisibleTimeRange(visibleTimeRangeRef.current);
+          setPlayheadTimestamp(playheadTimestampRef.current);
+          if (playheadTimestampRef.current && visibleTimeRangeRef.current) {
+            onPlayheadChangeRef.current?.(playheadTimestampRef.current, visibleTimeRangeRef.current, zoomTransformRef.current.k);
+          }
+        }
+      }, 5000);
+    })
+    .on('zoom', (event) => {
+      const transform = event.transform;
+      const currentScale = xScaleRef.current;
+      if (!currentScale) return;
+
+      // Use ref for chartCenterX to avoid stale closure
+      const centerX = chartCenterXRef.current;
+
+      // Create new scale based on zoom (already constrained by .constrain())
+      const newXScale = transform.rescaleX(currentScale);
+
+      // Calculate center timestamp (playhead position)
+      const centerTimestamp = newXScale.invert(centerX);
+
+      zoomTransformRef.current = transform;
+      const visibleStart = newXScale.invert(MARGIN.left);
+      const visibleEnd = newXScale.invert(width - MARGIN.right);
+      visibleTimeRangeRef.current = { start: visibleStart, end: visibleEnd };
+
+      playheadTimestampRef.current = centerTimestamp;
+
+      if (zoomRafRef.current) {
+        cancelAnimationFrame(zoomRafRef.current);
+      }
+      zoomRafRef.current = requestAnimationFrame(() => {
+        const latestTransform = zoomTransformRef.current;
+        const latestScale = latestTransform.rescaleX(currentScale);
+        const latestCenterTimestamp = latestScale.invert(centerX);
+        const latestVisibleStart = latestScale.invert(MARGIN.left);
+        const latestVisibleEnd = latestScale.invert(width - MARGIN.right);
+
+        const now = performance.now();
+        if (now - lastAxisUpdateRef.current > 100) {
+          lastAxisUpdateRef.current = now;
+          const xAxisGroup = svg.select<SVGGElement>('.x-axis');
+          const chartWidth = width - MARGIN.left - MARGIN.right;
+          const numTicks = Math.max(3, Math.floor(chartWidth / 100));
+          xAxisGroup.call(
+            d3.axisTop(latestScale)
+              .ticks(numTicks)
+              .tickFormat((d) => multiScaleFormat(d as Date)) as any
+          );
+          xAxisGroup.select('.domain').attr('stroke', borderColor);
+          xAxisGroup.selectAll('.tick line').attr('stroke', borderColor);
+          xAxisGroup.selectAll('.tick text').attr('fill', mutedForeground).attr('font-size', '11px');
+        }
+
+        svg.select('.grid-lines')
+          .selectAll<SVGLineElement, Date>('line')
+          .attr('x1', (d) => latestScale(d))
+          .attr('x2', (d) => latestScale(d));
+
+        svg.select('.day-boundaries')
+          .selectAll<SVGGElement, Date>('.day-boundary')
+          .each(function(d) {
+            const g = d3.select(this);
+            const x = latestScale(d);
+            g.select('line').attr('x1', x).attr('x2', x);
+            g.select('rect').attr('x', x - 45);
+            g.select('text').attr('x', x);
+          });
+
+        svg.select('.loading-indicators')
+          .selectAll<SVGRectElement, unknown>('.loading-shimmer-bg')
+          .each(function() {
+            const rect = d3.select(this);
+            const dayStart = new Date(parseFloat(rect.attr('data-day-start') || '0'));
+            if (!isNaN(dayStart.getTime())) {
+              const dayEnd = new Date(dayStart);
+              dayEnd.setDate(dayEnd.getDate() + 1);
+              rect.attr('x', latestScale(dayStart)).attr('width', Math.abs(latestScale(dayEnd) - latestScale(dayStart)));
+            }
+          });
+
+        svg.select('.loading-indicators')
+          .selectAll<SVGLineElement, unknown>('.loading-pulse-line')
+          .each(function() {
+            const line = d3.select(this);
+            const dayStart = new Date(parseFloat(line.attr('data-day-start') || '0'));
+            if (!isNaN(dayStart.getTime())) {
+              const x = latestScale(dayStart);
+              line.attr('x1', x).attr('x2', x);
+            }
+          });
+
+        // Reposition ALL event elements on every zoom/drag frame.
+        // No viewport culling — pixel dedup already bounds DOM element count,
+        // and skipping out-of-view elements leaves ghosts at the edges.
+        svg.selectAll<SVGRectElement, EventDot>('.event-dot')
+          .attr('x', (d) => latestScale(d.timestamp) - BAR_WIDTH / 2);
+
+        svg.selectAll<SVGRectElement, EventDot>('.event-bar')
+          .attr('x', (d) => latestScale(d.timestamp))
+          .attr('width', (d) => {
+            const endTime = Math.min(d.endTimeMs || d.timestamp.getTime(), nowTimeRef.current);
+            return Math.max(BAR_MIN_PIXELS, latestScale(endTime) - latestScale(d.timestamp));
+          });
+
+        svg.select('.now-line')
+          .attr('x1', (d: any) => latestScale(d))
+          .attr('x2', (d: any) => latestScale(d));
+
+        svg.select('.now-text')
+          .attr('x', (d: any) => latestScale(d));
+
+        // Bug #18 fix: use module-level formatDateLabel/formatCenterLabel
+        // (were duplicated here, allocating closures on every animation frame)
+        svg.select('.date-label-left').text(formatDateLabel(latestVisibleStart));
+        svg.select('.date-label-right').text(formatDateLabel(latestVisibleEnd));
+        svg.select('.date-label-center').text(formatCenterLabel(latestCenterTimestamp));
+      });
+    })
+    .on('end', () => {
+      isZoomingRef.current = false;
+      lastAxisUpdateRef.current = 0;
+
+      if (dragSafetyTimeoutRef.current) {
+        clearTimeout(dragSafetyTimeoutRef.current);
+        dragSafetyTimeoutRef.current = null;
+      }
+
+      // Deterministic guard: if this zoom-end was triggered by programmatic zoom restore,
+      // clear the flag and skip state propagation to prevent feedback loops
+      if (restoreCountRef.current > 0) {
+        restoreCountRef.current--;
+        return;
+      }
+
+      if (zoomSyncTimeoutRef.current) {
+        clearTimeout(zoomSyncTimeoutRef.current);
+      }
+      zoomSyncTimeoutRef.current = setTimeout(() => {
+        zoomSyncTimeoutRef.current = null;
+        setCurrentZoom(zoomTransformRef.current);
+        setVisibleTimeRange(visibleTimeRangeRef.current);
+        setPlayheadTimestamp(playheadTimestampRef.current);
+        if (playheadTimestampRef.current && visibleTimeRangeRef.current) {
+          onPlayheadChangeRef.current?.(playheadTimestampRef.current, visibleTimeRangeRef.current, zoomTransformRef.current.k);
+        }
+      }, 150);
+    });
+
+    // Store zoom reference
+    zoomRef.current = zoom;
+
+    // Apply zoom to SVG
+    svg.call(zoom);
+
+    // Override wheel behavior to zoom centered on playhead instead of mouse position
+    // PERFORMANCE: No transition on wheel - direct zoom for instant response
+    svg.on('wheel.zoom', function(event: WheelEvent) {
+      event.preventDefault();
+      // Larger zoom steps: 0.75x zoom out, 1.33x zoom in (was 0.9/1.1)
+      const direction = event.deltaY > 0 ? 0.75 : 1.33;
+      const svgNode = svg.node();
+      if (svgNode && zoomRef.current) {
+        // Use ref for chartCenterX to avoid stale closure after resize
+        // Direct call without transition - prevents stacking animations that kill perf
+        svg.call(
+          zoomRef.current.scaleBy as any,
+          direction,
+          [chartCenterXRef.current, height / 2]
+        );
+      }
+    });
+  }, [dimensions, getComputedColor]);
+
+  // Coarse zoom bucket — triggers main effect re-render (and re-dedup) after significant
+  // zoom changes. Without this, pixel dedup is frozen at the render-time scale and events
+  // that should become visible after zooming in remain hidden.
+  // Half-octave buckets: ~12 re-renders across the full 1x-1440x zoom range.
+  const zoomBucket = useMemo(
+    () => Math.round(Math.log2(Math.max(1, currentZoom.k)) * 2) / 2,
+    [currentZoom.k]
+  );
+
+  // D3 rendering — chrome, data joins, zoom restoration
   useEffect(() => {
     const svg = d3.select(svgRef.current);
     if (!svg.node() || !timelineData) return;
@@ -488,7 +888,7 @@ export function Timeline({
       // Create clip path for the chart area
       svg.append('defs')
         .append('clipPath')
-        .attr('id', 'chart-clip')
+        .attr('id', clipId)
         .append('rect')
         .attr('x', MARGIN.left)
         .attr('y', 0)
@@ -496,7 +896,7 @@ export function Timeline({
         .attr('height', height);
     } else {
       // Update clip path dimensions if needed
-      svg.select('#chart-clip rect')
+      svg.select(`#${clipId} rect`)
         .attr('width', width - MARGIN.left - MARGIN.right)
         .attr('height', height);
     }
@@ -521,277 +921,12 @@ export function Timeline({
     const chartCenterX = MARGIN.left + (width - MARGIN.left - MARGIN.right) / 2;
     chartCenterXRef.current = chartCenterX;
 
-    // === DETECT WHEN TO RECREATE ZOOM ===
-    // Only recreate zoom on first render or significant dimension changes
-    // Do NOT recreate on timeRange changes - this causes oscillation feedback loops
-    // when zooming out triggers more data loading which changes timeRange
-    const dimensionsChanged = Math.abs(prevDimensionsRef.current.width - width) > 10;
-    const shouldRecreateZoom = isFirstRender || !zoomRef.current || dimensionsChanged;
-
     // Update tracking refs
     prevDimensionsRef.current = { width, height };
     prevTimeRangeRef.current = { start: timeRange.start.getTime(), end: timeRange.end.getTime() };
 
-    // Create/recreate zoom behavior when needed - use refs in handlers to avoid stale closures
-    let zoom = zoomRef.current;
-    if (shouldRecreateZoom) {
-      // Cap zoom-out so at most 3 days are visible (prevents freezing)
-      const totalDomainMs = timeRange.end.getTime() - timeRange.start.getTime();
-      const maxVisibleMs = 3 * 24 * 60 * 60 * 1000; // 3 days
-      const minScale = Math.max(1, totalDomainMs / maxVisibleMs);
-
-      zoom = d3.zoom<SVGSVGElement, unknown>()
-        .scaleExtent([minScale, 1440])
-        .extent([[MARGIN.left, 0], [width - MARGIN.right, height]])
-        // Constrain panning: playhead can't go before data start or past "now"
-        .constrain((transform, _extent, _translateExtent) => {
-          const now = new Date();
-          const currentScale = xScaleRef.current;
-          if (!currentScale) return transform;
-
-          // Validate transform
-          if (!isFinite(transform.x) || !isFinite(transform.k) || transform.k <= 0) {
-            return transform;
-          }
-
-          // Use ref for chartCenterX to avoid stale closure
-          const centerX = chartCenterXRef.current;
-          if (!isFinite(centerX)) return transform;
-
-          // Get the current data boundaries from the scale's domain
-          const [domainStart] = currentScale.domain();
-
-          // Calculate what the center timestamp would be with this transform
-          const testScale = transform.rescaleX(currentScale);
-          const centerTimestamp = testScale.invert(centerX);
-
-          // Validate calculations
-          if (!centerTimestamp || !isFinite(centerTimestamp.getTime())) {
-            return transform;
-          }
-
-          let newTransform = transform;
-
-          // If center would be before data start, clamp it
-          if (centerTimestamp < domainStart) {
-            const startX = testScale(domainStart);
-            if (isFinite(startX)) {
-              const shiftNeeded = centerX - startX;
-              newTransform = d3.zoomIdentity
-                .translate(newTransform.x + shiftNeeded, newTransform.y)
-                .scale(newTransform.k);
-            }
-          }
-
-          // Recalculate center with potentially adjusted transform
-          const adjustedScale = newTransform.rescaleX(currentScale);
-          const adjustedCenter = adjustedScale.invert(centerX);
-
-          // If center would be in the future, clamp it
-          if (adjustedCenter && adjustedCenter > now) {
-            const nowX = adjustedScale(now);
-            if (isFinite(nowX)) {
-              const shiftNeeded = centerX - nowX;
-              newTransform = d3.zoomIdentity
-                .translate(newTransform.x + shiftNeeded, newTransform.y)
-                .scale(newTransform.k);
-            }
-          }
-
-          return newTransform;
-        })
-      // Center zoom on the playhead (center of chart) instead of mouse position
-      .wheelDelta((event) => {
-        // Halved multipliers for smoother, more granular zoom stepping
-        return -event.deltaY * (event.deltaMode === 1 ? 0.025 : event.deltaMode ? 1 : 0.001);
-      })
-      .on('start', () => {
-        // Mark that we're actively zooming - prevents unnecessary React re-renders
-        isZoomingRef.current = true;
-        // Safety: set a timeout to auto-release stuck drag after 5 seconds of no 'end' event
-        if (dragSafetyTimeoutRef.current) {
-          clearTimeout(dragSafetyTimeoutRef.current);
-        }
-        dragSafetyTimeoutRef.current = setTimeout(() => {
-          if (isZoomingRef.current) {
-            console.warn('Drag safety: auto-releasing stuck drag state');
-            isZoomingRef.current = false;
-            // Force sync state
-            setCurrentZoom(zoomTransformRef.current);
-            setVisibleTimeRange(visibleTimeRangeRef.current);
-            setPlayheadTimestamp(playheadTimestampRef.current);
-            if (playheadTimestampRef.current && visibleTimeRangeRef.current) {
-              onPlayheadChangeRef.current?.(playheadTimestampRef.current, visibleTimeRangeRef.current, zoomTransformRef.current.k);
-            }
-          }
-        }, 5000);
-      })
-      .on('zoom', (event) => {
-        const transform = event.transform;
-        const currentScale = xScaleRef.current;
-        if (!currentScale) return;
-
-        // Use ref for chartCenterX to avoid stale closure
-        const centerX = chartCenterXRef.current;
-
-        // Create new scale based on zoom (already constrained by .constrain())
-        const newXScale = transform.rescaleX(currentScale);
-
-        // Calculate center timestamp (playhead position)
-        const centerTimestamp = newXScale.invert(centerX);
-
-        zoomTransformRef.current = transform;
-        const visibleStart = newXScale.invert(MARGIN.left);
-        const visibleEnd = newXScale.invert(width - MARGIN.right);
-        visibleTimeRangeRef.current = { start: visibleStart, end: visibleEnd };
-
-        playheadTimestampRef.current = centerTimestamp;
-
-        if (zoomRafRef.current) {
-          cancelAnimationFrame(zoomRafRef.current);
-        }
-        zoomRafRef.current = requestAnimationFrame(() => {
-          const latestTransform = zoomTransformRef.current;
-          const latestScale = latestTransform.rescaleX(currentScale);
-          const latestCenterTimestamp = latestScale.invert(centerX);
-          const latestVisibleStart = latestScale.invert(MARGIN.left);
-          const latestVisibleEnd = latestScale.invert(width - MARGIN.right);
-
-          const now = performance.now();
-          if (now - lastAxisUpdateRef.current > 100) {
-            lastAxisUpdateRef.current = now;
-            const xAxisGroup = svg.select<SVGGElement>('.x-axis');
-            const chartWidth = width - MARGIN.left - MARGIN.right;
-            const numTicks = Math.max(3, Math.floor(chartWidth / 100));
-            xAxisGroup.call(
-              d3.axisTop(latestScale)
-                .ticks(numTicks)
-                .tickFormat((d) => multiScaleFormat(d as Date)) as any
-            );
-            xAxisGroup.select('.domain').attr('stroke', borderColor);
-            xAxisGroup.selectAll('.tick line').attr('stroke', borderColor);
-            xAxisGroup.selectAll('.tick text').attr('fill', mutedForeground).attr('font-size', '11px');
-          }
-
-          svg.select('.grid-lines')
-            .selectAll<SVGLineElement, Date>('line')
-            .attr('x1', (d) => latestScale(d))
-            .attr('x2', (d) => latestScale(d));
-
-          svg.select('.day-boundaries')
-            .selectAll<SVGGElement, Date>('.day-boundary')
-            .each(function(d) {
-              const g = d3.select(this);
-              const x = latestScale(d);
-              g.select('line').attr('x1', x).attr('x2', x);
-              g.select('rect').attr('x', x - 45);
-              g.select('text').attr('x', x);
-            });
-
-          svg.select('.loading-indicators')
-            .selectAll<SVGRectElement, unknown>('.loading-shimmer-bg')
-            .each(function() {
-              const rect = d3.select(this);
-              const dayStart = new Date(parseFloat(rect.attr('data-day-start') || '0'));
-              if (!isNaN(dayStart.getTime())) {
-                const dayEnd = new Date(dayStart);
-                dayEnd.setDate(dayEnd.getDate() + 1);
-                rect.attr('x', latestScale(dayStart)).attr('width', Math.abs(latestScale(dayEnd) - latestScale(dayStart)));
-              }
-            });
-
-          svg.select('.loading-indicators')
-            .selectAll<SVGLineElement, unknown>('.loading-pulse-line')
-            .each(function() {
-              const line = d3.select(this);
-              const dayStart = new Date(parseFloat(line.attr('data-day-start') || '0'));
-              if (!isNaN(dayStart.getTime())) {
-                const x = latestScale(dayStart);
-                line.attr('x1', x).attr('x2', x);
-              }
-            });
-
-          svg.selectAll<SVGRectElement, EventDot>('.event-dot')
-            .attr('x', (d) => latestScale(d.timestamp) - BAR_WIDTH / 2);
-
-          svg.selectAll<SVGRectElement, EventDot>('.event-bar')
-            .attr('x', (d) => latestScale(d.timestamp))
-            .attr('width', (d) => {
-              const endT = d.timestamp.getTime() + ((d.duration || 0) * 1000);
-              const endTime = Math.min(endT, nowTimeRef.current);
-              return Math.max(BAR_MIN_PIXELS, latestScale(new Date(endTime)) - latestScale(d.timestamp));
-            });
-
-          svg.select('.now-line')
-            .attr('x1', (d: any) => latestScale(d))
-            .attr('x2', (d: any) => latestScale(d));
-
-          svg.select('.now-text')
-            .attr('x', (d: any) => latestScale(d));
-
-          const formatDateLabel = (date: Date): string => {
-            return date.toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' });
-          };
-
-          const formatCenterLabel = (date: Date): string => {
-            const dayPart = date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-            const timePart = date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
-            return `${dayPart} • ${timePart}`;
-          };
-
-          svg.select('.date-label-left').text(formatDateLabel(latestVisibleStart));
-          svg.select('.date-label-right').text(formatDateLabel(latestVisibleEnd));
-          svg.select('.date-label-center').text(formatCenterLabel(latestCenterTimestamp));
-        });
-      })
-      .on('end', () => {
-        isZoomingRef.current = false;
-        lastAxisUpdateRef.current = 0;
-
-        if (dragSafetyTimeoutRef.current) {
-          clearTimeout(dragSafetyTimeoutRef.current);
-          dragSafetyTimeoutRef.current = null;
-        }
-
-        if (zoomSyncTimeoutRef.current) {
-          clearTimeout(zoomSyncTimeoutRef.current);
-        }
-        zoomSyncTimeoutRef.current = setTimeout(() => {
-          zoomSyncTimeoutRef.current = null;
-          setCurrentZoom(zoomTransformRef.current);
-          setVisibleTimeRange(visibleTimeRangeRef.current);
-          setPlayheadTimestamp(playheadTimestampRef.current);
-          if (playheadTimestampRef.current && visibleTimeRangeRef.current && !isRestoringStateRef.current) {
-            onPlayheadChangeRef.current?.(playheadTimestampRef.current, visibleTimeRangeRef.current, zoomTransformRef.current.k);
-          }
-        }, 150);
-      });
-
-      // Store zoom reference
-      zoomRef.current = zoom;
-
-      // Apply zoom to SVG (only on first render)
-      svg.call(zoom);
-
-      // Override wheel behavior to zoom centered on playhead instead of mouse position
-      // PERFORMANCE: No transition on wheel - direct zoom for instant response
-      svg.on('wheel.zoom', function(event: WheelEvent) {
-        event.preventDefault();
-        // Larger zoom steps: 0.75x zoom out, 1.33x zoom in (was 0.9/1.1)
-        const direction = event.deltaY > 0 ? 0.75 : 1.33;
-        const svgNode = svg.node();
-        if (svgNode && zoomRef.current) {
-          // Use ref for chartCenterX to avoid stale closure after resize
-          // Direct call without transition - prevents stacking animations that kill perf
-          svg.call(
-            zoomRef.current.scaleBy as any,
-            direction,
-            [chartCenterXRef.current, height / 2]
-          );
-        }
-      });
-    }
-    // End of first-render zoom setup
+    // Zoom behavior is managed by a separate effect (useEffect below with [dimensions] dep)
+    const zoom = zoomRef.current;
 
     // Get or create chart group
     let chartGroup = svg.select<SVGGElement>('.chart-group');
@@ -826,26 +961,6 @@ export function Timeline({
       .attr('width', width - MARGIN.left - MARGIN.right)
       .attr('height', yScale.bandwidth())
       .attr('fill', (_, i) => (i % 2 === 0 ? mutedColor : 'transparent'));
-
-    // Multi-scale time formatting (marmelab EventDrops style)
-    const formatMillisecond = d3.timeFormat('.%L');
-    const formatSecond = d3.timeFormat(':%S');
-    const formatMinute = d3.timeFormat('%-I:%M %p');
-    const formatHour = d3.timeFormat('%-I %p');
-    const formatDay = d3.timeFormat('%a %d');
-    const formatWeek = d3.timeFormat('%b %d');
-    const formatMonth = d3.timeFormat('%B');
-    const formatYear = d3.timeFormat('%Y');
-
-    const multiScaleFormat = (date: Date): string => {
-      return (d3.timeSecond(date) < date ? formatMillisecond
-        : d3.timeMinute(date) < date ? formatSecond
-        : d3.timeHour(date) < date ? formatMinute
-        : d3.timeDay(date) < date ? formatHour
-        : d3.timeMonth(date) < date ? (d3.timeWeek(date) < date ? formatDay : formatWeek)
-        : d3.timeYear(date) < date ? formatMonth
-        : formatYear)(date);
-    };
 
     // Create or update X-axis (time)
     let xAxisGroup = chartGroup.select<SVGGElement>('.x-axis');
@@ -949,119 +1064,12 @@ export function Timeline({
         .text(dateLabel);
     });
 
-    // Add loading indicators at edges where data is still loading - uses data join
-    // Helper to convert Date to YYYY-MM-DD string
-    const getDateStr = (date: Date): string => {
-      const year = date.getFullYear();
-      const month = String(date.getMonth() + 1).padStart(2, '0');
-      const day = String(date.getDate()).padStart(2, '0');
-      return `${year}-${month}-${day}`;
-    };
-
-    // Create shimmer gradient once (in defs)
-    const defs = svg.select('defs');
-    if (defs.select('#loading-shimmer').empty()) {
-      const loadingGradient = defs.append('linearGradient')
-        .attr('id', 'loading-shimmer')
-        .attr('x1', '0%')
-        .attr('y1', '0%')
-        .attr('x2', '100%')
-        .attr('y2', '0%');
-
-      loadingGradient.append('stop')
-        .attr('offset', '0%')
-        .attr('stop-color', '#3b82f6')
-        .attr('stop-opacity', 0.1);
-
-      loadingGradient.append('stop')
-        .attr('offset', '50%')
-        .attr('stop-color', '#3b82f6')
-        .attr('stop-opacity', 0.4);
-
-      loadingGradient.append('stop')
-        .attr('offset', '100%')
-        .attr('stop-color', '#3b82f6')
-        .attr('stop-opacity', 0.1);
-
-      // Animate the gradient
-      loadingGradient.append('animate')
-        .attr('attributeName', 'x1')
-        .attr('values', '-100%;100%')
-        .attr('dur', '1.5s')
-        .attr('repeatCount', 'indefinite');
-
-      loadingGradient.append('animate')
-        .attr('attributeName', 'x2')
-        .attr('values', '0%;200%')
-        .attr('dur', '1.5s')
-        .attr('repeatCount', 'indefinite');
-    }
-
-    // Get or create loading group
-    let loadingGroup = chartGroup.select<SVGGElement>('.loading-indicators');
-    if (loadingGroup.empty()) {
-      loadingGroup = chartGroup.append('g')
-        .attr('class', 'loading-indicators')
-        .attr('clip-path', 'url(#chart-clip)');
-    }
-
-    // Build array of loading day dates
-    const loadingDayDates: Date[] = [];
-    if (loadingDays && loadingDays.size > 0) {
-      const allDays = d3.timeDay.range(timeRange.start, new Date(timeRange.end.getTime() + 86400000));
-      allDays.forEach((dayStart) => {
-        const dayStr = getDateStr(dayStart);
-        if (loadingDays.has(dayStr)) {
-          loadingDayDates.push(dayStart);
-        }
-      });
-    }
-
-    // Data join for loading shimmer rects
-    loadingGroup.selectAll<SVGRectElement, Date>('.loading-shimmer-bg')
-      .data(loadingDayDates, d => d.getTime().toString())
-      .join(
-        enter => enter.append('rect')
-          .attr('class', 'loading-shimmer-bg')
-          .attr('fill', 'url(#loading-shimmer)')
-          .attr('pointer-events', 'none'),
-        update => update,
-        exit => exit.remove()
-      )
-      .attr('data-day-start', d => d.getTime().toString())
-      .attr('x', d => xScale(d))
-      .attr('y', MARGIN.top)
-      .attr('width', d => {
-        const dayEnd = new Date(d);
-        dayEnd.setDate(dayEnd.getDate() + 1);
-        return Math.abs(xScale(dayEnd) - xScale(d));
-      })
-      .attr('height', height - MARGIN.top - MARGIN.bottom);
-
-    // Data join for loading pulse lines
-    loadingGroup.selectAll<SVGLineElement, Date>('.loading-pulse-line')
-      .data(loadingDayDates, d => d.getTime().toString())
-      .join(
-        enter => enter.append('line')
-          .attr('class', 'loading-pulse-line')
-          .attr('stroke', '#3b82f6')
-          .attr('stroke-width', 3)
-          .attr('opacity', 0.6),
-        update => update,
-        exit => exit.remove()
-      )
-      .attr('data-day-start', d => d.getTime().toString())
-      .attr('x1', d => xScale(d))
-      .attr('x2', d => xScale(d))
-      .attr('y1', MARGIN.top)
-      .attr('y2', height - MARGIN.bottom);
-
     // Get or create clipped group for dots
     let dotsGroup = chartGroup.select<SVGGElement>('.dots-group');
     if (dotsGroup.empty()) {
       dotsGroup = chartGroup.append('g')
         .attr('class', 'dots-group')
-        .attr('clip-path', 'url(#chart-clip)');
+        .attr('clip-path', `url(#${clipId})`);
     }
 
     // Flatten all events for rendering
@@ -1075,8 +1083,9 @@ export function Timeline({
     // If we have a saved zoom transform, use that. Otherwise, compute what the
     // initial ~3h zoom would be.
     let effectiveScale = xScale;
-    if (zoomTransformRef.current && zoomTransformRef.current.k !== 1) {
-      // Use existing zoom transform
+    // Bug #11 fix: always use saved transform if chart is initialized (even at k===1).
+    // Previously, k===1 fell through to base scale, misclassifying events.
+    if (chartInitializedRef.current && zoomTransformRef.current) {
       effectiveScale = zoomTransformRef.current.rescaleX(xScale);
     } else if (!chartInitializedRef.current) {
       // First render: compute initial zoom level (~3h visible)
@@ -1093,49 +1102,28 @@ export function Timeline({
       effectiveScale = simulatedTransform.rescaleX(xScale);
     }
 
-    // Helper to determine if event should render as bar vs dot
-    const shouldRenderAsBar = (
-      event: EventDot,
-      scale: d3.ScaleTime<number, number>
-    ): boolean => {
-      if (!event.duration || event.duration < BAR_MIN_DURATION) return false;
-
-      const startTime = event.timestamp.getTime();
-      const endTime = startTime + (event.duration * 1000);
-      const pixelWidth = scale(new Date(endTime)) - scale(event.timestamp);
-
-      return pixelWidth >= BAR_MIN_PIXELS;
-    };
-
     // Update nowTimeRef at the start of each render cycle for consistency
     nowTimeRef.current = Date.now();
 
     // Filter out events that start after "now" (defensive - shouldn't happen but prevents future rendering)
     const eventsBeforeNow = allEvents.filter((e) => e.timestamp.getTime() <= nowTimeRef.current);
 
-    // Split events into dots and bars based on duration - use effective (zoomed) scale
-    const dotEvents = eventsBeforeNow.filter((e) => !shouldRenderAsBar(e, effectiveScale));
-    const barEvents = eventsBeforeNow.filter((e) => shouldRenderAsBar(e, effectiveScale));
+    // Split events into dots and bars based on duration - use effective (zoomed) scale,
+    // then pixel-deduplicate each set independently (a dot and bar at same pixel both survive)
+    const rawDotEvents = eventsBeforeNow.filter((e) => !shouldRenderAsBar(e, effectiveScale));
+    const rawBarEvents = eventsBeforeNow.filter((e) => shouldRenderAsBar(e, effectiveScale));
+    const dotEvents = deduplicateByPixel(rawDotEvents, effectiveScale);
+    const barEvents = deduplicateByPixel(rawBarEvents, effectiveScale);
 
     // Helper to check if event is selected (uses ref to avoid stale closure)
     const isSelected = (d: EventDot) => selectedEventKeysRef.current?.has(d.id) || false;
-
-    // Helper to get darker stroke color
-    const getDarkerColor = (color: string) => {
-      // Simple darkening by reducing brightness
-      const c = d3.color(color);
-      if (c) {
-        return c.darker(0.5).toString();
-      }
-      return color;
-    };
 
     // Create thin bars for brief/instant events (instead of circles)
     dotsGroup.selectAll('.event-dot')
       .data(dotEvents, (d) => (d as EventDot).id)
       .join('rect')
       .attr('class', 'event-dot')
-      .attr('x', (d) => xScale(d.timestamp) - BAR_WIDTH / 2)
+      .attr('x', (d) => effectiveScale(d.timestamp) - BAR_WIDTH / 2)
       .attr('y', (d) => (yScale(d.row) || 0) + yScale.bandwidth() / 2 - DOT_RADIUS)
       .attr('width', BAR_WIDTH)
       .attr('height', DOT_RADIUS * 2)
@@ -1189,15 +1177,12 @@ export function Timeline({
       .data(barEvents, (d) => (d as EventDot).id)
       .join('rect')
       .attr('class', 'event-bar')
-      .attr('x', (d) => xScale(d.timestamp))
+      .attr('x', (d) => effectiveScale(d.timestamp))
       .attr('y', (d) => (yScale(d.row) || 0) + yScale.bandwidth() / 2 - DOT_RADIUS)
       .attr('width', (d) => {
-        const startTime = d.timestamp.getTime();
-        const rawEndTime = startTime + ((d.duration || 0) * 1000);
-        // Cap end time at "now" to prevent bars extending into the future
-        // Use nowTimeRef for consistency with NOW line position
-        const endTime = Math.min(rawEndTime, nowTimeRef.current);
-        return Math.max(BAR_MIN_PIXELS, xScale(new Date(endTime)) - xScale(d.timestamp));
+        // Use pre-computed endTimeMs to avoid new Date() allocations
+        const endTime = Math.min(d.endTimeMs || d.timestamp.getTime(), nowTimeRef.current);
+        return Math.max(BAR_MIN_PIXELS, effectiveScale(endTime) - effectiveScale(d.timestamp));
       })
       .attr('height', DOT_RADIUS * 2)
       // No rx/ry - sharp corners for rectangles
@@ -1380,41 +1365,11 @@ export function Timeline({
     }
     playheadMarker.attr('points', `${chartCenterX - 6},${MARGIN.top - 2} ${chartCenterX + 6},${MARGIN.top - 2} ${chartCenterX},${MARGIN.top + 6}`);
 
-    // Store current time range for comparison
-    previousTimeRangeRef.current = {
-      start: timeRange.start.getTime(),
-      end: timeRange.end.getTime(),
-    };
-
     // Bottom date labels (marmelab style) - fixed position labels - select-or-create
     let dateLabelsGroup = svg.select<SVGGElement>('.date-labels-group');
     if (dateLabelsGroup.empty()) {
       dateLabelsGroup = svg.append('g').attr('class', 'date-labels-group');
     }
-
-    // Format for date labels: "22 January 2026"
-    const formatDateLabel = (date: Date): string => {
-      return date.toLocaleDateString('en-US', {
-        day: 'numeric',
-        month: 'long',
-        year: 'numeric',
-      });
-    };
-
-    // Format for center label: "Thu, Jan 22 • 11:59 AM"
-    const formatCenterLabel = (date: Date): string => {
-      const dayPart = date.toLocaleDateString('en-US', {
-        weekday: 'short',
-        month: 'short',
-        day: 'numeric',
-      });
-      const timePart = date.toLocaleTimeString('en-US', {
-        hour: 'numeric',
-        minute: '2-digit',
-        hour12: true,
-      });
-      return `${dayPart} • ${timePart}`;
-    };
 
     // Left date label (range start) - select-or-create
     let dateLabelLeft = dateLabelsGroup.select<SVGTextElement>('.date-label-left');
@@ -1483,11 +1438,21 @@ export function Timeline({
     // BUT: Skip if there's a pending navigation target - navigation logic below will handle it
     const hasExistingPlayhead = playheadTimestampRef.current !== null;
     const isDataReload = !isFirstRender && hasExistingPlayhead;
-    const hasPendingNavigation = targetPlayheadDate !== null;
+    // Bug #6 fix: use ref (synced via effect declared earlier) instead of prop.
+    // The prop isn't in this effect's dep array, so reading it directly was stale.
+    const hasPendingNavigation = targetPlayheadDateRef.current !== null;
 
     if (isDataReload && !hasPendingNavigation && zoom) {
       const savedTimestamp = playheadTimestampRef.current!;
-      const savedZoomLevel = zoomTransformRef.current.k || 1;
+      // Bug #3 fix: convert visible duration to k for the new domain.
+      // Using raw zoomTransformRef.current.k would produce wrong visible span when
+      // domain width changes (e.g., navigating from 2-day to 3-day loaded range).
+      const currentVisible = visibleTimeRangeRef.current;
+      const totalDomainMs = timeRange.end.getTime() - timeRange.start.getTime();
+      const savedVisibleMs = currentVisible
+        ? currentVisible.end.getTime() - currentVisible.start.getTime()
+        : 3 * 60 * 60 * 1000; // Default 3h
+      const savedZoomLevel = Math.max(1, totalDomainMs / savedVisibleMs);
 
       // Check if saved timestamp is within the new time range
       // If not, we need to clamp it to avoid positioning outside visible area
@@ -1512,16 +1477,20 @@ export function Timeline({
             .translate(translateX, 0)
             .scale(savedZoomLevel);
 
-          // Set flag to prevent zoom handler from triggering feedback loop
-          isRestoringStateRef.current = true;
+          // Set flag to prevent zoom end handler from triggering feedback loop.
+          // Flag is cleared deterministically in the zoom 'end' handler (not a timeout).
+          restoreCountRef.current++;
 
           // Apply without transition for instant restore
           svg.call(zoom.transform as any, restoredTransform);
 
-          // Clear flag after a short delay (let zoom handler complete)
+          // Bug #22 fix: safety — if zoom-end doesn't fire (e.g., interrupted),
+          // decrement ourselves after 500ms to prevent permanent stuck state.
           setTimeout(() => {
-            isRestoringStateRef.current = false;
-          }, 200);
+            if (restoreCountRef.current > 0) {
+              restoreCountRef.current--;
+            }
+          }, 500);
         }
       }
 
@@ -1567,65 +1536,192 @@ export function Timeline({
       onPlayheadChangeRef.current?.(initialCenterTime, initialVisibleRange, initialK);
     }
 
-    // === HANDLE PENDING NAVIGATION ===
-    // This runs AFTER scale is created, using the fresh local `xScale` variable
-    // which eliminates the race condition that plagued the separate useEffect approach
-    // NOTE: Read directly from prop (targetPlayheadDate), not from ref, because
-    // the ref sync effect might not have run yet when this effect runs.
-    const pendingTarget = targetPlayheadDate;
-    if (pendingTarget && zoomRef.current) {
-      const targetTime = pendingTarget.getTime();
-
-      // Only navigate if target is within the current loaded time range
-      if (targetTime >= timeRange.start.getTime() && targetTime <= timeRange.end.getTime()) {
-        // Use the FRESH xScale (local variable, not stale ref!)
-        const targetX = xScale(pendingTarget);
-        // Calculate zoom level for ~3h visible dynamically based on domain size
-        const desiredVisibleMs = 3 * 60 * 60 * 1000; // 3 hours
-        const totalDomainMs = timeRange.end.getTime() - timeRange.start.getTime();
-        const targetK = Math.max(1, totalDomainMs / desiredVisibleMs);
-        const newTx = chartCenterX - targetX * targetK;
-        const navigationTransform = d3.zoomIdentity.translate(newTx, 0).scale(targetK);
-
-        // Use shorter duration for first render, normal for subsequent navigations
-        const duration = chartInitializedRef.current ? 500 : 0;
-
-        if (duration > 0) {
-          svg.transition()
-            .duration(duration)
-            .ease(d3.easeCubicInOut)
-            .call(zoomRef.current.transform as any, navigationTransform)
-            .on('end', () => {
-              onTargetReachedRef.current?.();
-            });
-        } else {
-          // Instant navigation on first render
-          svg.call(zoomRef.current.transform as any, navigationTransform);
-          onTargetReachedRef.current?.();
-        }
-      }
-    }
-
     // Mark chart as initialized - subsequent renders will use enter/update/exit pattern
     chartInitializedRef.current = true;
 
-  // NOTE: Callbacks (onEventClick, onSelectionChange, onPlayheadChange) are stored in refs
-  // to prevent this effect from re-running when parent re-renders with new callback refs.
-  // selectedEventKeys is also stored in a ref for the same reason.
-  // targetPlayheadDate is included to trigger navigation when user clicks Today/Yesterday/etc.
-  }, [timelineData, dimensions, getComputedColor, loadingDays, targetPlayheadDate]);
+  // loadingDays and targetPlayheadDate removed — each has its own dedicated effect below.
+  // zoomBucket triggers re-dedup after significant zoom changes (Bug 3 fix).
+  }, [timelineData, dimensions, getComputedColor, zoomBucket]);
 
-  // Reset zoom handler - pans to center of time range at default zoom level
+  // === LOADING INDICATORS EFFECT ===
+  // Separated from main effect so loading state changes only update shimmers,
+  // not the entire 700+ line chart rebuild.
+  useEffect(() => {
+    const svg = d3.select(svgRef.current);
+    if (!svg.node() || !xScaleRef.current || !timelineData) return;
+
+    const { height } = dimensions;
+    const { timeRange } = timelineData;
+    const baseScale = xScaleRef.current;
+    // Use zoomed scale for correct positioning when zoomed in (Bug 4 fix).
+    // Without this, shimmers appear at the unzoomed position.
+    const zoomTransform = zoomTransformRef.current;
+    const xScale = (zoomTransform && zoomTransform.k !== 1)
+      ? zoomTransform.rescaleX(baseScale)
+      : baseScale;
+    const chartGroup = svg.select<SVGGElement>('.chart-group');
+    if (chartGroup.empty()) return;
+
+    // Create shimmer gradient once (in defs)
+    const defs = svg.select('defs');
+    if (defs.select(`#${shimmerId}`).empty()) {
+      const loadingGradient = defs.append('linearGradient')
+        .attr('id', shimmerId)
+        .attr('x1', '0%')
+        .attr('y1', '0%')
+        .attr('x2', '100%')
+        .attr('y2', '0%');
+
+      loadingGradient.append('stop')
+        .attr('offset', '0%')
+        .attr('stop-color', '#3b82f6')
+        .attr('stop-opacity', 0.1);
+      loadingGradient.append('stop')
+        .attr('offset', '50%')
+        .attr('stop-color', '#3b82f6')
+        .attr('stop-opacity', 0.4);
+      loadingGradient.append('stop')
+        .attr('offset', '100%')
+        .attr('stop-color', '#3b82f6')
+        .attr('stop-opacity', 0.1);
+
+      loadingGradient.append('animate')
+        .attr('attributeName', 'x1')
+        .attr('values', '-100%;100%')
+        .attr('dur', '1.5s')
+        .attr('repeatCount', 'indefinite');
+      loadingGradient.append('animate')
+        .attr('attributeName', 'x2')
+        .attr('values', '0%;200%')
+        .attr('dur', '1.5s')
+        .attr('repeatCount', 'indefinite');
+    }
+
+    // Get or create loading group
+    let loadingGroup = chartGroup.select<SVGGElement>('.loading-indicators');
+    if (loadingGroup.empty()) {
+      loadingGroup = chartGroup.append('g')
+        .attr('class', 'loading-indicators')
+        .attr('clip-path', `url(#${clipId})`);
+    }
+
+    // Build array of loading day dates
+    const loadingDayDates: Date[] = [];
+    if (loadingDays && loadingDays.size > 0) {
+      const allDays = d3.timeDay.range(timeRange.start, new Date(timeRange.end.getTime() + 86400000));
+      allDays.forEach((dayStart) => {
+        const dayStr = getDateStr(dayStart);
+        if (loadingDays.has(dayStr)) {
+          loadingDayDates.push(dayStart);
+        }
+      });
+    }
+
+    // Data join for loading shimmer rects
+    loadingGroup.selectAll<SVGRectElement, Date>('.loading-shimmer-bg')
+      .data(loadingDayDates, d => d.getTime().toString())
+      .join(
+        enter => enter.append('rect')
+          .attr('class', 'loading-shimmer-bg')
+          .attr('fill', `url(#${shimmerId})`)
+          .attr('pointer-events', 'none'),
+        update => update,
+        exit => exit.remove()
+      )
+      .attr('data-day-start', d => d.getTime().toString())
+      .attr('x', d => xScale(d))
+      .attr('y', MARGIN.top)
+      .attr('width', d => {
+        const dayEnd = new Date(d);
+        dayEnd.setDate(dayEnd.getDate() + 1);
+        return Math.abs(xScale(dayEnd) - xScale(d));
+      })
+      .attr('height', height - MARGIN.top - MARGIN.bottom);
+
+    // Data join for loading pulse lines
+    loadingGroup.selectAll<SVGLineElement, Date>('.loading-pulse-line')
+      .data(loadingDayDates, d => d.getTime().toString())
+      .join(
+        enter => enter.append('line')
+          .attr('class', 'loading-pulse-line')
+          .attr('stroke', '#3b82f6')
+          .attr('stroke-width', 3)
+          .attr('opacity', 0.6),
+        update => update,
+        exit => exit.remove()
+      )
+      .attr('data-day-start', d => d.getTime().toString())
+      .attr('x1', d => xScale(d))
+      .attr('x2', d => xScale(d))
+      .attr('y1', MARGIN.top)
+      .attr('y2', height - MARGIN.bottom);
+  }, [loadingDays, dimensions, timelineData]);
+
+  // === NAVIGATION EFFECT (Phase 4: immediate visual feedback) ===
+  // Fires when targetPlayheadDate is set or when timelineData changes (new data loaded).
+  // If the target is within the current scale domain → animate immediately (snappy).
+  // If the target is outside (data not loaded yet) → skip, wait for data to arrive.
+  // When data arrives, timelineData changes → main effect updates xScaleRef → this re-runs.
+  useEffect(() => {
+    if (!targetPlayheadDate || !zoomRef.current || !xScaleRef.current) return;
+    const svg = d3.select(svgRef.current);
+    if (!svg.node()) return;
+
+    const xScale = xScaleRef.current;
+    const domain = xScale.domain();
+    const targetTime = targetPlayheadDate.getTime();
+
+    // Only navigate if target is within the current loaded scale domain.
+    // Without this check, navigating to a date outside the domain produces extreme
+    // transform values that crash WebKit (the Wails webview).
+    if (targetTime < domain[0].getTime() || targetTime > domain[1].getTime()) return;
+
+    const { width } = dimensions;
+    const chartCenterX = MARGIN.left + (width - MARGIN.left - MARGIN.right) / 2;
+
+    const targetX = xScale(targetPlayheadDate);
+
+    // Preserve the user's current zoom level instead of resetting to 3h.
+    // Calculate target k from current visible duration so the same time span
+    // stays visible after navigation (even if the domain width changes).
+    const totalDomainMs = domain[1].getTime() - domain[0].getTime();
+    const currentVisible = visibleTimeRangeRef.current;
+    const currentVisibleMs = currentVisible
+      ? currentVisible.end.getTime() - currentVisible.start.getTime()
+      : 3 * 60 * 60 * 1000; // Default 3h on first load
+    const targetK = Math.max(1, totalDomainMs / currentVisibleMs);
+
+    const newTx = chartCenterX - targetX * targetK;
+    const navigationTransform = d3.zoomIdentity.translate(newTx, 0).scale(targetK);
+
+    // First render: instant. Subsequent: fast 300ms animation.
+    const duration = chartInitializedRef.current ? 300 : 0;
+
+    if (duration > 0) {
+      svg.transition()
+        .duration(duration)
+        .ease(d3.easeCubicOut) // Starts fast, decelerates — feels snappier
+        .call(zoomRef.current.transform as any, navigationTransform)
+        .on('end', () => {
+          onTargetReachedRef.current?.();
+        });
+    } else {
+      svg.call(zoomRef.current.transform as any, navigationTransform);
+      onTargetReachedRef.current?.();
+    }
+  }, [targetPlayheadDate, dimensions, timelineData]);
+
+  // Reset zoom handler — centers on playhead (or now) at default zoom level (Bug #13 fix)
   const handleResetZoom = useCallback(() => {
     const svg = d3.select(svgRef.current);
     const zoom = zoomRef.current;
 
     if (!svg.node() || !zoom || !timelineData) return;
 
-    // Calculate center of time range
-    const centerTime = new Date(
-      (timelineData.timeRange.start.getTime() + timelineData.timeRange.end.getTime()) / 2
-    );
+    // Bug #13 fix: center on current playhead position (or now), not midpoint of data range.
+    // Users expect "reset" to return to where they are, not jump to an arbitrary midpoint.
+    const centerTime = playheadTimestampRef.current
+      || new Date(Math.min(Date.now(), timelineData.timeRange.end.getTime()));
 
     const currentScale = xScaleRef.current;
     if (!currentScale) return;
@@ -1647,8 +1743,12 @@ export function Timeline({
       .ease(d3.easeCubicOut)
       .call(zoom.transform as any, newTransform);
 
-    // Update state (reset zoom to ~3h visible)
-    const resetVisibleRange = timelineData.timeRange;
+    // Calculate ACTUAL visible range at the reset zoom level (not the full data range)
+    const resetScale = newTransform.rescaleX(currentScale);
+    const resetVisibleRange = {
+      start: resetScale.invert(MARGIN.left),
+      end: resetScale.invert(width - MARGIN.right),
+    };
     setVisibleTimeRange(resetVisibleRange);
     visibleTimeRangeRef.current = resetVisibleRange;
     setPlayheadTimestamp(centerTime);
@@ -1665,14 +1765,10 @@ export function Timeline({
     });
   };
 
-  // Empty state
-  if (!timelineData || timelineData.rows.length === 0) {
-    return (
-      <div className="flex items-center justify-center h-64 text-muted-foreground">
-        <p>No events to display</p>
-      </div>
-    );
-  }
+  // === ALL HOOKS MUST BE ABOVE THE EARLY RETURN ===
+  // React requires hooks to be called in the same order every render.
+  // When timelineData is null (e.g., navigating to a new day), these hooks
+  // must still be called — they just return empty/default values.
 
   // Get screenshots in visible range for filmstrip, sorted by timestamp
   const filmstripScreenshots = useMemo(() => {
@@ -1704,6 +1800,19 @@ export function Timeline({
 
     return closestIndex;
   }, [filmstripScreenshots, playheadTimestamp]);
+
+  // Clamp gallery index when filmstrip changes (Bug 7 fix + Bug #16 fix).
+  // Without this, navigating to a day with fewer screenshots leaves galleryIndex
+  // pointing past the end of the array. Also resets to 0 when no screenshots.
+  useEffect(() => {
+    if (filmstripScreenshots.length === 0) {
+      setGalleryIndex(0);
+    } else {
+      setGalleryIndex(prev =>
+        prev >= filmstripScreenshots.length ? filmstripScreenshots.length - 1 : prev
+      );
+    }
+  }, [filmstripScreenshots.length]);
 
   // Handle filmstrip thumbnail click - open gallery at that index
   const handleFilmstripClick = useCallback((index: number) => {
@@ -1752,8 +1861,19 @@ export function Timeline({
     }
   }, [visibleTimeRange, timelineData]);
 
+  // Derive empty state flag — but do NOT early return, because unmounting the SVG
+  // would detach D3 zoom and break drag/pan on subsequent renders.
+  const isEmpty = !timelineData || timelineData.rows.length === 0;
+
   return (
     <div className="relative w-full h-full flex flex-col">
+      {/* Empty state overlay — shown on top of the (hidden) SVG so it stays in the DOM.
+          pointer-events-none so drag/zoom still reach the SVG underneath. */}
+      {isEmpty && (
+        <div className="absolute inset-0 z-20 flex items-center justify-center text-muted-foreground pointer-events-none">
+          <p>No events to display</p>
+        </div>
+      )}
       {/* Filmstrip - horizontal strip of screenshots centered on playhead */}
       {/* Filmstrip - show if ANY screenshots exist (not just visible range) to prevent layout shift */}
       {screenshots && screenshots.length > 0 && (

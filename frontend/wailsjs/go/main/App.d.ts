@@ -84,6 +84,8 @@ export function ExportReport(arg1:number,arg2:string):Promise<string>;
 
 export function ForceCapture():Promise<string>;
 
+export function GenerateEnhancedWeeklyHTML(arg1:string,arg2:string):Promise<string>;
+
 export function GenerateProjectReport(arg1:string,arg2:string,arg3:boolean,arg4:number):Promise<service.Report>;
 
 export function GenerateReport(arg1:string,arg2:string,arg3:boolean):Promise<service.Report>;

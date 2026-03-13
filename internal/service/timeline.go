@@ -166,7 +166,21 @@ func (s *TimelineService) GetSessionsForDate(date string) ([]*SessionSummary, er
 		return nil, err
 	}
 
-	var summaries []*SessionSummary
+	// Collect session IDs for batch queries
+	sessionIDs := make([]int64, 0, len(sessions))
+	for _, sess := range sessions {
+		sessionIDs = append(sessionIDs, sess.ID)
+	}
+
+	// Batch fetch all related data (7 queries total instead of 6N+1)
+	summaryMap, _ := s.store.GetSummariesForSessions(sessionIDs)
+	focusMap, _ := s.store.GetFocusEventsBySessionIDs(sessionIDs)
+	shellMap, _ := s.store.HasShellBySessionIDs(sessionIDs)
+	gitMap, _ := s.store.HasGitBySessionIDs(sessionIDs)
+	filesMap, _ := s.store.HasFilesBySessionIDs(sessionIDs)
+	browserMap, _ := s.store.HasBrowserBySessionIDs(sessionIDs)
+
+	var result []*SessionSummary
 	for _, sess := range sessions {
 		summary := &SessionSummary{
 			ID:              sess.ID,
@@ -185,70 +199,59 @@ func (s *TimelineService) GetSessionsForDate(date string) ([]*SessionSummary, er
 		}
 
 		// Skip empty sessions (zero duration AND zero screenshots)
-		// These are sessions that were created but never captured any data
 		if !summary.IsOngoing && summary.ScreenshotCount == 0 &&
 			(summary.DurationSeconds == nil || *summary.DurationSeconds == 0) {
 			continue
 		}
 
-		// Get summary if exists
-		if sess.SummaryID.Valid {
-			sum, err := s.store.GetSummary(sess.SummaryID.Int64)
-			if err == nil && sum != nil {
-				summary.Summary = sum.Summary
-				if sum.Explanation.Valid {
-					summary.Explanation = sum.Explanation.String
+		// Populate summary from batch map
+		if sum, ok := summaryMap[sess.ID]; ok && sum != nil {
+			summary.Summary = sum.Summary
+			if sum.Explanation.Valid {
+				summary.Explanation = sum.Explanation.String
+			}
+			if sum.Confidence.Valid {
+				summary.Confidence = sum.Confidence.String
+			}
+			summary.Tags = sum.Tags
+		}
+
+		// Compute top apps from batch-fetched focus events
+		if events, ok := focusMap[sess.ID]; ok {
+			appDurations := make(map[string]float64)
+			for _, evt := range events {
+				friendlyName := GetFriendlyAppName(evt.AppName)
+				appDurations[friendlyName] += evt.DurationSeconds
+			}
+			type appDur struct {
+				name     string
+				duration float64
+			}
+			appList := make([]appDur, 0, len(appDurations))
+			for app, dur := range appDurations {
+				appList = append(appList, appDur{app, dur})
+			}
+			sort.Slice(appList, func(i, j int) bool {
+				return appList[i].duration > appList[j].duration
+			})
+			for i, app := range appList {
+				if i >= 3 {
+					break
 				}
-				if sum.Confidence.Valid {
-					summary.Confidence = sum.Confidence.String
-				}
-				summary.Tags = sum.Tags
+				summary.TopApps = append(summary.TopApps, app.name)
 			}
 		}
 
-		// Get top apps from focus events (use friendly names, deduplicated)
-		focusEvents, _ := s.store.GetWindowFocusEventsBySession(sess.ID)
-		appDurations := make(map[string]float64)
-		for _, evt := range focusEvents {
-			friendlyName := GetFriendlyAppName(evt.AppName)
-			appDurations[friendlyName] += evt.DurationSeconds
-		}
-		// Sort by duration descending and take top 3
-		type appDur struct {
-			name     string
-			duration float64
-		}
-		appList := make([]appDur, 0, len(appDurations))
-		for app, dur := range appDurations {
-			appList = append(appList, appDur{app, dur})
-		}
-		sort.Slice(appList, func(i, j int) bool {
-			return appList[i].duration > appList[j].duration
-		})
-		for i, app := range appList {
-			if i >= 3 {
-				break
-			}
-			summary.TopApps = append(summary.TopApps, app.name)
-		}
+		// Check data source presence from batch maps
+		summary.HasShell = shellMap[sess.ID]
+		summary.HasGit = gitMap[sess.ID]
+		summary.HasFiles = filesMap[sess.ID]
+		summary.HasBrowser = browserMap[sess.ID]
 
-		// Check for data source presence
-		shellCmds, _ := s.store.GetShellCommandsBySession(sess.ID)
-		summary.HasShell = len(shellCmds) > 0
-
-		gitCommits, _ := s.store.GetGitCommitsBySession(sess.ID)
-		summary.HasGit = len(gitCommits) > 0
-
-		fileEvents, _ := s.store.GetFileEventsBySession(sess.ID)
-		summary.HasFiles = len(fileEvents) > 0
-
-		browserVisits, _ := s.store.GetBrowserVisitsBySession(sess.ID)
-		summary.HasBrowser = len(browserVisits) > 0
-
-		summaries = append(summaries, summary)
+		result = append(result, summary)
 	}
 
-	return summaries, nil
+	return result, nil
 }
 
 // GetScreenshotsForSession returns paginated screenshots for a session.

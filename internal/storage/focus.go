@@ -327,6 +327,47 @@ func (s *Store) GetFocusEventsForBackfill(startTime, endTime int64) ([]*WindowFo
 	return events, rows.Err()
 }
 
+// GetFocusEventsBySessionIDs retrieves focus events for multiple sessions in a single query.
+// Returns a map of sessionID -> []*WindowFocusEvent for efficient batch lookup.
+func (s *Store) GetFocusEventsBySessionIDs(sessionIDs []int64) (map[int64][]*WindowFocusEvent, error) {
+	if len(sessionIDs) == 0 {
+		return make(map[int64][]*WindowFocusEvent), nil
+	}
+
+	placeholders := make([]interface{}, len(sessionIDs))
+	for i, id := range sessionIDs {
+		placeholders[i] = id
+	}
+
+	query := fmt.Sprintf(`
+		SELECT id, window_title, app_name, window_class,
+		       start_time, end_time, duration_seconds, session_id, created_at,
+		       project_id, project_confidence, project_source
+		FROM window_focus_events
+		WHERE session_id IN (?%s)
+		ORDER BY session_id, start_time ASC`,
+		repeatPlaceholder(len(sessionIDs)-1))
+
+	rows, err := s.db.Query(query, placeholders...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query focus events by session IDs: %w", err)
+	}
+	defer rows.Close()
+
+	events, err := scanFocusEvents(rows)
+	if err != nil {
+		return nil, err
+	}
+
+	result := make(map[int64][]*WindowFocusEvent)
+	for _, evt := range events {
+		if evt.SessionID.Valid {
+			result[evt.SessionID.Int64] = append(result[evt.SessionID.Int64], evt)
+		}
+	}
+	return result, nil
+}
+
 func scanFocusEvents(rows *sql.Rows) ([]*WindowFocusEvent, error) {
 	var events []*WindowFocusEvent
 	for rows.Next() {

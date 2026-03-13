@@ -88,19 +88,19 @@ export function useMultiDayTimelineData({
       return name;
     };
 
-    // Helper to add event to appropriate row
+    // Helper to add event to appropriate row (immutable — creates new object instead of mutating)
     const addToRow = (rowName: string, event: EventDot) => {
       const displayName = getDisplayName(rowName);
       const normalized = normalizeRowName(rowName);
 
-      // Update event's row to use display name
-      event.row = displayName;
+      // Create new event with display name instead of mutating the original
+      const eventWithRow = event.row !== displayName ? { ...event, row: displayName } : event;
 
       if (!rowMap.has(normalized)) {
         rowMap.set(normalized, []);
       }
-      rowMap.get(normalized)!.push(event);
-      allEvents.push(event);
+      rowMap.get(normalized)!.push(eventWithRow);
+      allEvents.push(eventWithRow);
     };
 
     // Process each day's data
@@ -127,6 +127,7 @@ export function useMultiDayTimelineData({
                 ? '#22c55e' // green-500 for merged "In Focus"
                 : getAppHexColor(appName);
 
+              const cappedDur = capDuration(dateStr, activity.startTime, activity.durationSeconds);
               const event: EventDot = {
                 id: makeEventKey('activity', activity.id),
                 originalId: activity.id,
@@ -134,7 +135,8 @@ export function useMultiDayTimelineData({
                 type: 'activity',
                 row: rowName,
                 label: activity.windowTitle || appName,
-                duration: capDuration(dateStr, activity.startTime, activity.durationSeconds),
+                duration: cappedDur,
+                endTimeMs: cappedDur ? activity.startTime * 1000 + cappedDur * 1000 : undefined,
                 color,
                 metadata: activity,
               };
@@ -176,6 +178,7 @@ export function useMultiDayTimelineData({
             if (isInFuture(event.timestamp)) continue;
 
             const rowName = 'Shell';
+            const shellDur = capDuration(dateStr, event.timestamp, event.durationSeconds);
             const dot: EventDot = {
               id: makeEventKey('shell', event.id),
               originalId: event.id,
@@ -183,7 +186,8 @@ export function useMultiDayTimelineData({
               type: 'shell',
               row: rowName,
               label: event.command,
-              duration: capDuration(dateStr, event.timestamp, event.durationSeconds),
+              duration: shellDur,
+              endTimeMs: shellDur ? event.timestamp * 1000 + shellDur * 1000 : undefined,
               color: EVENT_TYPE_COLORS.shell,
               metadata: event,
             };
@@ -200,6 +204,7 @@ export function useMultiDayTimelineData({
             if (isInFuture(event.timestamp)) continue;
 
             const rowName = event.browser || 'Browser';
+            const browserDur = capDuration(dateStr, event.timestamp, event.visitDurationSeconds);
             const dot: EventDot = {
               id: makeEventKey('browser', event.id),
               originalId: event.id,
@@ -207,7 +212,8 @@ export function useMultiDayTimelineData({
               type: 'browser',
               row: rowName,
               label: event.title || event.domain,
-              duration: capDuration(dateStr, event.timestamp, event.visitDurationSeconds),
+              duration: browserDur,
+              endTimeMs: browserDur ? event.timestamp * 1000 + browserDur * 1000 : undefined,
               color: getAppHexColor(event.browser || 'browser'),
               metadata: event,
             };
@@ -281,13 +287,14 @@ export function useMultiDayTimelineData({
           const color = stateColors[state.state] || stateColors.afk;
 
           const dot: EventDot = {
-            id: `activity-state-${dateStr}-${i}`,
-            originalId: i,
+            id: `activity-state-${dateStr}-${state.startTime}`,
+            originalId: state.startTime, // Use startTime as stable ID (not loop index — loop index would delete wrong DB row)
             timestamp: new Date(state.startTime * 1000),
             type: 'activity',
             row: rowName,
             label,
             duration: effectiveDuration,
+            endTimeMs: state.startTime * 1000 + effectiveDuration * 1000,
             color,
             metadata: {
               startTime: state.startTime,
@@ -332,6 +339,7 @@ export function useMultiDayTimelineData({
           const appList = topApps.slice(0, 3).join(', ');
           const moreApps = topApps.length > 3 ? ` +${topApps.length - 3}` : '';
 
+          const sessionDur = capDuration(dateStr, session.startTime, session.durationSeconds ?? undefined);
           const dot: EventDot = {
             id: makeEventKey('session', session.id),
             originalId: session.id,
@@ -339,7 +347,8 @@ export function useMultiDayTimelineData({
             type: 'session',
             row: rowName,
             label: session.summary || `Session: ${appList}${moreApps}`,
-            duration: capDuration(dateStr, session.startTime, session.durationSeconds ?? undefined),
+            duration: sessionDur,
+            endTimeMs: sessionDur ? session.startTime * 1000 + sessionDur * 1000 : undefined,
             color: EVENT_TYPE_COLORS.session,
             metadata: {
               explanation: session.explanation,
