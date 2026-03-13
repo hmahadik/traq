@@ -1836,8 +1836,12 @@ export function Timeline({
   }, []);
 
   // Prefetch thumbnails for filmstrip screenshots around playhead for snappy loading
+  // Bug #28 fix: cancelled flag prevents stale prefetch from creating Image objects
+  // after effect cleanup (e.g., rapid panning fires this effect many times).
   useEffect(() => {
     if (filmstripScreenshots.length === 0 || playheadScreenshotIndex < 0) return;
+
+    let cancelled = false;
 
     // Prefetch 5 screenshots before and after playhead
     const prefetchRange = 5;
@@ -1849,6 +1853,7 @@ export function Timeline({
       if (ss?.id) {
         // Prefetch thumbnail
         api.screenshots.getThumbnail(ss.id).then((url) => {
+          if (cancelled) return; // Effect was cleaned up — don't accumulate Image objects
           const img = new Image();
           img.src = url;
         }).catch(() => {
@@ -1856,6 +1861,8 @@ export function Timeline({
         });
       }
     }
+
+    return () => { cancelled = true; };
   }, [filmstripScreenshots, playheadScreenshotIndex]);
 
   // Calculate visible duration for zoom indicator
