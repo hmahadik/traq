@@ -855,9 +855,9 @@ export function Timeline({
       if (!zoomRef.current) return;
 
       if (event.shiftKey) {
-        // Shift+wheel: horizontal pan — scroll 2% of chart width per tick
+        // Shift+wheel: horizontal pan — scroll 1% of chart width per tick
         const chartWidth = dimensionsRef.current.width - MARGIN.left - MARGIN.right;
-        const panDelta = (event.deltaY > 0 ? -1 : 1) * chartWidth * 0.02;
+        const panDelta = (event.deltaY > 0 ? -1 : 1) * chartWidth * 0.01;
         svg.call(zoomRef.current.translateBy as any, panDelta, 0);
       } else {
         // Plain wheel: zoom centered on playhead — gentle 5% steps
@@ -884,7 +884,7 @@ export function Timeline({
       if (!zoomRef.current) return;
 
       const chartWidth = dimensionsRef.current.width - MARGIN.left - MARGIN.right;
-      const panDelta = (event.key === 'PageUp' ? 1 : -1) * chartWidth * 0.1;
+      const panDelta = (event.key === 'PageUp' ? 1 : -1) * chartWidth * 0.05;
       svg.call(zoomRef.current.translateBy as any, panDelta, 0);
     };
 
