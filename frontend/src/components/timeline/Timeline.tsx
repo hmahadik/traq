@@ -575,10 +575,12 @@ export function Timeline({
       const entry = entries[0];
       if (entry) {
         const { width } = entry.contentRect;
-        // Calculate height based on fixed row height
+        // Calculate height based on fixed row height, with a minimum so empty days
+        // don't collapse the timeline into a tiny strip
         const numRows = timelineData?.rows.length || 1;
         const calculatedHeight = MARGIN.top + MARGIN.bottom + numRows * rowHeight;
-        const newDims = { width, height: calculatedHeight };
+        const minHeight = container.clientHeight || 300;
+        const newDims = { width, height: Math.max(calculatedHeight, minHeight) };
         dimensionsRef.current = newDims; // Bug #9 fix: sync ref immediately
         setDimensions(newDims);
       }
@@ -846,16 +848,20 @@ export function Timeline({
     // Apply zoom to SVG
     svg.call(zoom);
 
-    // Override wheel behavior to zoom centered on playhead instead of mouse position
-    // PERFORMANCE: No transition on wheel - direct zoom for instant response
+    // Override wheel behavior: Shift+wheel = horizontal scroll, plain wheel = zoom on playhead
+    // PERFORMANCE: No transition on wheel - direct zoom/pan for instant response
     svg.on('wheel.zoom', function(event: WheelEvent) {
       event.preventDefault();
-      // Larger zoom steps: 0.75x zoom out, 1.33x zoom in (was 0.9/1.1)
-      const direction = event.deltaY > 0 ? 0.75 : 1.33;
-      const svgNode = svg.node();
-      if (svgNode && zoomRef.current) {
-        // Use ref for chartCenterX to avoid stale closure after resize
-        // Direct call without transition - prevents stacking animations that kill perf
+      if (!zoomRef.current) return;
+
+      if (event.shiftKey) {
+        // Shift+wheel: horizontal pan — scroll 2% of chart width per tick
+        const chartWidth = dimensionsRef.current.width - MARGIN.left - MARGIN.right;
+        const panDelta = (event.deltaY > 0 ? -1 : 1) * chartWidth * 0.02;
+        svg.call(zoomRef.current.translateBy as any, panDelta, 0);
+      } else {
+        // Plain wheel: zoom centered on playhead — gentle 5% steps
+        const direction = event.deltaY > 0 ? 0.95 : 1.05;
         svg.call(
           zoomRef.current.scaleBy as any,
           direction,
@@ -864,6 +870,27 @@ export function Timeline({
       }
     });
   }, [dimensions, getComputedColor]);
+
+  // PageUp/PageDown keyboard navigation — pan 50% of visible range per keypress
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'PageUp' && event.key !== 'PageDown') return;
+      event.preventDefault();
+
+      const svg = d3.select(svgRef.current);
+      if (!zoomRef.current) return;
+
+      const chartWidth = dimensionsRef.current.width - MARGIN.left - MARGIN.right;
+      const panDelta = (event.key === 'PageUp' ? 1 : -1) * chartWidth * 0.1;
+      svg.call(zoomRef.current.translateBy as any, panDelta, 0);
+    };
+
+    container.addEventListener('keydown', handleKeyDown);
+    return () => container.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   // Coarse zoom bucket — triggers main effect re-render (and re-dedup) after significant
   // zoom changes. Without this, pixel dedup is frozen at the render-time scale and events
@@ -1896,10 +1923,8 @@ export function Timeline({
           <p>No events to display</p>
         </div>
       )}
-      {/* Filmstrip - horizontal strip of screenshots centered on playhead */}
-      {/* Filmstrip - show if ANY screenshots exist (not just visible range) to prevent layout shift */}
-      {screenshots && screenshots.length > 0 && (
-        <div className="flex-shrink-0 border-b border-border bg-muted/20">
+      {/* Filmstrip - always render to prevent layout shift between days */}
+      <div className="flex-shrink-0 border-b border-border bg-muted/20">
           {/* Filmstrip header - collapsible */}
           <div
             className="flex items-center gap-2 px-2 py-1 cursor-pointer hover:bg-muted/30"
@@ -1913,7 +1938,7 @@ export function Timeline({
             <Camera className="h-3 w-3 text-muted-foreground" />
             <span className="text-xs font-medium text-muted-foreground">Screenshots</span>
             <span className="text-xs text-muted-foreground/70">
-              ({filmstripScreenshots.length > 0 ? filmstripScreenshots.length : `${screenshots.length} total`})
+              ({filmstripScreenshots.length > 0 ? filmstripScreenshots.length : `${screenshots?.length || 0} total`})
             </span>
           </div>
 
@@ -2061,7 +2086,6 @@ export function Timeline({
             </>
           )}
         </div>
-      )}
 
       {/* Timeline visualization */}
       <div className="relative flex-1 min-h-[200px]">
@@ -2194,7 +2218,7 @@ export function Timeline({
           )}
         </div>
 
-        <div ref={containerRef} className="h-full overflow-hidden">
+        <div ref={containerRef} className="h-full overflow-hidden outline-none" tabIndex={0}>
           <svg
             ref={svgRef}
             width={dimensions.width}
