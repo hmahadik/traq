@@ -97,7 +97,7 @@ export function Sidebar() {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 py-4">
+      <nav className="flex-1 py-4 px-2">
         <ul className="space-y-1">
           {navItems.map(({ to, label, icon: Icon }) => {
             const isActive =
@@ -110,7 +110,7 @@ export function Sidebar() {
                   to={to}
                   onClick={() => setMobileMenuOpen(false)}
                   className={cn(
-                    'flex flex-col items-center gap-1 px-2 py-2 mx-2 rounded-lg text-xs font-medium transition-colors duration-75',
+                    'flex flex-col items-center gap-1 py-3 rounded-lg text-xs font-medium transition-colors duration-75',
                     isActive
                       ? 'bg-primary/10 text-primary'
                       : 'text-muted-foreground hover:bg-muted hover:text-foreground'
@@ -126,15 +126,16 @@ export function Sidebar() {
       </nav>
 
       {/* Bottom Actions */}
-      <div className="py-4 border-t border-border space-y-1">
+      <div className="py-4 px-2 border-t border-border space-y-1">
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
+              <button
                 className={cn(
-                  "w-full flex flex-col items-center gap-1 h-auto py-2 transition-colors duration-75",
-                  isPaused && "text-yellow-500 hover:text-yellow-600"
+                  "w-full flex flex-col items-center gap-1 h-auto py-3 rounded-lg text-xs font-medium transition-colors duration-75",
+                  isPaused
+                    ? "text-yellow-500 hover:bg-muted hover:text-yellow-600"
+                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
                 )}
                 onClick={handleTogglePause}
                 aria-label={isPaused ? 'Resume Capture' : 'Pause Capture'}
@@ -144,8 +145,8 @@ export function Sidebar() {
                 ) : (
                   <Pause className="h-5 w-5" />
                 )}
-                <span className="text-xs font-medium">{isPaused ? 'Resume' : 'Pause'}</span>
-              </Button>
+                <span>{isPaused ? 'Resume' : 'Pause'}</span>
+              </button>
             </TooltipTrigger>
             <TooltipContent side="right">
               <p>{isPaused ? 'Resume screenshot capture' : 'Pause screenshot capture'}</p>
@@ -153,9 +154,13 @@ export function Sidebar() {
           </Tooltip>
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                className="w-full flex flex-col items-center gap-1 h-auto py-2 transition-colors duration-75"
+              <button
+                className={cn(
+                  "w-full flex flex-col items-center gap-1 h-auto py-3 rounded-lg text-xs font-medium transition-colors duration-75",
+                  isCapturing || isPaused
+                    ? "text-muted-foreground/50 cursor-not-allowed"
+                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                )}
                 onClick={handleForceCapture}
                 disabled={isCapturing || isPaused}
                 aria-label="Force Capture"
@@ -165,8 +170,8 @@ export function Sidebar() {
                 ) : (
                   <Camera className="h-5 w-5" />
                 )}
-                <span className="text-xs font-medium">Capture</span>
-              </Button>
+                <span>Capture</span>
+              </button>
             </TooltipTrigger>
             <TooltipContent side="right">
               <p>{isPaused ? 'Resume capture first' : 'Capture screenshot now'}</p>
@@ -174,9 +179,8 @@ export function Sidebar() {
           </Tooltip>
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                className="w-full flex flex-col items-center gap-1 h-auto py-2 transition-colors duration-75 text-orange-500 hover:text-orange-600"
+              <button
+                className="w-full flex flex-col items-center gap-1 h-auto py-3 rounded-lg text-xs font-medium transition-colors duration-75 text-orange-500 hover:bg-muted hover:text-orange-600"
                 onClick={() => {
                   setReportDialogOpen(true);
                   setMobileMenuOpen(false);
@@ -184,8 +188,8 @@ export function Sidebar() {
                 aria-label="Report Issue"
               >
                 <Bug className="h-5 w-5" />
-                <span className="text-xs font-medium">Report</span>
-              </Button>
+                <span>Report</span>
+              </button>
             </TooltipTrigger>
             <TooltipContent side="right">
               <p>Report an issue or bug</p>
@@ -196,10 +200,10 @@ export function Sidebar() {
               <Link
                 to="/settings"
                 className={cn(
-                  'w-full flex flex-col items-center gap-1 h-auto py-2 transition-colors duration-75',
+                  'w-full flex flex-col items-center gap-1 h-auto py-3 rounded-lg transition-colors duration-75',
                   location.pathname.startsWith('/settings')
-                    ? 'text-primary'
-                    : 'text-muted-foreground hover:text-foreground'
+                    ? 'bg-primary/10 text-primary'
+                    : 'text-muted-foreground hover:bg-muted hover:text-foreground'
                 )}
                 onClick={() => setMobileMenuOpen(false)}
               >
@@ -238,14 +242,14 @@ export function Sidebar() {
       )}
 
       {/* Desktop sidebar - always visible */}
-      <aside className="hidden lg:flex lg:flex-col lg:w-[88px] lg:fixed lg:inset-y-0 lg:left-0 lg:z-30 bg-background border-r border-border">
+      <aside className="hidden lg:flex lg:flex-col lg:w-[100px] lg:fixed lg:inset-y-0 lg:left-0 lg:z-30 bg-background border-r border-border">
         {sidebarContent}
       </aside>
 
       {/* Mobile sidebar - slide in */}
       <aside
         className={cn(
-          'fixed inset-y-0 left-0 z-50 w-[88px] bg-background border-r border-border flex flex-col transform transition-transform duration-200 ease-in-out lg:hidden',
+          'fixed inset-y-0 left-0 z-50 w-[100px] bg-background border-r border-border flex flex-col transform transition-transform duration-200 ease-in-out lg:hidden',
           mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
         )}
       >
