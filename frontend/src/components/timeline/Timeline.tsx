@@ -871,25 +871,40 @@ export function Timeline({
     });
   }, [dimensions, getComputedColor]);
 
-  // PageUp/PageDown keyboard navigation — pan 50% of visible range per keypress
+  // PageUp/PageDown keyboard navigation — throttled to one pan per animation frame
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
+
+    let pendingDirection: number | null = null;
+    let rafId: number | null = null;
+
+    const applyPan = () => {
+      rafId = null;
+      if (pendingDirection == null || !zoomRef.current) return;
+
+      const svg = d3.select(svgRef.current);
+      const chartWidth = dimensionsRef.current.width - MARGIN.left - MARGIN.right;
+      const panDelta = pendingDirection * chartWidth * 0.05;
+      svg.call(zoomRef.current.translateBy as any, panDelta, 0);
+      pendingDirection = null;
+    };
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key !== 'PageUp' && event.key !== 'PageDown') return;
       event.preventDefault();
 
-      const svg = d3.select(svgRef.current);
-      if (!zoomRef.current) return;
-
-      const chartWidth = dimensionsRef.current.width - MARGIN.left - MARGIN.right;
-      const panDelta = (event.key === 'PageUp' ? 1 : -1) * chartWidth * 0.05;
-      svg.call(zoomRef.current.translateBy as any, panDelta, 0);
+      pendingDirection = event.key === 'PageUp' ? 1 : -1;
+      if (rafId == null) {
+        rafId = requestAnimationFrame(applyPan);
+      }
     };
 
     container.addEventListener('keydown', handleKeyDown);
-    return () => container.removeEventListener('keydown', handleKeyDown);
+    return () => {
+      container.removeEventListener('keydown', handleKeyDown);
+      if (rafId != null) cancelAnimationFrame(rafId);
+    };
   }, []);
 
   // Coarse zoom bucket — triggers main effect re-render (and re-dedup) after significant
