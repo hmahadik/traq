@@ -848,25 +848,27 @@ export function Timeline({
     // Apply zoom to SVG
     svg.call(zoom);
 
-    // Override wheel behavior: Shift+wheel = horizontal scroll, plain wheel = zoom on playhead
+    // Override wheel behavior: plain wheel = horizontal pan, Shift+wheel = zoom on playhead
     // PERFORMANCE: No transition on wheel - direct zoom/pan for instant response
     svg.on('wheel.zoom', function(event: WheelEvent) {
       event.preventDefault();
       if (!zoomRef.current) return;
 
       if (event.shiftKey) {
-        // Shift+wheel: horizontal pan — scroll 1% of chart width per tick
-        const chartWidth = dimensionsRef.current.width - MARGIN.left - MARGIN.right;
-        const panDelta = (event.deltaY > 0 ? -1 : 1) * chartWidth * 0.01;
-        svg.call(zoomRef.current.translateBy as any, panDelta, 0);
-      } else {
-        // Plain wheel: zoom centered on playhead — gentle 5% steps
-        const direction = event.deltaY > 0 ? 0.95 : 1.05;
+        // Shift+wheel: zoom centered on playhead — gentle 5% steps
+        // Use deltaY (browsers may put shifted scroll in deltaX, but deltaY is more reliable here)
+        const delta = event.deltaY || event.deltaX;
+        const direction = delta > 0 ? 0.95 : 1.05;
         svg.call(
           zoomRef.current.scaleBy as any,
           direction,
           [chartCenterXRef.current, dimensionsRef.current.height / 2]
         );
+      } else {
+        // Plain wheel: horizontal pan — scroll 0.5% of chart width per tick
+        const chartWidth = dimensionsRef.current.width - MARGIN.left - MARGIN.right;
+        const panDelta = (event.deltaY > 0 ? -1 : 1) * chartWidth * 0.005;
+        svg.call(zoomRef.current.translateBy as any, panDelta, 0);
       }
     });
   }, [dimensions, getComputedColor]);
