@@ -18,7 +18,6 @@ import {
   useOpenDataDir,
   useDataDir,
   useOptimizeDatabase,
-  useVersion,
 } from '@/api/hooks';
 import { formatBytes } from '@/lib/utils';
 import { SettingsCard } from '../SettingsCard';
@@ -28,7 +27,6 @@ export function GeneralSettings() {
   const { data: config, isLoading } = useConfig();
   const { data: storageStats } = useStorageStats();
   const { data: dataDir } = useDataDir();
-  const { data: version } = useVersion();
   const updateConfig = useUpdateConfig();
   const openDataDir = useOpenDataDir();
   const optimizeDatabase = useOptimizeDatabase();
@@ -327,17 +325,6 @@ export function GeneralSettings() {
           </Button>
         </div>
 
-        <div className="pt-4 border-t flex items-center justify-between text-sm text-muted-foreground">
-          <span>Version {version || 'dev'}</span>
-          <a
-            href="https://github.com/hmahadik/traq/releases"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="hover:text-foreground hover:underline"
-          >
-            Release Notes
-          </a>
-        </div>
       </SettingsCard>
     </div>
   );

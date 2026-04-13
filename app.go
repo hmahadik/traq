@@ -1212,12 +1212,23 @@ func (a *App) GetUpdateStatus() *service.UpdateStatus {
 	return a.Update.GetStatus()
 }
 
-// CheckForUpdate manually triggers an update check.
+// CheckForUpdate manually triggers an update check and downloads if available.
 func (a *App) CheckForUpdate() (*service.UpdateInfo, error) {
 	if a.Update == nil {
 		return nil, nil
 	}
-	return a.Update.CheckForUpdate()
+	info, err := a.Update.CheckForUpdate()
+	if err != nil {
+		return nil, err
+	}
+	if info == nil {
+		return nil, nil // already up to date
+	}
+	// Download immediately so the update is staged and ready to install
+	if err := a.Update.DownloadUpdate(info); err != nil {
+		return info, fmt.Errorf("update found (v%s) but download failed: %w", info.Version, err)
+	}
+	return info, nil
 }
 
 // TriggerUpdate manually applies a pending update and restarts.

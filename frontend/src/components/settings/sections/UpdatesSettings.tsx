@@ -1,4 +1,5 @@
-import { RefreshCw, Download, Loader2 } from 'lucide-react';
+import { RefreshCw, Download, Loader2, ExternalLink } from 'lucide-react';
+import { BrowserOpenURL } from '@wailsjs/runtime/runtime';
 import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
 import {
@@ -73,6 +74,20 @@ export function UpdatesSettings() {
               <RefreshCw className="h-4 w-4 mr-2" />
             )}
             Check for Updates
+          </Button>
+        </SettingsRow>
+
+        <SettingsRow
+          label="Release Notes"
+          description="View changelog on GitHub"
+        >
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => BrowserOpenURL('https://github.com/hmahadik/traq/releases')}
+          >
+            <ExternalLink className="h-4 w-4 mr-2" />
+            View
           </Button>
         </SettingsRow>
       </SettingsCard>
