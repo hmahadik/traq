@@ -114,7 +114,7 @@ func (s *UpdateService) backgroundChecker() {
 // checkAndDownload checks for updates and downloads if available.
 func (s *UpdateService) checkAndDownload() {
 	s.mu.RLock()
-	if !s.enabled {
+	if !s.enabled || s.updatePending {
 		s.mu.RUnlock()
 		return
 	}
@@ -384,9 +384,17 @@ func (s *UpdateService) ApplyAndRestart() error {
 
 // RestartSelf restarts the current process.
 func RestartSelf() error {
-	exe, err := os.Executable()
-	if err != nil {
-		return err
+	// On AppImage, os.Executable() returns the extracted binary inside the
+	// FUSE mount (e.g. /tmp/.mount_traqXXX/usr/bin/traq), not the .AppImage
+	// file itself. Since ApplyPendingUpdate replaces the .AppImage, we must
+	// restart from $APPIMAGE to actually run the new version.
+	exe := os.Getenv("APPIMAGE")
+	if exe == "" {
+		var err error
+		exe, err = os.Executable()
+		if err != nil {
+			return err
+		}
 	}
 
 	// Start new process
