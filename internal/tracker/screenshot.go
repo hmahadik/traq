@@ -69,7 +69,7 @@ func (c *ScreenCapture) Capture() (*CaptureResult, error) {
 	monitorIndex := 0
 	bounds := screenshot.GetDisplayBounds(monitorIndex)
 
-	img, err := screenshot.CaptureRect(bounds)
+	img, err := captureRect(bounds)
 	if err != nil {
 		return nil, fmt.Errorf("failed to capture screen: %w", err)
 	}
@@ -126,7 +126,7 @@ func (c *ScreenCapture) CaptureMonitor(monitorIndex int) (*CaptureResult, error)
 	}
 
 	bounds := screenshot.GetDisplayBounds(monitorIndex)
-	img, err := screenshot.CaptureRect(bounds)
+	img, err := captureRect(bounds)
 	if err != nil {
 		return nil, fmt.Errorf("failed to capture monitor %d: %w", monitorIndex, err)
 	}
