@@ -1228,6 +1228,16 @@ func (a *App) TriggerUpdate() error {
 	return a.Update.ApplyAndRestart()
 }
 
+// SetUpdateEnabled enables or disables auto-updates and persists the setting.
+func (a *App) SetUpdateEnabled(enabled bool) error {
+	if a.Update != nil {
+		a.Update.SetEnabled(enabled)
+	}
+	return a.Config.UpdateConfig(map[string]interface{}{
+		"update": map[string]interface{}{"autoUpdate": enabled},
+	})
+}
+
 // ============================================================================
 // Git Tracking Methods (exposed to frontend)
 // ============================================================================

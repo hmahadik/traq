@@ -1,7 +1,7 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Camera, Database, Sparkles, Tags, Settings2, FolderKanban } from 'lucide-react';
+import { Camera, Database, Sparkles, Tags, Settings2, FolderKanban, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useVersion } from '@/api/hooks';
+import { useVersion, useUpdateStatus } from '@/api/hooks';
 
 const sections = [
   { path: '/settings/capture', label: 'Capture', icon: Camera },
@@ -10,11 +10,13 @@ const sections = [
   { path: '/settings/categories', label: 'Categories', icon: Tags },
   { path: '/settings/general', label: 'General', icon: Settings2 },
   { path: '/settings/projects', label: 'Projects', icon: FolderKanban },
+  { path: '/settings/updates', label: 'Updates', icon: RefreshCw },
 ];
 
 export function SettingsSidebar() {
   const location = useLocation();
   const { data: version } = useVersion();
+  const { data: updateStatus } = useUpdateStatus();
 
   return (
     <aside className="w-52 flex-shrink-0 border-r bg-muted/30 flex flex-col">
@@ -39,14 +41,20 @@ export function SettingsSidebar() {
                 >
                   <Icon className="h-4 w-4" />
                   {label}
+                  {path === '/settings/updates' && updateStatus?.updatePending && (
+                    <span className="ml-auto h-2 w-2 rounded-full bg-orange-500" />
+                  )}
                 </Link>
               </li>
             );
           })}
         </ul>
       </nav>
-      <div className="p-4 border-t text-xs text-muted-foreground">
+      <div className="p-4 border-t text-xs text-muted-foreground flex items-center gap-2">
         v{version || 'dev'}
+        {updateStatus?.updatePending && (
+          <span className="h-2 w-2 rounded-full bg-orange-500" title="Update available" />
+        )}
       </div>
     </aside>
   );

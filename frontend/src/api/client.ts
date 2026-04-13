@@ -1230,6 +1230,31 @@ const search = {
   },
 };
 
+/**
+ * Updates API - Auto-update status and controls
+ */
+export const updates = {
+  getStatus: async () => {
+    await waitForReady();
+    return withRetry(() => App.GetUpdateStatus());
+  },
+
+  checkForUpdate: async () => {
+    await waitForReady();
+    return withRetry(() => App.CheckForUpdate());
+  },
+
+  triggerUpdate: async () => {
+    await waitForReady();
+    return App.TriggerUpdate();
+  },
+
+  setEnabled: async (enabled: boolean) => {
+    await waitForReady();
+    return App.SetUpdateEnabled(enabled);
+  },
+};
+
 // Unified API export
 export const api = {
   analytics,
@@ -1253,4 +1278,5 @@ export const api = {
   issues,
   projects,
   search,
+  updates,
 };

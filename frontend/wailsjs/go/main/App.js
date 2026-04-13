@@ -606,6 +606,10 @@ export function SetTagsForSession(arg1, arg2) {
   return window['go']['main']['App']['SetTagsForSession'](arg1, arg2);
 }
 
+export function SetUpdateEnabled(arg1) {
+  return window['go']['main']['App']['SetUpdateEnabled'](arg1);
+}
+
 export function StartOllamaService() {
   return window['go']['main']['App']['StartOllamaService']();
 }

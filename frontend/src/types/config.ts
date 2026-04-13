@@ -8,6 +8,13 @@ export interface Config {
   issues?: IssuesConfig;
   timeline?: TimelineConfig;
   ai?: AIConfig;
+  update?: UpdatesConfig;
+}
+
+export interface UpdatesConfig {
+  autoUpdate: boolean;
+  checkIntervalHours: number;
+  afkRestartMinutes: number;
 }
 
 export interface AIConfig {

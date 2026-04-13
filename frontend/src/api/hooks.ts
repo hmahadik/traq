@@ -99,6 +99,9 @@ export const queryKeys = {
     all: ['projectsConfig'] as const,
     autoAssign: () => [...queryKeys.projectsConfig.all, 'autoAssign'] as const,
   },
+  update: {
+    status: () => ['update', 'status'] as const,
+  },
 };
 
 // ============================================================================
@@ -1684,6 +1687,63 @@ export function useSetProjectsAutoAssign() {
     mutationFn: (enabled: boolean) => api.projectsConfig.setAutoAssign(enabled),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.projectsConfig.all });
+    },
+  });
+}
+
+// ============================================================================
+// Update Hooks
+// ============================================================================
+
+export function useUpdateStatus() {
+  return useQuery({
+    queryKey: queryKeys.update.status(),
+    queryFn: () => api.updates.getStatus(),
+    refetchInterval: (query) =>
+      query.state.data?.updatePending ? 10_000 : 60_000,
+  });
+}
+
+export function useCheckForUpdate() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.updates.checkForUpdate(),
+    onSuccess: (info) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.update.status() });
+      if (info && info.version) {
+        toast.success(`Update available: v${info.version}`);
+      } else {
+        toast.success('Already up to date');
+      }
+    },
+    onError: (error: unknown) => {
+      const message = error instanceof Error ? error.message : String(error);
+      toast.error(`Update check failed: ${message}`);
+    },
+  });
+}
+
+export function useTriggerUpdate() {
+  return useMutation({
+    mutationFn: () => api.updates.triggerUpdate(),
+    onError: (error: unknown) => {
+      const message = error instanceof Error ? error.message : String(error);
+      toast.error(`Failed to apply update: ${message}`);
+    },
+  });
+}
+
+export function useSetUpdateEnabled() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (enabled: boolean) => api.updates.setEnabled(enabled),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.update.status() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.config.all() });
+    },
+    onError: (error: unknown) => {
+      const message = error instanceof Error ? error.message : String(error);
+      toast.error(`Failed to update setting: ${message}`);
     },
   });
 }

@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
 import { system, api } from '@/api/client';
+import { useUpdateStatus } from '@/api/hooks';
 import { ReportIssueDialog } from '@/components/common/ReportIssueDialog';
 
 const navItems = [
@@ -23,6 +24,7 @@ export function Sidebar() {
   const [isPaused, setIsPaused] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [reportDialogOpen, setReportDialogOpen] = useState(false);
+  const { data: updateStatus } = useUpdateStatus();
 
   // Fetch initial pause state and poll for updates
   useEffect(() => {
@@ -207,7 +209,12 @@ export function Sidebar() {
                 )}
                 onClick={() => setMobileMenuOpen(false)}
               >
-                <Settings className="h-5 w-5" />
+                <div className="relative">
+                  <Settings className="h-5 w-5" />
+                  {updateStatus?.updatePending && (
+                    <span className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-orange-500" />
+                  )}
+                </div>
                 <span className="text-xs font-medium">Settings</span>
               </Link>
             </TooltipTrigger>

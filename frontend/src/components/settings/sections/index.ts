@@ -4,3 +4,4 @@ export { AISettings } from './AISettings';
 export { CategoriesSettings } from './CategoriesSettings';
 export { GeneralSettings } from './GeneralSettings';
 export { ProjectsSettings } from './ProjectsSettings';
+export { UpdatesSettings } from './UpdatesSettings';

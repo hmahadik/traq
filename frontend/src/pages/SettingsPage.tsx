@@ -7,6 +7,7 @@ import {
   CategoriesSettings,
   GeneralSettings,
   ProjectsSettings,
+  UpdatesSettings,
 } from '@/components/settings/sections';
 
 export function SettingsPage() {
@@ -23,6 +24,7 @@ export function SettingsPage() {
             <Route path="categories" element={<CategoriesSettings />} />
             <Route path="general" element={<GeneralSettings />} />
             <Route path="projects" element={<ProjectsSettings />} />
+            <Route path="updates" element={<UpdatesSettings />} />
           </Routes>
         </div>
       </div>

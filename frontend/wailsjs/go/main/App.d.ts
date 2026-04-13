@@ -308,6 +308,8 @@ export function SetReportIncludeUnassigned(arg1:boolean):Promise<void>;
 
 export function SetTagsForSession(arg1:number,arg2:Array<string>):Promise<void>;
 
+export function SetUpdateEnabled(arg1:boolean):Promise<void>;
+
 export function StartOllamaService():Promise<void>;
 
 export function StartTracking():Promise<void>;
