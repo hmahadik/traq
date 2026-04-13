@@ -329,29 +329,34 @@ func ApplyPendingUpdate(dataDir string) (bool, error) {
 		}
 	}
 
-	// Create backup of current binary
+	// On Linux, you can't open a running binary for writing (ETXTBSY).
+	// But you CAN unlink it — the kernel keeps the inode alive via the
+	// process's memory mapping. Then we copy the new binary to the same
+	// path, creating a fresh inode.
 	backupPath := exe + ".backup"
-	if err := copyFile(exe, backupPath); err != nil {
-		log.Printf("Warning: failed to create backup: %v", err)
-		// Continue anyway - update is more important
+	if err := os.Rename(exe, backupPath); err != nil {
+		log.Printf("Warning: failed to rename current binary to backup: %v", err)
+		// Try removing instead (works on Linux even while running)
+		if err := os.Remove(exe); err != nil {
+			return false, fmt.Errorf("failed to move running binary out of the way: %w", err)
+		}
+		backupPath = "" // no backup available
 	}
 
-	// Replace the binary
-	// On Unix, we can replace a running binary
-	// On Windows, this will fail if the binary is running
+	// Copy new binary to the original path (fresh inode, no ETXTBSY)
 	if err := copyFile(stagingPath, exe); err != nil {
 		// Try to restore from backup
 		if backupPath != "" {
-			copyFile(backupPath, exe)
+			os.Rename(backupPath, exe)
 		}
 		return false, fmt.Errorf("failed to apply update: %w", err)
 	}
 
-	// Clean up staging file
+	// Clean up staging file and backup
 	os.Remove(stagingPath)
-
-	// Clean up backup (or keep it for rollback?)
-	os.Remove(backupPath)
+	if backupPath != "" {
+		os.Remove(backupPath)
+	}
 
 	log.Println("Update applied successfully, restarting...")
 	return true, nil
