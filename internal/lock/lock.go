@@ -1,17 +1,16 @@
 package lock
 
-import (
-	"fmt"
-	"os"
-	"path/filepath"
-	"strconv"
-)
+import "path/filepath"
 
 const lockFileName = "traq.lock"
 
-// InstanceLock manages a PID-based lock file to prevent multiple instances.
+// InstanceLock prevents multiple instances of the application from running.
+// On Unix, uses PID-based lock files with signal-0 liveness checks.
+// On Windows, uses a named mutex (kernel object, automatically released on
+// process exit or crash — no stale locks possible).
 type InstanceLock struct {
-	path string
+	path   string  // PID lock file path (Unix)
+	handle uintptr // named mutex handle (Windows)
 }
 
 // New creates a new InstanceLock for the given data directory.
@@ -21,32 +20,6 @@ func New(dataDir string) *InstanceLock {
 	}
 }
 
-// Acquire attempts to acquire the instance lock.
-// Returns nil if successful, error if another instance is running.
-func (l *InstanceLock) Acquire() error {
-	// Check if lock file exists
-	if data, err := os.ReadFile(l.path); err == nil {
-		// Lock file exists - check if process is still running
-		pid, err := strconv.Atoi(string(data))
-		if err == nil && pid > 0 {
-			if isProcessRunning(pid) {
-				return fmt.Errorf("another instance of Traq is already running (PID: %d)", pid)
-			}
-		}
-		// Stale lock file - process is dead, remove it
-		os.Remove(l.path)
-	}
-
-	// Write our PID to the lock file
-	pid := os.Getpid()
-	if err := os.WriteFile(l.path, []byte(strconv.Itoa(pid)), 0644); err != nil {
-		return fmt.Errorf("failed to create lock file: %w", err)
-	}
-
-	return nil
-}
-
-// Release removes the lock file.
-func (l *InstanceLock) Release() {
-	os.Remove(l.path)
-}
+// Acquire and Release are implemented per-platform:
+//   lock_unix.go    — PID file + signal 0
+//   lock_windows.go — named mutex via CreateMutexW
