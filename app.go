@@ -21,8 +21,16 @@ import (
 	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
-// Version is set at build time via -ldflags "-X main.Version=x.y.z"
+// Version is set at build time via -ldflags "-X main.Version=x.y.z".
+// Defaults to "dev" for local builds. The init() guard below prevents
+// an empty string if ldflags passes -X main.Version= (no value).
 var Version = "dev"
+
+func init() {
+	if Version == "" {
+		Version = "dev"
+	}
+}
 
 // App struct holds the application state and services
 type App struct {

@@ -43,7 +43,9 @@ export function UpdatesSettings() {
           description="Installed version of Traq"
         >
           <span className="text-sm font-mono">
-            v{status.currentVersion}
+            {status.currentVersion === 'dev' || !status.currentVersion
+              ? 'Development Build'
+              : `v${status.currentVersion}`}
           </span>
         </SettingsRow>
 

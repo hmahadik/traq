@@ -142,6 +142,11 @@ func (s *UpdateService) checkAndDownload() {
 
 // CheckForUpdate checks GitHub for a newer release.
 func (s *UpdateService) CheckForUpdate() (*UpdateInfo, error) {
+	// Dev builds don't participate in auto-update — use git pull instead.
+	if s.currentVersion == "dev" || s.currentVersion == "" {
+		return nil, nil
+	}
+
 	s.mu.Lock()
 	s.lastCheck = time.Now()
 	s.mu.Unlock()

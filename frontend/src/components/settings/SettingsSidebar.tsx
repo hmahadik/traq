@@ -51,7 +51,7 @@ export function SettingsSidebar() {
         </ul>
       </nav>
       <div className="p-4 border-t text-xs text-muted-foreground flex items-center gap-2">
-        v{version || 'dev'}
+        {version && version !== 'dev' ? `v${version}` : 'dev'}
         {updateStatus?.updatePending && (
           <span className="h-2 w-2 rounded-full bg-orange-500" title="Update available" />
         )}
