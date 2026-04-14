@@ -5,7 +5,6 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
-	"syscall"
 )
 
 const lockFileName = "traq.lock"
@@ -50,16 +49,4 @@ func (l *InstanceLock) Acquire() error {
 // Release removes the lock file.
 func (l *InstanceLock) Release() {
 	os.Remove(l.path)
-}
-
-// isProcessRunning checks if a process with the given PID exists.
-func isProcessRunning(pid int) bool {
-	process, err := os.FindProcess(pid)
-	if err != nil {
-		return false
-	}
-
-	// On Unix, FindProcess always succeeds. Send signal 0 to check if process exists.
-	err = process.Signal(syscall.Signal(0))
-	return err == nil
 }

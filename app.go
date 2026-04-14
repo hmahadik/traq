@@ -221,7 +221,13 @@ func (a *App) startup(ctx context.Context) {
 	if a.daemon != nil {
 		a.daemon.SetUpdateCallbacks(
 			a.Update.HasPendingUpdate,
-			func() { a.Update.ApplyAndRestart() },
+			func() {
+				// Release instance lock before restart — os.Exit skips cleanup
+				if a.instanceLock != nil {
+					a.instanceLock.Release()
+				}
+				a.Update.ApplyAndRestart()
+			},
 		)
 	}
 
@@ -1235,6 +1241,12 @@ func (a *App) CheckForUpdate() (*service.UpdateInfo, error) {
 func (a *App) TriggerUpdate() error {
 	if a.Update == nil {
 		return nil
+	}
+	// Release instance lock before restart — os.Exit(0) in RestartSelf
+	// skips all deferred cleanup, so the lock file would persist and
+	// block the new instance (especially on Windows with PID reuse).
+	if a.instanceLock != nil {
+		a.instanceLock.Release()
 	}
 	return a.Update.ApplyAndRestart()
 }
