@@ -72,15 +72,13 @@ Each plugin:
 
 Native-history checkpointing continues to advance regardless of which source was read, so a user who toggles Shell History or installs the plugin later doesn't re-ingest their entire native history.
 
-**`internal/storage/migrations.go`** — bump `schemaVersion` from 12 to 13 and add idempotent `ALTER TABLE` calls (matching the existing Traq migration pattern — direct `s.db.Exec` with `IF NOT EXISTS`-equivalent guards, not up/down migrations):
+**`internal/storage/migrations.go`** — bump `schemaVersion` from 12 to 13 and add an idempotent `ALTER TABLE` call (matching the existing Traq migration pattern — direct `s.db.Exec` with `pragma_table_info` guards, not up/down migrations). The `shell_commands` table already carries `working_directory`, `exit_code`, `duration_seconds`, and `hostname`; those fields simply aren't populated by today's native-history parser. Only one new column is needed:
 
 ```sql
-ALTER TABLE shell_commands ADD COLUMN cwd TEXT;
-ALTER TABLE shell_commands ADD COLUMN exit_code INTEGER;
 ALTER TABLE shell_commands ADD COLUMN tmux_context TEXT;
 ```
 
-**`internal/storage/models.go`** — `ShellCommand` gains `CWD sql.NullString`, `ExitCode sql.NullInt64`, `TmuxContext sql.NullString`.
+**`internal/storage/models.go`** — `ShellCommand` gains `TmuxContext sql.NullString`. The existing `WorkingDirectory`, `ExitCode`, `DurationSeconds`, and `Hostname` fields are reused and start getting populated by the plugin-log path.
 
 **`app.go`** — three new Wails bindings: `GetShellSetupStatus`, `InstallShellPlugin`, `UninstallShellPlugin`.
 
@@ -232,7 +230,7 @@ For each embedded plugin (bash, zsh, fish, PowerShell): spawn the shell in an is
 
 - **Existing users on file-reading mode:** continue working unchanged. No prompt, no forced install. Status strip shows "Not installed" with a soft recommendation.
 - **New install columns are nullable:** file-parsed commands leave them NULL; no backfill needed.
-- **Schema migration:** bumps `schemaVersion` to 13 and adds three nullable columns to `shell_commands`. Forward-only, matching the existing Traq convention. Re-run safe (the codebase already has precedent for idempotent `ALTER TABLE` repair passes).
+- **Schema migration:** bumps `schemaVersion` to 13 and adds one nullable `tmux_context` column to `shell_commands`. Forward-only, matching the existing Traq convention. Re-run safe (the codebase already has precedent for idempotent `ALTER TABLE` repair passes).
 
 ## Future extensions (not in v1)
 
