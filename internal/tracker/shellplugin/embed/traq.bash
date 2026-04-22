@@ -10,13 +10,15 @@ __traq_log="$__traq_dir/history.log"
 __traq_overflow="$__traq_dir/overflowed"
 __traq_max_bytes=10485760  # 10 MiB
 
-# Capture command start time via PS0 (fires before each command runs).
-# EPOCHREALTIME is bash 5+; fall back to date for older bash.
-if [[ -n "${EPOCHREALTIME:-}" ]]; then
-    PS0='${__traq_start:=$EPOCHREALTIME}'
-else
-    PS0='${__traq_start:=$(date +%s)}'
-fi
+# Capture command start time via DEBUG trap (fires before each command).
+# Using PS0 would print the timestamp to the terminal; DEBUG is silent.
+# functrace is off by default, so DEBUG does not fire inside __traq_hook.
+__traq_preexec() {
+    [[ -n "${COMP_LINE:-}" ]] && return
+    [[ "$BASH_COMMAND" == "__traq_hook" ]] && return
+    __traq_start="${EPOCHREALTIME:-$(date +%s)}"
+}
+trap '__traq_preexec' DEBUG
 
 __traq_escape() {
     local s="$1"

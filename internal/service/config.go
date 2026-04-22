@@ -497,6 +497,23 @@ func (s *ConfigService) handleConfigSideEffect(key string, value interface{}) er
 			}
 			s.updateInference(config)
 		}
+	case "shell.enabled":
+		if s.shellSetup == nil {
+			return nil
+		}
+		enabled, ok := value.(bool)
+		if !ok {
+			return nil
+		}
+		if enabled {
+			if err := s.shellSetup.EnableCapture(); err != nil {
+				return fmt.Errorf("enable shell capture: %w", err)
+			}
+		} else {
+			if err := s.shellSetup.DisableCapture(); err != nil {
+				return fmt.Errorf("disable shell capture: %w", err)
+			}
+		}
 	}
 	return nil
 }
