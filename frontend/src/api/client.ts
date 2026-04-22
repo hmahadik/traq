@@ -1226,6 +1226,7 @@ export const shellSetup = {
   status: (shell: string) => App.GetShellSetupStatus(shell),
   install: (shell: string) => App.InstallShellPlugin(shell),
   uninstall: (shell: string) => App.UninstallShellPlugin(shell),
+  dismissOverflow: () => App.DismissShellOverflow(),
 };
 
 /**

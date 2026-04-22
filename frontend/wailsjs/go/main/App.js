@@ -138,6 +138,10 @@ export function DiscoverGitRepositories(arg1, arg2) {
   return window['go']['main']['App']['DiscoverGitRepositories'](arg1, arg2);
 }
 
+export function DismissShellOverflow() {
+  return window['go']['main']['App']['DismissShellOverflow']();
+}
+
 export function DownloadModel(arg1) {
   return window['go']['main']['App']['DownloadModel'](arg1);
 }

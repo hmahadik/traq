@@ -151,6 +151,14 @@ func (s *ShellSetupService) DisableCapture() error {
 	return nil
 }
 
+// DismissOverflow removes the overflow sentinel file.
+func (s *ShellSetupService) DismissOverflow() error {
+	if err := os.Remove(s.overflowPath()); err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	return nil
+}
+
 func (s *ShellSetupService) Status(kind shellplugin.ShellKind) (*SetupStatus, error) {
 	rcPath, err := s.rcPathFor(kind)
 	if err != nil {

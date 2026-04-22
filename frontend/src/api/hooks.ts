@@ -1782,3 +1782,11 @@ export function useUninstallShellPlugin() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['shellSetup'] }),
   });
 }
+
+export function useDismissShellOverflow() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.shellSetup.dismissOverflow(),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['shellSetup'] }),
+  });
+}

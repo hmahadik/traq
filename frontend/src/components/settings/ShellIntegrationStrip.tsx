@@ -1,4 +1,4 @@
-import { useShellSetupStatus, useInstallShellPlugin, useUninstallShellPlugin } from '@/api/hooks';
+import { useShellSetupStatus, useInstallShellPlugin, useUninstallShellPlugin, useDismissShellOverflow } from '@/api/hooks';
 import { Button } from '@/components/ui/button';
 
 interface Props {
@@ -16,6 +16,7 @@ export function ShellIntegrationStrip({ shell }: Props) {
   const { data: status, isLoading } = useShellSetupStatus(shell);
   const install = useInstallShellPlugin();
   const uninstall = useUninstallShellPlugin();
+  const dismiss = useDismissShellOverflow();
 
   if (isLoading || !status) return null;
 
@@ -23,6 +24,16 @@ export function ShellIntegrationStrip({ shell }: Props) {
 
   return (
     <div className="rounded-md border bg-muted/30 p-3 space-y-2">
+      {status.overflowed && (
+        <div className="rounded-md border border-yellow-500/40 bg-yellow-500/10 p-2 flex items-center justify-between gap-2">
+          <p className="text-xs text-yellow-800 dark:text-yellow-300">
+            Shell log hit its size limit while Traq was idle. Some commands may have been dropped.
+          </p>
+          <Button size="sm" variant="ghost" onClick={() => dismiss.mutate()} disabled={dismiss.isPending}>
+            Dismiss
+          </Button>
+        </div>
+      )}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <span className="text-sm font-medium">Shell integration</span>

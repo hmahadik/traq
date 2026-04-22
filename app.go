@@ -705,6 +705,11 @@ func (a *App) UninstallShellPlugin(shell string) error {
 	return a.ShellSetup.Uninstall(shellplugin.ShellKind(shell))
 }
 
+// DismissShellOverflow clears the overflow sentinel file.
+func (a *App) DismissShellOverflow() error {
+	return a.ShellSetup.DismissOverflow()
+}
+
 // SearchAllDataSources searches across all event types (git, shell, files, browser, screenshots).
 func (a *App) SearchAllDataSources(query string, maxResults int) ([]*service.SearchResult, error) {
 	if a.Timeline == nil {

@@ -74,6 +74,8 @@ export function DeleteTimelineCategoryRule(arg1:string):Promise<void>;
 
 export function DiscoverGitRepositories(arg1:Array<string>,arg2:number):Promise<Array<storage.GitRepository>>;
 
+export function DismissShellOverflow():Promise<void>;
+
 export function DownloadModel(arg1:string):Promise<void>;
 
 export function DownloadServer():Promise<void>;
