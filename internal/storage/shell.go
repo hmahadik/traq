@@ -10,10 +10,10 @@ func (s *Store) SaveShellCommand(cmd *ShellCommand) (int64, error) {
 	result, err := s.db.Exec(`
 		INSERT INTO shell_commands (
 			timestamp, command, shell_type, working_directory,
-			exit_code, duration_seconds, hostname, session_id
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+			exit_code, duration_seconds, hostname, tmux_context, session_id
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		cmd.Timestamp, cmd.Command, cmd.ShellType, cmd.WorkingDirectory,
-		cmd.ExitCode, cmd.DurationSeconds, cmd.Hostname, cmd.SessionID,
+		cmd.ExitCode, cmd.DurationSeconds, cmd.Hostname, cmd.TmuxContext, cmd.SessionID,
 	)
 	if err != nil {
 		return 0, fmt.Errorf("failed to insert shell command: %w", err)
@@ -31,7 +31,7 @@ func (s *Store) SaveShellCommand(cmd *ShellCommand) (int64, error) {
 func (s *Store) GetShellCommandsBySession(sessionID int64) ([]*ShellCommand, error) {
 	rows, err := s.db.Query(`
 		SELECT id, timestamp, command, shell_type, working_directory,
-		       exit_code, duration_seconds, hostname, session_id, created_at
+		       exit_code, duration_seconds, hostname, tmux_context, session_id, created_at
 		FROM shell_commands
 		WHERE session_id = ?
 		ORDER BY timestamp ASC`, sessionID)
@@ -47,7 +47,7 @@ func (s *Store) GetShellCommandsBySession(sessionID int64) ([]*ShellCommand, err
 func (s *Store) GetShellCommandsByTimeRange(start, end int64) ([]*ShellCommand, error) {
 	rows, err := s.db.Query(`
 		SELECT id, timestamp, command, shell_type, working_directory,
-		       exit_code, duration_seconds, hostname, session_id, created_at
+		       exit_code, duration_seconds, hostname, tmux_context, session_id, created_at
 		FROM shell_commands
 		WHERE timestamp >= ? AND timestamp <= ?
 		ORDER BY timestamp ASC`, start, end)
@@ -63,7 +63,7 @@ func (s *Store) GetShellCommandsByTimeRange(start, end int64) ([]*ShellCommand, 
 func (s *Store) GetRecentShellCommands(limit int) ([]*ShellCommand, error) {
 	rows, err := s.db.Query(`
 		SELECT id, timestamp, command, shell_type, working_directory,
-		       exit_code, duration_seconds, hostname, session_id, created_at
+		       exit_code, duration_seconds, hostname, tmux_context, session_id, created_at
 		FROM shell_commands
 		ORDER BY timestamp DESC
 		LIMIT ?`, limit)
@@ -111,7 +111,7 @@ func (s *Store) CountShellCommandsByTimeRange(start, end int64) (int64, error) {
 func (s *Store) GetAllShellCommands() ([]*ShellCommand, error) {
 	rows, err := s.db.Query(`
 		SELECT id, timestamp, command, shell_type, working_directory,
-		       exit_code, duration_seconds, hostname, session_id, created_at
+		       exit_code, duration_seconds, hostname, tmux_context, session_id, created_at
 		FROM shell_commands
 		ORDER BY timestamp DESC`)
 	if err != nil {
@@ -127,7 +127,7 @@ func (s *Store) SearchShellCommands(query string, limit int) ([]*ShellCommand, e
 	likeQuery := "%" + query + "%"
 	rows, err := s.db.Query(`
 		SELECT id, timestamp, command, shell_type, working_directory,
-		       exit_code, duration_seconds, hostname, session_id, created_at
+		       exit_code, duration_seconds, hostname, tmux_context, session_id, created_at
 		FROM shell_commands
 		WHERE command LIKE ?
 		ORDER BY timestamp DESC
@@ -234,7 +234,8 @@ func scanShellCommands(rows *sql.Rows) ([]*ShellCommand, error) {
 		cmd := &ShellCommand{}
 		err := rows.Scan(
 			&cmd.ID, &cmd.Timestamp, &cmd.Command, &cmd.ShellType, &cmd.WorkingDirectory,
-			&cmd.ExitCode, &cmd.DurationSeconds, &cmd.Hostname, &cmd.SessionID, &cmd.CreatedAt,
+			&cmd.ExitCode, &cmd.DurationSeconds, &cmd.Hostname, &cmd.TmuxContext,
+			&cmd.SessionID, &cmd.CreatedAt,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan shell command: %w", err)
