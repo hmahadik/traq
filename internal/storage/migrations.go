@@ -5,7 +5,7 @@ import (
 	"log"
 )
 
-const schemaVersion = 13
+const schemaVersion = 14
 
 const schema = `
 -- ============================================================================
@@ -112,11 +112,15 @@ CREATE TABLE IF NOT EXISTS shell_commands (
     hostname TEXT,
     tmux_context TEXT,
     session_id INTEGER REFERENCES sessions(id),
+    project_id INTEGER REFERENCES projects(id),
+    project_confidence REAL DEFAULT 0.0,
+    project_source TEXT DEFAULT 'unassigned',
     created_at INTEGER DEFAULT (strftime('%s', 'now'))
 );
 
 CREATE INDEX IF NOT EXISTS idx_shell_timestamp ON shell_commands(timestamp);
 CREATE INDEX IF NOT EXISTS idx_shell_session ON shell_commands(session_id);
+CREATE INDEX IF NOT EXISTS idx_shell_project ON shell_commands(project_id);
 
 CREATE TABLE IF NOT EXISTS git_repositories (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -331,6 +335,12 @@ func (s *Store) Migrate() error {
 		// Migration v13: Add tmux_context column to shell_commands for plugin-sourced entries
 		if err := s.applyMigration13(); err != nil {
 			return fmt.Errorf("failed to apply migration 13: %w", err)
+		}
+	}
+	if currentVersion < 14 {
+		// Migration v14: Add project assignment columns to shell_commands
+		if err := s.applyMigration14(); err != nil {
+			return fmt.Errorf("failed to apply migration 14: %w", err)
 		}
 	}
 
@@ -948,6 +958,8 @@ func (s *Store) repairShellCommandsTable() {
 	if err != nil || tableCount == 0 {
 		return
 	}
+
+	// Migration 13: tmux_context
 	var colCount int
 	err = s.db.QueryRow(`SELECT COUNT(*) FROM pragma_table_info('shell_commands') WHERE name = 'tmux_context'`).Scan(&colCount)
 	if err == nil && colCount == 0 {
@@ -957,6 +969,34 @@ func (s *Store) repairShellCommandsTable() {
 			log.Printf("repairShellCommandsTable: failed to add tmux_context column: %v", err)
 		}
 	}
+
+	// Migration 14: project assignment columns
+	err = s.db.QueryRow(`SELECT COUNT(*) FROM pragma_table_info('shell_commands') WHERE name = 'project_id'`).Scan(&colCount)
+	if err == nil && colCount == 0 {
+		s.db.Exec(`ALTER TABLE shell_commands ADD COLUMN project_id INTEGER REFERENCES projects(id)`)
+	}
+	err = s.db.QueryRow(`SELECT COUNT(*) FROM pragma_table_info('shell_commands') WHERE name = 'project_confidence'`).Scan(&colCount)
+	if err == nil && colCount == 0 {
+		s.db.Exec(`ALTER TABLE shell_commands ADD COLUMN project_confidence REAL DEFAULT 0.0`)
+	}
+	err = s.db.QueryRow(`SELECT COUNT(*) FROM pragma_table_info('shell_commands') WHERE name = 'project_source'`).Scan(&colCount)
+	if err == nil && colCount == 0 {
+		s.db.Exec(`ALTER TABLE shell_commands ADD COLUMN project_source TEXT DEFAULT 'unassigned'`)
+	}
+	s.db.Exec(`CREATE INDEX IF NOT EXISTS idx_shell_project ON shell_commands(project_id)`)
+}
+
+// applyMigration14 adds project assignment columns to shell_commands so shell
+// entries can be attributed to projects like screenshots / focus events / git commits.
+func (s *Store) applyMigration14() error {
+	// ALTER TABLE ADD COLUMN is idempotent-friendly via the repair path;
+	// any errors here (e.g. column already exists from a partial apply) are
+	// benign — repairShellCommandsTable also runs and guards on existence.
+	s.db.Exec(`ALTER TABLE shell_commands ADD COLUMN project_id INTEGER REFERENCES projects(id)`)
+	s.db.Exec(`ALTER TABLE shell_commands ADD COLUMN project_confidence REAL DEFAULT 0.0`)
+	s.db.Exec(`ALTER TABLE shell_commands ADD COLUMN project_source TEXT DEFAULT 'unassigned'`)
+	s.db.Exec(`CREATE INDEX IF NOT EXISTS idx_shell_project ON shell_commands(project_id)`)
+	return nil
 }
 
 // applyMigration12 adds draft fields for AI summary approval workflow.
