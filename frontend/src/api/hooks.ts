@@ -481,6 +481,7 @@ export function useUpdateConfig() {
     mutationFn: (updates: Partial<Config>) => api.config.updateConfig(updates),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.config.all() });
+      queryClient.invalidateQueries({ queryKey: ['shellSetup'] });
     },
   });
 }
