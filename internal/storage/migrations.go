@@ -4,7 +4,7 @@ import (
 	"fmt"
 )
 
-const schemaVersion = 12
+const schemaVersion = 13
 
 const schema = `
 -- ============================================================================
@@ -109,6 +109,7 @@ CREATE TABLE IF NOT EXISTS shell_commands (
     exit_code INTEGER,
     duration_seconds REAL,
     hostname TEXT,
+    tmux_context TEXT,
     session_id INTEGER REFERENCES sessions(id),
     created_at INTEGER DEFAULT (strftime('%s', 'now'))
 );
@@ -319,6 +320,12 @@ func (s *Store) Migrate() error {
 			return fmt.Errorf("failed to apply migration 12: %w", err)
 		}
 	}
+	if currentVersion < 13 {
+		// Migration v13: Add tmux_context column to shell_commands for plugin-sourced entries
+		if err := s.applyMigration13(); err != nil {
+			return fmt.Errorf("failed to apply migration 13: %w", err)
+		}
+	}
 
 	// Record schema version
 	if currentVersion == 0 {
@@ -347,6 +354,8 @@ func (s *Store) repairMissingTables() {
 	s.repairSummariesTable()
 	// Repair missing columns in screenshots table (migrations 9 & 10)
 	s.repairScreenshotsTable()
+	// Repair missing columns in shell_commands table (migration 13)
+	s.repairShellCommandsTable()
 	// Check and create project_patterns table if missing
 	var count int
 	err := s.db.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='project_patterns'`).Scan(&count)
@@ -910,6 +919,36 @@ func (s *Store) applyMigration11() error {
 	s.db.Exec(`CREATE INDEX IF NOT EXISTS idx_embeddings_hash ON activity_embeddings(context_hash)`)
 
 	return nil
+}
+
+// applyMigration13 adds tmux_context column to shell_commands for plugin-sourced entries.
+func (s *Store) applyMigration13() error {
+	var count int
+	err := s.db.QueryRow(
+		`SELECT COUNT(*) FROM pragma_table_info('shell_commands') WHERE name = 'tmux_context'`,
+	).Scan(&count)
+	if err != nil {
+		return fmt.Errorf("check tmux_context column: %w", err)
+	}
+	if count == 0 {
+		if _, err := s.db.Exec(`ALTER TABLE shell_commands ADD COLUMN tmux_context TEXT`); err != nil {
+			return fmt.Errorf("add tmux_context column: %w", err)
+		}
+	}
+	return nil
+}
+
+func (s *Store) repairShellCommandsTable() {
+	var tableCount int
+	err := s.db.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='shell_commands'`).Scan(&tableCount)
+	if err != nil || tableCount == 0 {
+		return
+	}
+	var colCount int
+	err = s.db.QueryRow(`SELECT COUNT(*) FROM pragma_table_info('shell_commands') WHERE name = 'tmux_context'`).Scan(&colCount)
+	if err == nil && colCount == 0 {
+		s.db.Exec(`ALTER TABLE shell_commands ADD COLUMN tmux_context TEXT`)
+	}
 }
 
 // applyMigration12 adds draft fields for AI summary approval workflow.
