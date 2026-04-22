@@ -33,6 +33,9 @@ __traq_escape() {
 
 __traq_hook() {
     local exit_code=$?
+    # Skip if no DEBUG preexec fired (e.g., first prompt of a new shell).
+    # Without this, history 1 returns stale entries from ~/.bash_history.
+    [[ -z "${__traq_start:-}" ]] && return
     [[ -f "$__traq_marker" ]] || { unset __traq_start; return; }
 
     # Overflow check
