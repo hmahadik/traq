@@ -1754,3 +1754,31 @@ export function useSetUpdateEnabled() {
 
 export { useMultiDayTimeline } from '@/hooks/useMultiDayTimeline';
 export type { DayData, MultiDayTimelineState, ScreenshotItem } from '@/hooks/useMultiDayTimeline';
+
+// ============================================================================
+// Shell Setup Hooks
+// ============================================================================
+
+export function useShellSetupStatus(shell: string) {
+  return useQuery({
+    queryKey: ['shellSetup', shell],
+    queryFn: () => api.shellSetup.status(shell),
+    refetchInterval: 5000,
+  });
+}
+
+export function useInstallShellPlugin() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (shell: string) => api.shellSetup.install(shell),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['shellSetup'] }),
+  });
+}
+
+export function useUninstallShellPlugin() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (shell: string) => api.shellSetup.uninstall(shell),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['shellSetup'] }),
+  });
+}

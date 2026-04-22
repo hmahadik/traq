@@ -1220,6 +1220,15 @@ export const issues = {
 };
 
 /**
+ * Shell Setup API - Shell plugin install/status/uninstall
+ */
+export const shellSetup = {
+  status: (shell: string) => App.GetShellSetupStatus(shell),
+  install: (shell: string) => App.InstallShellPlugin(shell),
+  uninstall: (shell: string) => App.UninstallShellPlugin(shell),
+};
+
+/**
  * Search API
  */
 const search = {
@@ -1278,5 +1287,6 @@ export const api = {
   issues,
   projects,
   search,
+  shellSetup,
   updates,
 };
