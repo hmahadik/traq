@@ -93,6 +93,7 @@ type ShellCommand struct {
 	ExitCode         sql.NullInt64   `json:"exitCode"`
 	DurationSeconds  sql.NullFloat64 `json:"durationSeconds"`
 	Hostname         sql.NullString  `json:"hostname"`
+	TmuxContext      sql.NullString  `json:"tmuxContext"`
 	SessionID        sql.NullInt64   `json:"sessionId"`
 	CreatedAt        int64           `json:"createdAt"`
 }

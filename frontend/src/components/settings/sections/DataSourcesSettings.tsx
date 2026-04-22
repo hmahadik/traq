@@ -13,15 +13,17 @@ import { SettingsRow } from '../SettingsRow';
 import { GitRepositoriesSection } from '../GitRepositoriesSection';
 import { FileWatchDirectoriesSection } from '../FileWatchDirectoriesSection';
 import { FileExtensionFilterSection } from '../FileExtensionFilterSection';
+import { ShellIntegrationStrip } from '../ShellIntegrationStrip';
 
 interface CollapsibleCardProps {
   title: string;
   enabled: boolean;
   onToggle: (enabled: boolean) => void;
   children: React.ReactNode;
+  alwaysVisible?: React.ReactNode;
 }
 
-function CollapsibleCard({ title, enabled, onToggle, children }: CollapsibleCardProps) {
+function CollapsibleCard({ title, enabled, onToggle, children, alwaysVisible }: CollapsibleCardProps) {
   return (
     <div className="rounded-lg border bg-card">
       <div className="flex items-center justify-between p-4">
@@ -35,9 +37,14 @@ function CollapsibleCard({ title, enabled, onToggle, children }: CollapsibleCard
         </div>
         <Switch checked={enabled} onCheckedChange={onToggle} />
       </div>
+      {alwaysVisible && (
+        <div className="px-4 pb-4 pt-0 border-t">
+          <div className="pt-4">{alwaysVisible}</div>
+        </div>
+      )}
       {enabled && (
-        <div className="px-4 pb-4 pt-0 border-t space-y-4">
-          <div className="pt-4">
+        <div className={`px-4 pb-4 ${alwaysVisible ? 'pt-0' : 'pt-0 border-t'} space-y-4`}>
+          <div className={alwaysVisible ? '' : 'pt-4'}>
             {children}
           </div>
         </div>
@@ -66,6 +73,15 @@ export function DataSourcesSettings() {
               shell: { ...config.dataSources.shell, enabled },
             },
           })
+        }
+        alwaysVisible={
+          <ShellIntegrationStrip
+            shell={
+              config.dataSources.shell.shellType === 'auto' || !config.dataSources.shell.shellType
+                ? 'bash'
+                : config.dataSources.shell.shellType
+            }
+          />
         }
       >
         <SettingsRow label="Shell Type" vertical>

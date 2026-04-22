@@ -34,13 +34,17 @@ func NewWindowTracker(p platform.Platform, store *storage.Store) *WindowTracker 
 }
 
 // Poll checks the current window and returns info if it changed.
+// A nil info with nil error means no window currently has focus
+// (e.g. empty desktop) — treated as "no change" so we don't churn focus events.
 func (t *WindowTracker) Poll() (*platform.WindowInfo, bool, error) {
 	info, err := t.platform.GetActiveWindow()
 	if err != nil {
 		return nil, false, err
 	}
+	if info == nil {
+		return nil, false, nil
+	}
 
-	// Check if focus changed
 	changed := t.currentFocus == nil ||
 		t.currentFocus.WindowTitle != info.Title ||
 		t.currentFocus.AppName != info.AppName
