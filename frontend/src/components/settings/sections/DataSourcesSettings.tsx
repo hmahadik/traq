@@ -13,6 +13,7 @@ import { SettingsRow } from '../SettingsRow';
 import { GitRepositoriesSection } from '../GitRepositoriesSection';
 import { FileWatchDirectoriesSection } from '../FileWatchDirectoriesSection';
 import { FileExtensionFilterSection } from '../FileExtensionFilterSection';
+import { ShellIntegrationStrip } from '../ShellIntegrationStrip';
 
 interface CollapsibleCardProps {
   title: string;
@@ -68,6 +69,13 @@ export function DataSourcesSettings() {
           })
         }
       >
+        <ShellIntegrationStrip
+          shell={
+            config.dataSources.shell.shellType === 'auto' || !config.dataSources.shell.shellType
+              ? 'bash'
+              : config.dataSources.shell.shellType
+          }
+        />
         <SettingsRow label="Shell Type" vertical>
           <Select
             value={config.dataSources.shell.shellType || 'auto'}
