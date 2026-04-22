@@ -236,6 +236,12 @@ CREATE TABLE IF NOT EXISTS schema_version (
 
 // Migrate applies any pending database migrations.
 func (s *Store) Migrate() error {
+	// Always run repair first. This handles DBs whose schema_version was stamped
+	// at the target without the accompanying DDL (e.g. a partial/no-op migration
+	// from an intermediate dev build). Repair sub-functions guard on table
+	// existence, so this is a no-op on fresh DBs.
+	s.repairMissingTables()
+
 	// Check current schema version
 	var currentVersion int
 	err := s.db.QueryRow("SELECT COALESCE(MAX(version), 0) FROM schema_version").Scan(&currentVersion)
@@ -336,9 +342,6 @@ func (s *Store) Migrate() error {
 	if err != nil {
 		return fmt.Errorf("failed to update schema version: %w", err)
 	}
-
-	// Run repair checks for tables that might be missing due to partial migrations
-	s.repairMissingTables()
 
 	return nil
 }
@@ -947,7 +950,9 @@ func (s *Store) repairShellCommandsTable() {
 	var colCount int
 	err = s.db.QueryRow(`SELECT COUNT(*) FROM pragma_table_info('shell_commands') WHERE name = 'tmux_context'`).Scan(&colCount)
 	if err == nil && colCount == 0 {
-		s.db.Exec(`ALTER TABLE shell_commands ADD COLUMN tmux_context TEXT`)
+		if _, err := s.db.Exec(`ALTER TABLE shell_commands ADD COLUMN tmux_context TEXT`); err != nil {
+			fmt.Printf("repairShellCommandsTable: failed to add tmux_context column: %v\n", err)
+		}
 	}
 }
 

@@ -34,11 +34,12 @@ function __traq_postexec --on-event fish_postexec
         set duration_ms (math "($end - $__traq_start) / 1000000")
     end
 
+    # Format: session:window_idx/window_name:pane_idx/pane_cmd
+    # e.g. "main:2/logs:1/vim" or "0:0/fish:0/fish"
     set -l tmux_ctx "-"
     if set -q TMUX
-        set -l s (tmux display-message -p '#S' 2>/dev/null)
-        set -l w (tmux display-message -p '#I' 2>/dev/null)
-        test -n "$s"; and test -n "$w"; and set tmux_ctx "$s:$w"
+        set -l ctx (tmux display-message -p '#S:#I/#W:#P/#{pane_current_command}' 2>/dev/null)
+        test -n "$ctx"; and set tmux_ctx "$ctx"
     end
 
     set -l hostname (hostname -s 2>/dev/null; or echo "-")

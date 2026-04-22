@@ -180,7 +180,7 @@ func (s *ShellSetupService) Status(kind shellplugin.ShellKind) (*SetupStatus, er
 	switch {
 	case rcHasFence && pluginExists && markerExists:
 		status.State = StateActive
-		status.Message = "Capturing commands from all shells."
+		status.Message = ""
 	case rcHasFence && pluginExists && !markerExists:
 		status.State = StateInstalledDisabled
 		status.Message = "Plugin installed but idle. Enable Shell History to resume."

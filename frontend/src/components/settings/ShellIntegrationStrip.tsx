@@ -58,11 +58,7 @@ export function ShellIntegrationStrip({ shell }: Props) {
             <Button
               size="sm"
               variant="outline"
-              onClick={() => {
-                if (window.confirm('Remove Traq shell integration?')) {
-                  uninstall.mutate(shell);
-                }
-              }}
+              onClick={() => uninstall.mutate(shell)}
               disabled={uninstall.isPending}
             >
               Uninstall
@@ -70,7 +66,13 @@ export function ShellIntegrationStrip({ shell }: Props) {
           )}
         </div>
       </div>
-      <p className="text-xs text-muted-foreground">{status.message}</p>
+      <p className="text-xs text-muted-foreground">
+        Adds a hook to your shell's startup file that records each command as you run it, along with
+        its exit code, duration, working directory, and tmux context. Without this, Traq can still
+        read commands from your shell's native history file, but without those extra fields and with
+        some delay.
+      </p>
+      {status.message && <p className="text-xs text-muted-foreground">{status.message}</p>}
       {status.state === 'active' && (
         <p className="text-xs text-muted-foreground">
           Open a new terminal or run <code className="rounded bg-muted px-1">source {status.rcPath}</code>{' '}

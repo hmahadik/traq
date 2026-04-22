@@ -46,12 +46,13 @@ __traq_precmd() {
     end=$EPOCHREALTIME
     duration_ms=$(awk -v s="$__traq_start" -v e="$end" 'BEGIN{printf "%.0f", (e - s) * 1000}')
 
+    # Format: session:window_idx/window_name:pane_idx/pane_cmd
+    # e.g. "main:2/logs:1/vim" or "0:0/zsh:0/zsh"
     local tmux_ctx="-"
     if [[ -n "${TMUX:-}" ]]; then
-        local session window
-        session=$(tmux display-message -p '#S' 2>/dev/null)
-        window=$(tmux display-message -p '#I' 2>/dev/null)
-        [[ -n "$session" && -n "$window" ]] && tmux_ctx="${session}:${window}"
+        local ctx
+        ctx=$(tmux display-message -p '#S:#I/#W:#P/#{pane_current_command}' 2>/dev/null)
+        [[ -n "$ctx" ]] && tmux_ctx="$ctx"
     fi
 
     local hostname
