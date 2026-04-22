@@ -10,9 +10,13 @@ __traq_log="$__traq_dir/history.log"
 __traq_overflow="$__traq_dir/overflowed"
 __traq_max_bytes=10485760  # 10 MiB
 
+# Baseline history number. Set lazily on the first hook call because
+# bash loads $HISTFILE into memory *after* rc files run, so snapshotting
+# here would see an empty history and still log the stale last entry.
+__traq_last_histnum=""
+
 # Capture command start time via DEBUG trap (fires before each command).
 # Using PS0 would print the timestamp to the terminal; DEBUG is silent.
-# functrace is off by default, so DEBUG does not fire inside __traq_hook.
 __traq_preexec() {
     [[ -n "${COMP_LINE:-}" ]] && return
     [[ "$BASH_COMMAND" == "__traq_hook" ]] && return
@@ -33,10 +37,30 @@ __traq_escape() {
 
 __traq_hook() {
     local exit_code=$?
-    # Skip if no DEBUG preexec fired (e.g., first prompt of a new shell).
-    # Without this, history 1 returns stale entries from ~/.bash_history.
-    [[ -z "${__traq_start:-}" ]] && return
+
+    # Read the current history entry and its number.
+    local hist_line hist_num cmd
+    hist_line=$(HISTTIMEFORMAT= builtin history 1 2>/dev/null)
+    hist_num=$(printf '%s' "$hist_line" | awk '{print $1}')
+    cmd=$(printf '%s' "$hist_line" | sed 's/^ *[0-9]* *//')
+
+    # First call: establish baseline without logging. HISTFILE is loaded
+    # by now, so $hist_num reflects the last pre-existing history entry.
+    if [[ -z "$__traq_last_histnum" ]]; then
+        __traq_last_histnum="${hist_num:-0}"
+        unset __traq_start
+        return
+    fi
+
+    # Skip if the history number hasn't advanced.
+    if [[ -z "$hist_num" || "$hist_num" == "$__traq_last_histnum" ]]; then
+        unset __traq_start
+        return
+    fi
+    __traq_last_histnum="$hist_num"
+
     [[ -f "$__traq_marker" ]] || { unset __traq_start; return; }
+    [[ -z "$cmd" ]] && { unset __traq_start; return; }
 
     # Overflow check
     if [[ -f "$__traq_log" ]]; then
@@ -48,11 +72,6 @@ __traq_hook() {
             return
         fi
     fi
-
-    # Last command via HISTCMD-based lookup
-    local cmd
-    cmd=$(HISTTIMEFORMAT= builtin history 1 2>/dev/null | sed 's/^ *[0-9]* *//')
-    [[ -z "$cmd" ]] && { unset __traq_start; return; }
 
     local ts
     ts=$(date +%s)
