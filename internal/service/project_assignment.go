@@ -1,6 +1,7 @@
 package service
 
 import (
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -704,6 +705,22 @@ func (s *ProjectAssignmentService) ExtractEventContext(eventType string, eventID
 		}
 		ctx.GitRepo = repoURL
 		ctx.BranchName = branch
+
+	case "shell":
+		// working_directory is by far the strongest project signal for shell
+		// commands — a cwd of ~/repos/traq almost always maps to the Traq project.
+		// shell_type ("bash"/"zsh"/"fish") is too generic to learn from, so we
+		// skip populating AppName.
+		var cwd sql.NullString
+		err := s.store.DB().QueryRow(
+			`SELECT working_directory FROM shell_commands WHERE id = ?`, eventID,
+		).Scan(&cwd)
+		if err != nil {
+			return nil, err
+		}
+		if cwd.Valid {
+			ctx.FilePath = cwd.String
+		}
 	}
 
 	return ctx, nil

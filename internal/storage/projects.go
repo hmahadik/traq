@@ -113,6 +113,10 @@ func (s *Store) DeleteProject(id int64) error {
 	if err != nil {
 		return fmt.Errorf("failed to clear git commit assignments: %w", err)
 	}
+	_, err = s.db.Exec(`UPDATE shell_commands SET project_id = NULL, project_source = 'unassigned' WHERE project_id = ?`, id)
+	if err != nil {
+		return fmt.Errorf("failed to clear shell command assignments: %w", err)
+	}
 
 	// Delete the project (cascades to patterns and examples)
 	_, err = s.db.Exec(`DELETE FROM projects WHERE id = ?`, id)
@@ -243,6 +247,8 @@ func (s *Store) SetEventProject(eventType string, eventID, projectID int64, conf
 		query = `UPDATE window_focus_events SET project_id = ?, project_confidence = ?, project_source = ? WHERE id = ?`
 	case "git":
 		query = `UPDATE git_commits SET project_id = ?, project_confidence = ?, project_source = ? WHERE id = ?`
+	case "shell":
+		query = `UPDATE shell_commands SET project_id = ?, project_confidence = ?, project_source = ? WHERE id = ?`
 	default:
 		return fmt.Errorf("unknown event type: %s", eventType)
 	}
@@ -271,6 +277,8 @@ func (s *Store) GetUnassignedEventCount() (int, error) {
 			SELECT COUNT(*) FROM window_focus_events WHERE project_source = 'unassigned' OR project_source IS NULL
 		) + (
 			SELECT COUNT(*) FROM git_commits WHERE project_source = 'unassigned' OR project_source IS NULL
+		) + (
+			SELECT COUNT(*) FROM shell_commands WHERE project_source = 'unassigned' OR project_source IS NULL
 		)
 	`).Scan(&count)
 	if err != nil {

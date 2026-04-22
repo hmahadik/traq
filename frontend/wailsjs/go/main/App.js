@@ -138,6 +138,10 @@ export function DiscoverGitRepositories(arg1, arg2) {
   return window['go']['main']['App']['DiscoverGitRepositories'](arg1, arg2);
 }
 
+export function DismissShellOverflow() {
+  return window['go']['main']['App']['DismissShellOverflow']();
+}
+
 export function DownloadModel(arg1) {
   return window['go']['main']['App']['DownloadModel'](arg1);
 }
@@ -422,6 +426,10 @@ export function GetShellCommandsForSession(arg1) {
   return window['go']['main']['App']['GetShellCommandsForSession'](arg1);
 }
 
+export function GetShellSetupStatus(arg1) {
+  return window['go']['main']['App']['GetShellSetupStatus'](arg1);
+}
+
 export function GetStorageStats() {
   return window['go']['main']['App']['GetStorageStats']();
 }
@@ -496,6 +504,10 @@ export function GetYearlyStats(arg1) {
 
 export function IgnoreActivities(arg1, arg2) {
   return window['go']['main']['App']['IgnoreActivities'](arg1, arg2);
+}
+
+export function InstallShellPlugin(arg1) {
+  return window['go']['main']['App']['InstallShellPlugin'](arg1);
 }
 
 export function IsReady() {
@@ -636,6 +648,10 @@ export function TriggerUpdate() {
 
 export function UnignoreActivities(arg1, arg2) {
   return window['go']['main']['App']['UnignoreActivities'](arg1, arg2);
+}
+
+export function UninstallShellPlugin(arg1) {
+  return window['go']['main']['App']['UninstallShellPlugin'](arg1);
 }
 
 export function UnregisterGitRepository(arg1) {

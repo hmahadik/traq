@@ -4,7 +4,7 @@ package platform
 
 import (
 	"bytes"
-	"context"
+	"encoding/binary"
 	"fmt"
 	"os"
 	"os/exec"
@@ -21,10 +21,23 @@ import (
 
 // Linux implements Platform for Linux systems.
 type Linux struct {
-	x11Conn     *xgb.Conn
-	x11Root     xproto.Window
-	x11InitOnce sync.Once
-	x11InitErr  error
+	x11Conn      *xgb.Conn
+	x11Root      xproto.Window
+	x11InitOnce  sync.Once
+	x11InitErr   error
+	x11Atoms     x11Atoms
+	x11AtomsOnce sync.Once
+	x11AtomsErr  error
+}
+
+// x11Atoms caches interned atom IDs needed for window inspection.
+// Atoms are stable for the connection lifetime, so a one-time intern is enough.
+type x11Atoms struct {
+	netActiveWindow xproto.Atom
+	netWmName       xproto.Atom
+	netWmPid        xproto.Atom
+	wmName          xproto.Atom
+	wmClass         xproto.Atom
 }
 
 // New returns the platform implementation for Linux.
@@ -60,134 +73,127 @@ func (l *Linux) CacheDir() string {
 }
 
 // GetActiveWindow returns information about the currently focused window.
+// Returns (nil, nil) when no window currently has focus (e.g. user is on an
+// empty desktop) — callers should treat that as "no change to record".
 func (l *Linux) GetActiveWindow() (*WindowInfo, error) {
-	// Get active window ID
-	windowID, err := l.getActiveWindowID()
+	l.initX11()
+	if l.x11InitErr != nil {
+		return nil, l.x11InitErr
+	}
+	if err := l.initAtoms(); err != nil {
+		return nil, err
+	}
+
+	winID, err := l.getActiveWindowID()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get active window ID: %w", err)
+		return nil, fmt.Errorf("get active window: %w", err)
+	}
+	if winID == 0 {
+		return nil, nil
 	}
 
 	info := &WindowInfo{}
-
-	// Get window title
-	title, err := l.getWindowTitle(windowID)
-	if err == nil {
-		info.Title = title
-	}
-
-	// Get WM_CLASS (app name and class)
-	appName, class, err := l.getWindowClass(windowID)
-	if err == nil {
-		info.AppName = appName
-		info.Class = class
-	}
-
-	// Get window geometry
-	x, y, w, h, err := l.getWindowGeometry(windowID)
-	if err == nil {
-		info.X = x
-		info.Y = y
-		info.Width = w
-		info.Height = h
-	}
-
-	// Get PID
-	pid, err := l.getWindowPID(windowID)
-	if err == nil {
-		info.PID = pid
-	}
-
+	info.Title = l.getWindowTitle(winID)
+	info.AppName, info.Class = l.getWindowClass(winID)
+	info.PID = l.getWindowPID(winID)
+	info.X, info.Y, info.Width, info.Height = l.getWindowGeometry(winID)
 	return info, nil
 }
 
-func (l *Linux) getActiveWindowID() (string, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancel()
-	cmd := exec.CommandContext(ctx, "xdotool", "getactivewindow")
-	out, err := cmd.Output()
-	if err != nil {
-		return "", err
-	}
-	return strings.TrimSpace(string(out)), nil
-}
-
-func (l *Linux) getWindowTitle(windowID string) (string, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancel()
-	cmd := exec.CommandContext(ctx, "xdotool", "getwindowname", windowID)
-	out, err := cmd.Output()
-	if err != nil {
-		return "", err
-	}
-	return strings.TrimSpace(string(out)), nil
-}
-
-func (l *Linux) getWindowClass(windowID string) (appName, class string, err error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancel()
-	cmd := exec.CommandContext(ctx, "xprop", "-id", windowID, "WM_CLASS")
-	out, err := cmd.Output()
-	if err != nil {
-		return "", "", err
-	}
-
-	// Parse: WM_CLASS(STRING) = "instance", "class"
-	line := strings.TrimSpace(string(out))
-	if !strings.Contains(line, "=") {
-		return "", "", fmt.Errorf("invalid WM_CLASS format")
-	}
-
-	parts := strings.SplitN(line, "=", 2)
-	if len(parts) != 2 {
-		return "", "", fmt.Errorf("invalid WM_CLASS format")
-	}
-
-	values := strings.Split(parts[1], ",")
-	if len(values) >= 1 {
-		appName = strings.Trim(strings.TrimSpace(values[0]), "\"")
-	}
-	if len(values) >= 2 {
-		class = strings.Trim(strings.TrimSpace(values[1]), "\"")
-	}
-
-	return appName, class, nil
-}
-
-func (l *Linux) getWindowGeometry(windowID string) (x, y, w, h int, err error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancel()
-	cmd := exec.CommandContext(ctx, "xdotool", "getwindowgeometry", "--shell", windowID)
-	out, err := cmd.Output()
-	if err != nil {
-		return 0, 0, 0, 0, err
-	}
-
-	// Parse shell format: X=..., Y=..., WIDTH=..., HEIGHT=...
-	for _, line := range strings.Split(string(out), "\n") {
-		line = strings.TrimSpace(line)
-		if strings.HasPrefix(line, "X=") {
-			x, _ = strconv.Atoi(strings.TrimPrefix(line, "X="))
-		} else if strings.HasPrefix(line, "Y=") {
-			y, _ = strconv.Atoi(strings.TrimPrefix(line, "Y="))
-		} else if strings.HasPrefix(line, "WIDTH=") {
-			w, _ = strconv.Atoi(strings.TrimPrefix(line, "WIDTH="))
-		} else if strings.HasPrefix(line, "HEIGHT=") {
-			h, _ = strconv.Atoi(strings.TrimPrefix(line, "HEIGHT="))
+// initAtoms interns the X11 atoms we need. Atom IDs are stable per connection,
+// so this only needs to run once.
+func (l *Linux) initAtoms() error {
+	l.x11AtomsOnce.Do(func() {
+		entries := []struct {
+			name string
+			out  *xproto.Atom
+		}{
+			{"_NET_ACTIVE_WINDOW", &l.x11Atoms.netActiveWindow},
+			{"_NET_WM_NAME", &l.x11Atoms.netWmName},
+			{"_NET_WM_PID", &l.x11Atoms.netWmPid},
+			{"WM_NAME", &l.x11Atoms.wmName},
+			{"WM_CLASS", &l.x11Atoms.wmClass},
 		}
-	}
-
-	return x, y, w, h, nil
+		for _, e := range entries {
+			r, err := xproto.InternAtom(l.x11Conn, false, uint16(len(e.name)), e.name).Reply()
+			if err != nil {
+				l.x11AtomsErr = fmt.Errorf("intern atom %s: %w", e.name, err)
+				return
+			}
+			*e.out = r.Atom
+		}
+	})
+	return l.x11AtomsErr
 }
 
-func (l *Linux) getWindowPID(windowID string) (int, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancel()
-	cmd := exec.CommandContext(ctx, "xdotool", "getwindowpid", windowID)
-	out, err := cmd.Output()
+func (l *Linux) getActiveWindowID() (xproto.Window, error) {
+	reply, err := xproto.GetProperty(l.x11Conn, false, l.x11Root,
+		l.x11Atoms.netActiveWindow, xproto.AtomWindow, 0, 1).Reply()
 	if err != nil {
 		return 0, err
 	}
-	return strconv.Atoi(strings.TrimSpace(string(out)))
+	if len(reply.Value) < 4 {
+		return 0, nil
+	}
+	return xproto.Window(binary.LittleEndian.Uint32(reply.Value)), nil
+}
+
+// getStringProp reads a string-like property using AtomAny so we accept either
+// STRING (latin-1) or UTF8_STRING — different apps set _NET_WM_NAME under
+// different types and we want to be permissive.
+func (l *Linux) getStringProp(win xproto.Window, atom xproto.Atom) string {
+	reply, err := xproto.GetProperty(l.x11Conn, false, win, atom,
+		xproto.GetPropertyTypeAny, 0, 4096).Reply()
+	if err != nil || len(reply.Value) == 0 {
+		return ""
+	}
+	return string(bytes.TrimRight(reply.Value, "\x00"))
+}
+
+func (l *Linux) getWindowTitle(win xproto.Window) string {
+	if v := l.getStringProp(win, l.x11Atoms.netWmName); v != "" {
+		return v
+	}
+	return l.getStringProp(win, l.x11Atoms.wmName)
+}
+
+func (l *Linux) getWindowClass(win xproto.Window) (appName, class string) {
+	reply, err := xproto.GetProperty(l.x11Conn, false, win,
+		l.x11Atoms.wmClass, xproto.GetPropertyTypeAny, 0, 1024).Reply()
+	if err != nil || len(reply.Value) == 0 {
+		return "", ""
+	}
+	// WM_CLASS is two consecutive null-terminated strings: instance\0class\0
+	parts := bytes.SplitN(reply.Value, []byte{0}, 3)
+	if len(parts) >= 1 {
+		appName = string(parts[0])
+	}
+	if len(parts) >= 2 {
+		class = string(parts[1])
+	}
+	return
+}
+
+func (l *Linux) getWindowPID(win xproto.Window) int {
+	reply, err := xproto.GetProperty(l.x11Conn, false, win,
+		l.x11Atoms.netWmPid, xproto.AtomCardinal, 0, 1).Reply()
+	if err != nil || len(reply.Value) < 4 {
+		return 0
+	}
+	return int(binary.LittleEndian.Uint32(reply.Value))
+}
+
+func (l *Linux) getWindowGeometry(win xproto.Window) (x, y, w, h int) {
+	geom, err := xproto.GetGeometry(l.x11Conn, xproto.Drawable(win)).Reply()
+	if err != nil {
+		return 0, 0, 0, 0
+	}
+	// GetGeometry returns coordinates relative to the window's parent.
+	// Translate to root for absolute screen coordinates (matches xdotool's behavior).
+	if trans, terr := xproto.TranslateCoordinates(l.x11Conn, win, l.x11Root, 0, 0).Reply(); terr == nil {
+		return int(trans.DstX), int(trans.DstY), int(geom.Width), int(geom.Height)
+	}
+	return int(geom.X), int(geom.Y), int(geom.Width), int(geom.Height)
 }
 
 func (l *Linux) initX11() {

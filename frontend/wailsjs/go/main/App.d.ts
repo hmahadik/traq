@@ -74,6 +74,8 @@ export function DeleteTimelineCategoryRule(arg1:string):Promise<void>;
 
 export function DiscoverGitRepositories(arg1:Array<string>,arg2:number):Promise<Array<storage.GitRepository>>;
 
+export function DismissShellOverflow():Promise<void>;
+
 export function DownloadModel(arg1:string):Promise<void>;
 
 export function DownloadServer():Promise<void>;
@@ -216,6 +218,8 @@ export function GetSessionsForDate(arg1:string):Promise<Array<service.SessionSum
 
 export function GetShellCommandsForSession(arg1:number):Promise<Array<storage.ShellCommand>>;
 
+export function GetShellSetupStatus(arg1:string):Promise<service.SetupStatus>;
+
 export function GetStorageStats():Promise<service.StorageStats>;
 
 export function GetSummary(arg1:number):Promise<storage.Summary>;
@@ -253,6 +257,8 @@ export function GetWeeklyStats(arg1:string):Promise<service.WeeklyStats>;
 export function GetYearlyStats(arg1:number):Promise<service.YearlyStats>;
 
 export function IgnoreActivities(arg1:string,arg2:Array<number>):Promise<void>;
+
+export function InstallShellPlugin(arg1:string):Promise<void>;
 
 export function IsReady():Promise<boolean>;
 
@@ -323,6 +329,8 @@ export function TestIssueWebhook():Promise<void>;
 export function TriggerUpdate():Promise<void>;
 
 export function UnignoreActivities(arg1:string,arg2:Array<number>):Promise<void>;
+
+export function UninstallShellPlugin(arg1:string):Promise<void>;
 
 export function UnregisterGitRepository(arg1:number):Promise<void>;
 
