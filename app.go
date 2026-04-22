@@ -17,6 +17,7 @@ import (
 	"traq/internal/service"
 	"traq/internal/storage"
 	"traq/internal/tracker"
+	"traq/internal/tracker/shellplugin"
 
 	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
@@ -55,6 +56,7 @@ type App struct {
 	Projects    *service.ProjectAssignmentService
 	Embeddings  *service.EmbeddingService
 	Draft       *service.DraftService
+	ShellSetup  *service.ShellSetupService
 
 	// Inference engine
 	inference *inference.Service
@@ -204,6 +206,9 @@ func (a *App) startup(ctx context.Context) {
 
 	// Initialize draft service (for AI draft approval workflow)
 	a.Draft = service.NewDraftService(a.store)
+
+	// Initialize shell setup service (plugin install/uninstall/status)
+	a.ShellSetup = service.NewShellSetupService(dataDir)
 
 	// Initialize issues service (for crash/manual reporting)
 	a.Issues = service.NewIssueService(a.store, Version)
@@ -683,6 +688,21 @@ func (a *App) GetScreenshotsForHour(date string, hour int) ([]*service.Screensho
 		return nil, nil
 	}
 	return a.Timeline.GetScreenshotsForHour(date, hour)
+}
+
+// GetShellSetupStatus returns the install/enable state for a given shell.
+func (a *App) GetShellSetupStatus(shell string) (*service.SetupStatus, error) {
+	return a.ShellSetup.Status(shellplugin.ShellKind(shell))
+}
+
+// InstallShellPlugin installs the Traq plugin for the given shell.
+func (a *App) InstallShellPlugin(shell string) error {
+	return a.ShellSetup.Install(shellplugin.ShellKind(shell))
+}
+
+// UninstallShellPlugin removes the Traq plugin for the given shell.
+func (a *App) UninstallShellPlugin(shell string) error {
+	return a.ShellSetup.Uninstall(shellplugin.ShellKind(shell))
 }
 
 // SearchAllDataSources searches across all event types (git, shell, files, browser, screenshots).

@@ -1973,6 +1973,28 @@ export namespace service {
 	        this.category = source["category"];
 	    }
 	}
+	export class SetupStatus {
+	    shell: string;
+	    state: string;
+	    rcPath: string;
+	    pluginPath: string;
+	    overflowed: boolean;
+	    message: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new SetupStatus(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.shell = source["shell"];
+	        this.state = source["state"];
+	        this.rcPath = source["rcPath"];
+	        this.pluginPath = source["pluginPath"];
+	        this.overflowed = source["overflowed"];
+	        this.message = source["message"];
+	    }
+	}
 	
 	export class ShellEventDisplay {
 	    id: number;
@@ -3040,6 +3062,7 @@ export namespace storage {
 	    exitCode: sql.NullInt64;
 	    durationSeconds: sql.NullFloat64;
 	    hostname: sql.NullString;
+	    tmuxContext: sql.NullString;
 	    sessionId: sql.NullInt64;
 	    createdAt: number;
 	
@@ -3057,6 +3080,7 @@ export namespace storage {
 	        this.exitCode = this.convertValues(source["exitCode"], sql.NullInt64);
 	        this.durationSeconds = this.convertValues(source["durationSeconds"], sql.NullFloat64);
 	        this.hostname = this.convertValues(source["hostname"], sql.NullString);
+	        this.tmuxContext = this.convertValues(source["tmuxContext"], sql.NullString);
 	        this.sessionId = this.convertValues(source["sessionId"], sql.NullInt64);
 	        this.createdAt = source["createdAt"];
 	    }
