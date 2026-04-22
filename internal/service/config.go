@@ -18,6 +18,7 @@ type ConfigService struct {
 	store           *storage.Store
 	platform        platform.Platform
 	daemon          *tracker.Daemon
+	shellSetup      *ShellSetupService
 	updateInference func(*Config)
 }
 
@@ -38,6 +39,11 @@ func (s *ConfigService) SetInferenceUpdater(update func(*Config)) {
 // SetDaemon sets the daemon reference (for late initialization).
 func (s *ConfigService) SetDaemon(daemon *tracker.Daemon) {
 	s.daemon = daemon
+}
+
+// SetShellSetup sets the shell setup service (for late initialization).
+func (s *ConfigService) SetShellSetup(svc *ShellSetupService) {
+	s.shellSetup = svc
 }
 
 // SyncAutoStart ensures the system autostart state matches the config.
@@ -681,6 +687,13 @@ func (s *ConfigService) RestartDaemon() error {
 		s.daemon.SetShellType(config.DataSources.Shell.ShellType)
 		s.daemon.SetShellHistoryPath(config.DataSources.Shell.HistoryPath)
 		s.daemon.SetShellExcludePatterns(config.DataSources.Shell.ExcludePatterns)
+		if s.shellSetup != nil {
+			if config.DataSources.Shell.Enabled {
+				_ = s.shellSetup.EnableCapture()
+			} else {
+				_ = s.shellSetup.DisableCapture()
+			}
+		}
 	}
 
 	// Apply file tracking configuration
