@@ -209,6 +209,7 @@ func (a *App) startup(ctx context.Context) {
 
 	// Initialize shell setup service (plugin install/uninstall/status)
 	a.ShellSetup = service.NewShellSetupService(dataDir)
+	a.Config.SetShellSetup(a.ShellSetup)
 
 	// Initialize issues service (for crash/manual reporting)
 	a.Issues = service.NewIssueService(a.store, Version)
