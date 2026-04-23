@@ -115,9 +115,9 @@ export function useMultiDayTimelineData({
       const data = dayData.gridData as TimelineGridData | null | undefined;
       if (!data) continue;
 
-      // Process activity blocks (always shown)
+      // Process activity blocks (always shown — they're the base layer)
       // When collapseActivityRows is true, merge all into single "In Focus" row
-      if (filters.showScreenshots) {
+      {
         for (const [, hourApps] of Object.entries(data.hourlyGrid)) {
           for (const [appName, activities] of Object.entries(hourApps)) {
             for (const activity of activities) {
@@ -337,7 +337,7 @@ export function useMultiDayTimelineData({
       }
 
       // Process screenshots from this day's data
-      if (dayData.screenshots && dayData.screenshots.length > 0) {
+      if (filters.showScreenshots && dayData.screenshots && dayData.screenshots.length > 0) {
         for (const screenshot of dayData.screenshots) {
           // Skip screenshots in the future (shouldn't happen but defensive)
           if (isInFuture(screenshot.timestamp)) continue;
