@@ -96,6 +96,8 @@ export function GenerateSummary(arg1:number):Promise<storage.Summary>;
 
 export function GenerateWeeklySummaryMarkdown(arg1:string,arg2:string):Promise<string>;
 
+export function GetAISession(arg1:string):Promise<service.AISessionDetail>;
+
 export function GetActivityTags(arg1:string):Promise<Array<service.TagUsage>>;
 
 export function GetAllApps():Promise<Array<main.AppWithCategory>>;
@@ -261,6 +263,8 @@ export function IgnoreActivities(arg1:string,arg2:Array<number>):Promise<void>;
 export function InstallShellPlugin(arg1:string):Promise<void>;
 
 export function IsReady():Promise<boolean>;
+
+export function ListAISessions(arg1:string):Promise<Array<service.AISessionDisplay>>;
 
 export function ListHierarchicalSummaries(arg1:string,arg2:number):Promise<Array<storage.HierarchicalSummary>>;
 
