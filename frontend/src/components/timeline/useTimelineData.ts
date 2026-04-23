@@ -192,6 +192,32 @@ export function useTimelineData({
       }
     }
 
+    // Process AI coding events
+    if (filters.showAI && data.aiEvents) {
+      for (const [, hourBlocks] of Object.entries(data.aiEvents)) {
+        for (const block of hourBlocks) {
+          const rowName = groupBy === 'app'
+            ? (block.projectName || block.tool || 'AI Coding')
+            : 'AI Coding';
+          const durationSec = Math.max(0, block.endTime - block.startTime);
+          const cappedDur = capDuration(block.startTime, durationSec);
+          const dot: EventDot = {
+            id: `ai-${block.tool}-${block.sessionId}-${block.startTime}`,
+            originalId: block.startTime,
+            timestamp: new Date(block.startTime * 1000),
+            type: 'ai',
+            row: rowName,
+            label: `${block.tool}: ${block.projectName || block.projectDir} (${block.eventCount} events)`,
+            duration: cappedDur,
+            endTimeMs: cappedDur ? block.startTime * 1000 + cappedDur * 1000 : undefined,
+            color: EVENT_TYPE_COLORS.ai,
+            metadata: block,
+          };
+          addToRow(rowName, dot);
+        }
+      }
+    }
+
     // Process browser events
     if (filters.showBrowser) {
       for (const [, hourEvents] of Object.entries(data.browserEvents)) {

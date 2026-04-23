@@ -1791,3 +1791,22 @@ export function useDismissShellOverflow() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['shellSetup'] }),
   });
 }
+
+// ============================================================================
+// AI coding sessions (Claude Code, opencode)
+// ============================================================================
+
+export function useAISessions(date: string) {
+  return useQuery({
+    queryKey: ['ai', 'sessions', date],
+    queryFn: () => api.ai.list(date),
+  });
+}
+
+export function useAISession(id: string | null) {
+  return useQuery({
+    queryKey: ['ai', 'session', id],
+    queryFn: () => api.ai.get(id!),
+    enabled: !!id,
+  });
+}

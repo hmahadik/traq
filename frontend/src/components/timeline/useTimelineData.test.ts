@@ -28,6 +28,7 @@ const createMockGridData = (overrides: Partial<TimelineGridData> = {}): Timeline
   shellEvents: {},
   browserEvents: {},
   fileEvents: {},
+  aiEvents: {},
   ...overrides,
 });
 
@@ -38,7 +39,7 @@ const defaultFilters: TimelineFilters = {
   showShell: true,
   showBrowser: true,
   showFiles: true,
-  showAfk: true,
+  showAI: true,
 };
 
 describe('useTimelineData', () => {
