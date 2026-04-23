@@ -115,9 +115,9 @@ export function useMultiDayTimelineData({
       const data = dayData.gridData as TimelineGridData | null | undefined;
       if (!data) continue;
 
-      // Process activity blocks (always shown)
+      // Process activity blocks (always shown — they're the base layer)
       // When collapseActivityRows is true, merge all into single "In Focus" row
-      if (filters.showScreenshots) {
+      {
         for (const [, hourApps] of Object.entries(data.hourlyGrid)) {
           for (const [appName, activities] of Object.entries(hourApps)) {
             for (const activity of activities) {
@@ -211,6 +211,36 @@ export function useMultiDayTimelineData({
               endTimeMs: shellDur ? event.timestamp * 1000 + shellDur * 1000 : undefined,
               color: EVENT_TYPE_COLORS.shell,
               metadata: event,
+            };
+            addToRow(rowName, dot);
+          }
+        }
+      }
+
+      // Process AI coding events
+      if (filters.showAI && data.aiEvents) {
+        for (const [, hourBlocks] of Object.entries(data.aiEvents)) {
+          for (const block of hourBlocks) {
+            if (isInFuture(block.startTime)) continue;
+
+            const aiKey = `ai-${block.tool}-${block.sessionId}-${block.startTime}`;
+            if (seenEventIds.has(aiKey)) continue;
+            seenEventIds.add(aiKey);
+
+            const rowName = block.projectName || block.tool || 'AI Coding';
+            const durationSec = Math.max(0, block.endTime - block.startTime);
+            const cappedDur = capDuration(dateStr, block.startTime, durationSec);
+            const dot: EventDot = {
+              id: aiKey,
+              originalId: block.startTime,
+              timestamp: new Date(block.startTime * 1000),
+              type: 'ai',
+              row: rowName,
+              label: `${block.tool}: ${block.projectName || block.projectDir} (${block.eventCount} events)`,
+              duration: cappedDur,
+              endTimeMs: cappedDur ? block.startTime * 1000 + cappedDur * 1000 : undefined,
+              color: EVENT_TYPE_COLORS.ai,
+              metadata: block,
             };
             addToRow(rowName, dot);
           }
@@ -337,7 +367,7 @@ export function useMultiDayTimelineData({
       }
 
       // Process screenshots from this day's data
-      if (dayData.screenshots && dayData.screenshots.length > 0) {
+      if (filters.showScreenshots && dayData.screenshots && dayData.screenshots.length > 0) {
         for (const screenshot of dayData.screenshots) {
           // Skip screenshots in the future (shouldn't happen but defensive)
           if (isInFuture(screenshot.timestamp)) continue;
