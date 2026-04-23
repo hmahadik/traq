@@ -59,6 +59,7 @@ const EVENT_TYPE_ICONS: Record<EventDropType, typeof GitCommit> = {
   screenshot: Camera,
   projects: FolderKanban,
   session: Sparkles,
+  ai: Sparkles,
 };
 
 interface EventListProps {
