@@ -22,6 +22,7 @@ const EVENT_TYPE_ICONS: Record<EventDropType, typeof GitCommit> = {
   screenshot: Camera,
   projects: FolderKanban,
   session: Sparkles,
+  ai: Sparkles,
 };
 
 const EVENT_TYPE_LABELS: Record<EventDropType, string> = {
@@ -34,6 +35,7 @@ const EVENT_TYPE_LABELS: Record<EventDropType, string> = {
   screenshot: 'Screenshot',
   projects: 'Project',
   session: 'Session Summary',
+  ai: 'AI Coding',
 };
 
 function formatTime(date: Date): string {
@@ -146,6 +148,22 @@ export const TimelineTooltip = forwardRef<HTMLDivElement, TimelineTooltipProps>(
         }
         if (meta.windowClass) {
           extraDetails.push({ label: 'Window', value: String(meta.windowClass) });
+        }
+        break;
+      }
+      case 'ai': {
+        const meta = event.metadata as Record<string, unknown>;
+        if (meta.tool) {
+          extraDetails.push({ label: 'Tool', value: String(meta.tool) });
+        }
+        if (meta.projectName || meta.projectDir) {
+          extraDetails.push({ label: 'Project', value: String(meta.projectName || meta.projectDir) });
+        }
+        if (meta.eventCount !== undefined) {
+          extraDetails.push({ label: 'Events', value: String(meta.eventCount) });
+        }
+        if (meta.isLive) {
+          extraDetails.push({ label: 'Status', value: 'Live' });
         }
         break;
       }

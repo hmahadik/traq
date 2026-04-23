@@ -196,9 +196,7 @@ export function useTimelineData({
     if (filters.showAI && data.aiEvents) {
       for (const [, hourBlocks] of Object.entries(data.aiEvents)) {
         for (const block of hourBlocks) {
-          const rowName = groupBy === 'app'
-            ? (block.projectName || block.tool || 'AI Coding')
-            : 'AI Coding';
+          const rowName = 'AI Coding';
           const durationSec = Math.max(0, block.endTime - block.startTime);
           const cappedDur = capDuration(block.startTime, durationSec);
           const dot: EventDot = {
@@ -478,7 +476,7 @@ export function useTimelineData({
         if (bFixed !== -1) return 1;
 
         // Special rows go at the bottom
-        const specialRows = ['Git', 'Shell', 'Browser', 'Files'];
+        const specialRows = ['Git', 'Shell', 'Browser', 'Files', 'AI Coding'];
         const aIsSpecial = specialRows.includes(a.name);
         const bIsSpecial = specialRows.includes(b.name);
 
