@@ -111,9 +111,9 @@ export function useTimelineData({
       allEvents.push(eventWithRow);
     };
 
-    // Process activity blocks (always shown — they're the base layer)
+    // Process activity blocks (always shown)
     // When collapseActivityRows is true, merge all into single "In Focus" row
-    {
+    if (filters.showScreenshots) {
       for (const [, hourApps] of Object.entries(data.hourlyGrid)) {
         for (const [appName, activities] of Object.entries(hourApps)) {
           for (const activity of activities) {
@@ -313,7 +313,7 @@ export function useTimelineData({
     }
 
     // Process screenshots (if provided)
-    if (filters.showScreenshots && screenshots && screenshots.length > 0) {
+    if (screenshots && screenshots.length > 0) {
       for (const screenshot of screenshots) {
         const rowName = 'Screenshots';
         const dot: EventDot = {

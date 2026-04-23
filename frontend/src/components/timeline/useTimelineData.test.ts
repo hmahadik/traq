@@ -151,7 +151,7 @@ describe('useTimelineData', () => {
       expect(result.current?.rows.find((r) => r.name === 'VS Code')).toBeDefined();
     });
 
-    it('activity rows are shown regardless of showScreenshots filter', () => {
+    it('does not process activities when showScreenshots is false', () => {
       const activity = createMockActivity();
 
       const { result } = renderHook(() =>
@@ -165,8 +165,9 @@ describe('useTimelineData', () => {
         })
       );
 
+      // Activity should not be added
       const chromeRow = result.current?.rows.find((r) => r.name === 'Chrome');
-      expect(chromeRow).toBeDefined();
+      expect(chromeRow).toBeUndefined();
     });
   });
 
