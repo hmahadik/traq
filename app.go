@@ -57,6 +57,7 @@ type App struct {
 	Embeddings  *service.EmbeddingService
 	Draft       *service.DraftService
 	ShellSetup  *service.ShellSetupService
+	AI          *service.AIService
 
 	// Inference engine
 	inference *inference.Service
@@ -121,6 +122,7 @@ func (a *App) startup(ctx context.Context) {
 	a.Timeline = service.NewTimelineService(a.store)
 	a.Screenshots = service.NewScreenshotService(a.store, dataDir)
 	a.Config = service.NewConfigService(a.store, a.platform, nil) // daemon set later
+	a.AI = service.NewAIService(a.store)
 	a.Config.SetInferenceUpdater(func(cfg *service.Config) {
 		if a.inference == nil {
 			return
@@ -2174,4 +2176,15 @@ func buildInferenceConfig(config *service.Config) *inference.Config {
 	}
 
 	return ic
+}
+
+// ListAISessions returns AI coding sessions (Claude Code, opencode) that had
+// activity on the given date. Bound to the frontend via Wails.
+func (a *App) ListAISessions(date string) ([]service.AISessionDisplay, error) {
+	return a.AI.ListAISessions(date)
+}
+
+// GetAISession returns detail for one AI session by its native tool ID.
+func (a *App) GetAISession(id string) (*service.AISessionDetail, error) {
+	return a.AI.GetAISession(id)
 }

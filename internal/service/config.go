@@ -162,10 +162,19 @@ type AFKConfig struct {
 
 // DataSourcesConfig contains settings for data sources.
 type DataSourcesConfig struct {
-	Shell   *ShellConfig   `json:"shell"`
-	Git     *GitConfig     `json:"git"`
-	Files   *FilesConfig   `json:"files"`
-	Browser *BrowserConfig `json:"browser"`
+	Shell      *ShellConfig      `json:"shell"`
+	Git        *GitConfig        `json:"git"`
+	Files      *FilesConfig      `json:"files"`
+	Browser    *BrowserConfig    `json:"browser"`
+	AITracking *AITrackingConfig `json:"aiTracking"`
+}
+
+// AITrackingConfig controls the Claude Code / opencode timeline lane.
+type AITrackingConfig struct {
+	Enabled         bool `json:"enabled"`
+	ClaudeEnabled   bool `json:"claudeEnabled"`
+	OpenCodeEnabled bool `json:"openCodeEnabled"`
+	IdleGapSeconds  int  `json:"idleGapSeconds"`
 }
 
 // ShellConfig contains shell history settings.
@@ -839,6 +848,12 @@ func (s *ConfigService) getDefaultDataSourcesConfig() *DataSourcesConfig {
 			Enabled:          true,
 			Browsers:         []string{"chrome", "firefox"},
 			HistoryLimitDays: 7, // Default to 7 days of history
+		},
+		AITracking: &AITrackingConfig{
+			Enabled:         true,
+			ClaudeEnabled:   true,
+			OpenCodeEnabled: true,
+			IdleGapSeconds:  1800,
 		},
 	}
 }

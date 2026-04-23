@@ -182,6 +182,10 @@ export function GenerateWeeklySummaryMarkdown(arg1, arg2) {
   return window['go']['main']['App']['GenerateWeeklySummaryMarkdown'](arg1, arg2);
 }
 
+export function GetAISession(arg1) {
+  return window['go']['main']['App']['GetAISession'](arg1);
+}
+
 export function GetActivityTags(arg1) {
   return window['go']['main']['App']['GetActivityTags'](arg1);
 }
@@ -512,6 +516,10 @@ export function InstallShellPlugin(arg1) {
 
 export function IsReady() {
   return window['go']['main']['App']['IsReady']();
+}
+
+export function ListAISessions(arg1) {
+  return window['go']['main']['App']['ListAISessions'](arg1);
 }
 
 export function ListHierarchicalSummaries(arg1, arg2) {
