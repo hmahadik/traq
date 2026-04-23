@@ -227,7 +227,7 @@ export function useMultiDayTimelineData({
             if (seenEventIds.has(aiKey)) continue;
             seenEventIds.add(aiKey);
 
-            const rowName = block.projectName || block.tool || 'AI Coding';
+            const rowName = 'AI Coding';
             const durationSec = Math.max(0, block.endTime - block.startTime);
             const cappedDur = capDuration(dateStr, block.startTime, durationSec);
             const dot: EventDot = {
@@ -457,7 +457,7 @@ export function useMultiDayTimelineData({
         if (bFixed !== -1) return 1;
 
         // Special rows go at the bottom
-        const specialRows = ['Git', 'Shell', 'Browser', 'Files'];
+        const specialRows = ['Git', 'Shell', 'Browser', 'Files', 'AI Coding'];
         const aIsSpecial = specialRows.includes(a.name);
         const bIsSpecial = specialRows.includes(b.name);
 
