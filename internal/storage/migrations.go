@@ -5,7 +5,7 @@ import (
 	"log"
 )
 
-const schemaVersion = 14
+const schemaVersion = 15
 
 const schema = `
 -- ============================================================================
@@ -341,6 +341,13 @@ func (s *Store) Migrate() error {
 		// Migration v14: Add project assignment columns to shell_commands
 		if err := s.applyMigration14(); err != nil {
 			return fmt.Errorf("failed to apply migration 14: %w", err)
+		}
+	}
+
+	if currentVersion < 15 {
+		// Migration v15: Add ai_sessions and ai_events tables for AI coding activity
+		if err := s.applyMigration15(); err != nil {
+			return fmt.Errorf("failed to apply migration 15: %w", err)
 		}
 	}
 
@@ -1048,4 +1055,38 @@ func (s *Store) applyMigration12() error {
 	s.db.Exec(`CREATE INDEX IF NOT EXISTS idx_focus_draft ON window_focus_events(is_draft)`)
 
 	return nil
+}
+
+// applyMigration15 adds ai_sessions and ai_events tables for AI coding
+// session activity (Claude Code, opencode). Sessions are keyed by the
+// tool's native session ID; events are per-turn timestamps only — no
+// transcript bodies are stored.
+func (s *Store) applyMigration15() error {
+	_, err := s.db.Exec(`
+		CREATE TABLE IF NOT EXISTS ai_sessions (
+			id              TEXT PRIMARY KEY,
+			tool            TEXT NOT NULL,
+			project_dir     TEXT,
+			file_path       TEXT,
+			started_at      INTEGER NOT NULL,
+			last_event_at   INTEGER NOT NULL,
+			event_count     INTEGER NOT NULL DEFAULT 0,
+			source_offset   INTEGER NOT NULL DEFAULT 0
+		);
+		CREATE INDEX IF NOT EXISTS idx_ai_sessions_last_event ON ai_sessions(last_event_at);
+		CREATE INDEX IF NOT EXISTS idx_ai_sessions_file_path   ON ai_sessions(file_path);
+
+		CREATE TABLE IF NOT EXISTS ai_events (
+			id           INTEGER PRIMARY KEY AUTOINCREMENT,
+			session_id   TEXT NOT NULL REFERENCES ai_sessions(id) ON DELETE CASCADE,
+			tool         TEXT NOT NULL,
+			kind         TEXT NOT NULL,
+			timestamp    INTEGER NOT NULL,
+			project_dir  TEXT
+		);
+		CREATE INDEX IF NOT EXISTS idx_ai_events_ts      ON ai_events(timestamp);
+		CREATE INDEX IF NOT EXISTS idx_ai_events_session ON ai_events(session_id);
+		CREATE INDEX IF NOT EXISTS idx_ai_events_tool_ts ON ai_events(tool, timestamp);
+	`)
+	return err
 }
