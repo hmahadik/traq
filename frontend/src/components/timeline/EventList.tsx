@@ -216,6 +216,30 @@ function gridDataToEvents(data: TimelineGridData | undefined): EventDot[] {
     });
   });
 
+  // AI coding blocks
+  if (data.aiEvents) {
+    Object.values(data.aiEvents).flat().forEach((block) => {
+      events.push({
+        id: `ai-${block.tool}-${block.sessionId}-${block.startTime}`,
+        originalId: block.startTime,
+        timestamp: new Date(block.startTime * 1000),
+        type: 'ai',
+        row: 'AI Coding',
+        label: `${block.tool}: ${block.projectName || block.projectDir} (${block.eventCount} events)`,
+        duration: Math.max(0, block.endTime - block.startTime),
+        color: '#8b5cf6',
+        metadata: {
+          tool: block.tool,
+          sessionId: block.sessionId,
+          projectName: block.projectName,
+          projectDir: block.projectDir,
+          eventCount: block.eventCount,
+          isLive: block.isLive,
+        },
+      });
+    });
+  }
+
   // Session summaries (AI summaries)
   if (data.sessionSummaries) {
     data.sessionSummaries.forEach((session) => {
