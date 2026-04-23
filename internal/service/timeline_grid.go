@@ -22,6 +22,7 @@ type TimelineGridData struct {
 	BrowserEvents    map[int][]BrowserEventDisplay             `json:"browserEvents"` // hour -> browser visits
 	AFKBlocks        map[int][]AFKBlock                        `json:"afkBlocks"` // hour -> AFK blocks
 	ActivityStates   []ActivityState                           `json:"activityStates"` // unified activity lane states
+	AIEvents         map[int][]AIBlockDisplay                  `json:"aiEvents"` // hour -> AI coding activity blocks
 }
 
 // DayStats contains aggregated statistics for a day.
@@ -970,6 +971,13 @@ func (s *TimelineService) GetTimelineGridDataWithOptions(date string, opts Timel
 	// Calculate activity states for the unified Activity lane
 	activityStates := s.calculateActivityStates(focusEvents, flattenAFKBlocks(afkBlocks), dayStart.Unix(), dayEnd.Unix())
 
+	// AI coding activity (Claude Code, opencode). Swallow errors to match the
+	// treatment of other optional lanes — absence shouldn't break the grid.
+	aiEvents, _ := NewAIService(s.store).GetAIActivityForDay(date)
+	if aiEvents == nil {
+		aiEvents = map[int][]AIBlockDisplay{}
+	}
+
 	return &TimelineGridData{
 		Date:             date,
 		DayStats:         dayStats,
@@ -983,6 +991,7 @@ func (s *TimelineService) GetTimelineGridDataWithOptions(date string, opts Timel
 		BrowserEvents:    browserEvents,
 		AFKBlocks:        afkBlocks,
 		ActivityStates:   activityStates,
+		AIEvents:         aiEvents,
 	}, nil
 }
 
