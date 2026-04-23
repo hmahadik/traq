@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"traq/internal/storage"
@@ -37,6 +38,7 @@ type claudeLine struct {
 	SessionID string    `json:"sessionId"`
 	CWD       string    `json:"cwd"`
 	Timestamp time.Time `json:"timestamp"`
+	IsMeta    bool      `json:"isMeta"`
 	Message   struct {
 		Role    string          `json:"role"`
 		Content json.RawMessage `json:"content"`
@@ -110,7 +112,7 @@ func parseClaudeLine(line []byte, filePath string, offsetAfter int64) (AIEvent, 
 	if err := json.Unmarshal(line, &cl); err != nil {
 		return AIEvent{}, false
 	}
-	kind := claudeKind(&cl)
+	kind, content := claudeKind(&cl)
 	if kind == "" {
 		return AIEvent{}, false
 	}
@@ -125,21 +127,68 @@ func parseClaudeLine(line []byte, filePath string, offsetAfter int64) (AIEvent, 
 		Kind:       kind,
 		FilePath:   filePath,
 		Offset:     offsetAfter,
+		Content:    content,
 	}, true
 }
 
-func claudeKind(cl *claudeLine) string {
+// claudeKind classifies a line and, for user prompts, returns the extracted
+// text. Meta messages and tool-result user messages are skipped — they
+// aren't prompts the user typed.
+func claudeKind(cl *claudeLine) (string, string) {
 	switch cl.Type {
 	case "user":
-		return "user_prompt"
+		if cl.IsMeta {
+			return "", ""
+		}
+		text, ok := extractUserPromptText(cl.Message.Content)
+		if !ok {
+			return "", ""
+		}
+		return "user_prompt", text
 	case "assistant":
 		if containsToolUse(cl.Message.Content) {
-			return "tool_use"
+			return "tool_use", ""
 		}
-		return "assistant_turn"
+		return "assistant_turn", ""
 	default:
-		return ""
+		return "", ""
 	}
+}
+
+// extractUserPromptText pulls the prompt text out of Claude's user message
+// content. Content can be either a bare string or an array of typed blocks.
+// Lines whose content is only tool results are rejected (ok=false).
+func extractUserPromptText(raw json.RawMessage) (string, bool) {
+	if len(raw) == 0 {
+		return "", false
+	}
+	// Bare string form.
+	var s string
+	if err := json.Unmarshal(raw, &s); err == nil {
+		return s, true
+	}
+	// Array-of-blocks form.
+	var items []struct {
+		Type string `json:"type"`
+		Text string `json:"text"`
+	}
+	if err := json.Unmarshal(raw, &items); err != nil {
+		return "", false
+	}
+	var parts []string
+	sawNonToolResult := false
+	for _, it := range items {
+		if it.Type != "tool_result" {
+			sawNonToolResult = true
+		}
+		if it.Type == "text" && it.Text != "" {
+			parts = append(parts, it.Text)
+		}
+	}
+	if !sawNonToolResult {
+		return "", false
+	}
+	return strings.Join(parts, "\n"), true
 }
 
 func containsToolUse(raw json.RawMessage) bool {

@@ -36,9 +36,13 @@ func buildOpencodeFixtureDB(t *testing.T) string {
 		VALUES ('ses_abc', 'proj-1', 'slug', '/home/u/repo', 't', '1', 1700000000000, 1700000030000);
 		INSERT INTO message (id, session_id, time_created, time_updated, data)
 		VALUES
-			('m1', 'ses_abc', 1700000010000, 1700000010000, '{}'),
-			('m2', 'ses_abc', 1700000020000, 1700000020000, '{}'),
-			('m3', 'ses_abc', 1700000030000, 1700000030000, '{}');
+			('m1', 'ses_abc', 1700000010000, 1700000010000, '{"role":"user"}'),
+			('m2', 'ses_abc', 1700000020000, 1700000020000, '{"role":"assistant"}'),
+			('m3', 'ses_abc', 1700000030000, 1700000030000, '{"role":"user"}');
+		INSERT INTO part (id, message_id, session_id, time_created, time_updated, data)
+		VALUES
+			('p1', 'm1', 'ses_abc', 1700000010000, 1700000010000, '{"type":"text","text":"hello world"}'),
+			('p3', 'm3', 'ses_abc', 1700000030000, 1700000030000, '{"type":"text","text":"second prompt"}');
 	`)
 	if err != nil {
 		t.Fatalf("seed: %v", err)
@@ -60,8 +64,8 @@ func TestOpenCodePluginReadsMessages(t *testing.T) {
 	if err != nil {
 		t.Fatalf("poll: %v", err)
 	}
-	if len(events) != 3 {
-		t.Fatalf("expected 3 events, got %d", len(events))
+	if len(events) != 2 {
+		t.Fatalf("expected 2 user events, got %d", len(events))
 	}
 	for _, e := range events {
 		if e.Tool != "opencode" {
@@ -73,9 +77,15 @@ func TestOpenCodePluginReadsMessages(t *testing.T) {
 		if e.ProjectDir != "/home/u/repo" {
 			t.Errorf("ProjectDir=%q", e.ProjectDir)
 		}
-		if e.Kind != "message" {
+		if e.Kind != "user_prompt" {
 			t.Errorf("Kind=%q", e.Kind)
 		}
+	}
+	if events[0].Content != "hello world" {
+		t.Errorf("events[0].Content=%q, want \"hello world\"", events[0].Content)
+	}
+	if events[1].Content != "second prompt" {
+		t.Errorf("events[1].Content=%q, want \"second prompt\"", events[1].Content)
 	}
 }
 
@@ -89,8 +99,8 @@ func TestOpenCodePluginResumesByMaxTimestamp(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(first) != 3 {
-		t.Fatalf("expected 3, got %d", len(first))
+	if len(first) != 2 {
+		t.Fatalf("expected 2, got %d", len(first))
 	}
 
 	var dbEvents []storage.AIEvent

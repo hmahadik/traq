@@ -44,11 +44,19 @@ func (p *OpenCodePlugin) Poll(ctx context.Context, store *storage.Store) ([]AIEv
 	}
 	defer db.Close()
 
+	// Select only user-role messages, joining the part table to retrieve
+	// the prompt text. A single user message can have multiple text parts;
+	// we concatenate them (rare in practice, but safe).
 	rows, err := db.QueryContext(ctx, `
-		SELECT m.session_id, s.directory, m.time_created
+		SELECT m.id, m.session_id, s.directory, m.time_created,
+		       COALESCE(group_concat(json_extract(p.data,'$.text'), CHAR(10)), '')
 		FROM message m
 		JOIN session s ON s.id = m.session_id
+		LEFT JOIN part p ON p.message_id = m.id
+		  AND json_extract(p.data,'$.type') = 'text'
 		WHERE m.time_created > ?
+		  AND json_extract(m.data,'$.role') = 'user'
+		GROUP BY m.id
 		ORDER BY m.time_created ASC
 	`, sinceMs)
 	if err != nil {
@@ -58,9 +66,9 @@ func (p *OpenCodePlugin) Poll(ctx context.Context, store *storage.Store) ([]AIEv
 
 	var out []AIEvent
 	for rows.Next() {
-		var sessionID, directory string
+		var msgID, sessionID, directory, content string
 		var tsMs int64
-		if err := rows.Scan(&sessionID, &directory, &tsMs); err != nil {
+		if err := rows.Scan(&msgID, &sessionID, &directory, &tsMs, &content); err != nil {
 			return nil, err
 		}
 		out = append(out, AIEvent{
@@ -68,7 +76,8 @@ func (p *OpenCodePlugin) Poll(ctx context.Context, store *storage.Store) ([]AIEv
 			SessionID:  sessionID,
 			ProjectDir: directory,
 			Timestamp:  time.Unix(0, tsMs*int64(time.Millisecond)),
-			Kind:       "message",
+			Kind:       "user_prompt",
+			Content:    content,
 		})
 	}
 	return out, rows.Err()

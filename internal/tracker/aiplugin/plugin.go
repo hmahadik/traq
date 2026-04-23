@@ -18,12 +18,15 @@ type AIEvent struct {
 	SessionID  string // tool's native session ID
 	ProjectDir string // absolute path or "" if unknown
 	Timestamp  time.Time
-	Kind       string // "user_prompt" | "assistant_turn" | "tool_use" | "message"
+	Kind       string // "user_prompt" | "assistant_turn" | "tool_use"
 	FilePath   string // source JSONL path (claude) or "" (opencode)
 	// Offset is the byte position *after* this event within FilePath.
 	// Claude sets this so AITracker can persist source_offset; opencode
 	// leaves it zero.
 	Offset int64
+	// Content is the raw user prompt text for user_prompt events, empty
+	// otherwise. Stored verbatim (no server-side truncation).
+	Content string
 }
 
 // AIPlugin is a single source of AI activity.
