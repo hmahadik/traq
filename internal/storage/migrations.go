@@ -4,7 +4,7 @@ import (
 	"fmt"
 )
 
-const schemaVersion = 15
+const schemaVersion = 16
 
 const schema = `
 -- ============================================================================
@@ -350,6 +350,13 @@ func (s *Store) Migrate() error {
 		}
 	}
 
+	if currentVersion < 16 {
+		// Migration v16: Add content column to ai_events for prompt text
+		if err := s.applyMigration16(); err != nil {
+			return fmt.Errorf("failed to apply migration 16: %w", err)
+		}
+	}
+
 	// Record schema version
 	if currentVersion == 0 {
 		_, err = s.db.Exec("INSERT OR REPLACE INTO schema_version (version) VALUES (?)", schemaVersion)
@@ -376,6 +383,8 @@ func (s *Store) repairMissingTables() {
 	s.repairScreenshotsTable()
 	// Repair missing columns in shell_commands table (migration 13)
 	s.repairShellCommandsTable()
+	// Repair missing columns in ai_events (migration 16)
+	s.repairAIEventsTable()
 	// Check and create project_patterns table if missing
 	var count int
 	err := s.db.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='project_patterns'`).Scan(&count)
@@ -1021,6 +1030,27 @@ func (s *Store) applyMigration12() error {
 	s.db.Exec(`CREATE INDEX IF NOT EXISTS idx_focus_draft ON window_focus_events(is_draft)`)
 
 	return nil
+}
+
+func (s *Store) repairAIEventsTable() {
+	var tableCount int
+	err := s.db.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='ai_events'`).Scan(&tableCount)
+	if err != nil || tableCount == 0 {
+		return
+	}
+	var colCount int
+	err = s.db.QueryRow(`SELECT COUNT(*) FROM pragma_table_info('ai_events') WHERE name = 'content'`).Scan(&colCount)
+	if err == nil && colCount == 0 {
+		s.db.Exec(`ALTER TABLE ai_events ADD COLUMN content TEXT`)
+	}
+}
+
+// applyMigration16 adds a content column to ai_events to store the text of
+// user prompts (and later opencode-side role-normalized user messages). The
+// column is nullable so existing rows remain valid.
+func (s *Store) applyMigration16() error {
+	_, err := s.db.Exec(`ALTER TABLE ai_events ADD COLUMN content TEXT`)
+	return err
 }
 
 // applyMigration15 adds ai_sessions and ai_events tables for AI coding

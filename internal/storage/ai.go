@@ -25,6 +25,7 @@ type AIEvent struct {
 	Kind       string
 	Timestamp  int64
 	ProjectDir string
+	Content    string // empty unless this is a user prompt
 }
 
 func (s *Store) UpsertAISession(sess *AISession) error {
@@ -85,8 +86,8 @@ func (s *Store) InsertAIEvents(events []AIEvent) error {
 		return err
 	}
 	stmt, err := tx.Prepare(`
-		INSERT INTO ai_events (session_id, tool, kind, timestamp, project_dir)
-		VALUES (?, ?, ?, ?, ?)
+		INSERT INTO ai_events (session_id, tool, kind, timestamp, project_dir, content)
+		VALUES (?, ?, ?, ?, ?, ?)
 	`)
 	if err != nil {
 		tx.Rollback()
@@ -94,7 +95,7 @@ func (s *Store) InsertAIEvents(events []AIEvent) error {
 	}
 	defer stmt.Close()
 	for _, e := range events {
-		if _, err := stmt.Exec(e.SessionID, e.Tool, e.Kind, e.Timestamp, aiNullableStr(e.ProjectDir)); err != nil {
+		if _, err := stmt.Exec(e.SessionID, e.Tool, e.Kind, e.Timestamp, aiNullableStr(e.ProjectDir), aiNullableStr(e.Content)); err != nil {
 			tx.Rollback()
 			return err
 		}
@@ -104,7 +105,7 @@ func (s *Store) InsertAIEvents(events []AIEvent) error {
 
 func (s *Store) GetAIEventsInRange(startUnix, endUnix int64) ([]AIEvent, error) {
 	rows, err := s.db.Query(`
-		SELECT id, session_id, tool, kind, timestamp, COALESCE(project_dir,'')
+		SELECT id, session_id, tool, kind, timestamp, COALESCE(project_dir,''), COALESCE(content,'')
 		FROM ai_events
 		WHERE timestamp BETWEEN ? AND ?
 		ORDER BY tool, session_id, timestamp
@@ -116,7 +117,7 @@ func (s *Store) GetAIEventsInRange(startUnix, endUnix int64) ([]AIEvent, error) 
 	var out []AIEvent
 	for rows.Next() {
 		var e AIEvent
-		if err := rows.Scan(&e.ID, &e.SessionID, &e.Tool, &e.Kind, &e.Timestamp, &e.ProjectDir); err != nil {
+		if err := rows.Scan(&e.ID, &e.SessionID, &e.Tool, &e.Kind, &e.Timestamp, &e.ProjectDir, &e.Content); err != nil {
 			return nil, err
 		}
 		out = append(out, e)

@@ -3,6 +3,7 @@ package service
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"traq/internal/storage"
@@ -28,6 +29,20 @@ type AIBlockDisplay struct {
 	EventCount  int    `json:"eventCount"`
 	IsLive      bool   `json:"isLive"`
 }
+
+type AIPromptDisplay struct {
+	Tool        string `json:"tool"`
+	SessionID   string `json:"sessionId"`
+	ProjectName string `json:"projectName"`
+	ProjectDir  string `json:"projectDir"`
+	Timestamp   int64  `json:"timestamp"`
+	Preview     string `json:"preview"` // truncated prompt text for list display
+	Content     string `json:"content"` // full prompt text (may be large)
+}
+
+// promptPreviewMaxChars caps the preview length. The full prompt is kept in
+// Content for detail views; this is just what the events list renders.
+const promptPreviewMaxChars = 160
 
 type AISessionDisplay struct {
 	ID          string `json:"id"`
@@ -100,6 +115,49 @@ func (s *AIService) GetAISession(id string) (*AISessionDetail, error) {
 		},
 		FilePath: sess.FilePath,
 	}, nil
+}
+
+// GetAIPromptsForDay returns one entry per user-initiated event (Claude
+// user_prompt, opencode message) so they can be listed individually in the
+// events panel. Session rows are looked up to populate project info.
+func (s *AIService) GetAIPromptsForDay(date string) ([]AIPromptDisplay, error) {
+	start, end, err := aiDayRangeUnix(date)
+	if err != nil {
+		return nil, err
+	}
+	events, err := s.store.GetAIEventsInRange(start, end)
+	if err != nil {
+		return nil, err
+	}
+	sessionRows := map[string]storage.AISession{}
+	out := make([]AIPromptDisplay, 0, len(events))
+	for _, e := range events {
+		if e.Kind != "user_prompt" {
+			continue
+		}
+		projectDir := e.ProjectDir
+		if projectDir == "" {
+			row, ok := sessionRows[e.SessionID]
+			if !ok {
+				rp, _ := s.store.GetAISessionByID(e.SessionID)
+				if rp != nil {
+					row = *rp
+					sessionRows[e.SessionID] = row
+				}
+			}
+			projectDir = row.ProjectDir
+		}
+		out = append(out, AIPromptDisplay{
+			Tool:        e.Tool,
+			SessionID:   e.SessionID,
+			ProjectName: filepath.Base(projectDir),
+			ProjectDir:  projectDir,
+			Timestamp:   e.Timestamp,
+			Preview:     truncatePrompt(e.Content, promptPreviewMaxChars),
+			Content:     e.Content,
+		})
+	}
+	return out, nil
 }
 
 // GetAIActivityForDay returns derived activity blocks grouped by local hour.
@@ -210,6 +268,23 @@ func (s *AIService) applyLiveFileRescue(blocks []AIBlockDisplay, sessionRows map
 			blocks[i].IsLive = true
 		}
 	}
+}
+
+// truncatePrompt collapses whitespace and trims to max runes, appending an
+// ellipsis when content was dropped. Slash-command and meta prompts already
+// arrive as short single-line strings; pasted context can be multi-kilobyte
+// so collapsing whitespace keeps the preview visually stable.
+func truncatePrompt(s string, max int) string {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return ""
+	}
+	s = strings.Join(strings.Fields(s), " ")
+	runes := []rune(s)
+	if len(runes) <= max {
+		return s
+	}
+	return string(runes[:max]) + "…"
 }
 
 // aiDayRangeUnix parses a YYYY-MM-DD date (local time) and returns [start, end]

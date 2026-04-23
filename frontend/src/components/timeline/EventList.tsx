@@ -241,6 +241,30 @@ function gridDataToEvents(data: TimelineGridData | undefined): EventDot[] {
     });
   }
 
+  // Individual AI user prompts
+  if (data.aiPrompts) {
+    data.aiPrompts.forEach((p, idx) => {
+      events.push({
+        id: `ai-prompt-${p.tool}-${p.sessionId}-${p.timestamp}-${idx}`,
+        originalId: p.timestamp,
+        timestamp: new Date(p.timestamp * 1000),
+        type: 'ai',
+        row: 'AI Coding',
+        label: p.preview || `${p.tool} prompt`,
+        color: '#a78bfa',
+        metadata: {
+          tool: p.tool,
+          sessionId: p.sessionId,
+          projectName: p.projectName,
+          projectDir: p.projectDir,
+          kind: 'prompt',
+          preview: p.preview,
+          content: p.content,
+        },
+      });
+    });
+  }
+
   // Session summaries (AI summaries)
   if (data.sessionSummaries) {
     data.sessionSummaries.forEach((session) => {

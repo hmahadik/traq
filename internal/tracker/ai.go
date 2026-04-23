@@ -93,6 +93,7 @@ func (t *AITracker) persist(events []aiplugin.AIEvent) error {
 				Kind:       e.Kind,
 				Timestamp:  e.Timestamp.Unix(),
 				ProjectDir: e.ProjectDir,
+				Content:    e.Content,
 			})
 		}
 		if err := t.store.InsertAIEvents(dbEvents); err != nil {
