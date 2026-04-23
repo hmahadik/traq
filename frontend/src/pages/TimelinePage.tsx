@@ -112,19 +112,21 @@ export function TimelinePage() {
   });
 
   const [filters, setFilters] = useState<TimelineFilters>(() => {
-    try {
-      const stored = localStorage.getItem(FILTER_STORAGE_KEY);
-      if (stored) return JSON.parse(stored);
-    } catch (e) {
-      console.error('Failed to load filters from localStorage:', e);
-    }
-    return {
+    const defaults: TimelineFilters = {
       showGit: true,
       showShell: true,
       showFiles: true,
       showBrowser: true,
       showScreenshots: true,
+      showAI: true,
     };
+    try {
+      const stored = localStorage.getItem(FILTER_STORAGE_KEY);
+      if (stored) return { ...defaults, ...JSON.parse(stored) };
+    } catch (e) {
+      console.error('Failed to load filters from localStorage:', e);
+    }
+    return defaults;
   });
 
   useEffect(() => {
