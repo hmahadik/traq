@@ -287,6 +287,99 @@ export function DataSourcesSettings() {
           />
         </SettingsRow>
       </CollapsibleCard>
+
+      <CollapsibleCard
+        title="AI Coding"
+        enabled={config.dataSources.aiTracking?.enabled ?? false}
+        onToggle={(enabled) =>
+          updateConfig.mutate({
+            dataSources: {
+              ...config.dataSources,
+              aiTracking: {
+                ...(config.dataSources.aiTracking ?? {
+                  enabled: false,
+                  claudeEnabled: true,
+                  openCodeEnabled: true,
+                  idleGapSeconds: 1800,
+                }),
+                enabled,
+              },
+            },
+          })
+        }
+      >
+        <SettingsRow label="Track Claude Code" description="Poll ~/.claude/projects JSONL transcripts">
+          <Switch
+            checked={config.dataSources.aiTracking?.claudeEnabled ?? true}
+            onCheckedChange={(claudeEnabled) =>
+              updateConfig.mutate({
+                dataSources: {
+                  ...config.dataSources,
+                  aiTracking: {
+                    ...(config.dataSources.aiTracking ?? {
+                      enabled: true,
+                      claudeEnabled: true,
+                      openCodeEnabled: true,
+                      idleGapSeconds: 1800,
+                    }),
+                    claudeEnabled,
+                  },
+                },
+              })
+            }
+          />
+        </SettingsRow>
+
+        <SettingsRow label="Track opencode" description="Poll opencode's local SQLite database">
+          <Switch
+            checked={config.dataSources.aiTracking?.openCodeEnabled ?? true}
+            onCheckedChange={(openCodeEnabled) =>
+              updateConfig.mutate({
+                dataSources: {
+                  ...config.dataSources,
+                  aiTracking: {
+                    ...(config.dataSources.aiTracking ?? {
+                      enabled: true,
+                      claudeEnabled: true,
+                      openCodeEnabled: true,
+                      idleGapSeconds: 1800,
+                    }),
+                    openCodeEnabled,
+                  },
+                },
+              })
+            }
+          />
+        </SettingsRow>
+
+        <SettingsRow label="Idle Gap (seconds)" description="Split blocks when events are farther apart" vertical>
+          <Input
+            type="number"
+            min={60}
+            max={7200}
+            step={60}
+            value={config.dataSources.aiTracking?.idleGapSeconds ?? 1800}
+            onChange={(e) => {
+              const parsed = parseInt(e.target.value, 10);
+              if (Number.isNaN(parsed)) return;
+              updateConfig.mutate({
+                dataSources: {
+                  ...config.dataSources,
+                  aiTracking: {
+                    ...(config.dataSources.aiTracking ?? {
+                      enabled: true,
+                      claudeEnabled: true,
+                      openCodeEnabled: true,
+                      idleGapSeconds: 1800,
+                    }),
+                    idleGapSeconds: parsed,
+                  },
+                },
+              });
+            }}
+          />
+        </SettingsRow>
+      </CollapsibleCard>
     </div>
   );
 }

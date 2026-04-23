@@ -14,6 +14,18 @@ export interface TimelineGridData {
   browserEvents: Record<number, BrowserEventDisplay[]>; // hour -> browser visits
   afkBlocks: Record<number, AFKBlock[]>; // hour -> AFK blocks
   activityStates: ActivityState[]; // unified activity lane states (active/break/afk)
+  aiEvents: Record<number, AIBlockDisplay[]>; // hour -> AI coding activity blocks
+}
+
+export interface AIBlockDisplay {
+  tool: string; // "claude" | "opencode"
+  sessionId: string;
+  projectDir: string;
+  projectName: string;
+  startTime: number; // Unix seconds
+  endTime: number; // Unix seconds (padded on backend)
+  eventCount: number;
+  isLive: boolean;
 }
 
 export interface DayStats {
