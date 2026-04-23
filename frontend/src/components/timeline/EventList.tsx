@@ -59,6 +59,7 @@ const EVENT_TYPE_ICONS: Record<EventDropType, typeof GitCommit> = {
   screenshot: Camera,
   projects: FolderKanban,
   session: Sparkles,
+  ai: Sparkles,
 };
 
 interface EventListProps {
@@ -215,6 +216,54 @@ function gridDataToEvents(data: TimelineGridData | undefined): EventDot[] {
       },
     });
   });
+
+  // AI coding blocks
+  if (data.aiEvents) {
+    Object.values(data.aiEvents).flat().forEach((block) => {
+      events.push({
+        id: `ai-${block.tool}-${block.sessionId}-${block.startTime}`,
+        originalId: block.startTime,
+        timestamp: new Date(block.startTime * 1000),
+        type: 'ai',
+        row: 'AI Coding',
+        label: `${block.tool}: ${block.projectName || block.projectDir} (${block.eventCount} events)`,
+        duration: Math.max(0, block.endTime - block.startTime),
+        color: '#8b5cf6',
+        metadata: {
+          tool: block.tool,
+          sessionId: block.sessionId,
+          projectName: block.projectName,
+          projectDir: block.projectDir,
+          eventCount: block.eventCount,
+          isLive: block.isLive,
+        },
+      });
+    });
+  }
+
+  // Individual AI user prompts
+  if (data.aiPrompts) {
+    data.aiPrompts.forEach((p, idx) => {
+      events.push({
+        id: `ai-prompt-${p.tool}-${p.sessionId}-${p.timestamp}-${idx}`,
+        originalId: p.timestamp,
+        timestamp: new Date(p.timestamp * 1000),
+        type: 'ai',
+        row: 'AI Coding',
+        label: p.preview || `${p.tool} prompt`,
+        color: '#a78bfa',
+        metadata: {
+          tool: p.tool,
+          sessionId: p.sessionId,
+          projectName: p.projectName,
+          projectDir: p.projectDir,
+          kind: 'prompt',
+          preview: p.preview,
+          content: p.content,
+        },
+      });
+    });
+  }
 
   // Session summaries (AI summaries)
   if (data.sessionSummaries) {

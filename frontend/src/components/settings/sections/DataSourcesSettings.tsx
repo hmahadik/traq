@@ -13,15 +13,17 @@ import { SettingsRow } from '../SettingsRow';
 import { GitRepositoriesSection } from '../GitRepositoriesSection';
 import { FileWatchDirectoriesSection } from '../FileWatchDirectoriesSection';
 import { FileExtensionFilterSection } from '../FileExtensionFilterSection';
+import { ShellIntegrationStrip } from '../ShellIntegrationStrip';
 
 interface CollapsibleCardProps {
   title: string;
   enabled: boolean;
   onToggle: (enabled: boolean) => void;
   children: React.ReactNode;
+  alwaysVisible?: React.ReactNode;
 }
 
-function CollapsibleCard({ title, enabled, onToggle, children }: CollapsibleCardProps) {
+function CollapsibleCard({ title, enabled, onToggle, children, alwaysVisible }: CollapsibleCardProps) {
   return (
     <div className="rounded-lg border bg-card">
       <div className="flex items-center justify-between p-4">
@@ -35,9 +37,14 @@ function CollapsibleCard({ title, enabled, onToggle, children }: CollapsibleCard
         </div>
         <Switch checked={enabled} onCheckedChange={onToggle} />
       </div>
+      {alwaysVisible && (
+        <div className="px-4 pb-4 pt-0 border-t">
+          <div className="pt-4">{alwaysVisible}</div>
+        </div>
+      )}
       {enabled && (
-        <div className="px-4 pb-4 pt-0 border-t space-y-4">
-          <div className="pt-4">
+        <div className={`px-4 pb-4 ${alwaysVisible ? 'pt-0' : 'pt-0 border-t'} space-y-4`}>
+          <div className={alwaysVisible ? '' : 'pt-4'}>
             {children}
           </div>
         </div>
@@ -66,6 +73,15 @@ export function DataSourcesSettings() {
               shell: { ...config.dataSources.shell, enabled },
             },
           })
+        }
+        alwaysVisible={
+          <ShellIntegrationStrip
+            shell={
+              config.dataSources.shell.shellType === 'auto' || !config.dataSources.shell.shellType
+                ? 'bash'
+                : config.dataSources.shell.shellType
+            }
+          />
         }
       >
         <SettingsRow label="Shell Type" vertical>
@@ -265,6 +281,99 @@ export function DataSourcesSettings() {
                 dataSources: {
                   ...config.dataSources,
                   browser: { ...config.dataSources.browser, excludedDomains: domains },
+                },
+              });
+            }}
+          />
+        </SettingsRow>
+      </CollapsibleCard>
+
+      <CollapsibleCard
+        title="AI Coding"
+        enabled={config.dataSources.aiTracking?.enabled ?? false}
+        onToggle={(enabled) =>
+          updateConfig.mutate({
+            dataSources: {
+              ...config.dataSources,
+              aiTracking: {
+                ...(config.dataSources.aiTracking ?? {
+                  enabled: false,
+                  claudeEnabled: true,
+                  openCodeEnabled: true,
+                  idleGapSeconds: 1800,
+                }),
+                enabled,
+              },
+            },
+          })
+        }
+      >
+        <SettingsRow label="Track Claude Code" description="Poll ~/.claude/projects JSONL transcripts">
+          <Switch
+            checked={config.dataSources.aiTracking?.claudeEnabled ?? true}
+            onCheckedChange={(claudeEnabled) =>
+              updateConfig.mutate({
+                dataSources: {
+                  ...config.dataSources,
+                  aiTracking: {
+                    ...(config.dataSources.aiTracking ?? {
+                      enabled: true,
+                      claudeEnabled: true,
+                      openCodeEnabled: true,
+                      idleGapSeconds: 1800,
+                    }),
+                    claudeEnabled,
+                  },
+                },
+              })
+            }
+          />
+        </SettingsRow>
+
+        <SettingsRow label="Track opencode" description="Poll opencode's local SQLite database">
+          <Switch
+            checked={config.dataSources.aiTracking?.openCodeEnabled ?? true}
+            onCheckedChange={(openCodeEnabled) =>
+              updateConfig.mutate({
+                dataSources: {
+                  ...config.dataSources,
+                  aiTracking: {
+                    ...(config.dataSources.aiTracking ?? {
+                      enabled: true,
+                      claudeEnabled: true,
+                      openCodeEnabled: true,
+                      idleGapSeconds: 1800,
+                    }),
+                    openCodeEnabled,
+                  },
+                },
+              })
+            }
+          />
+        </SettingsRow>
+
+        <SettingsRow label="Idle Gap (seconds)" description="Split blocks when events are farther apart" vertical>
+          <Input
+            type="number"
+            min={60}
+            max={7200}
+            step={60}
+            value={config.dataSources.aiTracking?.idleGapSeconds ?? 1800}
+            onChange={(e) => {
+              const parsed = parseInt(e.target.value, 10);
+              if (Number.isNaN(parsed)) return;
+              updateConfig.mutate({
+                dataSources: {
+                  ...config.dataSources,
+                  aiTracking: {
+                    ...(config.dataSources.aiTracking ?? {
+                      enabled: true,
+                      claudeEnabled: true,
+                      openCodeEnabled: true,
+                      idleGapSeconds: 1800,
+                    }),
+                    idleGapSeconds: parsed,
+                  },
                 },
               });
             }}

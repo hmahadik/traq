@@ -74,6 +74,8 @@ export function DeleteTimelineCategoryRule(arg1:string):Promise<void>;
 
 export function DiscoverGitRepositories(arg1:Array<string>,arg2:number):Promise<Array<storage.GitRepository>>;
 
+export function DismissShellOverflow():Promise<void>;
+
 export function DownloadModel(arg1:string):Promise<void>;
 
 export function DownloadServer():Promise<void>;
@@ -93,6 +95,8 @@ export function GenerateReport(arg1:string,arg2:string,arg3:boolean):Promise<ser
 export function GenerateSummary(arg1:number):Promise<storage.Summary>;
 
 export function GenerateWeeklySummaryMarkdown(arg1:string,arg2:string):Promise<string>;
+
+export function GetAISession(arg1:string):Promise<service.AISessionDetail>;
 
 export function GetActivityTags(arg1:string):Promise<Array<service.TagUsage>>;
 
@@ -216,6 +220,8 @@ export function GetSessionsForDate(arg1:string):Promise<Array<service.SessionSum
 
 export function GetShellCommandsForSession(arg1:number):Promise<Array<storage.ShellCommand>>;
 
+export function GetShellSetupStatus(arg1:string):Promise<service.SetupStatus>;
+
 export function GetStorageStats():Promise<service.StorageStats>;
 
 export function GetSummary(arg1:number):Promise<storage.Summary>;
@@ -254,7 +260,11 @@ export function GetYearlyStats(arg1:number):Promise<service.YearlyStats>;
 
 export function IgnoreActivities(arg1:string,arg2:Array<number>):Promise<void>;
 
+export function InstallShellPlugin(arg1:string):Promise<void>;
+
 export function IsReady():Promise<boolean>;
+
+export function ListAISessions(arg1:string):Promise<Array<service.AISessionDisplay>>;
 
 export function ListHierarchicalSummaries(arg1:string,arg2:number):Promise<Array<storage.HierarchicalSummary>>;
 
@@ -323,6 +333,8 @@ export function TestIssueWebhook():Promise<void>;
 export function TriggerUpdate():Promise<void>;
 
 export function UnignoreActivities(arg1:string,arg2:Array<number>):Promise<void>;
+
+export function UninstallShellPlugin(arg1:string):Promise<void>;
 
 export function UnregisterGitRepository(arg1:number):Promise<void>;
 

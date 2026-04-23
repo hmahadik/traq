@@ -1220,6 +1220,16 @@ export const issues = {
 };
 
 /**
+ * Shell Setup API - Shell plugin install/status/uninstall
+ */
+export const shellSetup = {
+  status: (shell: string) => App.GetShellSetupStatus(shell),
+  install: (shell: string) => App.InstallShellPlugin(shell),
+  uninstall: (shell: string) => App.UninstallShellPlugin(shell),
+  dismissOverflow: () => App.DismissShellOverflow(),
+};
+
+/**
  * Search API
  */
 const search = {
@@ -1255,8 +1265,21 @@ export const updates = {
   },
 };
 
+// AI coding activity (Claude Code, opencode) - timestamp-only session data
+const ai = {
+  list: async (date: string) => {
+    await waitForReady();
+    return App.ListAISessions(date);
+  },
+  get: async (id: string) => {
+    await waitForReady();
+    return App.GetAISession(id);
+  },
+};
+
 // Unified API export
 export const api = {
+  ai,
   analytics,
   timeline,
   reports,
@@ -1278,5 +1301,6 @@ export const api = {
   issues,
   projects,
   search,
+  shellSetup,
   updates,
 };

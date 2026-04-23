@@ -11,6 +11,7 @@ import (
 	"github.com/getsentry/sentry-go"
 	"traq/internal/platform"
 	"traq/internal/storage"
+	"traq/internal/tracker/aiplugin"
 )
 
 // DaemonConfig holds configuration for the tracker daemon.
@@ -59,6 +60,7 @@ type Daemon struct {
 	git     *GitTracker
 	files   *FileTracker
 	browser *BrowserTracker
+	ai      *AITracker
 
 	running         bool
 	paused          bool
@@ -95,6 +97,15 @@ func NewDaemon(config *DaemonConfig, store *storage.Store, plat platform.Platfor
 	// BrowserTracker for tracking browser history
 	browser := NewBrowserTracker(plat, store, config.DataDir)
 
+	// AITracker polls Claude Code and opencode session data from the user's
+	// home dir. If HOME isn't set, both plugins' Available() return false
+	// and ai.Poll() becomes a no-op.
+	home, _ := os.UserHomeDir()
+	ai := NewAITracker(store, []aiplugin.AIPlugin{
+		aiplugin.NewClaudePlugin(filepath.Join(home, ".claude", "projects")),
+		aiplugin.NewOpenCodePlugin(filepath.Join(home, ".local", "share", "opencode", "opencode.db")),
+	})
+
 	d := &Daemon{
 		config:            config,
 		store:             store,
@@ -107,6 +118,7 @@ func NewDaemon(config *DaemonConfig, store *storage.Store, plat platform.Platfor
 		git:               git,
 		files:             files,
 		browser:           browser,
+		ai:                ai,
 		stopCh:            make(chan struct{}),
 		afkRestartMinutes: 10, // Default: restart after 10 min AFK with pending update
 	}
@@ -377,6 +389,12 @@ func (d *Daemon) tick() {
 
 	// Poll browser history for new visits
 	d.browser.Poll(session.ID)
+
+	// Poll AI plugins (Claude Code, opencode). Independent of the current
+	// Traq session — AI events have no session FK.
+	if d.ai != nil {
+		_ = d.ai.Poll()
+	}
 }
 
 // checkAutoUpdate checks if we should auto-restart to apply a pending update.

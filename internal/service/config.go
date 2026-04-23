@@ -18,6 +18,7 @@ type ConfigService struct {
 	store           *storage.Store
 	platform        platform.Platform
 	daemon          *tracker.Daemon
+	shellSetup      *ShellSetupService
 	updateInference func(*Config)
 }
 
@@ -38,6 +39,11 @@ func (s *ConfigService) SetInferenceUpdater(update func(*Config)) {
 // SetDaemon sets the daemon reference (for late initialization).
 func (s *ConfigService) SetDaemon(daemon *tracker.Daemon) {
 	s.daemon = daemon
+}
+
+// SetShellSetup sets the shell setup service (for late initialization).
+func (s *ConfigService) SetShellSetup(svc *ShellSetupService) {
+	s.shellSetup = svc
 }
 
 // SyncAutoStart ensures the system autostart state matches the config.
@@ -156,10 +162,19 @@ type AFKConfig struct {
 
 // DataSourcesConfig contains settings for data sources.
 type DataSourcesConfig struct {
-	Shell   *ShellConfig   `json:"shell"`
-	Git     *GitConfig     `json:"git"`
-	Files   *FilesConfig   `json:"files"`
-	Browser *BrowserConfig `json:"browser"`
+	Shell      *ShellConfig      `json:"shell"`
+	Git        *GitConfig        `json:"git"`
+	Files      *FilesConfig      `json:"files"`
+	Browser    *BrowserConfig    `json:"browser"`
+	AITracking *AITrackingConfig `json:"aiTracking"`
+}
+
+// AITrackingConfig controls the Claude Code / opencode timeline lane.
+type AITrackingConfig struct {
+	Enabled         bool `json:"enabled"`
+	ClaudeEnabled   bool `json:"claudeEnabled"`
+	OpenCodeEnabled bool `json:"openCodeEnabled"`
+	IdleGapSeconds  int  `json:"idleGapSeconds"`
 }
 
 // ShellConfig contains shell history settings.
@@ -491,6 +506,23 @@ func (s *ConfigService) handleConfigSideEffect(key string, value interface{}) er
 			}
 			s.updateInference(config)
 		}
+	case "shell.enabled":
+		if s.shellSetup == nil {
+			return nil
+		}
+		enabled, ok := value.(bool)
+		if !ok {
+			return nil
+		}
+		if enabled {
+			if err := s.shellSetup.EnableCapture(); err != nil {
+				return fmt.Errorf("enable shell capture: %w", err)
+			}
+		} else {
+			if err := s.shellSetup.DisableCapture(); err != nil {
+				return fmt.Errorf("disable shell capture: %w", err)
+			}
+		}
 	}
 	return nil
 }
@@ -681,6 +713,13 @@ func (s *ConfigService) RestartDaemon() error {
 		s.daemon.SetShellType(config.DataSources.Shell.ShellType)
 		s.daemon.SetShellHistoryPath(config.DataSources.Shell.HistoryPath)
 		s.daemon.SetShellExcludePatterns(config.DataSources.Shell.ExcludePatterns)
+		if s.shellSetup != nil {
+			if config.DataSources.Shell.Enabled {
+				_ = s.shellSetup.EnableCapture()
+			} else {
+				_ = s.shellSetup.DisableCapture()
+			}
+		}
 	}
 
 	// Apply file tracking configuration
@@ -809,6 +848,12 @@ func (s *ConfigService) getDefaultDataSourcesConfig() *DataSourcesConfig {
 			Enabled:          true,
 			Browsers:         []string{"chrome", "firefox"},
 			HistoryLimitDays: 7, // Default to 7 days of history
+		},
+		AITracking: &AITrackingConfig{
+			Enabled:         true,
+			ClaudeEnabled:   true,
+			OpenCodeEnabled: true,
+			IdleGapSeconds:  1800,
 		},
 	}
 }

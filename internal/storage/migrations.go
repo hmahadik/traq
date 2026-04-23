@@ -4,7 +4,7 @@ import (
 	"fmt"
 )
 
-const schemaVersion = 12
+const schemaVersion = 16
 
 const schema = `
 -- ============================================================================
@@ -109,12 +109,17 @@ CREATE TABLE IF NOT EXISTS shell_commands (
     exit_code INTEGER,
     duration_seconds REAL,
     hostname TEXT,
+    tmux_context TEXT,
     session_id INTEGER REFERENCES sessions(id),
+    project_id INTEGER REFERENCES projects(id),
+    project_confidence REAL DEFAULT 0.0,
+    project_source TEXT DEFAULT 'unassigned',
     created_at INTEGER DEFAULT (strftime('%s', 'now'))
 );
 
 CREATE INDEX IF NOT EXISTS idx_shell_timestamp ON shell_commands(timestamp);
 CREATE INDEX IF NOT EXISTS idx_shell_session ON shell_commands(session_id);
+CREATE INDEX IF NOT EXISTS idx_shell_project ON shell_commands(project_id);
 
 CREATE TABLE IF NOT EXISTS git_repositories (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -235,6 +240,12 @@ CREATE TABLE IF NOT EXISTS schema_version (
 
 // Migrate applies any pending database migrations.
 func (s *Store) Migrate() error {
+	// Always run repair first. This handles DBs whose schema_version was stamped
+	// at the target without the accompanying DDL (e.g. a partial/no-op migration
+	// from an intermediate dev build). Repair sub-functions guard on table
+	// existence, so this is a no-op on fresh DBs.
+	s.repairMissingTables()
+
 	// Check current schema version
 	var currentVersion int
 	err := s.db.QueryRow("SELECT COALESCE(MAX(version), 0) FROM schema_version").Scan(&currentVersion)
@@ -319,6 +330,32 @@ func (s *Store) Migrate() error {
 			return fmt.Errorf("failed to apply migration 12: %w", err)
 		}
 	}
+	if currentVersion < 13 {
+		// Migration v13: Add tmux_context column to shell_commands for plugin-sourced entries
+		if err := s.applyMigration13(); err != nil {
+			return fmt.Errorf("failed to apply migration 13: %w", err)
+		}
+	}
+	if currentVersion < 14 {
+		// Migration v14: Add project assignment columns to shell_commands
+		if err := s.applyMigration14(); err != nil {
+			return fmt.Errorf("failed to apply migration 14: %w", err)
+		}
+	}
+
+	if currentVersion < 15 {
+		// Migration v15: Add ai_sessions and ai_events tables for AI coding activity
+		if err := s.applyMigration15(); err != nil {
+			return fmt.Errorf("failed to apply migration 15: %w", err)
+		}
+	}
+
+	if currentVersion < 16 {
+		// Migration v16: Add content column to ai_events for prompt text
+		if err := s.applyMigration16(); err != nil {
+			return fmt.Errorf("failed to apply migration 16: %w", err)
+		}
+	}
 
 	// Record schema version
 	if currentVersion == 0 {
@@ -329,9 +366,6 @@ func (s *Store) Migrate() error {
 	if err != nil {
 		return fmt.Errorf("failed to update schema version: %w", err)
 	}
-
-	// Run repair checks for tables that might be missing due to partial migrations
-	s.repairMissingTables()
 
 	return nil
 }
@@ -347,6 +381,10 @@ func (s *Store) repairMissingTables() {
 	s.repairSummariesTable()
 	// Repair missing columns in screenshots table (migrations 9 & 10)
 	s.repairScreenshotsTable()
+	// Repair missing columns in shell_commands table (migration 13)
+	s.repairShellCommandsTable()
+	// Repair missing columns in ai_events (migration 16)
+	s.repairAIEventsTable()
 	// Check and create project_patterns table if missing
 	var count int
 	err := s.db.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='project_patterns'`).Scan(&count)
@@ -912,6 +950,68 @@ func (s *Store) applyMigration11() error {
 	return nil
 }
 
+// applyMigration13 adds tmux_context column to shell_commands for plugin-sourced entries.
+func (s *Store) applyMigration13() error {
+	var count int
+	err := s.db.QueryRow(
+		`SELECT COUNT(*) FROM pragma_table_info('shell_commands') WHERE name = 'tmux_context'`,
+	).Scan(&count)
+	if err != nil {
+		return fmt.Errorf("check tmux_context column: %w", err)
+	}
+	if count == 0 {
+		if _, err := s.db.Exec(`ALTER TABLE shell_commands ADD COLUMN tmux_context TEXT`); err != nil {
+			return fmt.Errorf("add tmux_context column: %w", err)
+		}
+	}
+	return nil
+}
+
+func (s *Store) repairShellCommandsTable() {
+	var tableCount int
+	err := s.db.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='shell_commands'`).Scan(&tableCount)
+	if err != nil || tableCount == 0 {
+		return
+	}
+
+	// Migration 13: tmux_context
+	var colCount int
+	err = s.db.QueryRow(`SELECT COUNT(*) FROM pragma_table_info('shell_commands') WHERE name = 'tmux_context'`).Scan(&colCount)
+	if err == nil && colCount == 0 {
+		if _, err := s.db.Exec(`ALTER TABLE shell_commands ADD COLUMN tmux_context TEXT`); err != nil {
+			fmt.Printf("repairShellCommandsTable: failed to add tmux_context column: %v\n", err)
+		}
+	}
+
+	// Migration 14: project assignment columns
+	err = s.db.QueryRow(`SELECT COUNT(*) FROM pragma_table_info('shell_commands') WHERE name = 'project_id'`).Scan(&colCount)
+	if err == nil && colCount == 0 {
+		s.db.Exec(`ALTER TABLE shell_commands ADD COLUMN project_id INTEGER REFERENCES projects(id)`)
+	}
+	err = s.db.QueryRow(`SELECT COUNT(*) FROM pragma_table_info('shell_commands') WHERE name = 'project_confidence'`).Scan(&colCount)
+	if err == nil && colCount == 0 {
+		s.db.Exec(`ALTER TABLE shell_commands ADD COLUMN project_confidence REAL DEFAULT 0.0`)
+	}
+	err = s.db.QueryRow(`SELECT COUNT(*) FROM pragma_table_info('shell_commands') WHERE name = 'project_source'`).Scan(&colCount)
+	if err == nil && colCount == 0 {
+		s.db.Exec(`ALTER TABLE shell_commands ADD COLUMN project_source TEXT DEFAULT 'unassigned'`)
+	}
+	s.db.Exec(`CREATE INDEX IF NOT EXISTS idx_shell_project ON shell_commands(project_id)`)
+}
+
+// applyMigration14 adds project assignment columns to shell_commands so shell
+// entries can be attributed to projects like screenshots / focus events / git commits.
+func (s *Store) applyMigration14() error {
+	// ALTER TABLE ADD COLUMN is idempotent-friendly via the repair path;
+	// any errors here (e.g. column already exists from a partial apply) are
+	// benign — repairShellCommandsTable also runs and guards on existence.
+	s.db.Exec(`ALTER TABLE shell_commands ADD COLUMN project_id INTEGER REFERENCES projects(id)`)
+	s.db.Exec(`ALTER TABLE shell_commands ADD COLUMN project_confidence REAL DEFAULT 0.0`)
+	s.db.Exec(`ALTER TABLE shell_commands ADD COLUMN project_source TEXT DEFAULT 'unassigned'`)
+	s.db.Exec(`CREATE INDEX IF NOT EXISTS idx_shell_project ON shell_commands(project_id)`)
+	return nil
+}
+
 // applyMigration12 adds draft fields for AI summary approval workflow.
 // - is_draft: 0 = committed, 1 = draft (pending user approval)
 // - draft_status: 'none' | 'pending' | 'accepted' | 'rejected'
@@ -930,4 +1030,59 @@ func (s *Store) applyMigration12() error {
 	s.db.Exec(`CREATE INDEX IF NOT EXISTS idx_focus_draft ON window_focus_events(is_draft)`)
 
 	return nil
+}
+
+func (s *Store) repairAIEventsTable() {
+	var tableCount int
+	err := s.db.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='ai_events'`).Scan(&tableCount)
+	if err != nil || tableCount == 0 {
+		return
+	}
+	var colCount int
+	err = s.db.QueryRow(`SELECT COUNT(*) FROM pragma_table_info('ai_events') WHERE name = 'content'`).Scan(&colCount)
+	if err == nil && colCount == 0 {
+		s.db.Exec(`ALTER TABLE ai_events ADD COLUMN content TEXT`)
+	}
+}
+
+// applyMigration16 adds a content column to ai_events to store the text of
+// user prompts (and later opencode-side role-normalized user messages). The
+// column is nullable so existing rows remain valid.
+func (s *Store) applyMigration16() error {
+	_, err := s.db.Exec(`ALTER TABLE ai_events ADD COLUMN content TEXT`)
+	return err
+}
+
+// applyMigration15 adds ai_sessions and ai_events tables for AI coding
+// session activity (Claude Code, opencode). Sessions are keyed by the
+// tool's native session ID; events are per-turn timestamps only — no
+// transcript bodies are stored.
+func (s *Store) applyMigration15() error {
+	_, err := s.db.Exec(`
+		CREATE TABLE IF NOT EXISTS ai_sessions (
+			id              TEXT PRIMARY KEY,
+			tool            TEXT NOT NULL,
+			project_dir     TEXT,
+			file_path       TEXT,
+			started_at      INTEGER NOT NULL,
+			last_event_at   INTEGER NOT NULL,
+			event_count     INTEGER NOT NULL DEFAULT 0,
+			source_offset   INTEGER NOT NULL DEFAULT 0
+		);
+		CREATE INDEX IF NOT EXISTS idx_ai_sessions_last_event ON ai_sessions(last_event_at);
+		CREATE INDEX IF NOT EXISTS idx_ai_sessions_file_path   ON ai_sessions(file_path);
+
+		CREATE TABLE IF NOT EXISTS ai_events (
+			id           INTEGER PRIMARY KEY AUTOINCREMENT,
+			session_id   TEXT NOT NULL REFERENCES ai_sessions(id) ON DELETE CASCADE,
+			tool         TEXT NOT NULL,
+			kind         TEXT NOT NULL,
+			timestamp    INTEGER NOT NULL,
+			project_dir  TEXT
+		);
+		CREATE INDEX IF NOT EXISTS idx_ai_events_ts      ON ai_events(timestamp);
+		CREATE INDEX IF NOT EXISTS idx_ai_events_session ON ai_events(session_id);
+		CREATE INDEX IF NOT EXISTS idx_ai_events_tool_ts ON ai_events(tool, timestamp);
+	`)
+	return err
 }

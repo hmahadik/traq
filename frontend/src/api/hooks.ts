@@ -481,6 +481,7 @@ export function useUpdateConfig() {
     mutationFn: (updates: Partial<Config>) => api.config.updateConfig(updates),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.config.all() });
+      queryClient.invalidateQueries({ queryKey: ['shellSetup'] });
     },
   });
 }
@@ -1754,3 +1755,58 @@ export function useSetUpdateEnabled() {
 
 export { useMultiDayTimeline } from '@/hooks/useMultiDayTimeline';
 export type { DayData, MultiDayTimelineState, ScreenshotItem } from '@/hooks/useMultiDayTimeline';
+
+// ============================================================================
+// Shell Setup Hooks
+// ============================================================================
+
+export function useShellSetupStatus(shell: string) {
+  return useQuery({
+    queryKey: ['shellSetup', shell],
+    queryFn: () => api.shellSetup.status(shell),
+    refetchInterval: 5000,
+  });
+}
+
+export function useInstallShellPlugin() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (shell: string) => api.shellSetup.install(shell),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['shellSetup'] }),
+  });
+}
+
+export function useUninstallShellPlugin() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (shell: string) => api.shellSetup.uninstall(shell),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['shellSetup'] }),
+  });
+}
+
+export function useDismissShellOverflow() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.shellSetup.dismissOverflow(),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['shellSetup'] }),
+  });
+}
+
+// ============================================================================
+// AI coding sessions (Claude Code, opencode)
+// ============================================================================
+
+export function useAISessions(date: string) {
+  return useQuery({
+    queryKey: ['ai', 'sessions', date],
+    queryFn: () => api.ai.list(date),
+  });
+}
+
+export function useAISession(id: string | null) {
+  return useQuery({
+    queryKey: ['ai', 'session', id],
+    queryFn: () => api.ai.get(id!),
+    enabled: !!id,
+  });
+}

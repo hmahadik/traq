@@ -17,6 +17,7 @@ import (
 	"traq/internal/service"
 	"traq/internal/storage"
 	"traq/internal/tracker"
+	"traq/internal/tracker/shellplugin"
 
 	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
@@ -55,6 +56,8 @@ type App struct {
 	Projects    *service.ProjectAssignmentService
 	Embeddings  *service.EmbeddingService
 	Draft       *service.DraftService
+	ShellSetup  *service.ShellSetupService
+	AI          *service.AIService
 
 	// Inference engine
 	inference *inference.Service
@@ -119,6 +122,7 @@ func (a *App) startup(ctx context.Context) {
 	a.Timeline = service.NewTimelineService(a.store)
 	a.Screenshots = service.NewScreenshotService(a.store, dataDir)
 	a.Config = service.NewConfigService(a.store, a.platform, nil) // daemon set later
+	a.AI = service.NewAIService(a.store)
 	a.Config.SetInferenceUpdater(func(cfg *service.Config) {
 		if a.inference == nil {
 			return
@@ -204,6 +208,10 @@ func (a *App) startup(ctx context.Context) {
 
 	// Initialize draft service (for AI draft approval workflow)
 	a.Draft = service.NewDraftService(a.store)
+
+	// Initialize shell setup service (plugin install/uninstall/status)
+	a.ShellSetup = service.NewShellSetupService(dataDir)
+	a.Config.SetShellSetup(a.ShellSetup)
 
 	// Initialize issues service (for crash/manual reporting)
 	a.Issues = service.NewIssueService(a.store, Version)
@@ -683,6 +691,26 @@ func (a *App) GetScreenshotsForHour(date string, hour int) ([]*service.Screensho
 		return nil, nil
 	}
 	return a.Timeline.GetScreenshotsForHour(date, hour)
+}
+
+// GetShellSetupStatus returns the install/enable state for a given shell.
+func (a *App) GetShellSetupStatus(shell string) (*service.SetupStatus, error) {
+	return a.ShellSetup.Status(shellplugin.ShellKind(shell))
+}
+
+// InstallShellPlugin installs the Traq plugin for the given shell.
+func (a *App) InstallShellPlugin(shell string) error {
+	return a.ShellSetup.Install(shellplugin.ShellKind(shell))
+}
+
+// UninstallShellPlugin removes the Traq plugin for the given shell.
+func (a *App) UninstallShellPlugin(shell string) error {
+	return a.ShellSetup.Uninstall(shellplugin.ShellKind(shell))
+}
+
+// DismissShellOverflow clears the overflow sentinel file.
+func (a *App) DismissShellOverflow() error {
+	return a.ShellSetup.DismissOverflow()
 }
 
 // SearchAllDataSources searches across all event types (git, shell, files, browser, screenshots).
@@ -2148,4 +2176,15 @@ func buildInferenceConfig(config *service.Config) *inference.Config {
 	}
 
 	return ic
+}
+
+// ListAISessions returns AI coding sessions (Claude Code, opencode) that had
+// activity on the given date. Bound to the frontend via Wails.
+func (a *App) ListAISessions(date string) ([]service.AISessionDisplay, error) {
+	return a.AI.ListAISessions(date)
+}
+
+// GetAISession returns detail for one AI session by its native tool ID.
+func (a *App) GetAISession(id string) (*service.AISessionDetail, error) {
+	return a.AI.GetAISession(id)
 }
