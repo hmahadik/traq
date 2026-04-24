@@ -34,11 +34,16 @@ func TestBashPlugin_WritesLogLine(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Run bash interactively-ish: source the plugin, run one command, exit.
+	// Run bash interactively-ish: source the plugin, run two commands,
+	// invoking the hook manually between them. The first hook invocation
+	// establishes the baseline history number (by design — prevents logging
+	// stale pre-existing history); the second is what actually logs.
 	cmd := exec.Command("bash", "--noprofile", "--norc", "-c",
-		`set -o history; HISTFILE=/dev/null; source "$1"; echo hello; `+
-			`# PROMPT_COMMAND only fires at prompt; invoke hook manually:
-			__traq_hook`,
+		`set -o history; HISTFILE=/dev/null; source "$1"
+		echo first-cmd
+		__traq_hook  # baseline
+		echo hello
+		__traq_hook  # logs "echo hello"`,
 		"--", pluginPath)
 	cmd.Env = append(os.Environ(),
 		"HOME="+home,

@@ -116,7 +116,12 @@ func (s *ShellSetupService) Install(kind shellplugin.ShellKind) error {
 	if err := upsertFencedBlock(rcPath, block); err != nil {
 		return fmt.Errorf("update rc file: %w", err)
 	}
-	return nil
+
+	// Enable the capture marker so the plugin actually writes to history.log.
+	// Without this, the sourced plugin short-circuits on the marker check and
+	// post-install status is InstalledDisabled instead of Active — zero
+	// commands captured until the user toggles Shell History on by hand.
+	return s.EnableCapture()
 }
 
 func (s *ShellSetupService) Uninstall(kind shellplugin.ShellKind) error {

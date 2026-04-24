@@ -72,6 +72,14 @@ export function ShellIntegrationStrip({ shell }: Props) {
         read commands from your shell's native history file, but without those extra fields and with
         some delay.
       </p>
+      {status.state === 'not_installed' && (
+        <p className="text-xs text-muted-foreground">
+          Heads up: captured commands are briefly written to a local log file (mode 0600, in your
+          Traq data directory) before the secret filter runs at ingest. They never leave your
+          machine, but a command containing a secret could sit on disk for a few seconds before
+          being scrubbed.
+        </p>
+      )}
       {status.message && <p className="text-xs text-muted-foreground">{status.message}</p>}
       {status.state === 'active' && (
         <p className="text-xs text-muted-foreground">

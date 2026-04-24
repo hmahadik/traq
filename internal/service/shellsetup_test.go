@@ -98,10 +98,11 @@ func TestStatus_Transitions(t *testing.T) {
 	if err := svc.Install(shellplugin.Bash); err != nil {
 		t.Fatal(err)
 	}
-	svc.EnableCapture()
+	// Install enables capture automatically; state should be Active without
+	// a separate EnableCapture call.
 	st, _ = svc.Status(shellplugin.Bash)
 	if st.State != StateActive {
-		t.Errorf("expected Active, got %s", st.State)
+		t.Errorf("expected Active after Install, got %s", st.State)
 	}
 
 	svc.DisableCapture()

@@ -20,6 +20,7 @@ import (
 type ShellTracker struct {
 	platform          platform.Platform
 	store             *storage.Store
+	dataDir           string
 	checkpointFile    string
 	excludePatterns   []*regexp.Regexp
 	shellTypeOverride string // If set, overrides platform detection ("auto" means use platform)
@@ -36,6 +37,7 @@ func NewShellTracker(p platform.Platform, store *storage.Store, dataDir string) 
 	return &ShellTracker{
 		platform:       p,
 		store:          store,
+		dataDir:        dataDir,
 		checkpointFile: filepath.Join(dataDir, "shell_checkpoint.json"),
 		excludePatterns: []*regexp.Regexp{
 			regexp.MustCompile(`(?i)(password|passwd|secret|token|key=|api_key|apikey|auth)`),
@@ -113,9 +115,12 @@ func (t *ShellTracker) GetHistoryPathOverride() string {
 	return t.historyPathOverride
 }
 
-// pluginLogPath returns the path to the Traq shell plugin log.
+// pluginLogPath returns the path to the Traq shell plugin log. The directory
+// layout must stay in sync with ShellSetupService.shellDir — both derive
+// `<dataDir>/shell/...` from the same dataDir so the reader and the writer
+// can't drift apart.
 func (t *ShellTracker) pluginLogPath() string {
-	return filepath.Join(filepath.Dir(t.checkpointFile), "shell", "history.log")
+	return filepath.Join(t.dataDir, "shell", "history.log")
 }
 
 // Poll reads new commands from history and saves them.
@@ -134,8 +139,13 @@ func (t *ShellTracker) Poll(sessionID int64) ([]*storage.ShellCommand, error) {
 		nativeCmds = nil
 	}
 
-	// Merge and persist.
-	all := append(pluginCmds, nativeCmds...)
+	// Merge and persist. Allocate a fresh slice rather than append-in-place
+	// so we don't mutate pluginCmds' backing array — a caller inspecting
+	// the returned slices from readAndTruncatePluginLog / pollNativeHistory
+	// should see them unmodified.
+	all := make([]*storage.ShellCommand, 0, len(pluginCmds)+len(nativeCmds))
+	all = append(all, pluginCmds...)
+	all = append(all, nativeCmds...)
 
 	var saved []*storage.ShellCommand
 	for _, cmd := range all {

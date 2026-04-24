@@ -2,6 +2,7 @@ package storage
 
 import (
 	"fmt"
+	"log"
 )
 
 const schemaVersion = 13
@@ -951,7 +952,9 @@ func (s *Store) repairShellCommandsTable() {
 	err = s.db.QueryRow(`SELECT COUNT(*) FROM pragma_table_info('shell_commands') WHERE name = 'tmux_context'`).Scan(&colCount)
 	if err == nil && colCount == 0 {
 		if _, err := s.db.Exec(`ALTER TABLE shell_commands ADD COLUMN tmux_context TEXT`); err != nil {
-			fmt.Printf("repairShellCommandsTable: failed to add tmux_context column: %v\n", err)
+			// Wails GUI has no attached console; fmt.Printf would vanish. Use
+			// the project logger so this surfaces in dev logs and log files.
+			log.Printf("repairShellCommandsTable: failed to add tmux_context column: %v", err)
 		}
 	}
 }
