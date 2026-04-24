@@ -5,7 +5,9 @@ package platform
 import (
 	"bytes"
 	"encoding/binary"
+	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -20,14 +22,16 @@ import (
 )
 
 // Linux implements Platform for Linux systems.
+//
+// The X11 connection is established lazily on first use and re-established on
+// demand if it drops (display restart, xwayland crash, etc.). All access to
+// the connection state goes through ensureX11 / resetX11 under x11Mu.
 type Linux struct {
-	x11Conn      *xgb.Conn
-	x11Root      xproto.Window
-	x11InitOnce  sync.Once
-	x11InitErr   error
-	x11Atoms     x11Atoms
-	x11AtomsOnce sync.Once
-	x11AtomsErr  error
+	x11Mu    sync.Mutex
+	x11Conn  *xgb.Conn
+	x11Root  xproto.Window
+	x11Atoms x11Atoms
+	x11Ready bool
 }
 
 // x11Atoms caches interned atom IDs needed for window inspection.
@@ -76,16 +80,13 @@ func (l *Linux) CacheDir() string {
 // Returns (nil, nil) when no window currently has focus (e.g. user is on an
 // empty desktop) — callers should treat that as "no change to record".
 func (l *Linux) GetActiveWindow() (*WindowInfo, error) {
-	l.initX11()
-	if l.x11InitErr != nil {
-		return nil, l.x11InitErr
-	}
-	if err := l.initAtoms(); err != nil {
+	if err := l.ensureX11(); err != nil {
 		return nil, err
 	}
 
 	winID, err := l.getActiveWindowID()
 	if err != nil {
+		l.handleXErr(err)
 		return nil, fmt.Errorf("get active window: %w", err)
 	}
 	if winID == 0 {
@@ -100,30 +101,87 @@ func (l *Linux) GetActiveWindow() (*WindowInfo, error) {
 	return info, nil
 }
 
-// initAtoms interns the X11 atoms we need. Atom IDs are stable per connection,
-// so this only needs to run once.
-func (l *Linux) initAtoms() error {
-	l.x11AtomsOnce.Do(func() {
-		entries := []struct {
-			name string
-			out  *xproto.Atom
-		}{
-			{"_NET_ACTIVE_WINDOW", &l.x11Atoms.netActiveWindow},
-			{"_NET_WM_NAME", &l.x11Atoms.netWmName},
-			{"_NET_WM_PID", &l.x11Atoms.netWmPid},
-			{"WM_NAME", &l.x11Atoms.wmName},
-			{"WM_CLASS", &l.x11Atoms.wmClass},
+// ensureX11 lazily dials the X server and interns atoms. Safe to call from
+// every request path — it's a no-op once the connection is ready. If a prior
+// call invalidated the connection via resetX11, this re-dials.
+func (l *Linux) ensureX11() error {
+	l.x11Mu.Lock()
+	defer l.x11Mu.Unlock()
+	if l.x11Ready {
+		return nil
+	}
+
+	conn, err := xgb.NewConn()
+	if err != nil {
+		return fmt.Errorf("connect to X11: %w", err)
+	}
+	if err := screensaver.Init(conn); err != nil {
+		conn.Close()
+		return fmt.Errorf("init screensaver extension: %w", err)
+	}
+
+	atoms, err := internAtoms(conn)
+	if err != nil {
+		conn.Close()
+		return err
+	}
+
+	setup := xproto.Setup(conn)
+	l.x11Conn = conn
+	l.x11Root = setup.DefaultScreen(conn).Root
+	l.x11Atoms = atoms
+	l.x11Ready = true
+	return nil
+}
+
+// resetX11 marks the X11 connection as dead so the next ensureX11 call
+// re-dials. Call when an operation returns io.EOF (xgb's signal for a
+// closed connection — e.g. X server restart, XWayland crash, display logout).
+func (l *Linux) resetX11() {
+	l.x11Mu.Lock()
+	defer l.x11Mu.Unlock()
+	if l.x11Conn != nil {
+		l.x11Conn.Close()
+		l.x11Conn = nil
+	}
+	l.x11Ready = false
+}
+
+// handleXErr resets the connection if err indicates it's dead. xgb signals
+// connection death by returning io.EOF from Reply() when its internal
+// read goroutine has exited. Protocol errors (bad window, missing property)
+// surface as other error types and do not warrant a reconnect.
+func (l *Linux) handleXErr(err error) {
+	if err == nil {
+		return
+	}
+	if errors.Is(err, io.EOF) {
+		l.resetX11()
+	}
+}
+
+// internAtoms interns the X11 atoms we need. Atom IDs are stable for the
+// lifetime of a single connection, so we intern once per ensureX11 call.
+func internAtoms(conn *xgb.Conn) (x11Atoms, error) {
+	var a x11Atoms
+	entries := []struct {
+		name string
+		out  *xproto.Atom
+	}{
+		{"_NET_ACTIVE_WINDOW", &a.netActiveWindow},
+		{"_NET_WM_NAME", &a.netWmName},
+		{"_NET_WM_PID", &a.netWmPid},
+		{"WM_NAME", &a.wmName},
+		{"WM_CLASS", &a.wmClass},
+	}
+	for _, e := range entries {
+		r, err := xproto.InternAtom(conn, false, uint16(len(e.name)), e.name).Reply()
+		if err != nil {
+			return x11Atoms{}, fmt.Errorf("intern atom %s: %w", e.name, err)
 		}
-		for _, e := range entries {
-			r, err := xproto.InternAtom(l.x11Conn, false, uint16(len(e.name)), e.name).Reply()
-			if err != nil {
-				l.x11AtomsErr = fmt.Errorf("intern atom %s: %w", e.name, err)
-				return
-			}
-			*e.out = r.Atom
-		}
-	})
-	return l.x11AtomsErr
+		*e.out = r.Atom
+	}
+	return a, nil
 }
 
 func (l *Linux) getActiveWindowID() (xproto.Window, error) {
@@ -132,10 +190,20 @@ func (l *Linux) getActiveWindowID() (xproto.Window, error) {
 	if err != nil {
 		return 0, err
 	}
-	if len(reply.Value) < 4 {
-		return 0, nil
+	return parseWindowID(reply.Value), nil
+}
+
+// parseWindowID extracts an X window ID from the raw 4-byte property value.
+// Returns 0 when the property is unset or truncated.
+//
+// X11 property values arrive in the byte order negotiated at connection
+// setup. xgb always requests little-endian during the handshake, so we
+// decode little-endian here regardless of host CPU endianness.
+func parseWindowID(b []byte) xproto.Window {
+	if len(b) < 4 {
+		return 0
 	}
-	return xproto.Window(binary.LittleEndian.Uint32(reply.Value)), nil
+	return xproto.Window(binary.LittleEndian.Uint32(b))
 }
 
 // getStringProp reads a string-like property using AtomAny so we accept either
@@ -160,11 +228,19 @@ func (l *Linux) getWindowTitle(win xproto.Window) string {
 func (l *Linux) getWindowClass(win xproto.Window) (appName, class string) {
 	reply, err := xproto.GetProperty(l.x11Conn, false, win,
 		l.x11Atoms.wmClass, xproto.GetPropertyTypeAny, 0, 1024).Reply()
-	if err != nil || len(reply.Value) == 0 {
+	if err != nil {
 		return "", ""
 	}
-	// WM_CLASS is two consecutive null-terminated strings: instance\0class\0
-	parts := bytes.SplitN(reply.Value, []byte{0}, 3)
+	return parseWmClass(reply.Value)
+}
+
+// parseWmClass splits the WM_CLASS property, which is two consecutive
+// null-terminated strings in the form "instance\0class\0".
+func parseWmClass(b []byte) (appName, class string) {
+	if len(b) == 0 {
+		return "", ""
+	}
+	parts := bytes.SplitN(b, []byte{0}, 3)
 	if len(parts) >= 1 {
 		appName = string(parts[0])
 	}
@@ -177,10 +253,20 @@ func (l *Linux) getWindowClass(win xproto.Window) (appName, class string) {
 func (l *Linux) getWindowPID(win xproto.Window) int {
 	reply, err := xproto.GetProperty(l.x11Conn, false, win,
 		l.x11Atoms.netWmPid, xproto.AtomCardinal, 0, 1).Reply()
-	if err != nil || len(reply.Value) < 4 {
+	if err != nil {
 		return 0
 	}
-	return int(binary.LittleEndian.Uint32(reply.Value))
+	return parseCardinal(reply.Value)
+}
+
+// parseCardinal decodes a 4-byte little-endian X CARDINAL (used by
+// _NET_WM_PID and similar numeric properties). See parseWindowID for the
+// endianness rationale.
+func parseCardinal(b []byte) int {
+	if len(b) < 4 {
+		return 0
+	}
+	return int(binary.LittleEndian.Uint32(b))
 }
 
 func (l *Linux) getWindowGeometry(win xproto.Window) (x, y, w, h int) {
@@ -196,35 +282,16 @@ func (l *Linux) getWindowGeometry(win xproto.Window) (x, y, w, h int) {
 	return int(geom.X), int(geom.Y), int(geom.Width), int(geom.Height)
 }
 
-func (l *Linux) initX11() {
-	l.x11InitOnce.Do(func() {
-		conn, err := xgb.NewConn()
-		if err != nil {
-			l.x11InitErr = fmt.Errorf("failed to connect to X11: %w", err)
-			return
-		}
-
-		if err := screensaver.Init(conn); err != nil {
-			conn.Close()
-			l.x11InitErr = fmt.Errorf("failed to init screensaver extension: %w", err)
-			return
-		}
-
-		setup := xproto.Setup(conn)
-		l.x11Root = setup.DefaultScreen(conn).Root
-		l.x11Conn = conn
-	})
-}
-
 // GetLastInputTime returns the time of the last user input.
 func (l *Linux) GetLastInputTime() (time.Time, error) {
-	l.initX11()
+	initErr := l.ensureX11()
 
-	if l.x11Conn != nil {
+	if initErr == nil {
 		info, err := screensaver.QueryInfo(l.x11Conn, xproto.Drawable(l.x11Root)).Reply()
 		if err == nil {
 			return time.Now().Add(-time.Duration(info.MsSinceUserInput) * time.Millisecond), nil
 		}
+		l.handleXErr(err)
 	}
 
 	if out, err := exec.Command("xprintidle").Output(); err == nil {
@@ -233,8 +300,8 @@ func (l *Linux) GetLastInputTime() (time.Time, error) {
 		}
 	}
 
-	if l.x11InitErr != nil {
-		return time.Time{}, l.x11InitErr
+	if initErr != nil {
+		return time.Time{}, initErr
 	}
 	return time.Time{}, fmt.Errorf("unable to detect idle time: X11 screensaver extension unavailable and xprintidle not installed")
 }
