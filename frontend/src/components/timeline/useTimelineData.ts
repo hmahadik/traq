@@ -418,7 +418,10 @@ export function useTimelineData({
         const appList = topApps.slice(0, 3).join(', ');
         const moreApps = topApps.length > 3 ? ` +${topApps.length - 3}` : '';
 
-        const sessDur = capDuration(session.startTime, session.durationSeconds);
+        const rawSessDur = session.durationSeconds ?? (session.isOngoing
+          ? Math.max(0, nowTimestamp - session.startTime)
+          : undefined);
+        const sessDur = capDuration(session.startTime, rawSessDur);
         const dot: EventDot = {
           id: makeEventKey('session', session.id),
           originalId: session.id,

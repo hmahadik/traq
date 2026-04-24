@@ -398,7 +398,10 @@ export function useMultiDayTimelineData({
           const appList = topApps.slice(0, 3).join(', ');
           const moreApps = topApps.length > 3 ? ` +${topApps.length - 3}` : '';
 
-          const sessionDur = capDuration(dateStr, session.startTime, session.durationSeconds ?? undefined);
+          const rawSessionDur = session.durationSeconds ?? (session.isOngoing && dateStr === todayStr
+            ? Math.max(0, nowTimestamp - session.startTime)
+            : undefined);
+          const sessionDur = capDuration(dateStr, session.startTime, rawSessionDur);
           const dot: EventDot = {
             id: makeEventKey('session', session.id),
             originalId: session.id,

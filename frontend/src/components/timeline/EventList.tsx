@@ -279,7 +279,9 @@ function gridDataToEvents(data: TimelineGridData | undefined): EventDot[] {
         type: 'session',
         row: 'Sessions',
         label: session.summary || `Session: ${appList}${moreApps}`,
-        duration: session.durationSeconds ?? undefined,
+        duration: session.durationSeconds ?? (session.isOngoing
+          ? Math.max(0, Math.floor(Date.now() / 1000) - session.startTime)
+          : undefined),
         color: '#f59e0b',
         metadata: {
           explanation: session.explanation,
