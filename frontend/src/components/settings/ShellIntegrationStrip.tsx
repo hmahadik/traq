@@ -1,0 +1,92 @@
+import { useShellSetupStatus, useInstallShellPlugin, useUninstallShellPlugin, useDismissShellOverflow } from '@/api/hooks';
+import { Button } from '@/components/ui/button';
+
+interface Props {
+  shell: string;
+}
+
+const stateLabels: Record<string, { pill: string; className: string }> = {
+  not_installed:      { pill: 'Not installed',       className: 'bg-muted text-muted-foreground' },
+  active:             { pill: 'Active',              className: 'bg-green-500/20 text-green-700 dark:text-green-400' },
+  installed_disabled: { pill: 'Installed (disabled)', className: 'bg-yellow-500/20 text-yellow-700 dark:text-yellow-400' },
+  needs_attention:    { pill: 'Needs attention',     className: 'bg-red-500/20 text-red-700 dark:text-red-400' },
+};
+
+export function ShellIntegrationStrip({ shell }: Props) {
+  const { data: status, isLoading } = useShellSetupStatus(shell);
+  const install = useInstallShellPlugin();
+  const uninstall = useUninstallShellPlugin();
+  const dismiss = useDismissShellOverflow();
+
+  if (isLoading || !status) return null;
+
+  const label = stateLabels[status.state] ?? stateLabels.not_installed;
+
+  return (
+    <div className="rounded-md border bg-muted/30 p-3 space-y-2">
+      {status.overflowed && (
+        <div className="rounded-md border border-yellow-500/40 bg-yellow-500/10 p-2 flex items-center justify-between gap-2">
+          <p className="text-xs text-yellow-800 dark:text-yellow-300">
+            Shell log hit its size limit while Traq was idle. Some commands may have been dropped.
+          </p>
+          <Button size="sm" variant="ghost" onClick={() => dismiss.mutate()} disabled={dismiss.isPending}>
+            Dismiss
+          </Button>
+        </div>
+      )}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-medium">Shell integration</span>
+          <span className={`rounded-full px-2 py-0.5 text-xs ${label.className}`}>
+            {label.pill}
+          </span>
+        </div>
+        <div className="flex gap-2">
+          {status.state === 'not_installed' && (
+            <Button size="sm" onClick={() => install.mutate(shell)} disabled={install.isPending}>
+              Install plugin
+            </Button>
+          )}
+          {status.state === 'needs_attention' && (
+            <Button size="sm" onClick={() => install.mutate(shell)} disabled={install.isPending}>
+              Reinstall
+            </Button>
+          )}
+          {(status.state === 'active' ||
+            status.state === 'installed_disabled' ||
+            status.state === 'needs_attention') && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => uninstall.mutate(shell)}
+              disabled={uninstall.isPending}
+            >
+              Uninstall
+            </Button>
+          )}
+        </div>
+      </div>
+      <p className="text-xs text-muted-foreground">
+        Adds a hook to your shell's startup file that records each command as you run it, along with
+        its exit code, duration, working directory, and tmux context. Without this, Traq can still
+        read commands from your shell's native history file, but without those extra fields and with
+        some delay.
+      </p>
+      {status.state === 'not_installed' && (
+        <p className="text-xs text-muted-foreground">
+          Heads up: captured commands are briefly written to a local log file (mode 0600, in your
+          Traq data directory) before the secret filter runs at ingest. They never leave your
+          machine, but a command containing a secret could sit on disk for a few seconds before
+          being scrubbed.
+        </p>
+      )}
+      {status.message && <p className="text-xs text-muted-foreground">{status.message}</p>}
+      {status.state === 'active' && (
+        <p className="text-xs text-muted-foreground">
+          Open a new terminal or run <code className="rounded bg-muted px-1">source {status.rcPath}</code>{' '}
+          to activate in existing shells.
+        </p>
+      )}
+    </div>
+  );
+}

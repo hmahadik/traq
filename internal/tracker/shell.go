@@ -20,6 +20,7 @@ import (
 type ShellTracker struct {
 	platform          platform.Platform
 	store             *storage.Store
+	dataDir           string
 	checkpointFile    string
 	excludePatterns   []*regexp.Regexp
 	shellTypeOverride string // If set, overrides platform detection ("auto" means use platform)
@@ -36,6 +37,7 @@ func NewShellTracker(p platform.Platform, store *storage.Store, dataDir string) 
 	return &ShellTracker{
 		platform:       p,
 		store:          store,
+		dataDir:        dataDir,
 		checkpointFile: filepath.Join(dataDir, "shell_checkpoint.json"),
 		excludePatterns: []*regexp.Regexp{
 			regexp.MustCompile(`(?i)(password|passwd|secret|token|key=|api_key|apikey|auth)`),
@@ -113,46 +115,47 @@ func (t *ShellTracker) GetHistoryPathOverride() string {
 	return t.historyPathOverride
 }
 
+// pluginLogPath returns the path to the Traq shell plugin log. The directory
+// layout must stay in sync with ShellSetupService.shellDir — both derive
+// `<dataDir>/shell/...` from the same dataDir so the reader and the writer
+// can't drift apart.
+func (t *ShellTracker) pluginLogPath() string {
+	return filepath.Join(t.dataDir, "shell", "history.log")
+}
+
 // Poll reads new commands from history and saves them.
 func (t *ShellTracker) Poll(sessionID int64) ([]*storage.ShellCommand, error) {
-	// Use custom history path if set, otherwise use platform default
-	histPath := t.historyPathOverride
-	if histPath == "" {
-		histPath = t.platform.GetShellHistoryPath()
-	}
-	if histPath == "" {
-		return nil, nil
-	}
-
-	shellType := t.GetShellType()
-
-	// Load checkpoint
-	checkpoint, err := t.loadCheckpoint()
+	// 1. Try the Traq plugin log first (richer format, real-time).
+	pluginCmds, err := readAndTruncatePluginLog(t.pluginLogPath())
 	if err != nil {
-		checkpoint = &ShellCheckpoint{Offsets: make(map[string]int64)}
+		return nil, fmt.Errorf("plugin log: %w", err)
 	}
 
-	offset := checkpoint.Offsets[histPath]
-
-	// Parse history
-	commands, newOffset, err := t.parseHistory(histPath, shellType, offset)
+	// 2. Also read from the native history file (fallback + commands from shells
+	//    without the plugin installed).
+	nativeCmds, newOffset, err := t.pollNativeHistory()
 	if err != nil {
-		return nil, err
+		// Non-fatal: continue with plugin commands only.
+		nativeCmds = nil
 	}
 
-	// Filter and save commands
+	// Merge and persist. Allocate a fresh slice rather than append-in-place
+	// so we don't mutate pluginCmds' backing array — a caller inspecting
+	// the returned slices from readAndTruncatePluginLog / pollNativeHistory
+	// should see them unmodified.
+	all := make([]*storage.ShellCommand, 0, len(pluginCmds)+len(nativeCmds))
+	all = append(all, pluginCmds...)
+	all = append(all, nativeCmds...)
+
 	var saved []*storage.ShellCommand
-	for _, cmd := range commands {
+	for _, cmd := range all {
 		if t.shouldExclude(cmd.Command) {
 			continue
 		}
-
-		// Check if already exists
 		exists, err := t.store.CommandExists(cmd.Timestamp, cmd.Command)
 		if err != nil || exists {
 			continue
 		}
-
 		cmd.SessionID = sql.NullInt64{Int64: sessionID, Valid: sessionID > 0}
 		id, err := t.store.SaveShellCommand(cmd)
 		if err != nil {
@@ -162,11 +165,38 @@ func (t *ShellTracker) Poll(sessionID int64) ([]*storage.ShellCommand, error) {
 		saved = append(saved, cmd)
 	}
 
-	// Update checkpoint
-	checkpoint.Offsets[histPath] = newOffset
-	t.saveCheckpoint(checkpoint)
-
+	// Advance native-history checkpoint only if we actually read that source.
+	if newOffset >= 0 {
+		checkpoint, err := t.loadCheckpoint()
+		if err != nil {
+			checkpoint = &ShellCheckpoint{Offsets: make(map[string]int64)}
+		}
+		checkpoint.Offsets[t.GetHistoryPath()] = newOffset
+		t.saveCheckpoint(checkpoint)
+	}
 	return saved, nil
+}
+
+// pollNativeHistory reads the native shell-history file. Returns
+// (nil, -1, nil) if no native history path is configured.
+func (t *ShellTracker) pollNativeHistory() ([]*storage.ShellCommand, int64, error) {
+	histPath := t.GetHistoryPath()
+	if histPath == "" {
+		return nil, -1, nil
+	}
+	shellType := t.GetShellType()
+
+	checkpoint, err := t.loadCheckpoint()
+	if err != nil {
+		checkpoint = &ShellCheckpoint{Offsets: make(map[string]int64)}
+	}
+	offset := checkpoint.Offsets[histPath]
+
+	commands, newOffset, err := t.parseHistory(histPath, shellType, offset)
+	if err != nil {
+		return nil, -1, err
+	}
+	return commands, newOffset, nil
 }
 
 func (t *ShellTracker) parseHistory(path, shellType string, offset int64) ([]*storage.ShellCommand, int64, error) {
