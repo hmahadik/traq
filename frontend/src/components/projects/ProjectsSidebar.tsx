@@ -40,13 +40,20 @@ export function ProjectsSidebar({
 
   const handleConfirmDelete = async () => {
     if (!projectToDelete) return;
-    await deleteProject.mutateAsync(projectToDelete.id);
-    if (selectedProjectIds.has(projectToDelete.id)) {
-      const next = new Set(selectedProjectIds);
-      next.delete(projectToDelete.id);
-      onSelectionChange(next);
+    // Always close the dialog, even on failure. Without the finally, a
+    // backend error leaves the dialog stuck open with isPending still true
+    // — the hook's onError toast fires but the UI can't recover without
+    // a reload. The toast on useDeleteProject already surfaces the error.
+    try {
+      await deleteProject.mutateAsync(projectToDelete.id);
+      if (selectedProjectIds.has(projectToDelete.id)) {
+        const next = new Set(selectedProjectIds);
+        next.delete(projectToDelete.id);
+        onSelectionChange(next);
+      }
+    } finally {
+      setProjectToDelete(null);
     }
-    setProjectToDelete(null);
   };
 
   // Fetch stats for all projects
