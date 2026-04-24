@@ -1,10 +1,20 @@
-import { useMemo } from 'react';
-import { Plus, Loader2, CheckSquare, Square, CircleOff } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { Plus, Loader2, CheckSquare, Square, CircleOff, Trash2 } from 'lucide-react';
 import { useQueries } from '@tanstack/react-query';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import { useProjects, useUnassignedEventCount } from '@/api/hooks';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { useProjects, useUnassignedEventCount, useDeleteProject } from '@/api/hooks';
 import { api } from '@/api/client';
 
 // Special ID for unassigned activities
@@ -25,6 +35,26 @@ export function ProjectsSidebar({
 }: ProjectsSidebarProps) {
   const { data: projects, isLoading } = useProjects();
   const { data: unassignedCount } = useUnassignedEventCount();
+  const deleteProject = useDeleteProject();
+  const [projectToDelete, setProjectToDelete] = useState<{ id: number; name: string } | null>(null);
+
+  const handleConfirmDelete = async () => {
+    if (!projectToDelete) return;
+    // Always close the dialog, even on failure. Without the finally, a
+    // backend error leaves the dialog stuck open with isPending still true
+    // — the hook's onError toast fires but the UI can't recover without
+    // a reload. The toast on useDeleteProject already surfaces the error.
+    try {
+      await deleteProject.mutateAsync(projectToDelete.id);
+      if (selectedProjectIds.has(projectToDelete.id)) {
+        const next = new Set(selectedProjectIds);
+        next.delete(projectToDelete.id);
+        onSelectionChange(next);
+      }
+    } finally {
+      setProjectToDelete(null);
+    }
+  };
 
   // Fetch stats for all projects
   const statsQueries = useQueries({
@@ -170,7 +200,7 @@ export function ProjectsSidebar({
                     {eventCount != null && eventCount > 0 && (
                       <span
                         className={cn(
-                          'text-[10px] px-1.5 py-0.5 rounded-full font-medium',
+                          'text-[10px] px-1.5 py-0.5 rounded-full font-medium group-hover:hidden',
                           isSelected
                             ? 'bg-primary/20 text-primary'
                             : 'bg-muted text-muted-foreground'
@@ -179,6 +209,16 @@ export function ProjectsSidebar({
                         {eventCount.toLocaleString()}
                       </span>
                     )}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setProjectToDelete({ id: project.id, name: project.name });
+                      }}
+                      className="hidden group-hover:flex h-5 w-5 items-center justify-center rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                      title="Delete project"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </button>
                   </div>
                 </li>
               );
@@ -190,6 +230,31 @@ export function ProjectsSidebar({
           </div>
         )}
       </nav>
+
+      <AlertDialog
+        open={projectToDelete !== null}
+        onOpenChange={(open) => !open && setProjectToDelete(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Project</AlertDialogTitle>
+            <AlertDialogDescription>
+              Delete &quot;{projectToDelete?.name}&quot;? Learned rules and examples are removed.
+              Events already assigned will revert to unassigned.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmDelete}
+              disabled={deleteProject.isPending}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteProject.isPending ? 'Deleting...' : 'Delete'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </aside>
   );
 }

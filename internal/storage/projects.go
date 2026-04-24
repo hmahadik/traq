@@ -113,6 +113,10 @@ func (s *Store) DeleteProject(id int64) error {
 	if err != nil {
 		return fmt.Errorf("failed to clear git commit assignments: %w", err)
 	}
+	_, err = s.db.Exec(`UPDATE shell_commands SET project_id = NULL, project_source = 'unassigned' WHERE project_id = ?`, id)
+	if err != nil {
+		return fmt.Errorf("failed to clear shell command assignments: %w", err)
+	}
 
 	// Delete the project (cascades to patterns and examples)
 	_, err = s.db.Exec(`DELETE FROM projects WHERE id = ?`, id)
@@ -243,6 +247,8 @@ func (s *Store) SetEventProject(eventType string, eventID, projectID int64, conf
 		query = `UPDATE window_focus_events SET project_id = ?, project_confidence = ?, project_source = ? WHERE id = ?`
 	case "git":
 		query = `UPDATE git_commits SET project_id = ?, project_confidence = ?, project_source = ? WHERE id = ?`
+	case "shell":
+		query = `UPDATE shell_commands SET project_id = ?, project_confidence = ?, project_source = ? WHERE id = ?`
 	default:
 		return fmt.Errorf("unknown event type: %s", eventType)
 	}
@@ -262,15 +268,27 @@ func (s *Store) SetEventProject(eventType string, eventID, projectID int64, conf
 }
 
 // GetUnassignedEventCount returns count of events without project assignment.
+//
+// Uses `project_id IS NULL` rather than `project_source = 'unassigned'` so
+// each subquery can use the project_id index (idx_screenshots_project,
+// idx_focus_project, idx_git_project, idx_shell_project) instead of full
+// scans. These are the highest-volume tables in the DB and this function
+// drives a sidebar counter that refetches on timeline navigation.
+//
+// The two formulations are equivalent by construction: SetEventProject
+// always writes project_id and project_source together, so rows with
+// project_id IS NULL always have project_source in ('unassigned', NULL).
 func (s *Store) GetUnassignedEventCount() (int, error) {
 	var count int
 	err := s.db.QueryRow(`
 		SELECT (
-			SELECT COUNT(*) FROM screenshots WHERE project_source = 'unassigned' OR project_source IS NULL
+			SELECT COUNT(*) FROM screenshots WHERE project_id IS NULL
 		) + (
-			SELECT COUNT(*) FROM window_focus_events WHERE project_source = 'unassigned' OR project_source IS NULL
+			SELECT COUNT(*) FROM window_focus_events WHERE project_id IS NULL
 		) + (
-			SELECT COUNT(*) FROM git_commits WHERE project_source = 'unassigned' OR project_source IS NULL
+			SELECT COUNT(*) FROM git_commits WHERE project_id IS NULL
+		) + (
+			SELECT COUNT(*) FROM shell_commands WHERE project_id IS NULL
 		)
 	`).Scan(&count)
 	if err != nil {

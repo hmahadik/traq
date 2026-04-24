@@ -3065,6 +3065,9 @@ export namespace storage {
 	    tmuxContext: sql.NullString;
 	    sessionId: sql.NullInt64;
 	    createdAt: number;
+	    projectId: sql.NullInt64;
+	    projectConfidence: sql.NullFloat64;
+	    projectSource: sql.NullString;
 	
 	    static createFrom(source: any = {}) {
 	        return new ShellCommand(source);
@@ -3083,6 +3086,9 @@ export namespace storage {
 	        this.tmuxContext = this.convertValues(source["tmuxContext"], sql.NullString);
 	        this.sessionId = this.convertValues(source["sessionId"], sql.NullInt64);
 	        this.createdAt = source["createdAt"];
+	        this.projectId = this.convertValues(source["projectId"], sql.NullInt64);
+	        this.projectConfidence = this.convertValues(source["projectConfidence"], sql.NullFloat64);
+	        this.projectSource = this.convertValues(source["projectSource"], sql.NullString);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

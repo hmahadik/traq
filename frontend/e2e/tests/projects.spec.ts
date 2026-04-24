@@ -55,6 +55,30 @@ test.describe('Projects Page - Project Management Journey', () => {
     // Leave name empty
     await expect(projectsPage.saveButton).toBeDisabled();
   });
+
+  test('should delete a project via the sidebar trash button', async ({ projectsPage, page }) => {
+    const projectName = `Delete Me ${Date.now()}`;
+    await projectsPage.createProject(projectName, 'Will be deleted');
+    await page.waitForTimeout(1000);
+    expect(await projectsPage.isProjectVisible(projectName)).toBeTruthy();
+
+    // Hover the project row in the sidebar to reveal the trash button.
+    const row = page.locator('nav').getByText(projectName, { exact: false }).first();
+    await row.hover();
+    const trashBtn = row.locator('xpath=ancestor::li').getByTitle('Delete project');
+    await trashBtn.click();
+
+    const confirmDialog = page.getByRole('alertdialog');
+    await expect(confirmDialog).toBeVisible();
+    await expect(confirmDialog.getByText(projectName, { exact: false })).toBeVisible();
+    await confirmDialog.getByRole('button', { name: 'Delete' }).click();
+
+    // Dialog must close (regression guard for the missing-try/catch bug where
+    // an error would leave the dialog stuck open with isPending frozen).
+    await expect(confirmDialog).not.toBeVisible({ timeout: 5000 });
+    await page.waitForTimeout(500);
+    expect(await projectsPage.isProjectVisible(projectName)).toBeFalsy();
+  });
 });
 
 test.describe('Projects in Reports - Integration', () => {

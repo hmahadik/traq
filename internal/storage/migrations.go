@@ -5,7 +5,7 @@ import (
 	"log"
 )
 
-const schemaVersion = 13
+const schemaVersion = 14
 
 const schema = `
 -- ============================================================================
@@ -112,11 +112,15 @@ CREATE TABLE IF NOT EXISTS shell_commands (
     hostname TEXT,
     tmux_context TEXT,
     session_id INTEGER REFERENCES sessions(id),
+    project_id INTEGER REFERENCES projects(id),
+    project_confidence REAL DEFAULT 0.0,
+    project_source TEXT DEFAULT 'unassigned',
     created_at INTEGER DEFAULT (strftime('%s', 'now'))
 );
 
 CREATE INDEX IF NOT EXISTS idx_shell_timestamp ON shell_commands(timestamp);
 CREATE INDEX IF NOT EXISTS idx_shell_session ON shell_commands(session_id);
+CREATE INDEX IF NOT EXISTS idx_shell_project ON shell_commands(project_id);
 
 CREATE TABLE IF NOT EXISTS git_repositories (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -331,6 +335,12 @@ func (s *Store) Migrate() error {
 		// Migration v13: Add tmux_context column to shell_commands for plugin-sourced entries
 		if err := s.applyMigration13(); err != nil {
 			return fmt.Errorf("failed to apply migration 13: %w", err)
+		}
+	}
+	if currentVersion < 14 {
+		// Migration v14: Add project assignment columns to shell_commands
+		if err := s.applyMigration14(); err != nil {
+			return fmt.Errorf("failed to apply migration 14: %w", err)
 		}
 	}
 
@@ -942,21 +952,82 @@ func (s *Store) applyMigration13() error {
 	return nil
 }
 
+// repairShellCommandsTable re-adds columns and indexes that should exist on
+// shell_commands but may be missing if an earlier dev build stamped
+// schema_version past a migration without running its DDL (partial apply,
+// crash mid-migration, etc.). Covers migration 13 (tmux_context) and
+// migration 14 (project assignment). Each check is independent so a repair
+// can succeed partially and still move the DB forward.
 func (s *Store) repairShellCommandsTable() {
 	var tableCount int
 	err := s.db.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='shell_commands'`).Scan(&tableCount)
 	if err != nil || tableCount == 0 {
 		return
 	}
-	var colCount int
-	err = s.db.QueryRow(`SELECT COUNT(*) FROM pragma_table_info('shell_commands') WHERE name = 'tmux_context'`).Scan(&colCount)
-	if err == nil && colCount == 0 {
-		if _, err := s.db.Exec(`ALTER TABLE shell_commands ADD COLUMN tmux_context TEXT`); err != nil {
+
+	repairs := []struct {
+		column string
+		ddl    string
+	}{
+		{"tmux_context", `ALTER TABLE shell_commands ADD COLUMN tmux_context TEXT`},
+		{"project_id", `ALTER TABLE shell_commands ADD COLUMN project_id INTEGER REFERENCES projects(id)`},
+		{"project_confidence", `ALTER TABLE shell_commands ADD COLUMN project_confidence REAL DEFAULT 0.0`},
+		{"project_source", `ALTER TABLE shell_commands ADD COLUMN project_source TEXT DEFAULT 'unassigned'`},
+	}
+	for _, r := range repairs {
+		var colCount int
+		if err := s.db.QueryRow(
+			`SELECT COUNT(*) FROM pragma_table_info('shell_commands') WHERE name = ?`, r.column,
+		).Scan(&colCount); err != nil {
 			// Wails GUI has no attached console; fmt.Printf would vanish. Use
 			// the project logger so this surfaces in dev logs and log files.
-			log.Printf("repairShellCommandsTable: failed to add tmux_context column: %v", err)
+			log.Printf("repairShellCommandsTable: check %s column: %v", r.column, err)
+			continue
+		}
+		if colCount > 0 {
+			continue
+		}
+		if _, err := s.db.Exec(r.ddl); err != nil {
+			log.Printf("repairShellCommandsTable: add %s column: %v", r.column, err)
 		}
 	}
+	if _, err := s.db.Exec(`CREATE INDEX IF NOT EXISTS idx_shell_project ON shell_commands(project_id)`); err != nil {
+		log.Printf("repairShellCommandsTable: create idx_shell_project: %v", err)
+	}
+}
+
+// applyMigration14 adds project assignment columns to shell_commands so shell
+// entries can be attributed to projects like screenshots / focus events / git commits.
+// Each ALTER is guarded via pragma_table_info so real failures (disk full, DB
+// locked, schema corruption) surface as errors instead of being silently
+// dropped. Matches the pattern used by applyMigration13 / applyMigration9.
+func (s *Store) applyMigration14() error {
+	columns := []struct {
+		name string
+		ddl  string
+	}{
+		{"project_id", `ALTER TABLE shell_commands ADD COLUMN project_id INTEGER REFERENCES projects(id)`},
+		{"project_confidence", `ALTER TABLE shell_commands ADD COLUMN project_confidence REAL DEFAULT 0.0`},
+		{"project_source", `ALTER TABLE shell_commands ADD COLUMN project_source TEXT DEFAULT 'unassigned'`},
+	}
+	for _, c := range columns {
+		var count int
+		if err := s.db.QueryRow(
+			`SELECT COUNT(*) FROM pragma_table_info('shell_commands') WHERE name = ?`, c.name,
+		).Scan(&count); err != nil {
+			return fmt.Errorf("check %s column: %w", c.name, err)
+		}
+		if count > 0 {
+			continue
+		}
+		if _, err := s.db.Exec(c.ddl); err != nil {
+			return fmt.Errorf("add %s column: %w", c.name, err)
+		}
+	}
+	if _, err := s.db.Exec(`CREATE INDEX IF NOT EXISTS idx_shell_project ON shell_commands(project_id)`); err != nil {
+		return fmt.Errorf("create idx_shell_project: %w", err)
+	}
+	return nil
 }
 
 // applyMigration12 adds draft fields for AI summary approval workflow.

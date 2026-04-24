@@ -96,6 +96,10 @@ type ShellCommand struct {
 	TmuxContext      sql.NullString  `json:"tmuxContext"`
 	SessionID        sql.NullInt64   `json:"sessionId"`
 	CreatedAt        int64           `json:"createdAt"`
+
+	ProjectID         sql.NullInt64   `json:"projectId"`
+	ProjectConfidence sql.NullFloat64 `json:"projectConfidence"`
+	ProjectSource     sql.NullString  `json:"projectSource"`
 }
 
 // GitRepository represents a tracked git repository.
