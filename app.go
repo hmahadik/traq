@@ -131,8 +131,16 @@ func (a *App) startup(ctx context.Context) {
 		a.inference.UpdateConfig(inferenceConfig)
 	})
 
-	// Initialize daemon with default config
+	// Initialize daemon with saved config (falling back to defaults for any
+	// missing fields). Privacy-sensitive flags like AIStorePromptContent
+	// must be read from stored config at startup so the default-off behavior
+	// survives app restarts without the user re-opting-out every time.
 	daemonConfig := tracker.DefaultDaemonConfig(dataDir)
+	if cfg, err := a.Config.GetConfig(); err == nil && cfg != nil {
+		if cfg.DataSources != nil && cfg.DataSources.AITracking != nil {
+			daemonConfig.AIStorePromptContent = cfg.DataSources.AITracking.StorePromptContent
+		}
+	}
 	a.daemon, err = tracker.NewDaemon(daemonConfig, a.store, a.platform)
 	if err != nil {
 		log.Printf("Failed to initialize daemon: %v", err)
@@ -2187,4 +2195,12 @@ func (a *App) ListAISessions(date string) ([]service.AISessionDisplay, error) {
 // GetAISession returns detail for one AI session by its native tool ID.
 func (a *App) GetAISession(id string) (*service.AISessionDetail, error) {
 	return a.AI.GetAISession(id)
+}
+
+// GetAIPromptsForDay returns one entry per user-initiated AI event with
+// optional prompt-text preview. Preview / content are populated only when
+// AITrackingConfig.StorePromptContent is on at ingest time; otherwise both
+// fields come back empty and the frontend renders timestamp-only rows.
+func (a *App) GetAIPromptsForDay(date string) ([]service.AIPromptDisplay, error) {
+	return a.AI.GetAIPromptsForDay(date)
 }

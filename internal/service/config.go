@@ -170,11 +170,28 @@ type DataSourcesConfig struct {
 }
 
 // AITrackingConfig controls the Claude Code / opencode timeline lane.
+//
+// NOTE: Enabled / ClaudeEnabled / OpenCodeEnabled are not currently read by
+// the tracker — the plugins run unconditionally. Fix is tracked as a
+// follow-up; this PR only wires the new StorePromptContent flag since it
+// gates a privacy-sensitive behavior.
 type AITrackingConfig struct {
 	Enabled         bool `json:"enabled"`
 	ClaudeEnabled   bool `json:"claudeEnabled"`
 	OpenCodeEnabled bool `json:"openCodeEnabled"`
 	IdleGapSeconds  int  `json:"idleGapSeconds"`
+
+	// StorePromptContent opts into storing verbatim user-prompt text on
+	// ai_events rows. Default is false — the timeline shows user-prompt
+	// markers at their timestamps but the text stays out of the DB. When
+	// true, Claude JSONL prompts and opencode user messages are captured
+	// into ai_events.content, enabling prompt previews in the events list.
+	//
+	// Changes take effect on next app restart. This is intentional: a
+	// privacy-sensitive toggle should have an explicit boundary where the
+	// user knows the behavior changed, rather than silently rolling over
+	// on the next poll.
+	StorePromptContent bool `json:"storePromptContent"`
 }
 
 // ShellConfig contains shell history settings.
@@ -706,6 +723,9 @@ func (s *ConfigService) RestartDaemon() error {
 		MonitorMode:        config.Capture.MonitorMode,
 		MonitorIndex:       config.Capture.MonitorIndex,
 	}
+	if config.DataSources != nil && config.DataSources.AITracking != nil {
+		daemonConfig.AIStorePromptContent = config.DataSources.AITracking.StorePromptContent
+	}
 	s.daemon.UpdateConfig(daemonConfig)
 
 	// Apply shell configuration
@@ -850,10 +870,11 @@ func (s *ConfigService) getDefaultDataSourcesConfig() *DataSourcesConfig {
 			HistoryLimitDays: 7, // Default to 7 days of history
 		},
 		AITracking: &AITrackingConfig{
-			Enabled:         true,
-			ClaudeEnabled:   true,
-			OpenCodeEnabled: true,
-			IdleGapSeconds:  1800,
+			Enabled:            true,
+			ClaudeEnabled:      true,
+			OpenCodeEnabled:    true,
+			IdleGapSeconds:     1800,
+			StorePromptContent: false, // privacy-sensitive; opt-in only
 		},
 	}
 }

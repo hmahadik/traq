@@ -16,11 +16,18 @@ const toolOpenCode = "opencode"
 // Opens the DB read-only (immutable=1) so opencode's live process isn't
 // affected. Cursors on MAX(timestamp) — opencode stores ms, we store s.
 type OpenCodePlugin struct {
-	dbPath string
+	dbPath             string
+	storePromptContent bool
 }
 
 func NewOpenCodePlugin(dbPath string) *OpenCodePlugin {
 	return &OpenCodePlugin{dbPath: dbPath}
+}
+
+// SetStorePromptContent enables/disables storage of verbatim user-message
+// text on emitted events. Off by default — see ClaudePlugin.SetStorePromptContent.
+func (p *OpenCodePlugin) SetStorePromptContent(v bool) {
+	p.storePromptContent = v
 }
 
 func (p *OpenCodePlugin) Name() string { return toolOpenCode }
@@ -70,6 +77,9 @@ func (p *OpenCodePlugin) Poll(ctx context.Context, store *storage.Store) ([]AIEv
 		var tsMs int64
 		if err := rows.Scan(&msgID, &sessionID, &directory, &tsMs, &content); err != nil {
 			return nil, err
+		}
+		if !p.storePromptContent {
+			content = ""
 		}
 		out = append(out, AIEvent{
 			Tool:       toolOpenCode,

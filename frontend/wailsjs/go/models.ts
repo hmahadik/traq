@@ -309,17 +309,19 @@ export namespace service {
 	    claudeEnabled: boolean;
 	    openCodeEnabled: boolean;
 	    idleGapSeconds: number;
-	
+	    storePromptContent: boolean;
+
 	    static createFrom(source: any = {}) {
 	        return new AITrackingConfig(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.enabled = source["enabled"];
 	        this.claudeEnabled = source["claudeEnabled"];
 	        this.openCodeEnabled = source["openCodeEnabled"];
 	        this.idleGapSeconds = source["idleGapSeconds"];
+	        this.storePromptContent = source["storePromptContent"];
 	    }
 	}
 	export class ActivityBlock {

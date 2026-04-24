@@ -17,11 +17,19 @@ const toolClaude = "claude"
 
 // ClaudePlugin tails Claude Code JSONL session files in <root>/<project-slug>/*.jsonl.
 type ClaudePlugin struct {
-	root string // ~/.claude/projects (or a fixture root in tests)
+	root               string // ~/.claude/projects (or a fixture root in tests)
+	storePromptContent bool
 }
 
 func NewClaudePlugin(root string) *ClaudePlugin {
 	return &ClaudePlugin{root: root}
+}
+
+// SetStorePromptContent enables/disables storage of verbatim user-prompt
+// text on emitted events. Off by default — aligns with the design doc's
+// "no transcript storage by default" privacy claim.
+func (p *ClaudePlugin) SetStorePromptContent(v bool) {
+	p.storePromptContent = v
 }
 
 func (p *ClaudePlugin) Name() string { return toolClaude }
@@ -93,7 +101,7 @@ func (p *ClaudePlugin) readFile(path string, store *storage.Store) ([]AIEvent, e
 		line, err := reader.ReadBytes('\n')
 		if len(line) > 0 {
 			pos += int64(len(line))
-			if ev, ok := parseClaudeLine(line, path, pos); ok {
+			if ev, ok := parseClaudeLine(line, path, pos, p.storePromptContent); ok {
 				events = append(events, ev)
 			}
 		}
@@ -107,7 +115,7 @@ func (p *ClaudePlugin) readFile(path string, store *storage.Store) ([]AIEvent, e
 	return events, nil
 }
 
-func parseClaudeLine(line []byte, filePath string, offsetAfter int64) (AIEvent, bool) {
+func parseClaudeLine(line []byte, filePath string, offsetAfter int64, storePromptContent bool) (AIEvent, bool) {
 	var cl claudeLine
 	if err := json.Unmarshal(line, &cl); err != nil {
 		return AIEvent{}, false
@@ -118,6 +126,12 @@ func parseClaudeLine(line []byte, filePath string, offsetAfter int64) (AIEvent, 
 	}
 	if cl.SessionID == "" || cl.Timestamp.IsZero() {
 		return AIEvent{}, false
+	}
+	// Respect the privacy toggle. The kind="user_prompt" event is still
+	// emitted so the timeline can show the marker; only the text body is
+	// dropped.
+	if !storePromptContent {
+		content = ""
 	}
 	return AIEvent{
 		Tool:       toolClaude,

@@ -10,11 +10,12 @@
 
 1. Show when the user was engaged with Claude Code / opencode on the daily timeline.
 2. Group activity per tool + session + project, with concurrent sessions rendered as stacked blocks.
-3. Keep v1 minimal: no transcript storage, no cost/analytics page, no new AFK inputs.
+3. Keep v1 minimal: **no transcript storage by default**, no cost/analytics page, no new AFK inputs.
 
 ## Non-goals (v1)
 
-- Storing prompt text, assistant responses, tool-call arguments, diffs, token counts, or cost.
+- Storing assistant responses, tool-call arguments, diffs, token counts, or cost.
+- User-prompt text is stored **only when the user opts in** via Settings → Data Sources → AI Coding → "Store prompt text" (default off). When off, the timeline shows user-prompt markers at their timestamps but no text bodies land in the DB. When on, prompt previews become available in the events list; the toggle takes effect on next app restart.
 - Dedicated AI analytics / usage page.
 - Feeding AI events into AFK / focus-time detection.
 - Cross-tool correlation (matching a Claude session to an opencode session in the same repo).
@@ -251,8 +252,10 @@ New settings panel `frontend/src/components/settings/AITrackingSection.tsx`:
 
 ## Privacy
 
-- Only timestamps and structural fields are read (`type`, `sessionId`, `cwd`). No message bodies, no tool-call arguments, no diffs.
-- Source files stay in place; we store paths as references, never copies.
+- **By default**, only timestamps and structural fields are read (`type`, `sessionId`, `cwd`). Tool-call arguments, diffs, and assistant responses are never stored regardless of settings.
+- **User-prompt text** is stored only when the `storePromptContent` setting is explicitly enabled. When off (default), the `ai_events.content` column stays NULL for every row; the `kind="user_prompt"` marker is still written so the timeline can display a prompt icon at the right timestamp, but no text body.
+- When `storePromptContent` is on, prompt text is captured at mode 0600 into the Traq SQLite database. It never leaves the machine, but anyone with read access to `traq.db` can read verbatim prompt history — the Settings UI makes this explicit before the toggle is flipped.
+- Source files stay in place; we store paths as references, never copies. Paths are kept internal to the Go layer and omitted from Wails bindings (`AISessionDetail.FilePath` has `json:"-"`).
 - Deleting Traq's DB purges all AI-derived data.
 - No network I/O anywhere in the AI pipeline.
 

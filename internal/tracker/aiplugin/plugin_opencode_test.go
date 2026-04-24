@@ -53,6 +53,7 @@ func buildOpencodeFixtureDB(t *testing.T) string {
 func TestOpenCodePluginReadsMessages(t *testing.T) {
 	dbPath := buildOpencodeFixtureDB(t)
 	p := NewOpenCodePlugin(dbPath)
+	p.SetStorePromptContent(true) // opt in for content assertions
 	if !p.Available() {
 		t.Fatal("plugin should be available with fixture DB")
 	}
@@ -86,6 +87,29 @@ func TestOpenCodePluginReadsMessages(t *testing.T) {
 	}
 	if events[1].Content != "second prompt" {
 		t.Errorf("events[1].Content=%q, want \"second prompt\"", events[1].Content)
+	}
+}
+
+func TestOpenCodePluginDropsPromptContentByDefault(t *testing.T) {
+	dbPath := buildOpencodeFixtureDB(t)
+	p := NewOpenCodePlugin(dbPath) // default-off
+	store := storage.NewInMemoryTestStore(t)
+	defer store.Close()
+
+	events, err := p.Poll(context.Background(), store)
+	if err != nil {
+		t.Fatalf("poll: %v", err)
+	}
+	if len(events) != 2 {
+		t.Fatalf("expected 2 user events, got %d", len(events))
+	}
+	for i, e := range events {
+		if e.Kind != "user_prompt" {
+			t.Errorf("event[%d].Kind=%q, want user_prompt", i, e.Kind)
+		}
+		if e.Content != "" {
+			t.Errorf("default-off plugin leaked prompt content: event[%d].Content=%q", i, e.Content)
+		}
 	}
 }
 

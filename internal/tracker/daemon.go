@@ -24,6 +24,10 @@ type DaemonConfig struct {
 	DataDir            string
 	MonitorMode        string // "active_window", "primary", "specific"
 	MonitorIndex       int    // Only used when MonitorMode is "specific"
+
+	// AIStorePromptContent opts into verbatim user-prompt storage in the
+	// AI coding data source. Default false. See AITrackingConfig.
+	AIStorePromptContent bool
 }
 
 // DefaultDaemonConfig returns a default configuration.
@@ -101,10 +105,11 @@ func NewDaemon(config *DaemonConfig, store *storage.Store, plat platform.Platfor
 	// home dir. If HOME isn't set, both plugins' Available() return false
 	// and ai.Poll() becomes a no-op.
 	home, _ := os.UserHomeDir()
-	ai := NewAITracker(store, []aiplugin.AIPlugin{
-		aiplugin.NewClaudePlugin(filepath.Join(home, ".claude", "projects")),
-		aiplugin.NewOpenCodePlugin(filepath.Join(home, ".local", "share", "opencode", "opencode.db")),
-	})
+	claudePlugin := aiplugin.NewClaudePlugin(filepath.Join(home, ".claude", "projects"))
+	claudePlugin.SetStorePromptContent(config.AIStorePromptContent)
+	opencodePlugin := aiplugin.NewOpenCodePlugin(filepath.Join(home, ".local", "share", "opencode", "opencode.db"))
+	opencodePlugin.SetStorePromptContent(config.AIStorePromptContent)
+	ai := NewAITracker(store, []aiplugin.AIPlugin{claudePlugin, opencodePlugin})
 
 	d := &Daemon{
 		config:            config,

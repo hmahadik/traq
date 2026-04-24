@@ -125,3 +125,51 @@ NOT_JSON_GARBAGE
 		t.Fatalf("expected 2 valid events (garbage skipped), got %d", len(events))
 	}
 }
+
+func TestClaudePluginDropsPromptContentByDefault(t *testing.T) {
+	root := filepath.Join("testdata", "claude")
+	p := NewClaudePlugin(root) // storePromptContent defaults to false
+	store := storage.NewInMemoryTestStore(t)
+	defer store.Close()
+
+	events, err := p.Poll(context.Background(), store)
+	if err != nil {
+		t.Fatalf("poll: %v", err)
+	}
+	var userPrompts int
+	for _, e := range events {
+		if e.Kind != "user_prompt" {
+			continue
+		}
+		userPrompts++
+		if e.Content != "" {
+			t.Errorf("default-off plugin leaked prompt content: %q", e.Content)
+		}
+	}
+	if userPrompts == 0 {
+		t.Fatal("fixture should include at least one user_prompt event")
+	}
+}
+
+func TestClaudePluginIncludesPromptContentWhenOptedIn(t *testing.T) {
+	root := filepath.Join("testdata", "claude")
+	p := NewClaudePlugin(root)
+	p.SetStorePromptContent(true)
+	store := storage.NewInMemoryTestStore(t)
+	defer store.Close()
+
+	events, err := p.Poll(context.Background(), store)
+	if err != nil {
+		t.Fatalf("poll: %v", err)
+	}
+	var gotAny bool
+	for _, e := range events {
+		if e.Kind == "user_prompt" && e.Content != "" {
+			gotAny = true
+			break
+		}
+	}
+	if !gotAny {
+		t.Fatal("opted-in plugin should populate at least one user_prompt.Content from the fixture")
+	}
+}

@@ -96,6 +96,7 @@ export interface AITrackingConfig {
   claudeEnabled: boolean;
   openCodeEnabled: boolean;
   idleGapSeconds: number;
+  storePromptContent?: boolean;
 }
 
 export interface ShellConfig {
