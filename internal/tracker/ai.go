@@ -2,6 +2,7 @@ package tracker
 
 import (
 	"context"
+	"log"
 	"time"
 
 	"traq/internal/storage"
@@ -30,10 +31,19 @@ func (t *AITracker) Poll() error {
 			continue
 		}
 		events, err := p.Poll(ctx, t.store)
-		if err != nil || len(events) == 0 {
+		if err != nil {
+			// Surface continuous plugin failures so they're debuggable. The
+			// previous form swallowed errors silently, which masked e.g. a
+			// malformed JSONL file that would never succeed on retry.
+			log.Printf("AITracker: plugin %T poll failed: %v", p, err)
 			continue
 		}
-		_ = t.persist(events)
+		if len(events) == 0 {
+			continue
+		}
+		if err := t.persist(events); err != nil {
+			log.Printf("AITracker: persist events from %T: %v", p, err)
+		}
 	}
 	return nil
 }

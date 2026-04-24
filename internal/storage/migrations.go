@@ -1066,6 +1066,9 @@ func (s *Store) applyMigration12() error {
 	return nil
 }
 
+// repairAIEventsTable re-adds ai_events columns introduced after migration 15
+// that may be missing if an earlier dev build stamped schema_version past a
+// migration without running its DDL. Covers migration 16 (content).
 func (s *Store) repairAIEventsTable() {
 	var tableCount int
 	err := s.db.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='ai_events'`).Scan(&tableCount)
@@ -1073,18 +1076,43 @@ func (s *Store) repairAIEventsTable() {
 		return
 	}
 	var colCount int
-	err = s.db.QueryRow(`SELECT COUNT(*) FROM pragma_table_info('ai_events') WHERE name = 'content'`).Scan(&colCount)
-	if err == nil && colCount == 0 {
-		s.db.Exec(`ALTER TABLE ai_events ADD COLUMN content TEXT`)
+	if err := s.db.QueryRow(
+		`SELECT COUNT(*) FROM pragma_table_info('ai_events') WHERE name = 'content'`,
+	).Scan(&colCount); err != nil {
+		log.Printf("repairAIEventsTable: check content column: %v", err)
+		return
+	}
+	if colCount > 0 {
+		return
+	}
+	if _, err := s.db.Exec(`ALTER TABLE ai_events ADD COLUMN content TEXT`); err != nil {
+		log.Printf("repairAIEventsTable: add content column: %v", err)
 	}
 }
 
 // applyMigration16 adds a content column to ai_events to store the text of
 // user prompts (and later opencode-side role-normalized user messages). The
 // column is nullable so existing rows remain valid.
+//
+// Guarded with pragma_table_info so it no-ops when the column already
+// exists. Required because (a) the top-level schema const creates
+// ai_events with content already, so fresh installs would otherwise fail
+// with "duplicate column name", and (b) repairAIEventsTable runs before
+// the version-gated path and may have added the column on upgrade DBs.
 func (s *Store) applyMigration16() error {
-	_, err := s.db.Exec(`ALTER TABLE ai_events ADD COLUMN content TEXT`)
-	return err
+	var count int
+	if err := s.db.QueryRow(
+		`SELECT COUNT(*) FROM pragma_table_info('ai_events') WHERE name = 'content'`,
+	).Scan(&count); err != nil {
+		return fmt.Errorf("check content column: %w", err)
+	}
+	if count > 0 {
+		return nil
+	}
+	if _, err := s.db.Exec(`ALTER TABLE ai_events ADD COLUMN content TEXT`); err != nil {
+		return fmt.Errorf("add content column: %w", err)
+	}
+	return nil
 }
 
 // applyMigration15 adds ai_sessions and ai_events tables for AI coding

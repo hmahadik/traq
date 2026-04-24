@@ -16,8 +16,11 @@ const DefaultAIIdleGapSeconds = 30 * 60
 // have a visible footprint in the timeline.
 const blockTailPadSeconds = 30
 
-// osStat is indirected so tests can substitute it.
-var osStat = os.Stat
+// statFn is the file-stat dependency used by block derivation to detect
+// live (recently-modified) sessions. Defaults to os.Stat; tests can override
+// via AIService.SetStatFn to make "is this session live" deterministic
+// without touching real files.
+type statFn func(string) (os.FileInfo, error)
 
 type AIBlockDisplay struct {
 	Tool        string `json:"tool"`
@@ -56,16 +59,33 @@ type AISessionDisplay struct {
 
 type AISessionDetail struct {
 	AISessionDisplay
-	FilePath string `json:"filePath"`
+	// FilePath holds the absolute path to the tool's session file on disk.
+	// Tagged "-" so it's omitted from the JSON payload the frontend sees —
+	// the renderer has no reason to know a user's home directory, and any
+	// future client-side file-open flow should go through an explicit
+	// binding that resolves the path server-side.
+	FilePath string `json:"-"`
 }
 
 type AIService struct {
 	store          *storage.Store
 	idleGapSeconds int
+	stat           statFn
 }
 
 func NewAIService(store *storage.Store) *AIService {
-	return &AIService{store: store, idleGapSeconds: DefaultAIIdleGapSeconds}
+	return &AIService{
+		store:          store,
+		idleGapSeconds: DefaultAIIdleGapSeconds,
+		stat:           os.Stat,
+	}
+}
+
+// SetStatFn overrides the file-stat function for tests.
+func (s *AIService) SetStatFn(fn statFn) {
+	if fn != nil {
+		s.stat = fn
+	}
 }
 
 func (s *AIService) SetIdleGapSeconds(n int) {
@@ -260,7 +280,7 @@ func (s *AIService) applyLiveFileRescue(blocks []AIBlockDisplay, sessionRows map
 		if !ok || row.FilePath == "" {
 			continue
 		}
-		info, err := osStat(row.FilePath)
+		info, err := s.stat(row.FilePath)
 		if err != nil {
 			continue
 		}

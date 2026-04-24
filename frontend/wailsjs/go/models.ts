@@ -264,12 +264,11 @@ export namespace service {
 	    startedAt: number;
 	    lastEventAt: number;
 	    eventCount: number;
-	    filePath: string;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new AISessionDetail(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
@@ -279,7 +278,6 @@ export namespace service {
 	        this.startedAt = source["startedAt"];
 	        this.lastEventAt = source["lastEventAt"];
 	        this.eventCount = source["eventCount"];
-	        this.filePath = source["filePath"];
 	    }
 	}
 	export class AISessionDisplay {
