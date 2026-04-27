@@ -28,6 +28,13 @@ type DaemonConfig struct {
 	// AIStorePromptContent opts into verbatim user-prompt storage in the
 	// AI coding data source. Default false. See AITrackingConfig.
 	AIStorePromptContent bool
+
+	// AI tracking master + per-tool enable flags. Defaults true so an empty
+	// DaemonConfig keeps the previous "always on" behavior; production
+	// callers populate these from AITrackingConfig.
+	AITrackingEnabled bool
+	AIClaudeEnabled   bool
+	AIOpenCodeEnabled bool
 }
 
 // DefaultDaemonConfig returns a default configuration.
@@ -41,6 +48,9 @@ func DefaultDaemonConfig(dataDir string) *DaemonConfig {
 		DataDir:            dataDir,
 		MonitorMode:        "active_window",
 		MonitorIndex:       0,
+		AITrackingEnabled:  true,
+		AIClaudeEnabled:    true,
+		AIOpenCodeEnabled:  true,
 	}
 }
 
@@ -110,6 +120,9 @@ func NewDaemon(config *DaemonConfig, store *storage.Store, plat platform.Platfor
 	opencodePlugin := aiplugin.NewOpenCodePlugin(filepath.Join(home, ".local", "share", "opencode", "opencode.db"))
 	opencodePlugin.SetStorePromptContent(config.AIStorePromptContent)
 	ai := NewAITracker(store, []aiplugin.AIPlugin{claudePlugin, opencodePlugin})
+	ai.SetEnabled(config.AITrackingEnabled)
+	ai.SetToolEnabled("claude", config.AIClaudeEnabled)
+	ai.SetToolEnabled("opencode", config.AIOpenCodeEnabled)
 
 	d := &Daemon{
 		config:            config,
@@ -539,6 +552,11 @@ func (d *Daemon) UpdateConfig(config *DaemonConfig) {
 	d.afk.SetTimeout(config.AFKTimeout)
 	if config.ResumeWindow > 0 {
 		d.session.SetResumeWindow(config.ResumeWindow)
+	}
+	if d.ai != nil {
+		d.ai.SetEnabled(config.AITrackingEnabled)
+		d.ai.SetToolEnabled("claude", config.AIClaudeEnabled)
+		d.ai.SetToolEnabled("opencode", config.AIOpenCodeEnabled)
 	}
 }
 

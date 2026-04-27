@@ -171,10 +171,10 @@ type DataSourcesConfig struct {
 
 // AITrackingConfig controls the Claude Code / opencode timeline lane.
 //
-// NOTE: Enabled / ClaudeEnabled / OpenCodeEnabled are not currently read by
-// the tracker — the plugins run unconditionally. Fix is tracked as a
-// follow-up; this PR only wires the new StorePromptContent flag since it
-// gates a privacy-sensitive behavior.
+// Enabled is the master toggle; ClaudeEnabled / OpenCodeEnabled gate the
+// individual plugins. All three are applied between poll ticks via
+// AITracker — flipping a toggle in Settings stops the corresponding
+// plugin's next poll without requiring an app restart.
 type AITrackingConfig struct {
 	Enabled         bool `json:"enabled"`
 	ClaudeEnabled   bool `json:"claudeEnabled"`
@@ -725,6 +725,15 @@ func (s *ConfigService) RestartDaemon() error {
 	}
 	if config.DataSources != nil && config.DataSources.AITracking != nil {
 		daemonConfig.AIStorePromptContent = config.DataSources.AITracking.StorePromptContent
+		daemonConfig.AITrackingEnabled = config.DataSources.AITracking.Enabled
+		daemonConfig.AIClaudeEnabled = config.DataSources.AITracking.ClaudeEnabled
+		daemonConfig.AIOpenCodeEnabled = config.DataSources.AITracking.OpenCodeEnabled
+	} else {
+		// Preserve "always on" behavior when the AI section is absent from
+		// an older config file rather than silently disabling tracking.
+		daemonConfig.AITrackingEnabled = true
+		daemonConfig.AIClaudeEnabled = true
+		daemonConfig.AIOpenCodeEnabled = true
 	}
 	s.daemon.UpdateConfig(daemonConfig)
 

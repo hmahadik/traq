@@ -1,6 +1,7 @@
 package tracker
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -56,5 +57,56 @@ func TestAITrackerPersistsClaudeEvents(t *testing.T) {
 	after, _ := store.GetAIEventsInRange(0, 1<<62)
 	if len(after) != 2 {
 		t.Fatalf("expected no duplicate ingest, got %d total events", len(after))
+	}
+}
+
+// stubPlugin records Poll calls; lets us assert which plugins ran without
+// touching the disk readers.
+type stubPlugin struct {
+	name   string
+	polled int
+}
+
+func (s *stubPlugin) Name() string { return s.name }
+func (s *stubPlugin) Available() bool { return true }
+func (s *stubPlugin) Poll(_ context.Context, _ *storage.Store) ([]aiplugin.AIEvent, error) {
+	s.polled++
+	return nil, nil
+}
+
+func TestAITrackerPollSkipsDisabledTool(t *testing.T) {
+	store := storage.NewInMemoryTestStore(t)
+	defer store.Close()
+
+	claude := &stubPlugin{name: "claude"}
+	opencode := &stubPlugin{name: "opencode"}
+	tr := NewAITracker(store, []aiplugin.AIPlugin{claude, opencode})
+	tr.SetToolEnabled("claude", false)
+
+	if err := tr.Poll(); err != nil {
+		t.Fatal(err)
+	}
+	if claude.polled != 0 {
+		t.Errorf("disabled claude polled %d times, want 0", claude.polled)
+	}
+	if opencode.polled != 1 {
+		t.Errorf("opencode polled %d times, want 1", opencode.polled)
+	}
+}
+
+func TestAITrackerPollNoOpWhenDisabled(t *testing.T) {
+	store := storage.NewInMemoryTestStore(t)
+	defer store.Close()
+
+	claude := &stubPlugin{name: "claude"}
+	opencode := &stubPlugin{name: "opencode"}
+	tr := NewAITracker(store, []aiplugin.AIPlugin{claude, opencode})
+	tr.SetEnabled(false)
+
+	if err := tr.Poll(); err != nil {
+		t.Fatal(err)
+	}
+	if claude.polled != 0 || opencode.polled != 0 {
+		t.Errorf("master-disabled tracker polled plugins: claude=%d opencode=%d", claude.polled, opencode.polled)
 	}
 }

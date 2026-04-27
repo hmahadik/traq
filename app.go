@@ -138,7 +138,11 @@ func (a *App) startup(ctx context.Context) {
 	daemonConfig := tracker.DefaultDaemonConfig(dataDir)
 	if cfg, err := a.Config.GetConfig(); err == nil && cfg != nil {
 		if cfg.DataSources != nil && cfg.DataSources.AITracking != nil {
-			daemonConfig.AIStorePromptContent = cfg.DataSources.AITracking.StorePromptContent
+			ai := cfg.DataSources.AITracking
+			daemonConfig.AIStorePromptContent = ai.StorePromptContent
+			daemonConfig.AITrackingEnabled = ai.Enabled
+			daemonConfig.AIClaudeEnabled = ai.ClaudeEnabled
+			daemonConfig.AIOpenCodeEnabled = ai.OpenCodeEnabled
 		}
 	}
 	a.daemon, err = tracker.NewDaemon(daemonConfig, a.store, a.platform)
