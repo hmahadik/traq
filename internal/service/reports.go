@@ -30,7 +30,6 @@ func NewReportsService(store *storage.Store, timeline *TimelineService, analytic
 	}
 }
 
-
 // buildEnhancedReportContext fetches all data needed for reports and aggregates it.
 func (s *ReportsService) buildEnhancedReportContext(tr *TimeRange) (*EnhancedReportContext, error) {
 	ctx := &EnhancedReportContext{
