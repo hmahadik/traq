@@ -88,6 +88,15 @@ export interface DataSourcesConfig {
   git: GitConfig;
   files: FilesConfig;
   browser: BrowserConfig;
+  aiTracking?: AITrackingConfig;
+}
+
+export interface AITrackingConfig {
+  enabled: boolean;
+  claudeEnabled: boolean;
+  openCodeEnabled: boolean;
+  idleGapSeconds: number;
+  storePromptContent?: boolean;
 }
 
 export interface ShellConfig {

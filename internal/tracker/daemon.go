@@ -11,6 +11,7 @@ import (
 	"github.com/getsentry/sentry-go"
 	"traq/internal/platform"
 	"traq/internal/storage"
+	"traq/internal/tracker/aiplugin"
 )
 
 // DaemonConfig holds configuration for the tracker daemon.
@@ -23,6 +24,17 @@ type DaemonConfig struct {
 	DataDir            string
 	MonitorMode        string // "active_window", "primary", "specific"
 	MonitorIndex       int    // Only used when MonitorMode is "specific"
+
+	// AIStorePromptContent opts into verbatim user-prompt storage in the
+	// AI coding data source. Default false. See AITrackingConfig.
+	AIStorePromptContent bool
+
+	// AI tracking master + per-tool enable flags. Defaults true so an empty
+	// DaemonConfig keeps the previous "always on" behavior; production
+	// callers populate these from AITrackingConfig.
+	AITrackingEnabled bool
+	AIClaudeEnabled   bool
+	AIOpenCodeEnabled bool
 }
 
 // DefaultDaemonConfig returns a default configuration.
@@ -36,6 +48,9 @@ func DefaultDaemonConfig(dataDir string) *DaemonConfig {
 		DataDir:            dataDir,
 		MonitorMode:        "active_window",
 		MonitorIndex:       0,
+		AITrackingEnabled:  true,
+		AIClaudeEnabled:    true,
+		AIOpenCodeEnabled:  true,
 	}
 }
 
@@ -59,6 +74,7 @@ type Daemon struct {
 	git     *GitTracker
 	files   *FileTracker
 	browser *BrowserTracker
+	ai      *AITracker
 
 	running         bool
 	paused          bool
@@ -95,6 +111,19 @@ func NewDaemon(config *DaemonConfig, store *storage.Store, plat platform.Platfor
 	// BrowserTracker for tracking browser history
 	browser := NewBrowserTracker(plat, store, config.DataDir)
 
+	// AITracker polls Claude Code and opencode session data from the user's
+	// home dir. If HOME isn't set, both plugins' Available() return false
+	// and ai.Poll() becomes a no-op.
+	home, _ := os.UserHomeDir()
+	claudePlugin := aiplugin.NewClaudePlugin(filepath.Join(home, ".claude", "projects"))
+	claudePlugin.SetStorePromptContent(config.AIStorePromptContent)
+	opencodePlugin := aiplugin.NewOpenCodePlugin(filepath.Join(home, ".local", "share", "opencode", "opencode.db"))
+	opencodePlugin.SetStorePromptContent(config.AIStorePromptContent)
+	ai := NewAITracker(store, []aiplugin.AIPlugin{claudePlugin, opencodePlugin})
+	ai.SetEnabled(config.AITrackingEnabled)
+	ai.SetToolEnabled("claude", config.AIClaudeEnabled)
+	ai.SetToolEnabled("opencode", config.AIOpenCodeEnabled)
+
 	d := &Daemon{
 		config:            config,
 		store:             store,
@@ -107,6 +136,7 @@ func NewDaemon(config *DaemonConfig, store *storage.Store, plat platform.Platfor
 		git:               git,
 		files:             files,
 		browser:           browser,
+		ai:                ai,
 		stopCh:            make(chan struct{}),
 		afkRestartMinutes: 10, // Default: restart after 10 min AFK with pending update
 	}
@@ -377,6 +407,12 @@ func (d *Daemon) tick() {
 
 	// Poll browser history for new visits
 	d.browser.Poll(session.ID)
+
+	// Poll AI plugins (Claude Code, opencode). Independent of the current
+	// Traq session — AI events have no session FK.
+	if d.ai != nil {
+		_ = d.ai.Poll()
+	}
 }
 
 // checkAutoUpdate checks if we should auto-restart to apply a pending update.
@@ -517,6 +553,24 @@ func (d *Daemon) UpdateConfig(config *DaemonConfig) {
 	if config.ResumeWindow > 0 {
 		d.session.SetResumeWindow(config.ResumeWindow)
 	}
+	if d.ai != nil {
+		d.ai.SetEnabled(config.AITrackingEnabled)
+		d.ai.SetToolEnabled("claude", config.AIClaudeEnabled)
+		d.ai.SetToolEnabled("opencode", config.AIOpenCodeEnabled)
+	}
+}
+
+// SetAITrackingFlags forwards the master + per-tool enable toggles to the
+// AITracker so a Settings change takes effect on the next poll tick.
+// storePromptContent is intentionally not exposed here — it requires an
+// app restart so the user has an explicit boundary for the privacy change.
+func (d *Daemon) SetAITrackingFlags(enabled, claude, opencode bool) {
+	if d.ai == nil {
+		return
+	}
+	d.ai.SetEnabled(enabled)
+	d.ai.SetToolEnabled("claude", claude)
+	d.ai.SetToolEnabled("opencode", opencode)
 }
 
 // SetUpdateCallbacks sets the callbacks for auto-update support.

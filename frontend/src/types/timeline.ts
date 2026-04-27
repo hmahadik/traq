@@ -14,6 +14,28 @@ export interface TimelineGridData {
   browserEvents: Record<number, BrowserEventDisplay[]>; // hour -> browser visits
   afkBlocks: Record<number, AFKBlock[]>; // hour -> AFK blocks
   activityStates: ActivityState[]; // unified activity lane states (active/break/afk)
+  aiEvents: Record<number, AIBlockDisplay[]>; // hour -> AI coding activity blocks
+  aiPrompts: AIPromptDisplay[]; // individual user prompts across the day
+}
+
+export interface AIBlockDisplay {
+  tool: string; // "claude" | "opencode"
+  sessionId: string;
+  projectDir: string;
+  projectName: string;
+  startTime: number; // Unix seconds
+  endTime: number; // Unix seconds (padded on backend)
+  eventCount: number;
+  isLive: boolean;
+}
+
+export interface AIPromptDisplay {
+  tool: string;
+  sessionId: string;
+  projectName: string;
+  projectDir: string;
+  timestamp: number; // Unix seconds
+  preview: string; // truncated prompt text — full body is intentionally not exposed in list responses
 }
 
 export interface DayStats {

@@ -1265,8 +1265,21 @@ export const updates = {
   },
 };
 
+// AI coding activity (Claude Code, opencode) - timestamp-only session data
+const ai = {
+  list: async (date: string) => {
+    await waitForReady();
+    return App.ListAISessions(date);
+  },
+  get: async (id: string) => {
+    await waitForReady();
+    return App.GetAISession(id);
+  },
+};
+
 // Unified API export
 export const api = {
+  ai,
   analytics,
   timeline,
   reports,

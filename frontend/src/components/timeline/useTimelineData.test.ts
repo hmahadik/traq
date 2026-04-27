@@ -28,6 +28,7 @@ const createMockGridData = (overrides: Partial<TimelineGridData> = {}): Timeline
   shellEvents: {},
   browserEvents: {},
   fileEvents: {},
+  aiEvents: {},
   ...overrides,
 });
 
@@ -38,7 +39,7 @@ const defaultFilters: TimelineFilters = {
   showShell: true,
   showBrowser: true,
   showFiles: true,
-  showAfk: true,
+  showAI: true,
 };
 
 describe('useTimelineData', () => {
@@ -150,7 +151,7 @@ describe('useTimelineData', () => {
       expect(result.current?.rows.find((r) => r.name === 'VS Code')).toBeDefined();
     });
 
-    it('does not process activities when showScreenshots is false', () => {
+    it('activity rows are shown regardless of showScreenshots filter', () => {
       const activity = createMockActivity();
 
       const { result } = renderHook(() =>
@@ -164,9 +165,8 @@ describe('useTimelineData', () => {
         })
       );
 
-      // Activity should not be added
       const chromeRow = result.current?.rows.find((r) => r.name === 'Chrome');
-      expect(chromeRow).toBeUndefined();
+      expect(chromeRow).toBeDefined();
     });
   });
 

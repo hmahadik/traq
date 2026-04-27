@@ -162,10 +162,36 @@ type AFKConfig struct {
 
 // DataSourcesConfig contains settings for data sources.
 type DataSourcesConfig struct {
-	Shell   *ShellConfig   `json:"shell"`
-	Git     *GitConfig     `json:"git"`
-	Files   *FilesConfig   `json:"files"`
-	Browser *BrowserConfig `json:"browser"`
+	Shell      *ShellConfig      `json:"shell"`
+	Git        *GitConfig        `json:"git"`
+	Files      *FilesConfig      `json:"files"`
+	Browser    *BrowserConfig    `json:"browser"`
+	AITracking *AITrackingConfig `json:"aiTracking"`
+}
+
+// AITrackingConfig controls the Claude Code / opencode timeline lane.
+//
+// Enabled is the master toggle; ClaudeEnabled / OpenCodeEnabled gate the
+// individual plugins. All three are applied between poll ticks via
+// AITracker — flipping a toggle in Settings stops the corresponding
+// plugin's next poll without requiring an app restart.
+type AITrackingConfig struct {
+	Enabled         bool `json:"enabled"`
+	ClaudeEnabled   bool `json:"claudeEnabled"`
+	OpenCodeEnabled bool `json:"openCodeEnabled"`
+	IdleGapSeconds  int  `json:"idleGapSeconds"`
+
+	// StorePromptContent opts into storing verbatim user-prompt text on
+	// ai_events rows. Default is false — the timeline shows user-prompt
+	// markers at their timestamps but the text stays out of the DB. When
+	// true, Claude JSONL prompts and opencode user messages are captured
+	// into ai_events.content, enabling prompt previews in the events list.
+	//
+	// Changes take effect on next app restart. This is intentional: a
+	// privacy-sensitive toggle should have an explicit boundary where the
+	// user knows the behavior changed, rather than silently rolling over
+	// on the next poll.
+	StorePromptContent bool `json:"storePromptContent"`
 }
 
 // ShellConfig contains shell history settings.
@@ -328,6 +354,29 @@ func (s *ConfigService) GetConfig() (*Config, error) {
 	if val, err := s.store.GetConfig("browser.historyLimitDays"); err == nil && val != "" {
 		if v, e := strconv.Atoi(val); e == nil {
 			config.DataSources.Browser.HistoryLimitDays = v
+		}
+	}
+
+	// AI tracking settings — overlay stored values on the defaults from
+	// getDefaultDataSourcesConfig so a missing key keeps the default rather
+	// than zeroing the field.
+	if config.DataSources.AITracking != nil {
+		if val, err := s.store.GetConfig("ai.tracking.enabled"); err == nil && val != "" {
+			config.DataSources.AITracking.Enabled = val == "true"
+		}
+		if val, err := s.store.GetConfig("ai.tracking.claudeEnabled"); err == nil && val != "" {
+			config.DataSources.AITracking.ClaudeEnabled = val == "true"
+		}
+		if val, err := s.store.GetConfig("ai.tracking.openCodeEnabled"); err == nil && val != "" {
+			config.DataSources.AITracking.OpenCodeEnabled = val == "true"
+		}
+		if val, err := s.store.GetConfig("ai.tracking.idleGapSeconds"); err == nil && val != "" {
+			if v, e := strconv.Atoi(val); e == nil {
+				config.DataSources.AITracking.IdleGapSeconds = v
+			}
+		}
+		if val, err := s.store.GetConfig("ai.tracking.storePromptContent"); err == nil && val != "" {
+			config.DataSources.AITracking.StorePromptContent = val == "true"
 		}
 	}
 
@@ -497,6 +546,22 @@ func (s *ConfigService) handleConfigSideEffect(key string, value interface{}) er
 			}
 			s.updateInference(config)
 		}
+	case "ai.tracking.enabled", "ai.tracking.claudeEnabled", "ai.tracking.openCodeEnabled":
+		// Hot-reload the AI tracking enable flags to the running daemon so
+		// the toggle takes effect on the next AITracker.Poll tick rather
+		// than waiting for an app restart. storePromptContent and
+		// idleGapSeconds are intentionally restart-only and excluded here.
+		if s.daemon == nil {
+			return nil
+		}
+		config, err := s.GetConfig()
+		if err != nil {
+			return fmt.Errorf("refresh ai tracking config: %w", err)
+		}
+		if config.DataSources != nil && config.DataSources.AITracking != nil {
+			ai := config.DataSources.AITracking
+			s.daemon.SetAITrackingFlags(ai.Enabled, ai.ClaudeEnabled, ai.OpenCodeEnabled)
+		}
 	case "shell.enabled":
 		if s.shellSetup == nil {
 			return nil
@@ -573,6 +638,12 @@ func mapToStorageKey(frontendKey string) string {
 		"dataSources.browser.browsers":         "browser.browsers",
 		"dataSources.browser.excludedDomains":  "browser.excludedDomains",
 		"dataSources.browser.historyLimitDays": "browser.historyLimitDays",
+
+		"dataSources.aiTracking.enabled":            "ai.tracking.enabled",
+		"dataSources.aiTracking.claudeEnabled":      "ai.tracking.claudeEnabled",
+		"dataSources.aiTracking.openCodeEnabled":    "ai.tracking.openCodeEnabled",
+		"dataSources.aiTracking.idleGapSeconds":     "ai.tracking.idleGapSeconds",
+		"dataSources.aiTracking.storePromptContent": "ai.tracking.storePromptContent",
 
 		// Inference settings
 		"inference.engine":         "inference.engine",
@@ -696,6 +767,18 @@ func (s *ConfigService) RestartDaemon() error {
 		DataDir:            s.platform.DataDir(),
 		MonitorMode:        config.Capture.MonitorMode,
 		MonitorIndex:       config.Capture.MonitorIndex,
+	}
+	if config.DataSources != nil && config.DataSources.AITracking != nil {
+		daemonConfig.AIStorePromptContent = config.DataSources.AITracking.StorePromptContent
+		daemonConfig.AITrackingEnabled = config.DataSources.AITracking.Enabled
+		daemonConfig.AIClaudeEnabled = config.DataSources.AITracking.ClaudeEnabled
+		daemonConfig.AIOpenCodeEnabled = config.DataSources.AITracking.OpenCodeEnabled
+	} else {
+		// Preserve "always on" behavior when the AI section is absent from
+		// an older config file rather than silently disabling tracking.
+		daemonConfig.AITrackingEnabled = true
+		daemonConfig.AIClaudeEnabled = true
+		daemonConfig.AIOpenCodeEnabled = true
 	}
 	s.daemon.UpdateConfig(daemonConfig)
 
@@ -839,6 +922,13 @@ func (s *ConfigService) getDefaultDataSourcesConfig() *DataSourcesConfig {
 			Enabled:          true,
 			Browsers:         []string{"chrome", "firefox"},
 			HistoryLimitDays: 7, // Default to 7 days of history
+		},
+		AITracking: &AITrackingConfig{
+			Enabled:            true,
+			ClaudeEnabled:      true,
+			OpenCodeEnabled:    true,
+			IdleGapSeconds:     1800,
+			StorePromptContent: false, // privacy-sensitive; opt-in only
 		},
 	}
 }

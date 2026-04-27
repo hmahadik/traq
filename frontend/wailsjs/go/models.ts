@@ -214,6 +214,32 @@ export namespace service {
 	        this.minSessionMinutes = source["minSessionMinutes"];
 	    }
 	}
+	export class AIBlockDisplay {
+	    tool: string;
+	    sessionId: string;
+	    projectDir: string;
+	    projectName: string;
+	    startTime: number;
+	    endTime: number;
+	    eventCount: number;
+	    isLive: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new AIBlockDisplay(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.tool = source["tool"];
+	        this.sessionId = source["sessionId"];
+	        this.projectDir = source["projectDir"];
+	        this.projectName = source["projectName"];
+	        this.startTime = source["startTime"];
+	        this.endTime = source["endTime"];
+	        this.eventCount = source["eventCount"];
+	        this.isLive = source["isLive"];
+	    }
+	}
 	export class AIConfig {
 	    summaryMode: string;
 	    summaryChunkMinutes: number;
@@ -228,6 +254,96 @@ export namespace service {
 	        this.summaryMode = source["summaryMode"];
 	        this.summaryChunkMinutes = source["summaryChunkMinutes"];
 	        this.assignmentMode = source["assignmentMode"];
+	    }
+	}
+	export class AIPromptDisplay {
+	    tool: string;
+	    sessionId: string;
+	    projectName: string;
+	    projectDir: string;
+	    timestamp: number;
+	    preview: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new AIPromptDisplay(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.tool = source["tool"];
+	        this.sessionId = source["sessionId"];
+	        this.projectName = source["projectName"];
+	        this.projectDir = source["projectDir"];
+	        this.timestamp = source["timestamp"];
+	        this.preview = source["preview"];
+	    }
+	}
+	export class AISessionDetail {
+	    id: string;
+	    tool: string;
+	    projectName: string;
+	    projectDir: string;
+	    startedAt: number;
+	    lastEventAt: number;
+	    eventCount: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new AISessionDetail(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.tool = source["tool"];
+	        this.projectName = source["projectName"];
+	        this.projectDir = source["projectDir"];
+	        this.startedAt = source["startedAt"];
+	        this.lastEventAt = source["lastEventAt"];
+	        this.eventCount = source["eventCount"];
+	    }
+	}
+	export class AISessionDisplay {
+	    id: string;
+	    tool: string;
+	    projectName: string;
+	    projectDir: string;
+	    startedAt: number;
+	    lastEventAt: number;
+	    eventCount: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new AISessionDisplay(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.tool = source["tool"];
+	        this.projectName = source["projectName"];
+	        this.projectDir = source["projectDir"];
+	        this.startedAt = source["startedAt"];
+	        this.lastEventAt = source["lastEventAt"];
+	        this.eventCount = source["eventCount"];
+	    }
+	}
+	export class AITrackingConfig {
+	    enabled: boolean;
+	    claudeEnabled: boolean;
+	    openCodeEnabled: boolean;
+	    idleGapSeconds: number;
+	    storePromptContent: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new AITrackingConfig(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.enabled = source["enabled"];
+	        this.claudeEnabled = source["claudeEnabled"];
+	        this.openCodeEnabled = source["openCodeEnabled"];
+	        this.idleGapSeconds = source["idleGapSeconds"];
+	        this.storePromptContent = source["storePromptContent"];
 	    }
 	}
 	export class ActivityBlock {
@@ -794,6 +910,7 @@ export namespace service {
 	    git?: GitConfig;
 	    files?: FilesConfig;
 	    browser?: BrowserConfig;
+	    aiTracking?: AITrackingConfig;
 	
 	    static createFrom(source: any = {}) {
 	        return new DataSourcesConfig(source);
@@ -805,6 +922,7 @@ export namespace service {
 	        this.git = this.convertValues(source["git"], GitConfig);
 	        this.files = this.convertValues(source["files"], FilesConfig);
 	        this.browser = this.convertValues(source["browser"], BrowserConfig);
+	        this.aiTracking = this.convertValues(source["aiTracking"], AITrackingConfig);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -2124,6 +2242,8 @@ export namespace service {
 	    browserEvents: Record<number, Array<BrowserEventDisplay>>;
 	    afkBlocks: Record<number, Array<AFKBlock>>;
 	    activityStates: ActivityState[];
+	    aiEvents: Record<number, Array<AIBlockDisplay>>;
+	    aiPrompts: AIPromptDisplay[];
 	
 	    static createFrom(source: any = {}) {
 	        return new TimelineGridData(source);
@@ -2143,6 +2263,8 @@ export namespace service {
 	        this.browserEvents = this.convertValues(source["browserEvents"], Array<BrowserEventDisplay>, true);
 	        this.afkBlocks = this.convertValues(source["afkBlocks"], Array<AFKBlock>, true);
 	        this.activityStates = this.convertValues(source["activityStates"], ActivityState);
+	        this.aiEvents = this.convertValues(source["aiEvents"], Array<AIBlockDisplay>, true);
+	        this.aiPrompts = this.convertValues(source["aiPrompts"], AIPromptDisplay);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

@@ -111,9 +111,9 @@ export function useTimelineData({
       allEvents.push(eventWithRow);
     };
 
-    // Process activity blocks (always shown)
+    // Process activity blocks (always shown — they're the base layer)
     // When collapseActivityRows is true, merge all into single "In Focus" row
-    if (filters.showScreenshots) {
+    {
       for (const [, hourApps] of Object.entries(data.hourlyGrid)) {
         for (const [appName, activities] of Object.entries(hourApps)) {
           for (const activity of activities) {
@@ -186,6 +186,30 @@ export function useTimelineData({
             endTimeMs: shellDur ? event.timestamp * 1000 + shellDur * 1000 : undefined,
             color: EVENT_TYPE_COLORS.shell,
             metadata: event,
+          };
+          addToRow(rowName, dot);
+        }
+      }
+    }
+
+    // Process AI coding events
+    if (filters.showAI && data.aiEvents) {
+      for (const [, hourBlocks] of Object.entries(data.aiEvents)) {
+        for (const block of hourBlocks) {
+          const rowName = 'AI Coding';
+          const durationSec = Math.max(0, block.endTime - block.startTime);
+          const cappedDur = capDuration(block.startTime, durationSec);
+          const dot: EventDot = {
+            id: `ai-${block.tool}-${block.sessionId}-${block.startTime}`,
+            originalId: block.startTime,
+            timestamp: new Date(block.startTime * 1000),
+            type: 'ai',
+            row: rowName,
+            label: `${block.tool}: ${block.projectName || block.projectDir} (${block.eventCount} events)`,
+            duration: cappedDur,
+            endTimeMs: cappedDur ? block.startTime * 1000 + cappedDur * 1000 : undefined,
+            color: EVENT_TYPE_COLORS.ai,
+            metadata: block,
           };
           addToRow(rowName, dot);
         }
@@ -287,7 +311,7 @@ export function useTimelineData({
     }
 
     // Process screenshots (if provided)
-    if (screenshots && screenshots.length > 0) {
+    if (filters.showScreenshots && screenshots && screenshots.length > 0) {
       for (const screenshot of screenshots) {
         const rowName = 'Screenshots';
         const dot: EventDot = {
@@ -394,7 +418,10 @@ export function useTimelineData({
         const appList = topApps.slice(0, 3).join(', ');
         const moreApps = topApps.length > 3 ? ` +${topApps.length - 3}` : '';
 
-        const sessDur = capDuration(session.startTime, session.durationSeconds);
+        const rawSessDur = session.durationSeconds ?? (session.isOngoing
+          ? Math.max(0, nowTimestamp - session.startTime)
+          : undefined);
+        const sessDur = capDuration(session.startTime, rawSessDur);
         const dot: EventDot = {
           id: makeEventKey('session', session.id),
           originalId: session.id,
@@ -452,7 +479,7 @@ export function useTimelineData({
         if (bFixed !== -1) return 1;
 
         // Special rows go at the bottom
-        const specialRows = ['Git', 'Shell', 'Browser', 'Files'];
+        const specialRows = ['Git', 'Shell', 'Browser', 'Files', 'AI Coding'];
         const aIsSpecial = specialRows.includes(a.name);
         const bIsSpecial = specialRows.includes(b.name);
 

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
-import { GitBranch, Terminal, FolderOpen, Globe, Camera, RotateCcw } from 'lucide-react';
+import { GitBranch, Terminal, FolderOpen, Globe, Camera, RotateCcw, Sparkles } from 'lucide-react';
 import {
   Tooltip,
   TooltipContent,
@@ -14,6 +14,7 @@ export interface TimelineFilters {
   showFiles: boolean;
   showBrowser: boolean;
   showScreenshots: boolean;
+  showAI: boolean;
 }
 
 interface FilterControlsProps {
@@ -27,6 +28,7 @@ const FILTER_CONFIG = [
   { key: 'showFiles' as const, icon: FolderOpen, label: 'Files' },
   { key: 'showBrowser' as const, icon: Globe, label: 'Browser' },
   { key: 'showScreenshots' as const, icon: Camera, label: 'Screenshots' },
+  { key: 'showAI' as const, icon: Sparkles, label: 'AI Coding' },
 ];
 
 export const FilterControls: React.FC<FilterControlsProps> = ({ filters, onFiltersChange }) => {
@@ -52,6 +54,7 @@ export const FilterControls: React.FC<FilterControlsProps> = ({ filters, onFilte
                   showFiles: true,
                   showBrowser: true,
                   showScreenshots: true,
+                  showAI: true,
                 })}
               >
                 <RotateCcw className="h-3.5 w-3.5" />

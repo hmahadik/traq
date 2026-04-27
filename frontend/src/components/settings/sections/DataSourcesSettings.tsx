@@ -287,6 +287,125 @@ export function DataSourcesSettings() {
           />
         </SettingsRow>
       </CollapsibleCard>
+
+      <CollapsibleCard
+        title="AI Coding"
+        enabled={config.dataSources.aiTracking?.enabled ?? false}
+        onToggle={(enabled) =>
+          updateConfig.mutate({
+            dataSources: {
+              ...config.dataSources,
+              aiTracking: {
+                ...(config.dataSources.aiTracking ?? {
+                  enabled: false,
+                  claudeEnabled: true,
+                  openCodeEnabled: true,
+                  idleGapSeconds: 1800,
+                }),
+                enabled,
+              },
+            },
+          })
+        }
+      >
+        <SettingsRow label="Track Claude Code" description="Poll ~/.claude/projects JSONL transcripts">
+          <Switch
+            checked={config.dataSources.aiTracking?.claudeEnabled ?? true}
+            onCheckedChange={(claudeEnabled) =>
+              updateConfig.mutate({
+                dataSources: {
+                  ...config.dataSources,
+                  aiTracking: {
+                    ...(config.dataSources.aiTracking ?? {
+                      enabled: true,
+                      claudeEnabled: true,
+                      openCodeEnabled: true,
+                      idleGapSeconds: 1800,
+                    }),
+                    claudeEnabled,
+                  },
+                },
+              })
+            }
+          />
+        </SettingsRow>
+
+        <SettingsRow label="Track opencode" description="Poll opencode's local SQLite database">
+          <Switch
+            checked={config.dataSources.aiTracking?.openCodeEnabled ?? true}
+            onCheckedChange={(openCodeEnabled) =>
+              updateConfig.mutate({
+                dataSources: {
+                  ...config.dataSources,
+                  aiTracking: {
+                    ...(config.dataSources.aiTracking ?? {
+                      enabled: true,
+                      claudeEnabled: true,
+                      openCodeEnabled: true,
+                      idleGapSeconds: 1800,
+                    }),
+                    openCodeEnabled,
+                  },
+                },
+              })
+            }
+          />
+        </SettingsRow>
+
+        <SettingsRow label="Idle Gap (seconds)" description="Split blocks when events are farther apart" vertical>
+          <Input
+            type="number"
+            min={60}
+            max={7200}
+            step={60}
+            value={config.dataSources.aiTracking?.idleGapSeconds ?? 1800}
+            onChange={(e) => {
+              const parsed = parseInt(e.target.value, 10);
+              if (Number.isNaN(parsed)) return;
+              updateConfig.mutate({
+                dataSources: {
+                  ...config.dataSources,
+                  aiTracking: {
+                    ...(config.dataSources.aiTracking ?? {
+                      enabled: true,
+                      claudeEnabled: true,
+                      openCodeEnabled: true,
+                      idleGapSeconds: 1800,
+                    }),
+                    idleGapSeconds: parsed,
+                  },
+                },
+              });
+            }}
+          />
+        </SettingsRow>
+
+        <SettingsRow
+          label="Store prompt text"
+          description="Off by default. When on, verbatim user prompts are saved locally and shown as previews in the events list. Prompts never leave your machine, but they do land in the Traq SQLite database at 0600 — flip this on only if you want the preview feature and accept plaintext storage. Takes effect on next app restart."
+          vertical
+        >
+          <Switch
+            checked={config.dataSources.aiTracking?.storePromptContent ?? false}
+            onCheckedChange={(storePromptContent) =>
+              updateConfig.mutate({
+                dataSources: {
+                  ...config.dataSources,
+                  aiTracking: {
+                    ...(config.dataSources.aiTracking ?? {
+                      enabled: true,
+                      claudeEnabled: true,
+                      openCodeEnabled: true,
+                      idleGapSeconds: 1800,
+                    }),
+                    storePromptContent,
+                  },
+                },
+              })
+            }
+          />
+        </SettingsRow>
+      </CollapsibleCard>
     </div>
   );
 }
