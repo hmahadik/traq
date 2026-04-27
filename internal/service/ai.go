@@ -33,14 +33,22 @@ type AIBlockDisplay struct {
 	IsLive      bool   `json:"isLive"`
 }
 
+// AIPromptDisplay is the per-prompt entry returned by GetAIPromptsForDay.
+//
+// Only the truncated Preview is exposed. The full untruncated prompt body
+// stays out of every list response: a typical day-view load would otherwise
+// serialize multi-kilobyte (occasionally multi-megabyte) bodies across the
+// Wails bridge unconditionally, and any frontend XSS sink would then have a
+// straight path to verbatim user input. When a UI surface needs the full
+// text (a per-prompt detail dialog, for example), add an explicit
+// per-session binding rather than re-adding the field here.
 type AIPromptDisplay struct {
 	Tool        string `json:"tool"`
 	SessionID   string `json:"sessionId"`
 	ProjectName string `json:"projectName"`
 	ProjectDir  string `json:"projectDir"`
 	Timestamp   int64  `json:"timestamp"`
-	Preview     string `json:"preview"` // truncated prompt text for list display
-	Content     string `json:"content"` // full prompt text (may be large)
+	Preview     string `json:"preview"`
 }
 
 // promptPreviewMaxChars caps the preview length. The full prompt is kept in
@@ -174,7 +182,6 @@ func (s *AIService) GetAIPromptsForDay(date string) ([]AIPromptDisplay, error) {
 			ProjectDir:  projectDir,
 			Timestamp:   e.Timestamp,
 			Preview:     truncatePrompt(e.Content, promptPreviewMaxChars),
-			Content:     e.Content,
 		})
 	}
 	return out, nil

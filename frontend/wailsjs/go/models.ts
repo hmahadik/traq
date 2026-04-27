@@ -256,6 +256,28 @@ export namespace service {
 	        this.assignmentMode = source["assignmentMode"];
 	    }
 	}
+	export class AIPromptDisplay {
+	    tool: string;
+	    sessionId: string;
+	    projectName: string;
+	    projectDir: string;
+	    timestamp: number;
+	    preview: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new AIPromptDisplay(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.tool = source["tool"];
+	        this.sessionId = source["sessionId"];
+	        this.projectName = source["projectName"];
+	        this.projectDir = source["projectDir"];
+	        this.timestamp = source["timestamp"];
+	        this.preview = source["preview"];
+	    }
+	}
 	export class AISessionDetail {
 	    id: string;
 	    tool: string;
@@ -264,11 +286,11 @@ export namespace service {
 	    startedAt: number;
 	    lastEventAt: number;
 	    eventCount: number;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new AISessionDetail(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
@@ -310,11 +332,11 @@ export namespace service {
 	    openCodeEnabled: boolean;
 	    idleGapSeconds: number;
 	    storePromptContent: boolean;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new AITrackingConfig(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.enabled = source["enabled"];
@@ -2221,6 +2243,7 @@ export namespace service {
 	    afkBlocks: Record<number, Array<AFKBlock>>;
 	    activityStates: ActivityState[];
 	    aiEvents: Record<number, Array<AIBlockDisplay>>;
+	    aiPrompts: AIPromptDisplay[];
 	
 	    static createFrom(source: any = {}) {
 	        return new TimelineGridData(source);
@@ -2241,6 +2264,7 @@ export namespace service {
 	        this.afkBlocks = this.convertValues(source["afkBlocks"], Array<AFKBlock>, true);
 	        this.activityStates = this.convertValues(source["activityStates"], ActivityState);
 	        this.aiEvents = this.convertValues(source["aiEvents"], Array<AIBlockDisplay>, true);
+	        this.aiPrompts = this.convertValues(source["aiPrompts"], AIPromptDisplay);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

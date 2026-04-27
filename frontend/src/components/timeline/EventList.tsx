@@ -259,7 +259,6 @@ function gridDataToEvents(data: TimelineGridData | undefined): EventDot[] {
           projectDir: p.projectDir,
           kind: 'prompt',
           preview: p.preview,
-          content: p.content,
         },
       });
     });

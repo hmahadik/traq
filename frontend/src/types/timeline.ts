@@ -35,8 +35,7 @@ export interface AIPromptDisplay {
   projectName: string;
   projectDir: string;
   timestamp: number; // Unix seconds
-  preview: string; // truncated prompt text for list display
-  content: string; // full prompt text (may be large)
+  preview: string; // truncated prompt text — full body is intentionally not exposed in list responses
 }
 
 export interface DayStats {

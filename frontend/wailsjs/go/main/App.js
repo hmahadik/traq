@@ -182,6 +182,10 @@ export function GenerateWeeklySummaryMarkdown(arg1, arg2) {
   return window['go']['main']['App']['GenerateWeeklySummaryMarkdown'](arg1, arg2);
 }
 
+export function GetAIPromptsForDay(arg1) {
+  return window['go']['main']['App']['GetAIPromptsForDay'](arg1);
+}
+
 export function GetAISession(arg1) {
   return window['go']['main']['App']['GetAISession'](arg1);
 }

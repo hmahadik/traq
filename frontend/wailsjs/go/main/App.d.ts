@@ -96,6 +96,8 @@ export function GenerateSummary(arg1:number):Promise<storage.Summary>;
 
 export function GenerateWeeklySummaryMarkdown(arg1:string,arg2:string):Promise<string>;
 
+export function GetAIPromptsForDay(arg1:string):Promise<Array<service.AIPromptDisplay>>;
+
 export function GetAISession(arg1:string):Promise<service.AISessionDetail>;
 
 export function GetActivityTags(arg1:string):Promise<Array<service.TagUsage>>;
