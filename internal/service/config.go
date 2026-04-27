@@ -357,6 +357,29 @@ func (s *ConfigService) GetConfig() (*Config, error) {
 		}
 	}
 
+	// AI tracking settings — overlay stored values on the defaults from
+	// getDefaultDataSourcesConfig so a missing key keeps the default rather
+	// than zeroing the field.
+	if config.DataSources.AITracking != nil {
+		if val, err := s.store.GetConfig("ai.tracking.enabled"); err == nil && val != "" {
+			config.DataSources.AITracking.Enabled = val == "true"
+		}
+		if val, err := s.store.GetConfig("ai.tracking.claudeEnabled"); err == nil && val != "" {
+			config.DataSources.AITracking.ClaudeEnabled = val == "true"
+		}
+		if val, err := s.store.GetConfig("ai.tracking.openCodeEnabled"); err == nil && val != "" {
+			config.DataSources.AITracking.OpenCodeEnabled = val == "true"
+		}
+		if val, err := s.store.GetConfig("ai.tracking.idleGapSeconds"); err == nil && val != "" {
+			if v, e := strconv.Atoi(val); e == nil {
+				config.DataSources.AITracking.IdleGapSeconds = v
+			}
+		}
+		if val, err := s.store.GetConfig("ai.tracking.storePromptContent"); err == nil && val != "" {
+			config.DataSources.AITracking.StorePromptContent = val == "true"
+		}
+	}
+
 	// Issues settings
 	config.Issues = &IssuesConfig{
 		CrashReportingEnabled: true, // Default: send crash reports to Sentry
@@ -523,6 +546,22 @@ func (s *ConfigService) handleConfigSideEffect(key string, value interface{}) er
 			}
 			s.updateInference(config)
 		}
+	case "ai.tracking.enabled", "ai.tracking.claudeEnabled", "ai.tracking.openCodeEnabled":
+		// Hot-reload the AI tracking enable flags to the running daemon so
+		// the toggle takes effect on the next AITracker.Poll tick rather
+		// than waiting for an app restart. storePromptContent and
+		// idleGapSeconds are intentionally restart-only and excluded here.
+		if s.daemon == nil {
+			return nil
+		}
+		config, err := s.GetConfig()
+		if err != nil {
+			return fmt.Errorf("refresh ai tracking config: %w", err)
+		}
+		if config.DataSources != nil && config.DataSources.AITracking != nil {
+			ai := config.DataSources.AITracking
+			s.daemon.SetAITrackingFlags(ai.Enabled, ai.ClaudeEnabled, ai.OpenCodeEnabled)
+		}
 	case "shell.enabled":
 		if s.shellSetup == nil {
 			return nil
@@ -599,6 +638,12 @@ func mapToStorageKey(frontendKey string) string {
 		"dataSources.browser.browsers":         "browser.browsers",
 		"dataSources.browser.excludedDomains":  "browser.excludedDomains",
 		"dataSources.browser.historyLimitDays": "browser.historyLimitDays",
+
+		"dataSources.aiTracking.enabled":            "ai.tracking.enabled",
+		"dataSources.aiTracking.claudeEnabled":      "ai.tracking.claudeEnabled",
+		"dataSources.aiTracking.openCodeEnabled":    "ai.tracking.openCodeEnabled",
+		"dataSources.aiTracking.idleGapSeconds":     "ai.tracking.idleGapSeconds",
+		"dataSources.aiTracking.storePromptContent": "ai.tracking.storePromptContent",
 
 		// Inference settings
 		"inference.engine":         "inference.engine",

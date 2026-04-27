@@ -560,6 +560,19 @@ func (d *Daemon) UpdateConfig(config *DaemonConfig) {
 	}
 }
 
+// SetAITrackingFlags forwards the master + per-tool enable toggles to the
+// AITracker so a Settings change takes effect on the next poll tick.
+// storePromptContent is intentionally not exposed here — it requires an
+// app restart so the user has an explicit boundary for the privacy change.
+func (d *Daemon) SetAITrackingFlags(enabled, claude, opencode bool) {
+	if d.ai == nil {
+		return
+	}
+	d.ai.SetEnabled(enabled)
+	d.ai.SetToolEnabled("claude", claude)
+	d.ai.SetToolEnabled("opencode", opencode)
+}
+
 // SetUpdateCallbacks sets the callbacks for auto-update support.
 // onReady is called to check if an update is pending (returns true if ready to apply).
 // onApply is called to apply the update and restart the app.
