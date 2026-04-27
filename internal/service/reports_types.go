@@ -1,4 +1,5 @@
-// Package service: shared types extracted from reports.go for navigability.
+// Shared types for the reports service, extracted from reports.go for navigability.
+
 package service
 
 import (
@@ -129,11 +130,13 @@ type CommitsByRepo struct {
 	Commits     []*storage.GitCommit `json:"commits"`
 }
 
+// HourlyActivityData represents activity for a single hour.
 type HourlyActivityData struct {
 	Hour    int
 	Minutes int64
 }
 
+// TimelineEvent represents a unified event for chronological display.
 type TimelineEvent struct {
 	Timestamp int64
 	Type      string // "git", "shell", "file", "browser"

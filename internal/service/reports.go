@@ -1186,7 +1186,6 @@ func (s *ReportsService) generateSummaryReportMarkdown(tr *TimeRange) (string, e
 	return s.formatWeeklySummaryMarkdown(data), nil
 }
 
-// HourlyActivityData represents activity for a single hour.
 // getHourlyActivity returns activity breakdown by hour.
 func (s *ReportsService) getHourlyActivity(start, end int64) []HourlyActivityData {
 	startTime := time.Unix(start, 0)
@@ -1357,7 +1356,6 @@ func formatMinutes(minutes int64) string {
 	return fmt.Sprintf("%dm", minutes)
 }
 
-// TimelineEvent represents a unified event for chronological display.
 // generateDetailedReport creates a detailed HTML report with all data.
 func (s *ReportsService) generateDetailedReport(tr *TimeRange, includeScreenshots bool) (string, error) {
 	var sb strings.Builder
@@ -1832,7 +1830,6 @@ func (s *ReportsService) GetReport(id int64) (*Report, error) {
 	return toServiceReport(storageReport), nil
 }
 
-// DailySummary represents a daily summary report for the list view.
 // GetReportHistory returns past generated reports.
 func (s *ReportsService) GetReportHistory() ([]*ReportMeta, error) {
 	reports, err := s.store.GetAllReports()
