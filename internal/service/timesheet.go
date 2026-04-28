@@ -363,10 +363,11 @@ func (s *TimesheetService) PopulateNotes(ctx context.Context, data *TimesheetDat
 	return nil
 }
 
-// buildAgentInput assembles an aiagent.Input for a single entry. Window-title
-// and per-session summary aggregation is left for a future enhancement; this
-// minimal version provides project + date + hours + git commit messages on
-// that day. The AI agent has enough to write a reasonable paragraph.
+// buildAgentInput assembles an aiagent.Input for a single entry. The bundle
+// is filtered to *this* project's signals: only commits assigned to this
+// project, and only the activities each session summary attributed to this
+// project. Without that filter every project's notes saw the whole day's
+// commits and bled features from project A into project B's prose.
 func (s *TimesheetService) buildAgentInput(e *TimesheetEntry) (aiagent.Input, error) {
 	in := aiagent.Input{
 		Project: e.TraqProject,
@@ -381,14 +382,34 @@ func (s *TimesheetService) buildAgentInput(e *TimesheetEntry) (aiagent.Input, er
 	}
 	start := day.Unix()
 	end := day.Add(24 * time.Hour).Unix()
+
+	// Resolve project ID by name. Used to filter commits whose ProjectID
+	// (set by auto-assign / rules / manual / AI) matches this row's project.
+	// Unknown project names (e.g. names the LLM canonicalized but that
+	// never made it into the projects table) get no project-id filter and
+	// fall back to including no commits — better silence than contamination.
+	var projectID int64
+	if projects, err := s.store.GetProjects(); err == nil {
+		for _, p := range projects {
+			if strings.EqualFold(p.Name, e.TraqProject) {
+				projectID = p.ID
+				break
+			}
+		}
+	}
+
 	commits, err := s.store.GetGitCommitsByTimeRange(start, end)
 	if err != nil {
 		return in, fmt.Errorf("fetch git commits: %w", err)
 	}
 	for _, c := range commits {
-		// We don't filter by repo→project here in v1 — the agent gets all
-		// the day's commits. Plan C / a follow-up can add repo→project filtering
-		// once the existing reports.go logic for that is exposed cleanly.
+		// Filter: include only commits attributed to this project. If we
+		// couldn't resolve the project ID at all, we skip every commit —
+		// the agent will then write notes from project + hours alone, which
+		// is less rich but at least won't be wrong.
+		if projectID == 0 || !c.ProjectID.Valid || c.ProjectID.Int64 != projectID {
+			continue
+		}
 		msg := c.MessageSubject
 		if msg == "" {
 			msg = c.Message
@@ -397,6 +418,31 @@ func (s *TimesheetService) buildAgentInput(e *TimesheetEntry) (aiagent.Input, er
 			in.GitCommits = append(in.GitCommits, msg)
 		}
 	}
+
+	// Pull per-project activities from session summaries that overlap this
+	// day. The session-level LLM has already decomposed each session by
+	// project; we collect just the entries it tagged with this project name
+	// (case-insensitive, since the LLM may use casing variants).
+	if sessions, err := s.store.GetSessionsByTimeRange(start, end); err == nil {
+		want := strings.ToLower(e.TraqProject)
+		for _, sess := range sessions {
+			summary, _ := s.store.GetSummaryBySession(sess.ID)
+			if summary == nil {
+				continue
+			}
+			for _, pb := range summary.Projects {
+				if strings.ToLower(pb.Name) != want {
+					continue
+				}
+				for _, act := range pb.Activities {
+					if act = strings.TrimSpace(act); act != "" {
+						in.AISummaries = append(in.AISummaries, act)
+					}
+				}
+			}
+		}
+	}
+
 	return in, nil
 }
 
