@@ -262,7 +262,7 @@ func (a *App) startup(ctx context.Context) {
 			if mode == "" || mode == "off" {
 				return
 			}
-			summary, err := a.Summary.GenerateSummary(sessionID)
+			summary, err := a.generateSummaryUsingConfiguredBackend(sessionID, cfg)
 			if err != nil {
 				log.Printf("auto-summary: session %d failed: %v", sessionID, err)
 				return
@@ -1089,20 +1089,76 @@ func (a *App) GenerateEnhancedWeeklyHTML(startDate, endDate string) (string, err
 // Summary Methods (exposed to frontend)
 // ============================================================================
 
-// GenerateSummary generates an AI summary for a session.
+// GenerateSummary generates an AI summary for a session, dispatching to
+// the inference engine or a CLI agent based on ai.summaryBackend config.
 func (a *App) GenerateSummary(sessionID int64) (*storage.Summary, error) {
 	if a.Summary == nil {
 		return nil, fmt.Errorf("summary service not initialized")
 	}
-	return a.Summary.GenerateSummary(sessionID)
+	cfg, _ := a.Config.GetConfig()
+	return a.generateSummaryUsingConfiguredBackend(sessionID, cfg)
 }
 
-// RegenerateSummary regenerates an AI summary for a session.
+// RegenerateSummary deletes any existing summary for the session and
+// regenerates via the configured backend.
 func (a *App) RegenerateSummary(sessionID int64) (*storage.Summary, error) {
 	if a.Summary == nil {
 		return nil, fmt.Errorf("summary service not initialized")
 	}
-	return a.Summary.RegenerateSummary(sessionID)
+	if existing, err := a.store.GetSummaryBySession(sessionID); err == nil && existing != nil {
+		_ = a.store.DeleteSummary(existing.ID)
+	}
+	cfg, _ := a.Config.GetConfig()
+	return a.generateSummaryUsingConfiguredBackend(sessionID, cfg)
+}
+
+// generateSummaryUsingConfiguredBackend reads ai.summaryBackend and either
+// runs the local inference engine (default) or routes through an aiagent
+// CLI subprocess. CLI failure when explicitly configured returns the error;
+// CLI unavailability under "auto" silently falls back to inference so the
+// pipeline keeps working when claude/opencode aren't installed.
+func (a *App) generateSummaryUsingConfiguredBackend(sessionID int64, cfg *service.Config) (*storage.Summary, error) {
+	if cfg == nil || cfg.AI == nil || cfg.AI.SummaryBackend == "" || cfg.AI.SummaryBackend == "inference" {
+		return a.Summary.GenerateSummary(sessionID)
+	}
+	gen, err := pickSummaryAgent(cfg.AI.SummaryBackend)
+	if err != nil {
+		// auto mode: fall back to inference rather than failing the user.
+		if cfg.AI.SummaryBackend == "auto" {
+			log.Printf("summary-backend: %v; falling back to inference", err)
+			return a.Summary.GenerateSummary(sessionID)
+		}
+		return nil, err
+	}
+	return a.Summary.GenerateSummaryWithAgent(sessionID, gen)
+}
+
+// pickSummaryAgent mirrors pickAIGenerator but is scoped to summary
+// generation. Kept as a separate function so the timesheet AI-notes path
+// (which has its own backend selection) doesn't bind to summary settings.
+func pickSummaryAgent(backend string) (aiagent.Generator, error) {
+	switch backend {
+	case "claude":
+		g := aiagent.NewClaudeGenerator()
+		if !g.Available() {
+			return nil, fmt.Errorf("claude CLI not on PATH")
+		}
+		return g, nil
+	case "opencode":
+		g := aiagent.NewOpenCodeGenerator()
+		if !g.Available() {
+			return nil, fmt.Errorf("opencode CLI not on PATH")
+		}
+		return g, nil
+	case "auto":
+		g := aiagent.NewAutoGenerator()
+		if !g.Available() {
+			return nil, fmt.Errorf("no AI agent CLI on PATH (install claude or opencode)")
+		}
+		return g, nil
+	default:
+		return nil, fmt.Errorf("unknown summary backend: %s", backend)
+	}
 }
 
 // DeleteSummary deletes an AI summary.

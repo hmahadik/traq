@@ -102,6 +102,18 @@ type AIConfig struct {
 	SummaryMode         string `json:"summaryMode"`         // "auto_accept", "drafts", "off"
 	SummaryChunkMinutes int    `json:"summaryChunkMinutes"` // 15, 30, 60
 	AssignmentMode      string `json:"assignmentMode"`      // "auto_accept", "drafts", "off"
+
+	// SummaryBackend selects which AI tool generates session summaries.
+	//   "inference" (default) — local llama-server / Ollama / cloud API per
+	//     existing inference engine config.
+	//   "claude"             — invoke the `claude` CLI subprocess (uses Claude
+	//     Code's own auth; no API key needed in app).
+	//   "opencode"           — invoke the `opencode` CLI subprocess.
+	//   "auto"               — pick the first installed CLI; falls back to
+	//     "inference" if none are on PATH.
+	// Falling back to inference when a configured CLI is unavailable keeps
+	// summary generation alive when the user's CLI install is broken.
+	SummaryBackend string `json:"summaryBackend"`
 }
 
 // TimesheetConfig contains FunctionFox timesheet settings. Plan B stores
@@ -482,6 +494,9 @@ func (s *ConfigService) GetConfig() (*Config, error) {
 	if val, err := s.store.GetConfig("ai.assignmentMode"); err == nil && val != "" {
 		config.AI.AssignmentMode = val
 	}
+	if val, err := s.store.GetConfig("ai.summaryBackend"); err == nil && val != "" {
+		config.AI.SummaryBackend = val
+	}
 
 	// Timesheet settings
 	if val, err := s.store.GetConfig("timesheet.hoursRounding"); err == nil && val != "" {
@@ -707,6 +722,7 @@ func mapToStorageKey(frontendKey string) string {
 		"ai.summaryMode":         "ai.summaryMode",
 		"ai.summaryChunkMinutes": "ai.summaryChunkMinutes",
 		"ai.assignmentMode":      "ai.assignmentMode",
+		"ai.summaryBackend":      "ai.summaryBackend",
 
 		// Timesheet settings
 		"timesheet.hoursRounding":  "timesheet.hoursRounding",
@@ -1026,9 +1042,10 @@ func (s *ConfigService) getDefaultTimelineConfig() *TimelineConfig {
 
 func (s *ConfigService) getDefaultAIConfig() *AIConfig {
 	return &AIConfig{
-		SummaryMode:         "drafts", // Default: require approval for AI summaries
-		SummaryChunkMinutes: 15,       // Default: summarize in 15-minute chunks
-		AssignmentMode:      "drafts", // Default: require approval for project assignments
+		SummaryMode:         "drafts",     // Default: require approval for AI summaries
+		SummaryChunkMinutes: 15,           // Default: summarize in 15-minute chunks
+		AssignmentMode:      "drafts",     // Default: require approval for project assignments
+		SummaryBackend:      "inference",  // Default: local inference engine; "claude"/"opencode"/"auto" route through aiagent CLI
 	}
 }
 
