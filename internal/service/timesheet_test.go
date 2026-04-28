@@ -484,7 +484,7 @@ func TestPopulateNotes_PopulatesEntries(t *testing.T) {
 	}
 }
 
-func TestPopulateNotes_SkipsSkippedEntries(t *testing.T) {
+func TestPopulateNotes_SkipsOnlyUnattributedEntries(t *testing.T) {
 	store := storage.NewInMemoryTestStore(t)
 	defer store.Close()
 	rs := helperReportsServiceForTest(t, store)
@@ -493,21 +493,31 @@ func TestPopulateNotes_SkipsSkippedEntries(t *testing.T) {
 	agent := &fakeAgent{name: "fake", avail: true, output: "ok"}
 	data := &TimesheetData{
 		Entries: []TimesheetEntry{
-			{Date: "2026-04-25", TraqProject: "traq", Hours: 1.0, Skipped: true, SkipReason: "unmapped"},
-			{Date: "2026-04-25", TraqProject: "other", Hours: 2.0},
+			// Mapped, will-be-pushed: gets notes.
+			{Date: "2026-04-25", TraqProject: "traq", Hours: 1.0},
+			// Unmapped: still gets notes — the user wants to see what they
+			// did so they can decide whether to set up an FF mapping.
+			{Date: "2026-04-25", TraqProject: "other", Hours: 2.0, Skipped: true, SkipReason: "unmapped"},
+			// User-toggled-off: still gets notes — informs whether to re-enable.
+			{Date: "2026-04-25", TraqProject: "third", Hours: 0.5, Skipped: true, SkipReason: "user-skipped"},
+			// Unattributed synthetic bucket: no real signal, skip notes.
+			{Date: "2026-04-25", TraqProject: UnattributedProject, Hours: 0.25, Skipped: true, SkipReason: "unattributed"},
 		},
 	}
 	if err := ts.PopulateNotes(context.Background(), data, NewAgentNotesBackend(agent)); err != nil {
 		t.Fatalf("PopulateNotes: %v", err)
 	}
-	if data.Entries[0].Notes != "" {
-		t.Errorf("skipped entry got Notes %q, want empty", data.Entries[0].Notes)
+	for i := 0; i < 3; i++ {
+		if data.Entries[i].Notes != "ok" {
+			t.Errorf("entry[%d] (project=%s reason=%q) got Notes %q, want %q",
+				i, data.Entries[i].TraqProject, data.Entries[i].SkipReason, data.Entries[i].Notes, "ok")
+		}
 	}
-	if data.Entries[1].Notes != "ok" {
-		t.Errorf("non-skipped entry got Notes %q, want ok", data.Entries[1].Notes)
+	if data.Entries[3].Notes != "" {
+		t.Errorf("Unattributed entry got Notes %q, want empty", data.Entries[3].Notes)
 	}
-	if agent.callCount != 1 {
-		t.Errorf("expected 1 generator call (skipped row excluded), got %d", agent.callCount)
+	if agent.callCount != 3 {
+		t.Errorf("expected 3 generator calls (Unattributed only excluded), got %d", agent.callCount)
 	}
 }
 

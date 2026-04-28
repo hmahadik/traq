@@ -319,7 +319,13 @@ func (s *TimesheetService) PopulateNotes(ctx context.Context, data *TimesheetDat
 	log.Printf("[notes] PopulateNotes start backend=%s entries=%d", backend.Name(), len(data.Entries))
 	for i := range data.Entries {
 		e := &data.Entries[i]
-		if e.Skipped {
+		// Only skip the synthetic Unattributed bucket — there's no real
+		// project signal to summarize. Rows that are Skipped because they
+		// lack an FF mapping or were toggled off by the user *should* still
+		// get notes: in preview-only mode the user wants to see the AI's
+		// take regardless of push eligibility, and for mapped-but-disabled
+		// rows the notes inform whether they should re-enable the mapping.
+		if e.SkipReason == "unattributed" {
 			continue
 		}
 		in, err := s.buildAgentInput(e)
