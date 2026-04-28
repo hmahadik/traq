@@ -233,6 +233,32 @@ func (a *App) startup(ctx context.Context) {
 	// Initialize draft service (for AI draft approval workflow)
 	a.Draft = service.NewDraftService(a.store)
 
+	// Wire up auto-summary generation when sessions close. Without this, the
+	// summary pipeline only fires on manual user action, so most sessions
+	// never get an AI summary or its structured project allocations.
+	if a.daemon != nil {
+		a.daemon.SetOnSessionEnded(func(sessionID int64) {
+			cfg, err := a.Config.GetConfig()
+			if err != nil || cfg == nil || cfg.AI == nil {
+				return
+			}
+			mode := cfg.AI.SummaryMode
+			if mode == "" || mode == "off" {
+				return
+			}
+			summary, err := a.Summary.GenerateSummary(sessionID)
+			if err != nil {
+				log.Printf("auto-summary: session %d failed: %v", sessionID, err)
+				return
+			}
+			if mode == "drafts" && summary != nil {
+				if err := a.store.UpdateSummaryDraftStatus(summary.ID, true, "pending"); err != nil {
+					log.Printf("auto-summary: mark draft for session %d failed: %v", sessionID, err)
+				}
+			}
+		})
+	}
+
 	// Initialize shell setup service (plugin install/uninstall/status)
 	a.ShellSetup = service.NewShellSetupService(dataDir)
 	a.Config.SetShellSetup(a.ShellSetup)
