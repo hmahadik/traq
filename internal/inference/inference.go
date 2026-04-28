@@ -218,17 +218,70 @@ type SessionContext struct {
 	ScreenshotCount int
 	TopApps         []string
 	FocusEvents     []FocusEvent
-	ShellCommands   []string
-	GitCommits      []string
-	FileEvents      []string
-	BrowserVisits   []string
+	ShellCommands   []ShellEvent
+	GitCommits      []GitEvent
+	FileEvents      []FileEvent
+	BrowserVisits   []BrowserEvent
+	AIEvents        []AIEvent
 }
 
-// FocusEvent represents a window focus event
+// FocusEvent represents a window focus event. Timestamp + ProjectName
+// are populated to support chronological prompts and to surface existing
+// project assignments to the LLM.
 type FocusEvent struct {
 	AppName     string
 	WindowTitle string
 	Duration    float64
+	StartTime   int64
+	ProjectName string // empty when unassigned
+}
+
+// ShellEvent is a shell command observation. WorkingDirectory is the
+// strongest project signal for terminal sessions and was previously
+// dropped before the prompt; surfacing it lets the model attribute
+// terminal time without re-deriving from window titles.
+type ShellEvent struct {
+	Timestamp        int64
+	Command          string
+	WorkingDirectory string
+}
+
+// GitEvent surfaces the repo name + branch so the LLM can tell which
+// project a commit belongs to, not just the subject line.
+type GitEvent struct {
+	Timestamp int64
+	Subject   string
+	Repo      string
+	Branch    string
+}
+
+// FileEvent is a file-system change event with timestamp preserved.
+type FileEvent struct {
+	Timestamp int64
+	EventType string // "created", "modified", "deleted", "renamed"
+	FileName  string
+	Directory string
+}
+
+// BrowserEvent carries title + domain (URL kept available for context).
+type BrowserEvent struct {
+	Timestamp int64
+	Title     string
+	Domain    string
+	URL       string
+}
+
+// AIEvent is one entry from a Claude Code or opencode coding session
+// that overlaps this work session. ProjectDir is what the AI tool was
+// pointed at; Content is the user's prompt text (empty for assistant
+// turns / tool uses to avoid blowing the prompt budget on model output
+// that's already redundant with the other event streams).
+type AIEvent struct {
+	Timestamp  int64
+	Tool       string // "claude" | "opencode"
+	Kind       string // "user_prompt" | "assistant_turn" | "tool_use" | "message"
+	ProjectDir string
+	Content    string
 }
 
 // BuildSummaryPrompt is the exported form of the session-summary prompt
@@ -262,18 +315,27 @@ func buildPrompt(ctx *SessionContext) string {
 	sb.WriteString(fmt.Sprintf("Screenshots: %d\n\n", ctx.ScreenshotCount))
 
 	// === GROUP FOCUS EVENTS BY APP ===
+	// Aggregate per-app totals + top windows + the project the events were
+	// already attributed to (when known) so the LLM sees deterministic
+	// allocation alongside the raw window titles.
 	if len(ctx.FocusEvents) > 0 {
 		sb.WriteString("=== APPLICATION ACTIVITY ===\n")
 
 		// Group by app
 		appWindows := make(map[string][]FocusEvent)
 		appDurations := make(map[string]float64)
+		appProjects := make(map[string]map[string]float64) // app -> project -> seconds
 		for _, evt := range ctx.FocusEvents {
 			appWindows[evt.AppName] = append(appWindows[evt.AppName], evt)
 			appDurations[evt.AppName] += evt.Duration
+			if evt.ProjectName != "" {
+				if appProjects[evt.AppName] == nil {
+					appProjects[evt.AppName] = make(map[string]float64)
+				}
+				appProjects[evt.AppName][evt.ProjectName] += evt.Duration
+			}
 		}
 
-		// Sort apps by duration (use slice for ordering)
 		type appDur struct {
 			name string
 			dur  float64
@@ -286,22 +348,36 @@ func buildPrompt(ctx *SessionContext) string {
 			return sortedApps[i].dur > sortedApps[j].dur
 		})
 
-		// Output each app with its windows
 		for _, ad := range sortedApps {
 			appMins := int(ad.dur / 60)
 			if appMins < 1 {
 				continue
 			}
-
 			sb.WriteString(fmt.Sprintf("\n%s (%dm):\n", ad.name, appMins))
+
+			// Show pre-attributed projects under this app, if any.
+			if projs := appProjects[ad.name]; len(projs) > 0 {
+				type pd struct {
+					name string
+					sec  float64
+				}
+				var ps []pd
+				for n, s := range projs {
+					ps = append(ps, pd{n, s})
+				}
+				sort.Slice(ps, func(i, j int) bool { return ps[i].sec > ps[j].sec })
+				var parts []string
+				for _, p := range ps {
+					parts = append(parts, fmt.Sprintf("%s=%dm", p.name, int(p.sec/60)))
+				}
+				sb.WriteString(fmt.Sprintf("  pre-attributed: %s\n", strings.Join(parts, ", ")))
+			}
 
 			// Aggregate windows for this app
 			windowDurations := make(map[string]float64)
 			for _, evt := range appWindows[ad.name] {
 				windowDurations[evt.WindowTitle] += evt.Duration
 			}
-
-			// Sort windows by duration
 			type winDur struct {
 				title string
 				dur   float64
@@ -313,8 +389,6 @@ func buildPrompt(ctx *SessionContext) string {
 			sort.Slice(sortedWindows, func(i, j int) bool {
 				return sortedWindows[i].dur > sortedWindows[j].dur
 			})
-
-			// Show top 5 windows per app
 			for i, wd := range sortedWindows {
 				if i >= 5 {
 					if len(sortedWindows) > 5 {
@@ -353,38 +427,90 @@ func buildPrompt(ctx *SessionContext) string {
 		sb.WriteString("\n")
 	}
 
-	// === GIT COMMITS (ALL) ===
-	if len(ctx.GitCommits) > 0 {
-		sb.WriteString("=== GIT COMMITS ===\n")
-		for _, commit := range ctx.GitCommits {
-			sb.WriteString(fmt.Sprintf("- %s\n", commit))
-		}
-		sb.WriteString("\n")
+	// === CHRONOLOGICAL EVENT LOG ===
+	// Interleaves shell + git + file + browser + AI-coding events ordered by
+	// timestamp, formatted with offsets from session start. Preserving order
+	// gives the LLM enough context to write a *narrative* summary ("started
+	// in the traq repo, then jumped to the acme branch...") rather than just
+	// listing aggregate stats. Focus events are NOT included — they would
+	// dominate the log; the aggregate APPLICATION ACTIVITY section above
+	// covers them.
+	type logEntry struct {
+		ts   int64
+		line string
 	}
-
-	// === SHELL COMMANDS (ALL) ===
-	if len(ctx.ShellCommands) > 0 {
-		sb.WriteString("=== SHELL COMMANDS ===\n")
-		for _, cmd := range ctx.ShellCommands {
-			sb.WriteString(fmt.Sprintf("- %s\n", cmd))
+	var entries []logEntry
+	for _, sh := range ctx.ShellCommands {
+		line := fmt.Sprintf("shell cmd=%q", sh.Command)
+		if sh.WorkingDirectory != "" {
+			line += fmt.Sprintf(" cwd=%s", sh.WorkingDirectory)
 		}
-		sb.WriteString("\n")
+		entries = append(entries, logEntry{sh.Timestamp, line})
 	}
-
-	// === FILE ACTIVITY (ALL) ===
-	if len(ctx.FileEvents) > 0 {
-		sb.WriteString("=== FILE ACTIVITY ===\n")
-		for _, evt := range ctx.FileEvents {
-			sb.WriteString(fmt.Sprintf("- %s\n", evt))
+	for _, gc := range ctx.GitCommits {
+		line := fmt.Sprintf("git commit subject=%q", gc.Subject)
+		if gc.Repo != "" {
+			line += fmt.Sprintf(" repo=%s", gc.Repo)
 		}
-		sb.WriteString("\n")
+		if gc.Branch != "" {
+			line += fmt.Sprintf(" branch=%s", gc.Branch)
+		}
+		entries = append(entries, logEntry{gc.Timestamp, line})
 	}
-
-	// === BROWSER DOMAINS ===
-	if len(ctx.BrowserVisits) > 0 {
-		sb.WriteString("=== BROWSER ACTIVITY ===\n")
-		for _, visit := range ctx.BrowserVisits {
-			sb.WriteString(fmt.Sprintf("- %s\n", visit))
+	for _, fe := range ctx.FileEvents {
+		line := fmt.Sprintf("file %s name=%s", fe.EventType, fe.FileName)
+		if fe.Directory != "" {
+			line += fmt.Sprintf(" dir=%s", fe.Directory)
+		}
+		entries = append(entries, logEntry{fe.Timestamp, line})
+	}
+	for _, bv := range ctx.BrowserVisits {
+		title := bv.Title
+		if title == "" {
+			title = bv.Domain
+		}
+		line := fmt.Sprintf("browser domain=%s title=%q", bv.Domain, title)
+		entries = append(entries, logEntry{bv.Timestamp, line})
+	}
+	for _, ae := range ctx.AIEvents {
+		// Skip noisy assistant turns / tool uses with no content; those
+		// events don't carry signal beyond what shell/file/git already give.
+		if ae.Kind != "user_prompt" && ae.Content == "" {
+			continue
+		}
+		preview := ae.Content
+		const maxAILen = 200
+		if len(preview) > maxAILen {
+			preview = preview[:maxAILen] + "..."
+		}
+		line := fmt.Sprintf("ai tool=%s kind=%s", ae.Tool, ae.Kind)
+		if ae.ProjectDir != "" {
+			line += fmt.Sprintf(" projectDir=%s", ae.ProjectDir)
+		}
+		if preview != "" {
+			line += fmt.Sprintf(" prompt=%q", preview)
+		}
+		entries = append(entries, logEntry{ae.Timestamp, line})
+	}
+	if len(entries) > 0 {
+		sort.Slice(entries, func(i, j int) bool { return entries[i].ts < entries[j].ts })
+		sb.WriteString("=== EVENT LOG (chronological, offsets from session start) ===\n")
+		const maxLogEntries = 200
+		shown := entries
+		if len(shown) > maxLogEntries {
+			shown = shown[:maxLogEntries]
+		}
+		for _, e := range shown {
+			off := e.ts - ctx.StartTime
+			if off < 0 {
+				off = 0
+			}
+			mm := off / 60
+			ss := off % 60
+			sb.WriteString(fmt.Sprintf("[+%02d:%02d] %s\n", mm, ss, e.line))
+		}
+		if len(entries) > maxLogEntries {
+			sb.WriteString(fmt.Sprintf("... %d more events truncated\n", len(entries)-maxLogEntries))
 		}
 		sb.WriteString("\n")
 	}
