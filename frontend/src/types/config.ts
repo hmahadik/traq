@@ -30,6 +30,7 @@ export interface AIConfig {
   summaryMode: 'auto_accept' | 'drafts' | 'off';
   summaryChunkMinutes: number;
   assignmentMode: 'auto_accept' | 'drafts' | 'off';
+  summaryBackend?: 'inference' | 'claude' | 'opencode' | 'auto';
 }
 
 export interface TimelineConfig {
