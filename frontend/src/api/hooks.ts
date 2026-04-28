@@ -1793,6 +1793,48 @@ export function useDismissShellOverflow() {
 }
 
 // ============================================================================
+// Tmux Integration Hooks
+// ============================================================================
+
+export function useTmuxSetupStatus() {
+  return useQuery({
+    queryKey: ['tmuxSetup'] as const,
+    queryFn: () => api.tmuxSetup.status(),
+    refetchInterval: 5000,
+  });
+}
+
+export function useInstallTmuxIntegration() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.tmuxSetup.install(),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['tmuxSetup'] });
+      toast.success('Tmux integration installed');
+    },
+    onError: (error: unknown) => {
+      const m = error instanceof Error ? error.message : String(error);
+      toast.error(`Failed to install tmux integration: ${m}`);
+    },
+  });
+}
+
+export function useUninstallTmuxIntegration() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.tmuxSetup.uninstall(),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['tmuxSetup'] });
+      toast.success('Tmux integration removed');
+    },
+    onError: (error: unknown) => {
+      const m = error instanceof Error ? error.message : String(error);
+      toast.error(`Failed to remove tmux integration: ${m}`);
+    },
+  });
+}
+
+// ============================================================================
 // AI coding sessions (Claude Code, opencode)
 // ============================================================================
 

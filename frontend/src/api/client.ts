@@ -1230,6 +1230,17 @@ export const shellSetup = {
 };
 
 /**
+ * Tmux integration setup API — separate from shellSetup because tmux is
+ * its own configurable layer (its config file, lifecycle, and detection
+ * are independent of any specific shell).
+ */
+export const tmuxSetup = {
+  status: () => App.GetTmuxSetupStatus(),
+  install: () => App.InstallTmuxIntegration(),
+  uninstall: () => App.UninstallTmuxIntegration(),
+};
+
+/**
  * Search API
  */
 const search = {
@@ -1359,6 +1370,7 @@ export const api = {
   projects,
   search,
   shellSetup,
+  tmuxSetup,
   updates,
   timesheet,
   projectMappings,

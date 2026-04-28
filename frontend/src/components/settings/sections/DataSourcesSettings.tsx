@@ -14,6 +14,7 @@ import { GitRepositoriesSection } from '../GitRepositoriesSection';
 import { FileWatchDirectoriesSection } from '../FileWatchDirectoriesSection';
 import { FileExtensionFilterSection } from '../FileExtensionFilterSection';
 import { ShellIntegrationStrip } from '../ShellIntegrationStrip';
+import { TmuxIntegrationStrip } from '../TmuxIntegrationStrip';
 
 interface CollapsibleCardProps {
   title: string;
@@ -75,13 +76,16 @@ export function DataSourcesSettings() {
           })
         }
         alwaysVisible={
-          <ShellIntegrationStrip
-            shell={
-              config.dataSources.shell.shellType === 'auto' || !config.dataSources.shell.shellType
-                ? 'bash'
-                : config.dataSources.shell.shellType
-            }
-          />
+          <div className="space-y-2">
+            <ShellIntegrationStrip
+              shell={
+                config.dataSources.shell.shellType === 'auto' || !config.dataSources.shell.shellType
+                  ? 'bash'
+                  : config.dataSources.shell.shellType
+              }
+            />
+            <TmuxIntegrationStrip />
+          </div>
         }
       >
         <SettingsRow label="Shell Type" vertical>
