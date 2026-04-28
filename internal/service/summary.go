@@ -202,15 +202,31 @@ func (s *SummaryService) buildSessionContext(session *storage.Session) (*inferen
 		ctx.DurationSeconds = ctx.EndTime - ctx.StartTime
 	}
 
+	// Pre-load project names so we can annotate focus events that already
+	// have a ProjectID assigned by the auto-assign / rules / AI / manual
+	// pipeline. Lets the LLM see "this 30-min block was already attributed
+	// to Acme" instead of guessing from the window title.
+	projects, _ := s.store.GetProjects()
+	projectNameByID := make(map[int64]string, len(projects))
+	for _, p := range projects {
+		projectNameByID[p.ID] = p.Name
+	}
+
 	// Get focus events
 	focusEvents, _ := s.store.GetWindowFocusEventsBySession(session.ID)
 	appDurations := make(map[string]float64)
 	for _, evt := range focusEvents {
 		appDurations[evt.AppName] += evt.DurationSeconds
+		var projName string
+		if evt.ProjectID.Valid {
+			projName = projectNameByID[evt.ProjectID.Int64]
+		}
 		ctx.FocusEvents = append(ctx.FocusEvents, inference.FocusEvent{
 			AppName:     evt.AppName,
 			WindowTitle: evt.WindowTitle,
 			Duration:    evt.DurationSeconds,
+			StartTime:   evt.StartTime,
+			ProjectName: projName,
 		})
 	}
 
@@ -233,32 +249,88 @@ func (s *SummaryService) buildSessionContext(session *storage.Session) (*inferen
 		ctx.TopApps = append(ctx.TopApps, ad.name)
 	}
 
-	// Get shell commands
+	// Get shell commands — including working directory, the strongest
+	// project signal for terminal time.
 	shellCmds, _ := s.store.GetShellCommandsBySession(session.ID)
 	for _, cmd := range shellCmds {
-		ctx.ShellCommands = append(ctx.ShellCommands, cmd.Command)
+		cwd := ""
+		if cmd.WorkingDirectory.Valid {
+			cwd = cmd.WorkingDirectory.String
+		}
+		ctx.ShellCommands = append(ctx.ShellCommands, inference.ShellEvent{
+			Timestamp:        cmd.Timestamp,
+			Command:          cmd.Command,
+			WorkingDirectory: cwd,
+		})
 	}
 
-	// Get git commits
+	// Get git commits — annotate with repo name (from a small lookup cache)
+	// and branch so the LLM can attribute commits without guessing.
 	gitCommits, _ := s.store.GetGitCommitsBySession(session.ID)
+	repoNameByID := make(map[int64]string)
 	for _, commit := range gitCommits {
-		ctx.GitCommits = append(ctx.GitCommits, commit.MessageSubject)
+		repoName, ok := repoNameByID[commit.RepositoryID]
+		if !ok {
+			if repo, err := s.store.GetGitRepository(commit.RepositoryID); err == nil && repo != nil {
+				repoName = repo.Name
+			}
+			repoNameByID[commit.RepositoryID] = repoName
+		}
+		branch := ""
+		if commit.Branch.Valid {
+			branch = commit.Branch.String
+		}
+		subject := commit.MessageSubject
+		if subject == "" {
+			subject = commit.Message
+		}
+		ctx.GitCommits = append(ctx.GitCommits, inference.GitEvent{
+			Timestamp: commit.Timestamp,
+			Subject:   subject,
+			Repo:      repoName,
+			Branch:    branch,
+		})
 	}
 
 	// Get file events
 	fileEvents, _ := s.store.GetFileEventsBySession(session.ID)
 	for _, evt := range fileEvents {
-		ctx.FileEvents = append(ctx.FileEvents, fmt.Sprintf("%s: %s", evt.EventType, evt.FileName))
+		ctx.FileEvents = append(ctx.FileEvents, inference.FileEvent{
+			Timestamp: evt.Timestamp,
+			EventType: evt.EventType,
+			FileName:  evt.FileName,
+			Directory: evt.Directory,
+		})
 	}
 
 	// Get browser visits
 	browserVisits, _ := s.store.GetBrowserVisitsBySession(session.ID)
 	for _, visit := range browserVisits {
-		title := visit.Domain
-		if visit.Title.Valid && visit.Title.String != "" {
+		title := ""
+		if visit.Title.Valid {
 			title = visit.Title.String
 		}
-		ctx.BrowserVisits = append(ctx.BrowserVisits, title)
+		ctx.BrowserVisits = append(ctx.BrowserVisits, inference.BrowserEvent{
+			Timestamp: visit.Timestamp,
+			Title:     title,
+			Domain:    visit.Domain,
+			URL:       visit.URL,
+		})
+	}
+
+	// Pull AI coding events that overlap this work session. These come from
+	// claude/opencode session logs and provide rich signal: which directory
+	// the AI was pointed at and what the user was actually asking for.
+	if aiEvents, err := s.store.GetAIEventsInRange(ctx.StartTime, ctx.EndTime); err == nil {
+		for _, e := range aiEvents {
+			ctx.AIEvents = append(ctx.AIEvents, inference.AIEvent{
+				Timestamp:  e.Timestamp,
+				Tool:       e.Tool,
+				Kind:       e.Kind,
+				ProjectDir: e.ProjectDir,
+				Content:    e.Content,
+			})
+		}
 	}
 
 	return ctx, nil
