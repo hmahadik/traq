@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"strings"
 	"testing"
@@ -155,6 +156,76 @@ func TestBuildTimesheet_AttributesByProjectID(t *testing.T) {
 	}
 	if data.Entries[0].TraqProject != "Acme Corp" {
 		t.Errorf("TraqProject = %q, want %q (ProjectID should win over title detection)", data.Entries[0].TraqProject, "Acme Corp")
+	}
+}
+
+func TestBuildTimesheet_PrefersSummaryAllocations(t *testing.T) {
+	store := storage.NewInMemoryTestStore(t)
+	defer store.Close()
+
+	if _, err := store.CreateProject("Acme Corp", "#ff0000", ""); err != nil {
+		t.Fatalf("create project: %v", err)
+	}
+
+	base := time.Date(2026, 4, 25, 10, 0, 0, 0, time.Local)
+
+	// Create a session for the day, plus one focus event inside it. The
+	// focus event has NO project assignment and a meaningless title — so
+	// the focus-event fallback would bucket it as Unattributed. The summary
+	// (below) overrides this.
+	sessID, err := store.CreateSession(base.Unix())
+	if err != nil {
+		t.Fatalf("create session: %v", err)
+	}
+	eventID, err := store.SaveFocusEvent(&storage.WindowFocusEvent{
+		WindowTitle:     "irrelevant",
+		AppName:         "firefox",
+		StartTime:       base.Unix(),
+		EndTime:         base.Add(time.Hour).Unix(),
+		DurationSeconds: 3600,
+		SessionID:       sql.NullInt64{Int64: sessID, Valid: true},
+	})
+	if err != nil {
+		t.Fatalf("save event: %v", err)
+	}
+	_ = eventID
+	if err := store.EndSession(sessID, base.Add(time.Hour).Unix()); err != nil {
+		t.Fatalf("end session: %v", err)
+	}
+
+	// Save a summary attributing the whole hour to Acme Corp via the LLM
+	// allocation path, using a lowercase variant to verify canonicalization.
+	summary := &storage.Summary{
+		SessionID: sql.NullInt64{Int64: sessID, Valid: true},
+		Summary:   "test",
+		Projects: []storage.ProjectBreakdown{
+			{Name: "acme corp", TimeMinutes: 60, Confidence: "high"},
+		},
+		CreatedAt: base.Unix(),
+	}
+	sumID, err := store.SaveSummary(summary)
+	if err != nil {
+		t.Fatalf("save summary: %v", err)
+	}
+	if err := store.SetSessionSummary(sessID, sumID); err != nil {
+		t.Fatalf("link summary: %v", err)
+	}
+
+	rs := helperReportsServiceForTest(t, store)
+	ts := NewTimesheetService(store, rs)
+	data, err := ts.BuildTimesheet("2026-04-25", "2026-04-25", 0.25)
+	if err != nil {
+		t.Fatalf("BuildTimesheet: %v", err)
+	}
+	if len(data.Entries) != 1 {
+		t.Fatalf("expected 1 entry from summary path, got %d: %+v", len(data.Entries), data.Entries)
+	}
+	got := data.Entries[0]
+	if got.TraqProject != "Acme Corp" {
+		t.Errorf("TraqProject = %q, want %q (canonicalized from 'acme corp')", got.TraqProject, "Acme Corp")
+	}
+	if got.Hours != 1.0 {
+		t.Errorf("Hours = %v, want 1.0 from 60-minute summary allocation", got.Hours)
 	}
 }
 

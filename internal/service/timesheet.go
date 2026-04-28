@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"math"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -103,18 +104,25 @@ func (s *TimesheetService) BuildTimesheet(startDate, endDate string, hoursRoundi
 	if err != nil {
 		return nil, fmt.Errorf("fetch focus events: %w", err)
 	}
+	sessions, err := s.store.GetSessionsByTimeRange(start.Unix(), endExclusive.Unix())
+	if err != nil {
+		return nil, fmt.Errorf("fetch sessions: %w", err)
+	}
 
-	// Pre-load all projects into an id→name map so we can attribute events
-	// by their stored ProjectID without a per-event DB call. Auto-assignment
-	// (rules / AI / manual) writes ProjectID onto the event, which is the
-	// authoritative source of truth for "this activity belongs to project X".
+	// Pre-load all projects so we can:
+	//   1) Attribute focus events by their stored ProjectID without a per-event DB call.
+	//   2) Canonicalize project names returned by the AI summary (LLM may use
+	//      slight variants like "acme" vs "Acme Corp"; we want the canonical
+	//      Traq project name so FF-mapping resolution finds them).
 	projects, err := s.store.GetProjects()
 	if err != nil {
 		return nil, fmt.Errorf("fetch projects: %w", err)
 	}
 	projectNameByID := make(map[int64]string, len(projects))
+	canonicalByLower := make(map[string]string, len(projects))
 	for _, p := range projects {
 		projectNameByID[p.ID] = p.Name
+		canonicalByLower[strings.ToLower(p.Name)] = p.Name
 	}
 
 	// Bucket: key = "YYYY-MM-DD|project" → seconds.
@@ -124,11 +132,46 @@ func (s *TimesheetService) BuildTimesheet(startDate, endDate string, hoursRoundi
 	}
 	buckets := map[bucketKey]float64{}
 
+	// Group focus events by session so we can fall back per-session when the
+	// session has no AI summary. Events without a session ID fall through to
+	// the sessionless slice.
+	eventsBySession := map[int64][]*storage.WindowFocusEvent{}
+	var sessionlessEvents []*storage.WindowFocusEvent
 	for _, e := range events {
+		if e.SessionID.Valid {
+			eventsBySession[e.SessionID.Int64] = append(eventsBySession[e.SessionID.Int64], e)
+		} else {
+			sessionlessEvents = append(sessionlessEvents, e)
+		}
+	}
+
+	// Per-session attribution: prefer the LLM-allocated project breakdown
+	// from the session's summary; fall back to focus-event ProjectID
+	// attribution when no summary exists.
+	for _, sess := range sessions {
+		summary, _ := s.store.GetSummaryBySession(sess.ID)
+		if summary != nil && len(summary.Projects) > 0 {
+			sessDate := time.Unix(sess.StartTime, 0).In(loc).Format("2006-01-02")
+			for _, pb := range summary.Projects {
+				name := canonicalizeProjectName(pb.Name, canonicalByLower)
+				if name == "" {
+					name = UnattributedProject
+				}
+				buckets[bucketKey{sessDate, name}] += float64(pb.TimeMinutes) * 60
+			}
+			continue
+		}
+		// Focus-event fallback for this session.
+		for _, e := range eventsBySession[sess.ID] {
+			proj := s.attributeEvent(e, projectNameByID)
+			d := time.Unix(e.StartTime, 0).In(loc).Format("2006-01-02")
+			buckets[bucketKey{d, proj}] += e.DurationSeconds
+		}
+	}
+
+	// Sessionless focus events: attribute via the same fallback path.
+	for _, e := range sessionlessEvents {
 		proj := s.attributeEvent(e, projectNameByID)
-		// Use the event's start time in user's local timezone for the date bucket.
-		// Events spanning midnight count entirely toward the start day. This matches
-		// the existing reports convention.
 		d := time.Unix(e.StartTime, 0).In(loc).Format("2006-01-02")
 		buckets[bucketKey{d, proj}] += e.DurationSeconds
 	}
@@ -167,6 +210,22 @@ func (s *TimesheetService) BuildTimesheet(startDate, endDate string, hoursRoundi
 		return nil, err
 	}
 	return &data, nil
+}
+
+// canonicalizeProjectName matches an LLM-returned project name (which may
+// be a casing/whitespace variant of an actual Traq project) against the
+// canonical project list and returns the canonical name. Returns the
+// original trimmed name if no match is found — the caller decides whether
+// to bucket it as Unattributed.
+func canonicalizeProjectName(name string, canonicalByLower map[string]string) string {
+	trimmed := strings.TrimSpace(name)
+	if trimmed == "" {
+		return ""
+	}
+	if canonical, ok := canonicalByLower[strings.ToLower(trimmed)]; ok {
+		return canonical
+	}
+	return trimmed
 }
 
 // attributeEvent returns the project name to bucket a focus event under.
