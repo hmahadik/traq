@@ -471,7 +471,7 @@ func TestPopulateNotes_PopulatesEntries(t *testing.T) {
 			{Date: "2026-04-25", TraqProject: "other", Hours: 2.0},
 		},
 	}
-	if err := ts.PopulateNotes(context.Background(), data, agent); err != nil {
+	if err := ts.PopulateNotes(context.Background(), data, NewAgentNotesBackend(agent)); err != nil {
 		t.Fatalf("PopulateNotes: %v", err)
 	}
 	for i := range data.Entries {
@@ -497,7 +497,7 @@ func TestPopulateNotes_SkipsSkippedEntries(t *testing.T) {
 			{Date: "2026-04-25", TraqProject: "other", Hours: 2.0},
 		},
 	}
-	if err := ts.PopulateNotes(context.Background(), data, agent); err != nil {
+	if err := ts.PopulateNotes(context.Background(), data, NewAgentNotesBackend(agent)); err != nil {
 		t.Fatalf("PopulateNotes: %v", err)
 	}
 	if data.Entries[0].Notes != "" {
@@ -522,10 +522,10 @@ func TestPopulateNotes_CachesByInputHash(t *testing.T) {
 	data1 := &TimesheetData{Entries: []TimesheetEntry{e}}
 	data2 := &TimesheetData{Entries: []TimesheetEntry{e}}
 
-	if err := ts.PopulateNotes(context.Background(), data1, agent); err != nil {
+	if err := ts.PopulateNotes(context.Background(), data1, NewAgentNotesBackend(agent)); err != nil {
 		t.Fatalf("first PopulateNotes: %v", err)
 	}
-	if err := ts.PopulateNotes(context.Background(), data2, agent); err != nil {
+	if err := ts.PopulateNotes(context.Background(), data2, NewAgentNotesBackend(agent)); err != nil {
 		t.Fatalf("second PopulateNotes: %v", err)
 	}
 	if agent.callCount != 1 {
@@ -549,7 +549,7 @@ func TestPopulateNotes_GeneratorError_RecordsButContinues(t *testing.T) {
 			{Date: "2026-04-26", TraqProject: "traq", Hours: 1.0},
 		},
 	}
-	if err := ts.PopulateNotes(context.Background(), data, agent); err != nil {
+	if err := ts.PopulateNotes(context.Background(), data, NewAgentNotesBackend(agent)); err != nil {
 		t.Fatalf("PopulateNotes returned error (should continue past per-entry failure): %v", err)
 	}
 	if !strings.Contains(data.Entries[0].Notes, "notes generation failed") {

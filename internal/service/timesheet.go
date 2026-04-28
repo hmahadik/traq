@@ -304,15 +304,14 @@ func roundToMultiple(x, m float64) float64 {
 	return math.Round(x/m) * m
 }
 
-// PopulateNotes invokes the given AI generator for each non-skipped entry
-// and writes the result to entry.Notes. If gen is nil, this is a no-op.
+// PopulateNotes invokes the given backend for each non-skipped entry and
+// writes the result to entry.Notes. If backend is nil, this is a no-op.
 //
-// Each entry's input bundle is hashed; cache hits skip the generator call.
-// Generator failures on a single entry are logged into entry.Notes as a
-// best-effort marker but do not abort the whole pass — other entries can
-// still succeed.
-func (s *TimesheetService) PopulateNotes(ctx context.Context, data *TimesheetData, gen aiagent.Generator) error {
-	if gen == nil {
+// Each entry's input bundle is hashed; cache hits skip the backend call.
+// Per-entry failures are surfaced in the Notes field as a best-effort
+// marker but do not abort the whole pass — other entries can still succeed.
+func (s *TimesheetService) PopulateNotes(ctx context.Context, data *TimesheetData, backend NotesBackend) error {
+	if backend == nil {
 		return nil
 	}
 	for i := range data.Entries {
@@ -335,16 +334,13 @@ func (s *TimesheetService) PopulateNotes(ctx context.Context, data *TimesheetDat
 			e.Notes = cached
 			continue
 		}
-		out, err := gen.Generate(ctx, in)
+		notes, err := backend.Generate(ctx, in)
 		if err != nil {
-			// Per-entry failure: surface the error in the Notes field so the
-			// user sees what went wrong, but don't abort the whole pass.
 			e.Notes = fmt.Sprintf("[notes generation failed: %v]", err)
 			continue
 		}
-		notes := out.Notes
 		if notes == "" {
-			notes = "[empty response from AI agent]"
+			notes = "[empty response from AI backend]"
 		}
 		s.cacheMu.Lock()
 		s.notesCache[key] = notes

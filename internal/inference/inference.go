@@ -210,6 +210,44 @@ func (s *Service) GenerateSummary(context *SessionContext) (*SummaryResult, erro
 	return result, nil
 }
 
+// CompletePrompt sends a raw prompt through the configured engine and
+// returns the model's text response *unparsed*. Use this when the caller
+// has built its own prompt (e.g. the timesheet-notes pipeline) and wants
+// plain text out — GenerateSummary's JSON-extraction behavior would only
+// get in the way for free-form prose responses.
+//
+// Mirrors GenerateSummary's engine dispatch so callers don't need to know
+// whether they're hitting the bundled server, Ollama, or a cloud API.
+func (s *Service) CompletePrompt(prompt string) (string, error) {
+	if s.config == nil {
+		return "", fmt.Errorf("inference not configured")
+	}
+	log.Printf("[inference] CompletePrompt engine=%s prompt-bytes=%d", s.config.Engine, len(prompt))
+	switch s.config.Engine {
+	case EngineBundled:
+		if s.bundled == nil {
+			return "", fmt.Errorf("bundled engine not initialized")
+		}
+		if !s.bundled.IsRunning() {
+			if err := s.bundled.Start(); err != nil {
+				return "", fmt.Errorf("failed to start bundled server: %w", err)
+			}
+		}
+		return s.bundled.Complete(prompt)
+	case EngineOllama:
+		if s.config.Ollama == nil {
+			return "", fmt.Errorf("Ollama not configured")
+		}
+		return s.callOllama(prompt)
+	case EngineCloud:
+		if s.config.Cloud == nil {
+			return "", fmt.Errorf("Cloud API not configured")
+		}
+		return s.callCloudAPI(prompt)
+	}
+	return "", fmt.Errorf("unknown inference engine: %s", s.config.Engine)
+}
+
 // SessionContext contains data for summary generation
 type SessionContext struct {
 	StartTime       int64
