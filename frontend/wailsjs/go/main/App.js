@@ -474,6 +474,10 @@ export function GetTimelineGridData(arg1) {
   return window['go']['main']['App']['GetTimelineGridData'](arg1);
 }
 
+export function GetTmuxSetupStatus() {
+  return window['go']['main']['App']['GetTmuxSetupStatus']();
+}
+
 export function GetTopWindows(arg1, arg2) {
   return window['go']['main']['App']['GetTopWindows'](arg1, arg2);
 }
@@ -524,6 +528,10 @@ export function IgnoreActivities(arg1, arg2) {
 
 export function InstallShellPlugin(arg1) {
   return window['go']['main']['App']['InstallShellPlugin'](arg1);
+}
+
+export function InstallTmuxIntegration() {
+  return window['go']['main']['App']['InstallTmuxIntegration']();
 }
 
 export function IsReady() {
@@ -696,6 +704,10 @@ export function UnignoreActivities(arg1, arg2) {
 
 export function UninstallShellPlugin(arg1) {
   return window['go']['main']['App']['UninstallShellPlugin'](arg1);
+}
+
+export function UninstallTmuxIntegration() {
+  return window['go']['main']['App']['UninstallTmuxIntegration']();
 }
 
 export function UnregisterGitRepository(arg1) {

@@ -243,6 +243,8 @@ export function GetThumbnailPath(arg1:number):Promise<string>;
 
 export function GetTimelineGridData(arg1:string):Promise<service.TimelineGridData>;
 
+export function GetTmuxSetupStatus():Promise<service.TmuxSetupStatus>;
+
 export function GetTopWindows(arg1:string,arg2:number):Promise<Array<service.WindowUsage>>;
 
 export function GetTopWindowsRange(arg1:number,arg2:number,arg3:number):Promise<Array<service.WindowUsage>>;
@@ -268,6 +270,8 @@ export function GetYearlyStats(arg1:number):Promise<service.YearlyStats>;
 export function IgnoreActivities(arg1:string,arg2:Array<number>):Promise<void>;
 
 export function InstallShellPlugin(arg1:string):Promise<void>;
+
+export function InstallTmuxIntegration():Promise<void>;
 
 export function IsReady():Promise<boolean>;
 
@@ -354,6 +358,8 @@ export function TriggerUpdate():Promise<void>;
 export function UnignoreActivities(arg1:string,arg2:Array<number>):Promise<void>;
 
 export function UninstallShellPlugin(arg1:string):Promise<void>;
+
+export function UninstallTmuxIntegration():Promise<void>;
 
 export function UnregisterGitRepository(arg1:number):Promise<void>;
 

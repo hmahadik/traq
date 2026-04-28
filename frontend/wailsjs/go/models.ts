@@ -2440,6 +2440,24 @@ export namespace service {
 		}
 	}
 	
+	export class TmuxSetupStatus {
+	    state: string;
+	    confPath: string;
+	    installed: boolean;
+	    message: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new TmuxSetupStatus(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.state = source["state"];
+	        this.confPath = source["confPath"];
+	        this.installed = source["installed"];
+	        this.message = source["message"];
+	    }
+	}
 	
 	
 	

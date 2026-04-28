@@ -60,6 +60,7 @@ type App struct {
 	Embeddings  *service.EmbeddingService
 	Draft       *service.DraftService
 	ShellSetup  *service.ShellSetupService
+	TmuxSetup   *service.TmuxSetupService
 	AI          *service.AIService
 	Timesheet   *service.TimesheetService
 
@@ -278,6 +279,7 @@ func (a *App) startup(ctx context.Context) {
 	// Initialize shell setup service (plugin install/uninstall/status)
 	a.ShellSetup = service.NewShellSetupService(dataDir)
 	a.Config.SetShellSetup(a.ShellSetup)
+	a.TmuxSetup = service.NewTmuxSetupService()
 
 	// Initialize issues service (for crash/manual reporting)
 	a.Issues = service.NewIssueService(a.store, Version)
@@ -777,6 +779,24 @@ func (a *App) UninstallShellPlugin(shell string) error {
 // DismissShellOverflow clears the overflow sentinel file.
 func (a *App) DismissShellOverflow() error {
 	return a.ShellSetup.DismissOverflow()
+}
+
+// GetTmuxSetupStatus returns whether Traq's tmux integration block is
+// present in the user's tmux.conf, and whether tmux is on PATH at all.
+func (a *App) GetTmuxSetupStatus() (*service.TmuxSetupStatus, error) {
+	return a.TmuxSetup.Status()
+}
+
+// InstallTmuxIntegration writes Traq's set-titles config block to the
+// user's tmux.conf and live-reloads any running tmux server.
+func (a *App) InstallTmuxIntegration() error {
+	return a.TmuxSetup.Install()
+}
+
+// UninstallTmuxIntegration removes Traq's tmux config block (other tmux
+// settings the user has are left untouched).
+func (a *App) UninstallTmuxIntegration() error {
+	return a.TmuxSetup.Uninstall()
 }
 
 // SearchAllDataSources searches across all event types (git, shell, files, browser, screenshots).
