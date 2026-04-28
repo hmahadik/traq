@@ -2360,43 +2360,53 @@ func (a *App) GenerateTimesheet(startDate, endDate string) (*service.TimesheetDa
 		return nil, err
 	}
 	if cfg.Timesheet != nil && cfg.Timesheet.AINotesEnabled {
-		gen, err := pickAIGenerator(cfg.Timesheet.AINotesBackend)
+		backend, err := a.pickNotesBackend(cfg.Timesheet.AINotesBackend)
 		if err != nil {
 			// Non-fatal: return the data without AI-generated notes; the UI
 			// can warn the user that the configured AI backend isn't available.
 			return data, nil
 		}
-		if err := a.Timesheet.PopulateNotes(a.ctx, data, gen); err != nil {
+		if err := a.Timesheet.PopulateNotes(a.ctx, data, backend); err != nil {
 			return data, fmt.Errorf("populate notes: %w", err)
 		}
 	}
 	return data, nil
 }
 
-// pickAIGenerator selects the configured AI backend. Returns an error if the
-// configured backend is not available on PATH.
-func pickAIGenerator(backend string) (aiagent.Generator, error) {
+// pickNotesBackend selects the configured notes backend. "inference" routes
+// through the local inference engine (same one summaries can use); the rest
+// route through CLI subprocesses. Returns an error when the requested
+// backend isn't available — caller decides whether to abort or fall through.
+func (a *App) pickNotesBackend(backend string) (service.NotesBackend, error) {
 	switch backend {
+	case "inference":
+		if a.inference == nil {
+			return nil, fmt.Errorf("inference service not initialized")
+		}
+		if status := a.inference.GetSetupStatus(); !status.Ready {
+			return nil, fmt.Errorf("inference not ready: %s", status.Issue)
+		}
+		return service.NewInferenceNotesBackend(a.inference), nil
 	case "claude":
 		g := aiagent.NewClaudeGenerator()
 		if !g.Available() {
 			return nil, fmt.Errorf("claude CLI not on PATH")
 		}
-		return g, nil
+		return service.NewAgentNotesBackend(g), nil
 	case "opencode":
 		g := aiagent.NewOpenCodeGenerator()
 		if !g.Available() {
 			return nil, fmt.Errorf("opencode CLI not on PATH")
 		}
-		return g, nil
+		return service.NewAgentNotesBackend(g), nil
 	case "auto", "":
 		g := aiagent.NewAutoGenerator()
 		if !g.Available() {
 			return nil, fmt.Errorf("no AI agent CLI on PATH (install claude or opencode)")
 		}
-		return g, nil
+		return service.NewAgentNotesBackend(g), nil
 	default:
-		return nil, fmt.Errorf("unknown AI backend: %s", backend)
+		return nil, fmt.Errorf("unknown AI notes backend: %s", backend)
 	}
 }
 
