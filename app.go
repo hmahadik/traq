@@ -2359,17 +2359,42 @@ func (a *App) GenerateTimesheet(startDate, endDate string) (*service.TimesheetDa
 	if err != nil {
 		return nil, err
 	}
-	if cfg.Timesheet != nil && cfg.Timesheet.AINotesEnabled {
-		backend, err := a.pickNotesBackend(cfg.Timesheet.AINotesBackend)
-		if err != nil {
-			// Non-fatal: return the data without AI-generated notes; the UI
-			// can warn the user that the configured AI backend isn't available.
-			return data, nil
+	if cfg.Timesheet == nil || !cfg.Timesheet.AINotesEnabled {
+		log.Printf("[timesheet] notes skipped: aiNotesEnabled=%v",
+			cfg.Timesheet != nil && cfg.Timesheet.AINotesEnabled)
+		return data, nil
+	}
+	log.Printf("[timesheet] notes enabled backend=%q entries=%d",
+		cfg.Timesheet.AINotesBackend, len(data.Entries))
+	backend, err := a.pickNotesBackend(cfg.Timesheet.AINotesBackend)
+	if err != nil {
+		// Surface the failure as a generated-but-noted-as-failed marker on
+		// every non-skipped row, so the user sees something concrete in the
+		// preview instead of "huh, no notes." The previous behavior (silent
+		// fall-through) made misconfigured backends indistinguishable from
+		// the AI-notes-off case.
+		log.Printf("[timesheet] notes backend unavailable: %v", err)
+		marker := fmt.Sprintf("[notes backend %q unavailable: %v]", cfg.Timesheet.AINotesBackend, err)
+		for i := range data.Entries {
+			if !data.Entries[i].Skipped {
+				data.Entries[i].Notes = marker
+			}
 		}
-		if err := a.Timesheet.PopulateNotes(a.ctx, data, backend); err != nil {
-			return data, fmt.Errorf("populate notes: %w", err)
+		return data, nil
+	}
+	log.Printf("[timesheet] notes backend selected: %s", backend.Name())
+	if err := a.Timesheet.PopulateNotes(a.ctx, data, backend); err != nil {
+		log.Printf("[timesheet] PopulateNotes returned err=%v", err)
+		return data, fmt.Errorf("populate notes: %w", err)
+	}
+	// Quick post-condition: did anything actually land?
+	populated := 0
+	for _, e := range data.Entries {
+		if e.Notes != "" && !strings.HasPrefix(e.Notes, "[") {
+			populated++
 		}
 	}
+	log.Printf("[timesheet] notes populated %d/%d entries", populated, len(data.Entries))
 	return data, nil
 }
 

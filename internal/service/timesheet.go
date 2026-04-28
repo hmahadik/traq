@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"log"
 	"math"
 	"sort"
 	"strings"
@@ -312,8 +313,10 @@ func roundToMultiple(x, m float64) float64 {
 // marker but do not abort the whole pass — other entries can still succeed.
 func (s *TimesheetService) PopulateNotes(ctx context.Context, data *TimesheetData, backend NotesBackend) error {
 	if backend == nil {
+		log.Printf("[notes] PopulateNotes: nil backend, skipping")
 		return nil
 	}
+	log.Printf("[notes] PopulateNotes start backend=%s entries=%d", backend.Name(), len(data.Entries))
 	for i := range data.Entries {
 		e := &data.Entries[i]
 		if e.Skipped {
@@ -331,10 +334,14 @@ func (s *TimesheetService) PopulateNotes(ctx context.Context, data *TimesheetDat
 		cached, ok := s.notesCache[key]
 		s.cacheMu.Unlock()
 		if ok {
+			log.Printf("[notes] %s/%s cache-hit", e.Date, e.TraqProject)
 			e.Notes = cached
 			continue
 		}
+		callStart := time.Now()
 		notes, err := backend.Generate(ctx, in)
+		log.Printf("[notes] %s/%s err=%v bytes=%d duration=%vs",
+			e.Date, e.TraqProject, err, len(notes), time.Since(callStart).Seconds())
 		if err != nil {
 			e.Notes = fmt.Sprintf("[notes generation failed: %v]", err)
 			continue
