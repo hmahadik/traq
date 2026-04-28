@@ -431,6 +431,13 @@ func (f *fakeAgent) Generate(ctx context.Context, in aiagent.Input) (*aiagent.Ou
 	}
 	return &aiagent.Output{Notes: f.output, Tool: f.name}, nil
 }
+func (f *fakeAgent) GenerateRaw(ctx context.Context, prompt string) (string, error) {
+	f.callCount++
+	if f.err != nil {
+		return "", f.err
+	}
+	return f.output, nil
+}
 
 func TestPopulateNotes_NilGenerator_NoOp(t *testing.T) {
 	store := storage.NewInMemoryTestStore(t)

@@ -30,19 +30,28 @@ func (g *OpenCodeGenerator) Available() bool {
 var ansiRE = regexp.MustCompile(`\x1b\[[0-9;]*[a-zA-Z]`)
 
 func (g *OpenCodeGenerator) Generate(ctx context.Context, in Input) (*Output, error) {
-	prompt := BuildPrompt(in)
 	start := time.Now()
+	out, err := g.GenerateRaw(ctx, BuildPrompt(in))
+	if err != nil {
+		return nil, err
+	}
+	return &Output{
+		Notes:      out,
+		Tool:       "opencode",
+		DurationMS: time.Since(start).Milliseconds(),
+	}, nil
+}
+
+// GenerateRaw runs `opencode run <prompt>` and returns trimmed, ANSI-stripped
+// stdout. Used by callers that build their own prompt structure.
+func (g *OpenCodeGenerator) GenerateRaw(ctx context.Context, prompt string) (string, error) {
 	cmd := g.commandFunc(ctx, "opencode", "run", prompt)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 	if err := cmd.Run(); err != nil {
-		return nil, fmt.Errorf("opencode invocation failed: %w (stderr: %s)", err, strings.TrimSpace(stderr.String()))
+		return "", fmt.Errorf("opencode invocation failed: %w (stderr: %s)", err, strings.TrimSpace(stderr.String()))
 	}
 	cleaned := ansiRE.ReplaceAllString(stdout.String(), "")
-	return &Output{
-		Notes:      strings.TrimSpace(cleaned),
-		Tool:       "opencode",
-		DurationMS: time.Since(start).Milliseconds(),
-	}, nil
+	return strings.TrimSpace(cleaned), nil
 }

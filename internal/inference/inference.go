@@ -231,6 +231,20 @@ type FocusEvent struct {
 	Duration    float64
 }
 
+// BuildSummaryPrompt is the exported form of the session-summary prompt
+// builder. Callers that want to run the same prompt through a non-inference
+// backend (e.g. the aiagent CLI subprocess pipeline) can use this directly.
+func BuildSummaryPrompt(ctx *SessionContext) string {
+	return buildPrompt(ctx)
+}
+
+// ParseSummaryResponse exposes parseResponse so the CLI-backed callers can
+// share the same output normalization (JSON extraction, fallback, garbage
+// activity filtering) as the inference-backed callers.
+func ParseSummaryResponse(raw string) *SummaryResult {
+	return parseResponse(raw)
+}
+
 func buildPrompt(ctx *SessionContext) string {
 	var sb strings.Builder
 

@@ -28,8 +28,15 @@ type Output struct {
 }
 
 // Generator turns an Input bundle into a polished timesheet entry.
+//
+// GenerateRaw is the lower-level escape hatch: callers that need to send a
+// fully-formed prompt (e.g. the session-summary pipeline, which builds its
+// own complex prompt in the inference package) can invoke the CLI directly
+// without going through Input/Output. The returned string is the raw stdout
+// of the agent — callers handle their own parsing.
 type Generator interface {
 	Available() bool
 	Name() string // "claude" | "opencode" | "auto"
 	Generate(ctx context.Context, in Input) (*Output, error)
+	GenerateRaw(ctx context.Context, prompt string) (string, error)
 }

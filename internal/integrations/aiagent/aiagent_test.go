@@ -98,6 +98,15 @@ func (f *fakeGenerator) Available() bool      { return f.available }
 func (f *fakeGenerator) Generate(ctx context.Context, in Input) (*Output, error) {
 	return f.out, f.err
 }
+func (f *fakeGenerator) GenerateRaw(ctx context.Context, prompt string) (string, error) {
+	if f.err != nil {
+		return "", f.err
+	}
+	if f.out == nil {
+		return "", nil
+	}
+	return f.out.Notes, nil
+}
 
 func TestAutoGenerator_PicksFirstAvailable(t *testing.T) {
 	a := &fakeGenerator{name: "a", available: false}

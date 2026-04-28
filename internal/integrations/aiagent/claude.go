@@ -27,18 +27,28 @@ func (g *ClaudeGenerator) Available() bool {
 }
 
 func (g *ClaudeGenerator) Generate(ctx context.Context, in Input) (*Output, error) {
-	prompt := BuildPrompt(in)
 	start := time.Now()
+	out, err := g.GenerateRaw(ctx, BuildPrompt(in))
+	if err != nil {
+		return nil, err
+	}
+	return &Output{
+		Notes:      out,
+		Tool:       "claude",
+		DurationMS: time.Since(start).Milliseconds(),
+	}, nil
+}
+
+// GenerateRaw runs `claude --bare -p <prompt>` and returns trimmed stdout.
+// Used by callers that build their own prompt structure (e.g. session
+// summary) and don't fit the timesheet-notes Input/Output shape.
+func (g *ClaudeGenerator) GenerateRaw(ctx context.Context, prompt string) (string, error) {
 	cmd := g.commandFunc(ctx, "claude", "--bare", "-p", prompt)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 	if err := cmd.Run(); err != nil {
-		return nil, fmt.Errorf("claude invocation failed: %w (stderr: %s)", err, strings.TrimSpace(stderr.String()))
+		return "", fmt.Errorf("claude invocation failed: %w (stderr: %s)", err, strings.TrimSpace(stderr.String()))
 	}
-	return &Output{
-		Notes:      strings.TrimSpace(stdout.String()),
-		Tool:       "claude",
-		DurationMS: time.Since(start).Milliseconds(),
-	}, nil
+	return strings.TrimSpace(stdout.String()), nil
 }

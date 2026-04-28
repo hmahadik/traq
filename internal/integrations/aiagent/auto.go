@@ -37,5 +37,17 @@ func (g *AutoGenerator) Generate(ctx context.Context, in Input) (*Output, error)
 			return sub.Generate(ctx, in)
 		}
 	}
-	return nil, errors.New("no AI agent CLI is available on PATH (install claude or opencode)")
+	return nil, errNoAgent
 }
+
+// GenerateRaw forwards to the first available subgenerator.
+func (g *AutoGenerator) GenerateRaw(ctx context.Context, prompt string) (string, error) {
+	for _, sub := range g.generators {
+		if sub.Available() {
+			return sub.GenerateRaw(ctx, prompt)
+		}
+	}
+	return "", errNoAgent
+}
+
+var errNoAgent = errors.New("no AI agent CLI is available on PATH (install claude or opencode)")
