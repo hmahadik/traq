@@ -297,6 +297,7 @@ export namespace service {
 	    summaryMode: string;
 	    summaryChunkMinutes: number;
 	    assignmentMode: string;
+	    summaryBackend: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new AIConfig(source);
@@ -307,6 +308,7 @@ export namespace service {
 	        this.summaryMode = source["summaryMode"];
 	        this.summaryChunkMinutes = source["summaryChunkMinutes"];
 	        this.assignmentMode = source["assignmentMode"];
+	        this.summaryBackend = source["summaryBackend"];
 	    }
 	}
 	export class AIPromptDisplay {
