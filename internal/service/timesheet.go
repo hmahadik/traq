@@ -1,11 +1,17 @@
 package service
 
 import (
+	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"math"
 	"sort"
+	"sync"
 	"time"
 
+	"traq/internal/integrations/aiagent"
 	"traq/internal/storage"
 )
 
@@ -42,12 +48,23 @@ type TimesheetData struct {
 type TimesheetService struct {
 	store   *storage.Store
 	reports *ReportsService
+
+	// notesCache is keyed by SHA-256 of an aiagent.Input bundle (deterministic
+	// JSON encoding). Generator output is cached in-process so re-rendering
+	// the same preview doesn't re-spend tokens. The cache is intentionally
+	// unbounded — preview re-runs in a single session number in the dozens.
+	notesCache map[string]string
+	cacheMu    sync.Mutex
 }
 
 // NewTimesheetService constructs a TimesheetService. The reports service is
 // used for its exported project-detection methods.
 func NewTimesheetService(store *storage.Store, reports *ReportsService) *TimesheetService {
-	return &TimesheetService{store: store, reports: reports}
+	return &TimesheetService{
+		store:      store,
+		reports:    reports,
+		notesCache: map[string]string{},
+	}
 }
 
 // BuildTimesheet builds the structured timesheet for [startDate, endDate]
@@ -189,4 +206,105 @@ func roundToMultiple(x, m float64) float64 {
 		return x
 	}
 	return math.Round(x/m) * m
+}
+
+// PopulateNotes invokes the given AI generator for each non-skipped entry
+// and writes the result to entry.Notes. If gen is nil, this is a no-op.
+//
+// Each entry's input bundle is hashed; cache hits skip the generator call.
+// Generator failures on a single entry are logged into entry.Notes as a
+// best-effort marker but do not abort the whole pass — other entries can
+// still succeed.
+func (s *TimesheetService) PopulateNotes(ctx context.Context, data *TimesheetData, gen aiagent.Generator) error {
+	if gen == nil {
+		return nil
+	}
+	for i := range data.Entries {
+		e := &data.Entries[i]
+		if e.Skipped {
+			continue
+		}
+		in, err := s.buildAgentInput(e)
+		if err != nil {
+			return fmt.Errorf("build input for %s/%s: %w", e.Date, e.TraqProject, err)
+		}
+		key, err := hashInput(in)
+		if err != nil {
+			return fmt.Errorf("hash input: %w", err)
+		}
+		s.cacheMu.Lock()
+		cached, ok := s.notesCache[key]
+		s.cacheMu.Unlock()
+		if ok {
+			e.Notes = cached
+			continue
+		}
+		out, err := gen.Generate(ctx, in)
+		if err != nil {
+			// Per-entry failure: surface the error in the Notes field so the
+			// user sees what went wrong, but don't abort the whole pass.
+			e.Notes = fmt.Sprintf("[notes generation failed: %v]", err)
+			continue
+		}
+		notes := out.Notes
+		if notes == "" {
+			notes = "[empty response from AI agent]"
+		}
+		s.cacheMu.Lock()
+		s.notesCache[key] = notes
+		s.cacheMu.Unlock()
+		e.Notes = notes
+	}
+	return nil
+}
+
+// buildAgentInput assembles an aiagent.Input for a single entry. Window-title
+// and per-session summary aggregation is left for a future enhancement; this
+// minimal version provides project + date + hours + git commit messages on
+// that day. The AI agent has enough to write a reasonable paragraph.
+func (s *TimesheetService) buildAgentInput(e *TimesheetEntry) (aiagent.Input, error) {
+	in := aiagent.Input{
+		Project: e.TraqProject,
+		Date:    e.Date,
+		Hours:   e.Hours,
+	}
+	// Date range for that single day in user's local time.
+	loc := time.Local
+	day, err := time.ParseInLocation("2006-01-02", e.Date, loc)
+	if err != nil {
+		return in, fmt.Errorf("parse date: %w", err)
+	}
+	start := day.Unix()
+	end := day.Add(24 * time.Hour).Unix()
+	commits, err := s.store.GetGitCommitsByTimeRange(start, end)
+	if err != nil {
+		return in, fmt.Errorf("fetch git commits: %w", err)
+	}
+	for _, c := range commits {
+		// We don't filter by repo→project here in v1 — the agent gets all
+		// the day's commits. Plan C / a follow-up can add repo→project filtering
+		// once the existing reports.go logic for that is exposed cleanly.
+		msg := c.MessageSubject
+		if msg == "" {
+			msg = c.Message
+		}
+		if msg != "" {
+			in.GitCommits = append(in.GitCommits, msg)
+		}
+	}
+	return in, nil
+}
+
+// hashInput produces a deterministic SHA-256 hex of an aiagent.Input. Used as
+// a cache key so re-rendering the same preview doesn't re-spend tokens.
+func hashInput(in aiagent.Input) (string, error) {
+	// Canonical encoding: JSON encoder produces field order matching struct
+	// declaration, which is deterministic for our types. Slice order is
+	// already deterministic from upstream sorted aggregation.
+	b, err := json.Marshal(in)
+	if err != nil {
+		return "", err
+	}
+	sum := sha256.Sum256(b)
+	return hex.EncodeToString(sum[:]), nil
 }

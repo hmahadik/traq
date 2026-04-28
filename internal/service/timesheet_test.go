@@ -1,9 +1,13 @@
 package service
 
 import (
+	"context"
+	"fmt"
+	"strings"
 	"testing"
 	"time"
 
+	"traq/internal/integrations/aiagent"
 	"traq/internal/storage"
 )
 
@@ -281,5 +285,145 @@ func TestBuildTimesheet_DisabledMappingMarksUserSkipped(t *testing.T) {
 	}
 	if len(data.UnmappedProjects) != 0 {
 		t.Errorf("UnmappedProjects should be empty when mapping exists (just disabled): %v", data.UnmappedProjects)
+	}
+}
+
+// fakeAgent is a controllable aiagent.Generator for tests.
+type fakeAgent struct {
+	name      string
+	avail     bool
+	output    string
+	err       error
+	callCount int
+}
+
+func (f *fakeAgent) Name() string    { return f.name }
+func (f *fakeAgent) Available() bool { return f.avail }
+func (f *fakeAgent) Generate(ctx context.Context, in aiagent.Input) (*aiagent.Output, error) {
+	f.callCount++
+	if f.err != nil {
+		return nil, f.err
+	}
+	return &aiagent.Output{Notes: f.output, Tool: f.name}, nil
+}
+
+func TestPopulateNotes_NilGenerator_NoOp(t *testing.T) {
+	store := storage.NewInMemoryTestStore(t)
+	defer store.Close()
+	rs := helperReportsServiceForTest(t, store)
+	ts := NewTimesheetService(store, rs)
+
+	data := &TimesheetData{
+		Entries: []TimesheetEntry{
+			{Date: "2026-04-25", TraqProject: "traq", Hours: 1.0},
+		},
+	}
+	if err := ts.PopulateNotes(context.Background(), data, nil); err != nil {
+		t.Fatalf("PopulateNotes: %v", err)
+	}
+	if data.Entries[0].Notes != "" {
+		t.Errorf("Notes = %q, expected empty for nil generator", data.Entries[0].Notes)
+	}
+}
+
+func TestPopulateNotes_PopulatesEntries(t *testing.T) {
+	store := storage.NewInMemoryTestStore(t)
+	defer store.Close()
+	rs := helperReportsServiceForTest(t, store)
+	ts := NewTimesheetService(store, rs)
+
+	agent := &fakeAgent{name: "fake", avail: true, output: "Worked on traq."}
+	data := &TimesheetData{
+		Entries: []TimesheetEntry{
+			{Date: "2026-04-25", TraqProject: "traq", Hours: 1.0},
+			{Date: "2026-04-25", TraqProject: "other", Hours: 2.0},
+		},
+	}
+	if err := ts.PopulateNotes(context.Background(), data, agent); err != nil {
+		t.Fatalf("PopulateNotes: %v", err)
+	}
+	for i := range data.Entries {
+		if data.Entries[i].Notes != "Worked on traq." {
+			t.Errorf("entry[%d].Notes = %q", i, data.Entries[i].Notes)
+		}
+	}
+	if agent.callCount != 2 {
+		t.Errorf("expected 2 generator calls, got %d", agent.callCount)
+	}
+}
+
+func TestPopulateNotes_SkipsSkippedEntries(t *testing.T) {
+	store := storage.NewInMemoryTestStore(t)
+	defer store.Close()
+	rs := helperReportsServiceForTest(t, store)
+	ts := NewTimesheetService(store, rs)
+
+	agent := &fakeAgent{name: "fake", avail: true, output: "ok"}
+	data := &TimesheetData{
+		Entries: []TimesheetEntry{
+			{Date: "2026-04-25", TraqProject: "traq", Hours: 1.0, Skipped: true, SkipReason: "unmapped"},
+			{Date: "2026-04-25", TraqProject: "other", Hours: 2.0},
+		},
+	}
+	if err := ts.PopulateNotes(context.Background(), data, agent); err != nil {
+		t.Fatalf("PopulateNotes: %v", err)
+	}
+	if data.Entries[0].Notes != "" {
+		t.Errorf("skipped entry got Notes %q, want empty", data.Entries[0].Notes)
+	}
+	if data.Entries[1].Notes != "ok" {
+		t.Errorf("non-skipped entry got Notes %q, want ok", data.Entries[1].Notes)
+	}
+	if agent.callCount != 1 {
+		t.Errorf("expected 1 generator call (skipped row excluded), got %d", agent.callCount)
+	}
+}
+
+func TestPopulateNotes_CachesByInputHash(t *testing.T) {
+	store := storage.NewInMemoryTestStore(t)
+	defer store.Close()
+	rs := helperReportsServiceForTest(t, store)
+	ts := NewTimesheetService(store, rs)
+
+	agent := &fakeAgent{name: "fake", avail: true, output: "cached!"}
+	e := TimesheetEntry{Date: "2026-04-25", TraqProject: "traq", Hours: 1.0}
+	data1 := &TimesheetData{Entries: []TimesheetEntry{e}}
+	data2 := &TimesheetData{Entries: []TimesheetEntry{e}}
+
+	if err := ts.PopulateNotes(context.Background(), data1, agent); err != nil {
+		t.Fatalf("first PopulateNotes: %v", err)
+	}
+	if err := ts.PopulateNotes(context.Background(), data2, agent); err != nil {
+		t.Fatalf("second PopulateNotes: %v", err)
+	}
+	if agent.callCount != 1 {
+		t.Errorf("expected 1 generator call (second served from cache), got %d", agent.callCount)
+	}
+	if data2.Entries[0].Notes != "cached!" {
+		t.Errorf("cached Notes not applied: got %q", data2.Entries[0].Notes)
+	}
+}
+
+func TestPopulateNotes_GeneratorError_RecordsButContinues(t *testing.T) {
+	store := storage.NewInMemoryTestStore(t)
+	defer store.Close()
+	rs := helperReportsServiceForTest(t, store)
+	ts := NewTimesheetService(store, rs)
+
+	agent := &fakeAgent{name: "fake", avail: true, err: fmt.Errorf("boom")}
+	data := &TimesheetData{
+		Entries: []TimesheetEntry{
+			{Date: "2026-04-25", TraqProject: "traq", Hours: 1.0},
+			{Date: "2026-04-26", TraqProject: "traq", Hours: 1.0},
+		},
+	}
+	if err := ts.PopulateNotes(context.Background(), data, agent); err != nil {
+		t.Fatalf("PopulateNotes returned error (should continue past per-entry failure): %v", err)
+	}
+	if !strings.Contains(data.Entries[0].Notes, "notes generation failed") {
+		t.Errorf("entry[0].Notes = %q, want failure marker", data.Entries[0].Notes)
+	}
+	if !strings.Contains(data.Entries[1].Notes, "notes generation failed") {
+		t.Errorf("entry[1].Notes = %q, want failure marker", data.Entries[1].Notes)
 	}
 }
