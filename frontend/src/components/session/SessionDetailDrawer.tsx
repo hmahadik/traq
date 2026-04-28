@@ -15,13 +15,14 @@ import {
   useGitCommitsForSession,
   useFileEventsForSession,
   useBrowserVisitsForSession,
+  useGenerateSummary,
   useRegenerateSummary,
   useDeleteSummary,
   useDeleteSession,
   useDeleteScreenshot,
 } from '@/api/hooks';
 import { formatTimeRange, formatDuration, formatTimestamp, getNullableInt, getNullableString, isNullableValid } from '@/lib/utils';
-import { Terminal, GitCommit, FileText, Globe, RefreshCw, Trash2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Terminal, GitCommit, FileText, Globe, RefreshCw, Trash2, ChevronLeft, ChevronRight, Sparkles, Loader2 } from 'lucide-react';
 import { Screenshot } from '@/components/common/Screenshot';
 import { ActivityLogTable } from '@/components/session/ActivityLogTable';
 import { CollapsibleSection } from '@/components/session/CollapsibleSection';
@@ -36,6 +37,7 @@ interface SessionDetailDrawerProps {
 export function SessionDetailDrawer({ open, onOpenChange, sessionId }: SessionDetailDrawerProps) {
   // Lightweight summary with counts only (no arrays loaded)
   const { data: context, isLoading, refetch } = useSessionContextSummary(sessionId || 0);
+  const generateMutation = useGenerateSummary();
   const regenerateMutation = useRegenerateSummary();
   const deleteSummaryMutation = useDeleteSummary();
   const deleteMutation = useDeleteSession();
@@ -67,6 +69,18 @@ export function SessionDetailDrawer({ open, onOpenChange, sessionId }: SessionDe
   const safeGitCommits = gitCommits || [];
   const safeFileEvents = fileEvents || [];
   const safeBrowserVisits = browserVisits || [];
+
+  const handleGenerateSummary = async () => {
+    if (!sessionId) return;
+    try {
+      await generateMutation.mutateAsync(sessionId);
+      toast.success('Summary generated');
+      refetch();
+    } catch (error) {
+      toast.error(`Failed to generate summary: ${error instanceof Error ? error.message : String(error)}`);
+      console.error('Generate summary error:', error);
+    }
+  };
 
   const handleRegenerateSummary = async () => {
     if (!sessionId) return;
@@ -183,6 +197,40 @@ export function SessionDetailDrawer({ open, onOpenChange, sessionId }: SessionDe
               </div>
             ) : (
               <div className="space-y-6">
+                {/* Empty-state Generate Summary card — shown when no AI summary exists yet */}
+                {!summary && (
+                  <Card>
+                    <CardContent className="flex items-center justify-between gap-4 p-4">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <Sparkles className="h-5 w-5 text-muted-foreground shrink-0" />
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium">No AI summary yet</p>
+                          <p className="text-xs text-muted-foreground">
+                            Generate a summary with project allocations from this session's activity.
+                          </p>
+                        </div>
+                      </div>
+                      <Button
+                        size="sm"
+                        onClick={handleGenerateSummary}
+                        disabled={generateMutation.isPending}
+                      >
+                        {generateMutation.isPending ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Generating...
+                          </>
+                        ) : (
+                          <>
+                            <Sparkles className="mr-2 h-4 w-4" />
+                            Generate
+                          </>
+                        )}
+                      </Button>
+                    </CardContent>
+                  </Card>
+                )}
+
                 {/* Summary */}
                 {summary && (
                   <>
