@@ -102,6 +102,10 @@ export function DeleteProject(arg1) {
   return window['go']['main']['App']['DeleteProject'](arg1);
 }
 
+export function DeleteProjectMapping(arg1) {
+  return window['go']['main']['App']['DeleteProjectMapping'](arg1);
+}
+
 export function DeleteProjectPattern(arg1) {
   return window['go']['main']['App']['DeleteProjectPattern'](arg1);
 }
@@ -176,6 +180,10 @@ export function GenerateReport(arg1, arg2, arg3) {
 
 export function GenerateSummary(arg1) {
   return window['go']['main']['App']['GenerateSummary'](arg1);
+}
+
+export function GenerateTimesheet(arg1, arg2) {
+  return window['go']['main']['App']['GenerateTimesheet'](arg1, arg2);
 }
 
 export function GenerateWeeklySummaryMarkdown(arg1, arg2) {
@@ -526,8 +534,24 @@ export function ListAISessions(arg1) {
   return window['go']['main']['App']['ListAISessions'](arg1);
 }
 
+export function ListFFCustomers() {
+  return window['go']['main']['App']['ListFFCustomers']();
+}
+
+export function ListFFJobs(arg1) {
+  return window['go']['main']['App']['ListFFJobs'](arg1);
+}
+
+export function ListFFTasks(arg1, arg2) {
+  return window['go']['main']['App']['ListFFTasks'](arg1, arg2);
+}
+
 export function ListHierarchicalSummaries(arg1, arg2) {
   return window['go']['main']['App']['ListHierarchicalSummaries'](arg1, arg2);
+}
+
+export function ListProjectMappings() {
+  return window['go']['main']['App']['ListProjectMappings']();
 }
 
 export function MergeTags(arg1, arg2) {
@@ -606,6 +630,10 @@ export function SaveAppCategory(arg1, arg2) {
   return window['go']['main']['App']['SaveAppCategory'](arg1, arg2);
 }
 
+export function SaveProjectMapping(arg1) {
+  return window['go']['main']['App']['SaveProjectMapping'](arg1);
+}
+
 export function SearchAllDataSources(arg1, arg2) {
   return window['go']['main']['App']['SearchAllDataSources'](arg1, arg2);
 }
@@ -648,6 +676,10 @@ export function StopTracking() {
 
 export function SuggestProject(arg1) {
   return window['go']['main']['App']['SuggestProject'](arg1);
+}
+
+export function TestFFConnection() {
+  return window['go']['main']['App']['TestFFConnection']();
 }
 
 export function TestIssueWebhook() {

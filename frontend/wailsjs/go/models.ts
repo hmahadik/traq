@@ -1,3 +1,56 @@
+export namespace functionfox {
+	
+	export class Customer {
+	    ID: string;
+	    Name: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new Customer(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.ID = source["ID"];
+	        this.Name = source["Name"];
+	    }
+	}
+	export class Job {
+	    ID: string;
+	    CustomerID: string;
+	    Name: string;
+	    Code: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new Job(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.ID = source["ID"];
+	        this.CustomerID = source["CustomerID"];
+	        this.Name = source["Name"];
+	        this.Code = source["Code"];
+	    }
+	}
+	export class Task {
+	    ID: string;
+	    JobID: string;
+	    Name: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new Task(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.ID = source["ID"];
+	        this.JobID = source["JobID"];
+	        this.Name = source["Name"];
+	    }
+	}
+
+}
+
 export namespace inference {
 	
 	export class BundledStatus {
@@ -735,6 +788,26 @@ export namespace service {
 	        this.sitesVisitedPercent = source["sitesVisitedPercent"];
 	    }
 	}
+	export class TimesheetConfig {
+	    hoursRounding: number;
+	    ffAccountId: string;
+	    ffUsername: string;
+	    aiNotesEnabled: boolean;
+	    aiNotesBackend: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new TimesheetConfig(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.hoursRounding = source["hoursRounding"];
+	        this.ffAccountId = source["ffAccountId"];
+	        this.ffUsername = source["ffUsername"];
+	        this.aiNotesEnabled = source["aiNotesEnabled"];
+	        this.aiNotesBackend = source["aiNotesBackend"];
+	    }
+	}
 	export class TimelineConfig {
 	    minActivityDurationSeconds: number;
 	    titleDisplay: string;
@@ -1004,6 +1077,7 @@ export namespace service {
 	    update?: UpdateConfig;
 	    timeline?: TimelineConfig;
 	    ai?: AIConfig;
+	    timesheet?: TimesheetConfig;
 	
 	    static createFrom(source: any = {}) {
 	        return new Config(source);
@@ -1021,6 +1095,7 @@ export namespace service {
 	        this.update = this.convertValues(source["update"], UpdateConfig);
 	        this.timeline = this.convertValues(source["timeline"], TimelineConfig);
 	        this.ai = this.convertValues(source["ai"], AIConfig);
+	        this.timesheet = this.convertValues(source["timesheet"], TimesheetConfig);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -2286,6 +2361,84 @@ export namespace service {
 		}
 	}
 	
+	export class TimesheetEntry {
+	    date: string;
+	    traqProject: string;
+	    hours: number;
+	    notes: string;
+	    ffClientId: string;
+	    ffClientName: string;
+	    ffJobId: string;
+	    ffJobName: string;
+	    ffTaskId: string;
+	    ffTaskName: string;
+	    skipped: boolean;
+	    skipReason: string;
+	    ffTimesheetId: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new TimesheetEntry(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.date = source["date"];
+	        this.traqProject = source["traqProject"];
+	        this.hours = source["hours"];
+	        this.notes = source["notes"];
+	        this.ffClientId = source["ffClientId"];
+	        this.ffClientName = source["ffClientName"];
+	        this.ffJobId = source["ffJobId"];
+	        this.ffJobName = source["ffJobName"];
+	        this.ffTaskId = source["ffTaskId"];
+	        this.ffTaskName = source["ffTaskName"];
+	        this.skipped = source["skipped"];
+	        this.skipReason = source["skipReason"];
+	        this.ffTimesheetId = source["ffTimesheetId"];
+	    }
+	}
+	export class TimesheetData {
+	    start: string;
+	    end: string;
+	    entries: TimesheetEntry[];
+	    unmappedProjects: string[];
+	    hoursRounding: number;
+	    generatedAt: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new TimesheetData(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.start = source["start"];
+	        this.end = source["end"];
+	        this.entries = this.convertValues(source["entries"], TimesheetEntry);
+	        this.unmappedProjects = source["unmappedProjects"];
+	        this.hoursRounding = source["hoursRounding"];
+	        this.generatedAt = source["generatedAt"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
+	
 	
 	
 	export class UpdateInfo {
@@ -2810,6 +2963,38 @@ export namespace storage {
 		    }
 		    return a;
 		}
+	}
+	export class FunctionFoxProjectMapping {
+	    id: number;
+	    traqProject: string;
+	    ffClientId: string;
+	    ffClientName: string;
+	    ffJobId: string;
+	    ffJobName: string;
+	    ffTaskId: string;
+	    ffTaskName: string;
+	    enabled: boolean;
+	    createdAt: number;
+	    updatedAt: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new FunctionFoxProjectMapping(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.traqProject = source["traqProject"];
+	        this.ffClientId = source["ffClientId"];
+	        this.ffClientName = source["ffClientName"];
+	        this.ffJobId = source["ffJobId"];
+	        this.ffJobName = source["ffJobName"];
+	        this.ffTaskId = source["ffTaskId"];
+	        this.ffTaskName = source["ffTaskName"];
+	        this.enabled = source["enabled"];
+	        this.createdAt = source["createdAt"];
+	        this.updatedAt = source["updatedAt"];
+	    }
 	}
 	export class GitCommit {
 	    id: number;

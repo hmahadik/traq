@@ -12,6 +12,8 @@ import (
 	"time"
 
 	"traq/internal/inference"
+	"traq/internal/integrations/aiagent"
+	"traq/internal/integrations/functionfox"
 	"traq/internal/lock"
 	"traq/internal/platform"
 	"traq/internal/service"
@@ -58,6 +60,10 @@ type App struct {
 	Draft       *service.DraftService
 	ShellSetup  *service.ShellSetupService
 	AI          *service.AIService
+	Timesheet   *service.TimesheetService
+
+	// FunctionFox client (Plan B uses stub; Plan C will use real HTTP client)
+	ffClient functionfox.Client
 
 	// Inference engine
 	inference *inference.Service
@@ -206,6 +212,12 @@ func (a *App) startup(ctx context.Context) {
 
 	// Wire up reports service to projects service (for auto-discovery)
 	a.Projects.SetReportsService(a.Reports)
+
+	// Initialize timesheet service (after reports service for project detection)
+	a.Timesheet = service.NewTimesheetService(a.store, a.Reports)
+
+	// Initialize FunctionFox client (Plan B uses stub)
+	a.ffClient = functionfox.NewStubClient()
 
 	// Initialize backfill service (after reports service for detection functions)
 	a.backfillService = service.NewBackfillService(a.store, a.Projects, a.Reports)
@@ -2207,4 +2219,106 @@ func (a *App) GetAISession(id string) (*service.AISessionDetail, error) {
 // fields come back empty and the frontend renders timestamp-only rows.
 func (a *App) GetAIPromptsForDay(date string) ([]service.AIPromptDisplay, error) {
 	return a.AI.GetAIPromptsForDay(date)
+}
+
+// =============================================================================
+// Timesheet (Plan B)
+// =============================================================================
+
+// GenerateTimesheet builds a structured per-(project, date) timesheet for the
+// given date range and resolves FF mappings. Notes are NOT generated unless
+// AI notes are enabled in settings (handled by GenerateTimesheetWithAINotes).
+func (a *App) GenerateTimesheet(startDate, endDate string) (*service.TimesheetData, error) {
+	cfg, err := a.Config.GetConfig()
+	if err != nil {
+		return nil, fmt.Errorf("get config: %w", err)
+	}
+	rounding := 0.25
+	if cfg.Timesheet != nil && cfg.Timesheet.HoursRounding > 0 {
+		rounding = cfg.Timesheet.HoursRounding
+	}
+	data, err := a.Timesheet.BuildTimesheet(startDate, endDate, rounding)
+	if err != nil {
+		return nil, err
+	}
+	if cfg.Timesheet != nil && cfg.Timesheet.AINotesEnabled {
+		gen, err := pickAIGenerator(cfg.Timesheet.AINotesBackend)
+		if err != nil {
+			// Non-fatal: return the data without AI-generated notes; the UI
+			// can warn the user that the configured AI backend isn't available.
+			return data, nil
+		}
+		if err := a.Timesheet.PopulateNotes(a.ctx, data, gen); err != nil {
+			return data, fmt.Errorf("populate notes: %w", err)
+		}
+	}
+	return data, nil
+}
+
+// pickAIGenerator selects the configured AI backend. Returns an error if the
+// configured backend is not available on PATH.
+func pickAIGenerator(backend string) (aiagent.Generator, error) {
+	switch backend {
+	case "claude":
+		g := aiagent.NewClaudeGenerator()
+		if !g.Available() {
+			return nil, fmt.Errorf("claude CLI not on PATH")
+		}
+		return g, nil
+	case "opencode":
+		g := aiagent.NewOpenCodeGenerator()
+		if !g.Available() {
+			return nil, fmt.Errorf("opencode CLI not on PATH")
+		}
+		return g, nil
+	case "auto", "":
+		g := aiagent.NewAutoGenerator()
+		if !g.Available() {
+			return nil, fmt.Errorf("no AI agent CLI on PATH (install claude or opencode)")
+		}
+		return g, nil
+	default:
+		return nil, fmt.Errorf("unknown AI backend: %s", backend)
+	}
+}
+
+// ListProjectMappings returns all stored Traq project → FunctionFox mappings.
+func (a *App) ListProjectMappings() ([]*storage.FunctionFoxProjectMapping, error) {
+	return a.store.ListFunctionFoxProjectMappings()
+}
+
+// SaveProjectMapping inserts or updates a Traq project → FunctionFox mapping.
+// Returns the row ID (insert) or 0 (update — sqlite driver-specific behavior).
+func (a *App) SaveProjectMapping(m *storage.FunctionFoxProjectMapping) (int64, error) {
+	if m == nil {
+		return 0, fmt.Errorf("mapping is nil")
+	}
+	return a.store.SaveFunctionFoxProjectMapping(m)
+}
+
+// DeleteProjectMapping removes the mapping for the given Traq project.
+func (a *App) DeleteProjectMapping(traqProject string) error {
+	return a.store.DeleteFunctionFoxProjectMapping(traqProject)
+}
+
+// ListFFCustomers returns the list of FunctionFox customers (clients) visible
+// to the configured account. Plan B uses a stub; Plan C wires the real HTTP client.
+func (a *App) ListFFCustomers() ([]functionfox.Customer, error) {
+	return a.ffClient.ListCustomers(a.ctx)
+}
+
+// ListFFJobs returns the jobs (projects) under a given FF customer.
+func (a *App) ListFFJobs(customerID string) ([]functionfox.Job, error) {
+	return a.ffClient.ListJobs(a.ctx, customerID)
+}
+
+// ListFFTasks returns the tasks (activities) within a given FF job.
+func (a *App) ListFFTasks(customerID, jobID string) ([]functionfox.Task, error) {
+	return a.ffClient.ListTasks(a.ctx, customerID, jobID)
+}
+
+// TestFFConnection verifies the FunctionFox client is reachable. Plan B's stub
+// always returns nil. Plan C will perform a real login round-trip.
+func (a *App) TestFFConnection() error {
+	return a.ffClient.TestConnection(a.ctx)
 }
