@@ -9,6 +9,15 @@ export interface Config {
   timeline?: TimelineConfig;
   ai?: AIConfig;
   update?: UpdatesConfig;
+  timesheet?: TimesheetConfig;
+}
+
+export interface TimesheetConfig {
+  hoursRounding: number;
+  ffAccountId: string;
+  ffUsername: string;
+  aiNotesEnabled: boolean;
+  aiNotesBackend: string; // "auto" | "claude" | "opencode"
 }
 
 export interface UpdatesConfig {

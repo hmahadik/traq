@@ -1265,6 +1265,63 @@ export const updates = {
   },
 };
 
+/**
+ * Timesheet API (Plan B) - structured per-(project, date) entries for
+ * FunctionFox preview. Push is gated to Plan C.
+ */
+export const timesheet = {
+  generate: async (startDate: string, endDate: string) => {
+    await waitForReady();
+    return withRetry(() => App.GenerateTimesheet(startDate, endDate));
+  },
+};
+
+/**
+ * FunctionFox project mapping API - links a Traq project name to a
+ * (FF client, job, task) triple so timesheet entries can be pushed.
+ */
+export const projectMappings = {
+  list: async () => {
+    await waitForReady();
+    const result = await withRetry(() => App.ListProjectMappings());
+    return result || [];
+  },
+  save: async (mapping: import('@wailsjs/go/models').storage.FunctionFoxProjectMapping) => {
+    await waitForReady();
+    return App.SaveProjectMapping(mapping);
+  },
+  delete: async (traqProject: string) => {
+    await waitForReady();
+    return App.DeleteProjectMapping(traqProject);
+  },
+};
+
+/**
+ * FunctionFox catalog API - lists clients, jobs, and tasks for the configured
+ * FF account. Plan B uses a stub backend; Plan C wires the real HTTP client.
+ */
+export const functionfox = {
+  listCustomers: async () => {
+    await waitForReady();
+    const result = await withRetry(() => App.ListFFCustomers());
+    return result || [];
+  },
+  listJobs: async (customerID: string) => {
+    await waitForReady();
+    const result = await withRetry(() => App.ListFFJobs(customerID));
+    return result || [];
+  },
+  listTasks: async (customerID: string, jobID: string) => {
+    await waitForReady();
+    const result = await withRetry(() => App.ListFFTasks(customerID, jobID));
+    return result || [];
+  },
+  testConnection: async () => {
+    await waitForReady();
+    return App.TestFFConnection();
+  },
+};
+
 // AI coding activity (Claude Code, opencode) - timestamp-only session data
 const ai = {
   list: async (date: string) => {
@@ -1303,4 +1360,7 @@ export const api = {
   search,
   shellSetup,
   updates,
+  timesheet,
+  projectMappings,
+  functionfox,
 };
