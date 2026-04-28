@@ -151,3 +151,106 @@ type DailySummary struct {
 	SessionsCount int    `json:"sessionsCount"`
 	CreatedAt     int64  `json:"createdAt"`
 }
+
+// WeeklySummaryData holds all the aggregated data for a weekly summary report.
+type WeeklySummaryData struct {
+	StartDate       string
+	EndDate         string
+	TotalHours      float64
+	SessionCount    int
+	ScreenshotCount int
+	FocusEventCount int
+	GitCommitCount  int
+	ShellCmdCount   int
+	FileEventCount  int
+
+	// Project distribution
+	Projects []ProjectSummary
+
+	// Daily breakdown
+	DailyStats []DailySummaryStats
+
+	// Git statistics
+	TotalInsertions int64
+	TotalDeletions  int64
+	CommitsByRepo   []*CommitsByRepo
+
+	// Meetings
+	Meetings []MeetingDetection
+
+	// Slack channels
+	SlackChannels []SlackChannel
+
+	// Browser activity by domain with page titles
+	BrowserDomains []BrowserDomainSummary
+
+	// App usage
+	AppUsage []*AppDetailedUsage
+
+	// File downloads
+	Downloads []FileSummary
+
+	// Research topics (from Claude/AI assistant pages)
+	ResearchTopics []ResearchTopic
+
+	// Key accomplishments (top-level highlights)
+	KeyAccomplishments []string
+
+	// Total communication time
+	TotalSlackMins int64
+	TotalZoomMins  int64
+	TotalEmailMins int64
+}
+
+// ProjectSummary represents a project with its time and accomplishments
+type ProjectSummary struct {
+	Name           string
+	Description    string
+	Hours          float64
+	Percentage     float64
+	CommitCount    int
+	DailyAccomplishments map[string][]string // date -> accomplishments
+	Apps           []string
+}
+
+// DailySummaryStats holds stats for a single day
+type DailySummaryStats struct {
+	Date            string
+	DayOfWeek       string
+	DayName         string // "Mon Jan 06"
+	Hours           float64
+	SessionCount    int
+	CommitCount     int
+	PrimaryFocus    string
+	Accomplishments []string
+}
+
+// SlackChannel holds Slack channel activity
+type SlackChannel struct {
+	Name         string
+	DurationMins int64
+	IsHuddle     bool
+}
+
+// BrowserDomainSummary holds browser activity for a domain
+type BrowserDomainSummary struct {
+	Domain        string
+	DurationMins  int64
+	VisitCount    int64
+	Category      string
+	SampleTitles  []string
+}
+
+// FileSummary represents a downloaded file
+type FileSummary struct {
+	FileName  string
+	Timestamp int64
+	Category  string
+}
+
+// ResearchTopic represents a research topic from browser activity
+type ResearchTopic struct {
+	Topic        string
+	DurationMins int64
+	Source       string
+}
