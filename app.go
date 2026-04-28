@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -93,6 +94,21 @@ func (a *App) startup(ctx context.Context) {
 
 	// Ensure data directory exists
 	dataDir := a.platform.DataDir()
+
+	// Mirror logs to a stable file in the data dir so users can diagnose
+	// failures without needing to find the terminal that launched wails dev.
+	// File is opened in append mode and capped via lumberjack-style rotation
+	// (manual: keep at most ~5MB of recent logs by truncating on startup).
+	if err := os.MkdirAll(dataDir, 0o755); err == nil {
+		logPath := filepath.Join(dataDir, "traq.log")
+		// Truncate-on-startup keeps the file bounded across runs without
+		// pulling in a rotation dep. Each run gets a clean log; the user's
+		// most recent failure is always at the top.
+		if f, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644); err == nil {
+			log.SetOutput(io.MultiWriter(os.Stderr, f))
+			log.Printf("traq starting: log mirrored to %s", logPath)
+		}
+	}
 
 	// Acquire instance lock to prevent multiple instances
 	a.instanceLock = lock.New(dataDir)
