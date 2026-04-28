@@ -21,6 +21,7 @@ import {
   TimeRangeSelector,
   ReportTypeSelector,
   ReportPreview,
+  TimesheetPreview,
 } from '@/components/reports';
 import {
   useReportHistory,
@@ -29,6 +30,7 @@ import {
   useDeleteReport,
   useParseTimeRange,
   useProjects,
+  useGenerateTimesheet,
 } from '@/api/hooks';
 import { api } from '@/api/client';
 import { Loader2, Sparkles, ImageIcon, History, Trash2, FolderKanban } from 'lucide-react';
@@ -71,7 +73,7 @@ export function ReportsPage() {
     setTimeRange(getInitialTimeRange());
   }, [selectedDate, timeframeType, dateRange]);
 
-  const [reportType, setReportType] = useState<'summary' | 'detailed' | 'standup'>('summary');
+  const [reportType, setReportType] = useState<'summary' | 'detailed' | 'standup' | 'timesheet'>('summary');
   const [includeScreenshots, setIncludeScreenshots] = useState(false);
   const [generatedReport, setGeneratedReport] = useState<Report | undefined>();
   const [selectedProjectId, setSelectedProjectId] = useState<string>('all');
@@ -82,6 +84,26 @@ export function ReportsPage() {
   const generateReport = useGenerateReport();
   const exportReport = useExportReport();
   const deleteReport = useDeleteReport();
+  const generateTimesheet = useGenerateTimesheet();
+
+  const isTimesheet = reportType === 'timesheet';
+
+  // Convert parsed unix seconds → "YYYY-MM-DD" in local timezone for the
+  // timesheet endpoint, which expects calendar dates.
+  const toLocalDateString = (unixSeconds: number) => {
+    const d = new Date(unixSeconds * 1000);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  };
+
+  const handleGenerateTimesheet = async () => {
+    if (!parsedRange) return;
+    const startDate = toLocalDateString(parsedRange.start);
+    const endDate = toLocalDateString(parsedRange.end);
+    await generateTimesheet.mutateAsync({ startDate, endDate });
+  };
 
   const handleGenerate = async () => {
     const projectId = selectedProjectId === 'all' ? 0 : parseInt(selectedProjectId, 10);
@@ -210,55 +232,60 @@ export function ReportsPage() {
             parsedRange={parsedRange}
           />
 
-          <ReportTypeSelector value={reportType} onChange={setReportType} />
+          <ReportTypeSelector value={reportType} onChange={(v) => setReportType(v as typeof reportType)} />
 
-          {/* Project filter */}
-          <div className="space-y-2">
-            <label className="text-sm font-medium flex items-center gap-1.5">
-              <FolderKanban className="h-3.5 w-3.5 text-muted-foreground" />
-              Project Filter
-            </label>
-            <Select value={selectedProjectId} onValueChange={setSelectedProjectId}>
-              <SelectTrigger>
-                <SelectValue placeholder="All projects" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All projects (combined)</SelectItem>
-                {projects?.map(project => (
-                  <SelectItem key={project.id} value={String(project.id)}>
-                    <div className="flex items-center gap-2">
-                      <div
-                        className="w-3 h-3 rounded-full"
-                        style={{ backgroundColor: project.color }}
-                      />
-                      {project.name}
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          {/* Project filter — narrative reports only */}
+          {!isTimesheet && (
+            <div className="space-y-2">
+              <label className="text-sm font-medium flex items-center gap-1.5">
+                <FolderKanban className="h-3.5 w-3.5 text-muted-foreground" />
+                Project Filter
+              </label>
+              <Select value={selectedProjectId} onValueChange={setSelectedProjectId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="All projects" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All projects (combined)</SelectItem>
+                  {projects?.map(project => (
+                    <SelectItem key={project.id} value={String(project.id)}>
+                      <div className="flex items-center gap-2">
+                        <div
+                          className="w-3 h-3 rounded-full"
+                          style={{ backgroundColor: project.color }}
+                        />
+                        {project.name}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           {/* Generate section */}
           <div className="space-y-3">
-            <div className="flex items-center gap-3">
-              <Switch
-                id="includeScreenshots"
-                checked={includeScreenshots}
-                onCheckedChange={setIncludeScreenshots}
-              />
-              <label htmlFor="includeScreenshots" className="text-sm flex items-center gap-1.5 cursor-pointer">
-                <ImageIcon className="h-3.5 w-3.5 text-muted-foreground" />
-                Include screenshots
-              </label>
-            </div>
+            {!isTimesheet && (
+              <div className="flex items-center gap-3">
+                <Switch
+                  id="includeScreenshots"
+                  checked={includeScreenshots}
+                  onCheckedChange={setIncludeScreenshots}
+                />
+                <label htmlFor="includeScreenshots" className="text-sm flex items-center gap-1.5 cursor-pointer">
+                  <ImageIcon className="h-3.5 w-3.5 text-muted-foreground" />
+                  Include screenshots
+                </label>
+              </div>
+            )}
 
             <Button
-              onClick={handleGenerate}
-              disabled={generateReport.isPending}
+              onClick={isTimesheet ? handleGenerateTimesheet : handleGenerate}
+              disabled={isTimesheet ? generateTimesheet.isPending : generateReport.isPending}
               className="w-full"
+              data-testid={isTimesheet ? 'generate-timesheet' : 'generate-report'}
             >
-              {generateReport.isPending ? (
+              {(isTimesheet ? generateTimesheet.isPending : generateReport.isPending) ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   Generating...
@@ -266,7 +293,7 @@ export function ReportsPage() {
               ) : (
                 <>
                   <Sparkles className="mr-2 h-4 w-4" />
-                  Generate Report
+                  {isTimesheet ? 'Generate Timesheet' : 'Generate Report'}
                 </>
               )}
             </Button>
@@ -274,13 +301,23 @@ export function ReportsPage() {
         </div>
 
         {/* Right Column - Preview (fills height) */}
-        <ReportPreview
-          report={generatedReport}
-          isLoading={generateReport.isPending}
-          onExport={handleExport}
-          isExporting={exportReport.isPending}
-          fullHeight
-        />
+        {isTimesheet ? (
+          <TimesheetPreview
+            data={generateTimesheet.data}
+            isLoading={generateTimesheet.isPending}
+            isError={generateTimesheet.isError}
+            error={generateTimesheet.error}
+            onGenerate={handleGenerateTimesheet}
+          />
+        ) : (
+          <ReportPreview
+            report={generatedReport}
+            isLoading={generateReport.isPending}
+            onExport={handleExport}
+            isExporting={exportReport.isPending}
+            fullHeight
+          />
+        )}
       </div>
     </div>
   );

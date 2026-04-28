@@ -1,6 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
-import { FileText, ListChecks, MessageSquare, Circle, CheckCircle2 } from 'lucide-react';
+import { FileText, ListChecks, MessageSquare, Circle, CheckCircle2, FileSpreadsheet } from 'lucide-react';
 
 interface ReportTypeSelectorProps {
   value: string;
@@ -11,6 +11,7 @@ const REPORT_TYPES = [
   { id: 'summary', name: 'Summary', description: 'High-level overview', icon: FileText },
   { id: 'detailed', name: 'Detailed', description: 'Full activity breakdown', icon: ListChecks },
   { id: 'standup', name: 'Standup', description: 'Brief daily format', icon: MessageSquare },
+  { id: 'timesheet', name: 'Timesheet', description: 'Per-project hours for FunctionFox', icon: FileSpreadsheet },
 ];
 
 export function ReportTypeSelector({ value, onChange }: ReportTypeSelectorProps) {
