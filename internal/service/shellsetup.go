@@ -113,7 +113,7 @@ func (s *ShellSetupService) Install(kind shellplugin.ShellKind) error {
 		traqFenceEnd,
 	}, "\n")
 
-	if err := upsertFencedBlock(rcPath, block); err != nil {
+	if err := upsertFencedBlock(rcPath, block, traqFenceStart, traqFenceEnd); err != nil {
 		return fmt.Errorf("update rc file: %w", err)
 	}
 
@@ -129,7 +129,7 @@ func (s *ShellSetupService) Uninstall(kind shellplugin.ShellKind) error {
 	if err != nil {
 		return err
 	}
-	if err := removeFencedBlock(rcPath); err != nil {
+	if err := removeFencedBlock(rcPath, traqFenceStart, traqFenceEnd); err != nil {
 		return fmt.Errorf("update rc file: %w", err)
 	}
 	if err := os.Remove(s.pluginPath(kind)); err != nil && !os.IsNotExist(err) {
@@ -208,26 +208,30 @@ func fileExists(p string) bool {
 	return err == nil
 }
 
-// upsertFencedBlock atomically replaces or appends the fenced block in rcPath.
-func upsertFencedBlock(rcPath, block string) error {
+// upsertFencedBlock atomically replaces or appends a fenced block in rcPath.
+// startFence and endFence are full-line markers — anything between them is
+// considered Traq-managed and gets replaced on update. The same helper is
+// shared by the shell and tmux installers; they pass distinct fences so an
+// uninstall of one never touches the other's content.
+func upsertFencedBlock(rcPath, block, startFence, endFence string) error {
 	existing, err := os.ReadFile(rcPath)
 	if err != nil && !os.IsNotExist(err) {
 		return err
 	}
 
 	var out bytes.Buffer
-	if bytes.Contains(existing, []byte(traqFenceStart)) {
+	if bytes.Contains(existing, []byte(startFence)) {
 		scanner := bufio.NewScanner(bytes.NewReader(existing))
 		scanner.Buffer(make([]byte, 64*1024), 1024*1024)
 		inside := false
 		for scanner.Scan() {
 			line := scanner.Text()
 			switch {
-			case !inside && strings.TrimSpace(line) == traqFenceStart:
+			case !inside && strings.TrimSpace(line) == startFence:
 				inside = true
 				out.WriteString(block)
 				out.WriteByte('\n')
-			case inside && strings.TrimSpace(line) == traqFenceEnd:
+			case inside && strings.TrimSpace(line) == endFence:
 				inside = false
 			case !inside:
 				out.WriteString(line)
@@ -246,7 +250,7 @@ func upsertFencedBlock(rcPath, block string) error {
 	return atomicWriteFile(rcPath, out.Bytes(), 0600)
 }
 
-func removeFencedBlock(rcPath string) error {
+func removeFencedBlock(rcPath, startFence, endFence string) error {
 	data, err := os.ReadFile(rcPath)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -254,7 +258,7 @@ func removeFencedBlock(rcPath string) error {
 		}
 		return err
 	}
-	if !bytes.Contains(data, []byte(traqFenceStart)) {
+	if !bytes.Contains(data, []byte(startFence)) {
 		return nil
 	}
 	var out bytes.Buffer
@@ -264,9 +268,9 @@ func removeFencedBlock(rcPath string) error {
 	for scanner.Scan() {
 		line := scanner.Text()
 		switch {
-		case !inside && strings.TrimSpace(line) == traqFenceStart:
+		case !inside && strings.TrimSpace(line) == startFence:
 			inside = true
-		case inside && strings.TrimSpace(line) == traqFenceEnd:
+		case inside && strings.TrimSpace(line) == endFence:
 			inside = false
 		case !inside:
 			out.WriteString(line)
