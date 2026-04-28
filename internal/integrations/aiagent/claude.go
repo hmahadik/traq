@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"os"
 	"os/exec"
 	"strings"
 	"time"
@@ -39,11 +40,21 @@ func (g *ClaudeGenerator) Generate(ctx context.Context, in Input) (*Output, erro
 	}, nil
 }
 
-// GenerateRaw runs `claude --bare -p <prompt>` and returns trimmed stdout.
-// Used by callers that build their own prompt structure (e.g. session
-// summary) and don't fit the timesheet-notes Input/Output shape.
+// GenerateRaw runs `claude -p <prompt>` and returns trimmed stdout.
+//
+// We deliberately do NOT pass --bare: that flag forces Anthropic auth to
+// strictly use ANTHROPIC_API_KEY / apiKeyHelper and skips OAuth + keychain,
+// which immediately fails for users authenticated via Claude Code's normal
+// `claude login` flow (the common case). Plain `-p` honors whichever auth
+// the user has configured.
+//
+// The command runs from a temp directory so CLAUDE.md / hooks / settings
+// from the user's working tree don't leak into the prompt context — Traq
+// is asking Claude to summarize Traq's own session data, not to read its
+// own source code repo.
 func (g *ClaudeGenerator) GenerateRaw(ctx context.Context, prompt string) (string, error) {
-	cmd := g.commandFunc(ctx, "claude", "--bare", "-p", prompt)
+	cmd := g.commandFunc(ctx, "claude", "-p", prompt)
+	cmd.Dir = os.TempDir()
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
