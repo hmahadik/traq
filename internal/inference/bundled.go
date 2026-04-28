@@ -350,7 +350,15 @@ func (e *BundledEngine) checkHealth() bool {
 	return resp.StatusCode == http.StatusOK
 }
 
-// Complete sends a completion request to the bundled server
+// Complete sends a chat-completion request to the bundled server.
+//
+// We use the OpenAI-compatible /v1/chat/completions endpoint rather than the
+// raw /completion endpoint because llama-server applies the model's chat
+// template automatically — Phi-3 needs <|user|>...<|end|><|assistant|>
+// markers, Llama-3 needs different ones, etc. Without the template the model
+// doesn't know it's supposed to "be the assistant" and degenerates into
+// repeating or extending the user content (e.g. echoing prompt instructions
+// back as the answer).
 func (e *BundledEngine) Complete(prompt string) (string, error) {
 	e.mu.RLock()
 	running := e.running
@@ -360,12 +368,12 @@ func (e *BundledEngine) Complete(prompt string) (string, error) {
 		return "", fmt.Errorf("bundled server is not running")
 	}
 
-	// Use the OpenAI-compatible /v1/completions endpoint
 	reqBody := map[string]interface{}{
-		"prompt":      prompt,
+		"messages": []map[string]string{
+			{"role": "user", "content": prompt},
+		},
 		"max_tokens":  1024,
 		"temperature": 0.7,
-		"stop":        []string{"\n\n\n"},
 	}
 
 	jsonBody, err := json.Marshal(reqBody)
@@ -373,7 +381,7 @@ func (e *BundledEngine) Complete(prompt string) (string, error) {
 		return "", err
 	}
 
-	url := fmt.Sprintf("http://localhost:%d/completion", e.config.Port)
+	url := fmt.Sprintf("http://localhost:%d/v1/chat/completions", e.config.Port)
 	postTS := time.Now()
 	log.Printf("[bundled] POST %s body=%d", url, len(jsonBody))
 	resp, err := e.client.Post(url, "application/json", bytes.NewReader(jsonBody))
@@ -395,14 +403,22 @@ func (e *BundledEngine) Complete(prompt string) (string, error) {
 	}
 	log.Printf("[bundled] response bytes=%d", len(body))
 
+	// /v1/chat/completions response shape:
+	//   { "choices": [ { "message": { "content": "..." } } ], ... }
 	var result struct {
-		Content string `json:"content"`
+		Choices []struct {
+			Message struct {
+				Content string `json:"content"`
+			} `json:"message"`
+		} `json:"choices"`
 	}
 	if err := json.Unmarshal(body, &result); err != nil {
 		return "", fmt.Errorf("failed to parse response: %w", err)
 	}
-
-	return result.Content, nil
+	if len(result.Choices) == 0 {
+		return "", fmt.Errorf("bundled server returned no choices: %s", string(body))
+	}
+	return result.Choices[0].Message.Content, nil
 }
 
 // GetModelInfo returns information about the loaded model
