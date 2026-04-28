@@ -521,10 +521,15 @@ func extractServerFromZip(zipPath, destPath, targetFilename string) error {
 
 		filename := filepath.Base(f.Name)
 
-		// Check if this is a file we need
+		// Check if this is a file we need.
+		// Recent llama.cpp releases (b4400+) split libggml into multiple
+		// libraries: libggml-base.so, libggml-cpu.so, libggml-blas.so, etc.
+		// Match both the old monolithic name and the new "libggml-*" siblings,
+		// otherwise the binary fails at startup with "cannot open shared
+		// object file: libggml-base.so".
 		isNeeded := filename == targetFilename ||
-			strings.HasPrefix(filename, "libllama.") ||
-			strings.HasPrefix(filename, "libggml.")
+			strings.HasPrefix(filename, "libllama") ||
+			strings.HasPrefix(filename, "libggml")
 
 		if !isNeeded {
 			continue
