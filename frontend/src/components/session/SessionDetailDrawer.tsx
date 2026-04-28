@@ -168,7 +168,11 @@ export function SessionDetailDrawer({ open, onOpenChange, sessionId }: SessionDe
             {session && (
               <SheetDescription>
                 {(() => {
-                  const isOngoing = session.endTime === null;
+                  // session.endTime arrives over Wails IPC as a sql.NullInt64
+                  // ({Int64, Valid}), not as `null`, so a strict null check
+                  // never trips and the duration falls through to a 0-valued
+                  // durationSeconds for ongoing sessions. Use isNullableValid.
+                  const isOngoing = !isNullableValid(session.endTime);
                   const duration = isOngoing
                     ? Math.floor(Date.now() / 1000) - session.startTime
                     : getNullableInt(session.durationSeconds, 0);
