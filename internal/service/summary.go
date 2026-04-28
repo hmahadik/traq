@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"log"
 	"sort"
 	"time"
 
@@ -27,6 +28,9 @@ func NewSummaryService(store *storage.Store, inf *inference.Service) *SummarySer
 
 // GenerateSummary generates a summary for a session
 func (s *SummaryService) GenerateSummary(sessionID int64) (*storage.Summary, error) {
+	overallStart := time.Now()
+	log.Printf("[summary] generate session=%d: start", sessionID)
+
 	// Get session
 	session, err := s.store.GetSession(sessionID)
 	if err != nil {
@@ -35,21 +39,30 @@ func (s *SummaryService) GenerateSummary(sessionID int64) (*storage.Summary, err
 	if session == nil {
 		return nil, fmt.Errorf("session not found: %d", sessionID)
 	}
+	log.Printf("[summary] generate session=%d: session loaded duration=%vs", sessionID, time.Since(overallStart).Seconds())
 
 	// Build context for the inference
 	ctx, err := s.buildSessionContext(session)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build context: %w", err)
 	}
+	log.Printf("[summary] generate session=%d: context built focus=%d shell=%d git=%d files=%d browser=%d topApps=%v duration=%vs",
+		sessionID, len(ctx.FocusEvents), len(ctx.ShellCommands), len(ctx.GitCommits), len(ctx.FileEvents), len(ctx.BrowserVisits), ctx.TopApps, time.Since(overallStart).Seconds())
 
 	// Check setup status first
+	statusStart := time.Now()
 	status := s.inference.GetSetupStatus()
+	log.Printf("[summary] generate session=%d: setup-status ready=%v engine=%s issue=%q checked-in=%vs",
+		sessionID, status.Ready, status.Engine, status.Issue, time.Since(statusStart).Seconds())
 	if !status.Ready {
 		return nil, fmt.Errorf("inference not ready: %s. %s", status.Issue, status.Suggestion)
 	}
 
 	// Generate summary
+	inferenceStart := time.Now()
+	log.Printf("[summary] generate session=%d: calling inference.GenerateSummary", sessionID)
 	result, err := s.inference.GenerateSummary(ctx)
+	log.Printf("[summary] generate session=%d: inference returned err=%v duration=%vs", sessionID, err, time.Since(inferenceStart).Seconds())
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate summary: %w", err)
 	}
@@ -105,6 +118,7 @@ func (s *SummaryService) GenerateSummary(sessionID int64) (*storage.Summary, err
 		fmt.Printf("Warning: failed to link summary to session: %v\n", err)
 	}
 
+	log.Printf("[summary] generate session=%d: done summaryID=%d total=%vs", sessionID, summaryID, time.Since(overallStart).Seconds())
 	return summary, nil
 }
 

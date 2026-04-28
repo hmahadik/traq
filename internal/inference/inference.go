@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -156,18 +157,28 @@ func (s *Service) GenerateSummary(context *SessionContext) (*SummaryResult, erro
 	var modelUsed string
 	var err error
 
+	log.Printf("[inference] GenerateSummary engine=%s prompt-bytes=%d", s.config.Engine, len(prompt))
 	switch s.config.Engine {
 	case EngineBundled:
 		if s.bundled == nil {
 			return nil, fmt.Errorf("bundled engine not initialized")
 		}
 		// Start the bundled server if not already running
-		if !s.bundled.IsRunning() {
+		running := s.bundled.IsRunning()
+		log.Printf("[inference] bundled IsRunning=%v", running)
+		if !running {
+			startTS := time.Now()
+			log.Printf("[inference] bundled Start: begin")
 			if err := s.bundled.Start(); err != nil {
+				log.Printf("[inference] bundled Start: failed err=%v after=%vs", err, time.Since(startTS).Seconds())
 				return nil, fmt.Errorf("failed to start bundled server: %w", err)
 			}
+			log.Printf("[inference] bundled Start: ok after=%vs", time.Since(startTS).Seconds())
 		}
+		completeTS := time.Now()
+		log.Printf("[inference] bundled Complete: posting")
 		response, err = s.bundled.Complete(prompt)
+		log.Printf("[inference] bundled Complete: returned err=%v bytes=%d after=%vs", err, len(response), time.Since(completeTS).Seconds())
 		modelUsed = "bundled:" + filepath.Base(s.config.Bundled.ModelPath)
 	case EngineOllama:
 		if s.config.Ollama == nil {
