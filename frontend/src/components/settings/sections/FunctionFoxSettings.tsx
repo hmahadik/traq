@@ -36,9 +36,10 @@ const ROUNDING_OPTIONS = [
 ];
 
 const AI_BACKENDS = [
-  { value: 'auto', label: 'Auto-detect' },
-  { value: 'claude', label: 'Claude (CLI)' },
+  { value: 'inference', label: 'Local inference' },
+  { value: 'claude', label: 'Claude Code (CLI)' },
   { value: 'opencode', label: 'OpenCode (CLI)' },
+  { value: 'auto', label: 'Auto-detect CLI' },
 ];
 
 export function FunctionFoxSettings() {
