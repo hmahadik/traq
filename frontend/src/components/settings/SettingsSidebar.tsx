@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Camera, Database, Sparkles, Tags, Settings2, FolderKanban, RefreshCw } from 'lucide-react';
+import { Camera, Database, Sparkles, Tags, Settings2, FolderKanban, RefreshCw, Briefcase } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useVersion, useUpdateStatus } from '@/api/hooks';
 
@@ -10,6 +10,7 @@ const sections = [
   { path: '/settings/categories', label: 'Categories', icon: Tags },
   { path: '/settings/general', label: 'General', icon: Settings2 },
   { path: '/settings/projects', label: 'Projects', icon: FolderKanban },
+  { path: '/settings/functionfox', label: 'FunctionFox', icon: Briefcase },
   { path: '/settings/updates', label: 'Updates', icon: RefreshCw },
 ];
 

@@ -8,6 +8,7 @@ import {
   GeneralSettings,
   ProjectsSettings,
   UpdatesSettings,
+  FunctionFoxSettings,
 } from '@/components/settings/sections';
 
 export function SettingsPage() {
@@ -25,6 +26,7 @@ export function SettingsPage() {
             <Route path="general" element={<GeneralSettings />} />
             <Route path="projects" element={<ProjectsSettings />} />
             <Route path="updates" element={<UpdatesSettings />} />
+            <Route path="functionfox" element={<FunctionFoxSettings />} />
           </Routes>
         </div>
       </div>
