@@ -270,65 +270,6 @@ func (s *ReportsService) GetDailySummaries(limit int) ([]*DailySummary, error) {
 	return summaries, nil
 }
 
-// parseFlexibleDate parses a date string in various common formats
-// Input is expected to be lowercase (already lowercased by caller)
-func parseFlexibleDate(input string) (time.Time, bool) {
-	input = strings.TrimSpace(input)
-
-	// Map of lowercase month abbreviations/names to Go format month
-	monthMap := map[string]time.Month{
-		"jan": time.January, "january": time.January,
-		"feb": time.February, "february": time.February,
-		"mar": time.March, "march": time.March,
-		"apr": time.April, "april": time.April,
-		"may": time.May,
-		"jun": time.June, "june": time.June,
-		"jul": time.July, "july": time.July,
-		"aug": time.August, "august": time.August,
-		"sep": time.September, "september": time.September,
-		"oct": time.October, "october": time.October,
-		"nov": time.November, "november": time.November,
-		"dec": time.December, "december": time.December,
-	}
-
-	// Try "month day, year" format (e.g., "jan 5, 2026")
-	monthDayYearRe := regexp.MustCompile(`^([a-z]+)\s+(\d{1,2}),?\s*(\d{4})$`)
-	if matches := monthDayYearRe.FindStringSubmatch(input); len(matches) == 4 {
-		month, ok := monthMap[matches[1]]
-		if ok {
-			day, _ := strconv.Atoi(matches[2])
-			year, _ := strconv.Atoi(matches[3])
-			return time.Date(year, month, day, 0, 0, 0, 0, time.Local), true
-		}
-	}
-
-	// Try "day month year" format (e.g., "5 jan 2026")
-	dayMonthYearRe := regexp.MustCompile(`^(\d{1,2})\s+([a-z]+)\s+(\d{4})$`)
-	if matches := dayMonthYearRe.FindStringSubmatch(input); len(matches) == 4 {
-		month, ok := monthMap[matches[2]]
-		if ok {
-			day, _ := strconv.Atoi(matches[1])
-			year, _ := strconv.Atoi(matches[3])
-			return time.Date(year, month, day, 0, 0, 0, 0, time.Local), true
-		}
-	}
-
-	// Try standard formats
-	formats := []string{
-		"2006-01-02", // 2026-01-05
-		"01/02/2006", // 01/05/2026
-		"1/2/2006",   // 1/5/2026
-	}
-
-	for _, format := range formats {
-		if parsed, err := time.ParseInLocation(format, input, time.Local); err == nil {
-			return parsed, true
-		}
-	}
-
-	return time.Time{}, false
-}
-
 // ParseTimeRange parses natural language time input.
 func (s *ReportsService) ParseTimeRange(input string) (*TimeRange, error) {
 	now := time.Now()
@@ -2077,24 +2018,6 @@ func (s *ReportsService) inferAppPrimaryUse(appName string, windows []WindowBrea
 	}
 
 	return "Various tasks"
-}
-
-// formatNumber formats a large number with commas
-func formatNumber(n int64) string {
-	s := fmt.Sprintf("%d", n)
-	if n < 1000 {
-		return s
-	}
-
-	// Add commas
-	var result []byte
-	for i, c := range s {
-		if i > 0 && (len(s)-i)%3 == 0 {
-			result = append(result, ',')
-		}
-		result = append(result, byte(c))
-	}
-	return string(result)
 }
 
 // extractCommunicationStats extracts Slack, Zoom, and Email time from focus events
