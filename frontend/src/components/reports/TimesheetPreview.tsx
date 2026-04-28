@@ -36,6 +36,9 @@ export function TimesheetPreview({ data, isLoading, isError, error, onGenerate }
 
   const totalHours = entries.reduce((sum, e) => sum + (e.skipped ? 0 : e.hours), 0);
   const includedCount = entries.filter((e) => !e.skipped).length;
+  const unattributedHours = entries
+    .filter((e) => e.skipReason === 'unattributed')
+    .reduce((sum, e) => sum + e.hours, 0);
 
   return (
     <Card className="h-full flex flex-col">
@@ -89,6 +92,18 @@ export function TimesheetPreview({ data, isLoading, isError, error, onGenerate }
           </div>
         ) : (
           <>
+            {unattributedHours > 0 && (
+              <div className="m-4 rounded-md border border-orange-500/40 bg-orange-500/10 p-3 flex gap-2 text-sm">
+                <AlertTriangle className="h-4 w-4 text-orange-500 shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-medium">{unattributedHours.toFixed(2)}h unattributed</p>
+                  <p className="text-muted-foreground text-xs">
+                    Activity that isn't assigned to any Traq project. Assign these in the
+                    Projects page (or add rules) so they bucket under the right client next time.
+                  </p>
+                </div>
+              </div>
+            )}
             {data.unmappedProjects && data.unmappedProjects.length > 0 && (
               <div className="m-4 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 flex gap-2 text-sm">
                 <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
@@ -124,7 +139,7 @@ export function TimesheetPreview({ data, isLoading, isError, error, onGenerate }
                       <td className="px-3 py-2">
                         <Checkbox
                           checked={!e.skipped}
-                          disabled={e.skipReason === 'unmapped'}
+                          disabled={e.skipReason === 'unmapped' || e.skipReason === 'unattributed'}
                           onCheckedChange={(checked) =>
                             updateEntry(i, {
                               skipped: !checked,
@@ -137,7 +152,9 @@ export function TimesheetPreview({ data, isLoading, isError, error, onGenerate }
                       <td className="px-3 py-2 font-mono text-xs">{e.date}</td>
                       <td className="px-3 py-2 font-medium">{e.traqProject}</td>
                       <td className="px-3 py-2 text-xs">
-                        {e.ffClientName ? (
+                        {e.skipReason === 'unattributed' ? (
+                          <span className="text-orange-500">no project</span>
+                        ) : e.ffClientName ? (
                           <div>
                             <div>{e.ffClientName}</div>
                             <div className="text-muted-foreground">

@@ -77,7 +77,7 @@ func TestBuildTimesheet_BucketsByProjectAndDate(t *testing.T) {
 	}
 }
 
-func TestBuildTimesheet_DropsUndetectedProjects(t *testing.T) {
+func TestBuildTimesheet_BucketsUndetectedAsUnattributed(t *testing.T) {
 	store := storage.NewInMemoryTestStore(t)
 	defer store.Close()
 
@@ -99,8 +99,62 @@ func TestBuildTimesheet_DropsUndetectedProjects(t *testing.T) {
 	if err != nil {
 		t.Fatalf("BuildTimesheet: %v", err)
 	}
-	if len(data.Entries) != 0 {
-		t.Errorf("expected 0 entries (no project detected), got %d: %+v", len(data.Entries), data.Entries)
+	if len(data.Entries) != 1 {
+		t.Fatalf("expected 1 unattributed entry, got %d: %+v", len(data.Entries), data.Entries)
+	}
+	got := data.Entries[0]
+	if got.TraqProject != UnattributedProject {
+		t.Errorf("TraqProject = %q, want %q", got.TraqProject, UnattributedProject)
+	}
+	if !got.Skipped || got.SkipReason != "unattributed" {
+		t.Errorf("expected skipped=true reason=unattributed, got skipped=%v reason=%q", got.Skipped, got.SkipReason)
+	}
+	if got.Hours != 1.0 {
+		t.Errorf("Hours = %v, want 1.0", got.Hours)
+	}
+	for _, p := range data.UnmappedProjects {
+		if p == UnattributedProject {
+			t.Errorf("UnattributedProject leaked into UnmappedProjects: %v", data.UnmappedProjects)
+		}
+	}
+}
+
+func TestBuildTimesheet_AttributesByProjectID(t *testing.T) {
+	store := storage.NewInMemoryTestStore(t)
+	defer store.Close()
+
+	proj, err := store.CreateProject("Acme Corp", "#ff0000", "")
+	if err != nil {
+		t.Fatalf("create project: %v", err)
+	}
+
+	base := time.Date(2026, 4, 25, 10, 0, 0, 0, time.Local)
+	id, err := store.SaveFocusEvent(&storage.WindowFocusEvent{
+		WindowTitle:     "completely unrelated title that no pattern matches",
+		AppName:         "firefox",
+		StartTime:       base.Unix(),
+		EndTime:         base.Add(time.Hour).Unix(),
+		DurationSeconds: 3600,
+	})
+	if err != nil {
+		t.Fatalf("save: %v", err)
+	}
+	// Assign the event to the project (simulates what auto-assign / rules would do).
+	if err := store.SetEventProject("focus", id, proj.ID, 1.0, "user"); err != nil {
+		t.Fatalf("assign: %v", err)
+	}
+
+	rs := helperReportsServiceForTest(t, store)
+	ts := NewTimesheetService(store, rs)
+	data, err := ts.BuildTimesheet("2026-04-25", "2026-04-25", 0.25)
+	if err != nil {
+		t.Fatalf("BuildTimesheet: %v", err)
+	}
+	if len(data.Entries) != 1 {
+		t.Fatalf("expected 1 entry, got %d: %+v", len(data.Entries), data.Entries)
+	}
+	if data.Entries[0].TraqProject != "Acme Corp" {
+		t.Errorf("TraqProject = %q, want %q (ProjectID should win over title detection)", data.Entries[0].TraqProject, "Acme Corp")
 	}
 }
 

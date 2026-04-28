@@ -15,21 +15,26 @@ import (
 	"traq/internal/storage"
 )
 
+// UnattributedProject is the synthetic project name used for time that
+// could not be attributed to any Traq project. These rows surface in the
+// preview so the user sees the gap, but they are never pushable.
+const UnattributedProject = "(Unattributed)"
+
 // TimesheetEntry is one row in the structured timesheet preview: a single
 // project's tracked time on a single date.
 type TimesheetEntry struct {
 	Date          string  `json:"date"`          // "YYYY-MM-DD" in user's local timezone
-	TraqProject   string  `json:"traqProject"`   // canonical project name from DetectProjectFromWindowTitle
+	TraqProject   string  `json:"traqProject"`   // canonical project name from event.ProjectID, fallback DetectProjectFromWindowTitle, or UnattributedProject
 	Hours         float64 `json:"hours"`         // rounded per user's setting
-	Notes         string  `json:"notes"`         // initially empty; populated by Task 6 (notes generator)
-	FFClientID    string  `json:"ffClientId"`    // populated by Task 5 (mapping resolution); empty if unmapped
+	Notes         string  `json:"notes"`         // initially empty; populated by PopulateNotes
+	FFClientID    string  `json:"ffClientId"`    // populated by mapping resolution; empty if unmapped
 	FFClientName  string  `json:"ffClientName"`
 	FFJobID       string  `json:"ffJobId"`
 	FFJobName     string  `json:"ffJobName"`
 	FFTaskID      string  `json:"ffTaskId"`
 	FFTaskName    string  `json:"ffTaskName"`
 	Skipped       bool    `json:"skipped"`       // user toggled off in preview
-	SkipReason    string  `json:"skipReason"`    // "" or "unmapped" or "user-skipped"
+	SkipReason    string  `json:"skipReason"`    // "" or "unmapped" or "user-skipped" or "unattributed"
 	FFTimesheetID string  `json:"ffTimesheetId"` // populated by Plan C after a successful push; empty in Plan B
 }
 
@@ -99,25 +104,33 @@ func (s *TimesheetService) BuildTimesheet(startDate, endDate string, hoursRoundi
 		return nil, fmt.Errorf("fetch focus events: %w", err)
 	}
 
+	// Pre-load all projects into an id→name map so we can attribute events
+	// by their stored ProjectID without a per-event DB call. Auto-assignment
+	// (rules / AI / manual) writes ProjectID onto the event, which is the
+	// authoritative source of truth for "this activity belongs to project X".
+	projects, err := s.store.GetProjects()
+	if err != nil {
+		return nil, fmt.Errorf("fetch projects: %w", err)
+	}
+	projectNameByID := make(map[int64]string, len(projects))
+	for _, p := range projects {
+		projectNameByID[p.ID] = p.Name
+	}
+
 	// Bucket: key = "YYYY-MM-DD|project" → seconds.
 	type bucketKey struct {
 		date    string
 		project string
 	}
 	buckets := map[bucketKey]float64{}
-	distinctProjects := map[string]struct{}{}
 
 	for _, e := range events {
-		proj := s.reports.DetectProjectFromWindowTitle(e.WindowTitle, e.AppName)
-		if proj == "" {
-			continue // unattributed activity is omitted from the timesheet
-		}
+		proj := s.attributeEvent(e, projectNameByID)
 		// Use the event's start time in user's local timezone for the date bucket.
 		// Events spanning midnight count entirely toward the start day. This matches
 		// the existing reports convention.
 		d := time.Unix(e.StartTime, 0).In(loc).Format("2006-01-02")
 		buckets[bucketKey{d, proj}] += e.DurationSeconds
-		distinctProjects[proj] = struct{}{}
 	}
 
 	// Convert buckets → entries with rounded hours.
@@ -156,9 +169,28 @@ func (s *TimesheetService) BuildTimesheet(startDate, endDate string, hoursRoundi
 	return &data, nil
 }
 
+// attributeEvent returns the project name to bucket a focus event under.
+// Order of preference:
+//  1. event.ProjectID — the authoritative assignment from auto-assign / rules / AI / manual.
+//  2. DetectProjectFromWindowTitle — string-pattern fallback for unassigned events.
+//  3. UnattributedProject — surfaces the gap in the preview rather than dropping silently.
+func (s *TimesheetService) attributeEvent(e *storage.WindowFocusEvent, projectNameByID map[int64]string) string {
+	if e.ProjectID.Valid {
+		if name, ok := projectNameByID[e.ProjectID.Int64]; ok && name != "" {
+			return name
+		}
+	}
+	if name := s.reports.DetectProjectFromWindowTitle(e.WindowTitle, e.AppName); name != "" {
+		return name
+	}
+	return UnattributedProject
+}
+
 // resolveMappings populates FF* fields on each entry from the stored mappings,
 // marks unmapped entries as Skipped="unmapped" and disabled-mapping entries as
 // Skipped="user-skipped", and populates data.UnmappedProjects (deduped, sorted).
+// The synthetic UnattributedProject bucket is always skipped with reason
+// "unattributed" and never appears in UnmappedProjects.
 func (s *TimesheetService) resolveMappings(data *TimesheetData) error {
 	mappings, err := s.store.ListFunctionFoxProjectMappings()
 	if err != nil {
@@ -172,6 +204,11 @@ func (s *TimesheetService) resolveMappings(data *TimesheetData) error {
 	unmappedSet := map[string]struct{}{}
 	for i := range data.Entries {
 		e := &data.Entries[i]
+		if e.TraqProject == UnattributedProject {
+			e.Skipped = true
+			e.SkipReason = "unattributed"
+			continue
+		}
 		m, ok := byProject[e.TraqProject]
 		if !ok {
 			e.Skipped = true
