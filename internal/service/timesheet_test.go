@@ -148,3 +148,138 @@ func TestRoundToMultiple(t *testing.T) {
 		}
 	}
 }
+
+func TestBuildTimesheet_ResolvesMappings(t *testing.T) {
+	store := storage.NewInMemoryTestStore(t)
+	defer store.Close()
+
+	base := time.Date(2026, 4, 25, 10, 0, 0, 0, time.Local)
+	_, err := store.SaveFocusEvent(&storage.WindowFocusEvent{
+		WindowTitle:     "main.go - traq - Visual Studio Code",
+		AppName:         "code",
+		StartTime:       base.Unix(),
+		EndTime:         base.Add(time.Hour).Unix(),
+		DurationSeconds: 3600,
+	})
+	if err != nil {
+		t.Fatalf("save event: %v", err)
+	}
+	_, err = store.SaveFunctionFoxProjectMapping(&storage.FunctionFoxProjectMapping{
+		TraqProject:  "traq",
+		FFClientID:   "1003",
+		FFClientName: "Internal",
+		FFJobID:      "2020",
+		FFJobName:    "Internal Tools",
+		FFTaskID:     "3001",
+		FFTaskName:   "Development",
+		Enabled:      true,
+	})
+	if err != nil {
+		t.Fatalf("save mapping: %v", err)
+	}
+
+	rs := helperReportsServiceForTest(t, store)
+	ts := NewTimesheetService(store, rs)
+	data, err := ts.BuildTimesheet("2026-04-25", "2026-04-25", 0.25)
+	if err != nil {
+		t.Fatalf("BuildTimesheet: %v", err)
+	}
+	if len(data.Entries) != 1 {
+		t.Fatalf("expected 1 entry, got %d", len(data.Entries))
+	}
+	e := data.Entries[0]
+	if e.FFJobID != "2020" {
+		t.Errorf("FFJobID = %q, want 2020", e.FFJobID)
+	}
+	if e.FFTaskName != "Development" {
+		t.Errorf("FFTaskName = %q, want Development", e.FFTaskName)
+	}
+	if e.Skipped {
+		t.Errorf("Skipped = true, want false (mapping is enabled)")
+	}
+	if len(data.UnmappedProjects) != 0 {
+		t.Errorf("UnmappedProjects = %v, want empty", data.UnmappedProjects)
+	}
+}
+
+func TestBuildTimesheet_UnmappedSurfacesProject(t *testing.T) {
+	store := storage.NewInMemoryTestStore(t)
+	defer store.Close()
+
+	base := time.Date(2026, 4, 25, 10, 0, 0, 0, time.Local)
+	_, err := store.SaveFocusEvent(&storage.WindowFocusEvent{
+		WindowTitle:     "main.go - traq - Visual Studio Code",
+		AppName:         "code",
+		StartTime:       base.Unix(),
+		EndTime:         base.Add(time.Hour).Unix(),
+		DurationSeconds: 3600,
+	})
+	if err != nil {
+		t.Fatalf("save: %v", err)
+	}
+	// No mapping saved.
+
+	rs := helperReportsServiceForTest(t, store)
+	ts := NewTimesheetService(store, rs)
+	data, err := ts.BuildTimesheet("2026-04-25", "2026-04-25", 0.25)
+	if err != nil {
+		t.Fatalf("BuildTimesheet: %v", err)
+	}
+	if len(data.Entries) != 1 {
+		t.Fatalf("expected 1 entry, got %d", len(data.Entries))
+	}
+	e := data.Entries[0]
+	if !e.Skipped {
+		t.Error("Skipped should be true (no mapping)")
+	}
+	if e.SkipReason != "unmapped" {
+		t.Errorf("SkipReason = %q, want unmapped", e.SkipReason)
+	}
+	if len(data.UnmappedProjects) != 1 || data.UnmappedProjects[0] != "traq" {
+		t.Errorf("UnmappedProjects = %v, want [traq]", data.UnmappedProjects)
+	}
+}
+
+func TestBuildTimesheet_DisabledMappingMarksUserSkipped(t *testing.T) {
+	store := storage.NewInMemoryTestStore(t)
+	defer store.Close()
+
+	base := time.Date(2026, 4, 25, 10, 0, 0, 0, time.Local)
+	_, err := store.SaveFocusEvent(&storage.WindowFocusEvent{
+		WindowTitle:     "main.go - traq - Visual Studio Code",
+		AppName:         "code",
+		StartTime:       base.Unix(),
+		EndTime:         base.Add(time.Hour).Unix(),
+		DurationSeconds: 3600,
+	})
+	if err != nil {
+		t.Fatalf("save event: %v", err)
+	}
+	_, err = store.SaveFunctionFoxProjectMapping(&storage.FunctionFoxProjectMapping{
+		TraqProject: "traq", FFClientID: "1", FFClientName: "x", FFJobID: "2", FFJobName: "y", FFTaskID: "3", FFTaskName: "z",
+		Enabled: false, // disabled
+	})
+	if err != nil {
+		t.Fatalf("save mapping: %v", err)
+	}
+
+	rs := helperReportsServiceForTest(t, store)
+	ts := NewTimesheetService(store, rs)
+	data, err := ts.BuildTimesheet("2026-04-25", "2026-04-25", 0.25)
+	if err != nil {
+		t.Fatalf("BuildTimesheet: %v", err)
+	}
+	if len(data.Entries) != 1 {
+		t.Fatalf("expected 1 entry, got %d", len(data.Entries))
+	}
+	e := data.Entries[0]
+	if !e.Skipped || e.SkipReason != "user-skipped" {
+		t.Errorf("Skipped=%v SkipReason=%q, want true/user-skipped", e.Skipped, e.SkipReason)
+	}
+	if e.FFJobID != "2" {
+		t.Errorf("FFJobID = %q, expected populated even when disabled", e.FFJobID)
+	}
+	if len(data.UnmappedProjects) != 0 {
+		t.Errorf("UnmappedProjects should be empty when mapping exists (just disabled): %v", data.UnmappedProjects)
+	}
+}

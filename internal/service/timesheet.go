@@ -126,14 +126,61 @@ func (s *TimesheetService) BuildTimesheet(startDate, endDate string, hoursRoundi
 		return entries[i].TraqProject < entries[j].TraqProject
 	})
 
-	return &TimesheetData{
+	data := TimesheetData{
 		Start:         startDate,
 		End:           endDate,
 		Entries:       entries,
 		HoursRounding: hoursRounding,
 		GeneratedAt:   time.Now().Unix(),
-		// UnmappedProjects populated by Task 5.
-	}, nil
+	}
+	if err := s.resolveMappings(&data); err != nil {
+		return nil, err
+	}
+	return &data, nil
+}
+
+// resolveMappings populates FF* fields on each entry from the stored mappings,
+// marks unmapped entries as Skipped="unmapped" and disabled-mapping entries as
+// Skipped="user-skipped", and populates data.UnmappedProjects (deduped, sorted).
+func (s *TimesheetService) resolveMappings(data *TimesheetData) error {
+	mappings, err := s.store.ListFunctionFoxProjectMappings()
+	if err != nil {
+		return fmt.Errorf("list project mappings: %w", err)
+	}
+	byProject := make(map[string]*storage.FunctionFoxProjectMapping, len(mappings))
+	for _, m := range mappings {
+		byProject[m.TraqProject] = m
+	}
+
+	unmappedSet := map[string]struct{}{}
+	for i := range data.Entries {
+		e := &data.Entries[i]
+		m, ok := byProject[e.TraqProject]
+		if !ok {
+			e.Skipped = true
+			e.SkipReason = "unmapped"
+			unmappedSet[e.TraqProject] = struct{}{}
+			continue
+		}
+		// Populate FF fields whether enabled or not — UI shows them in both cases.
+		e.FFClientID = m.FFClientID
+		e.FFClientName = m.FFClientName
+		e.FFJobID = m.FFJobID
+		e.FFJobName = m.FFJobName
+		e.FFTaskID = m.FFTaskID
+		e.FFTaskName = m.FFTaskName
+		if !m.Enabled {
+			e.Skipped = true
+			e.SkipReason = "user-skipped"
+		}
+	}
+
+	data.UnmappedProjects = make([]string, 0, len(unmappedSet))
+	for name := range unmappedSet {
+		data.UnmappedProjects = append(data.UnmappedProjects, name)
+	}
+	sort.Strings(data.UnmappedProjects)
+	return nil
 }
 
 // roundToMultiple rounds x to the nearest multiple of m. Both must be positive.
