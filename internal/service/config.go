@@ -85,6 +85,7 @@ type Config struct {
 	Update      *UpdateConfig      `json:"update"`
 	Timeline    *TimelineConfig    `json:"timeline"`
 	AI          *AIConfig          `json:"ai"`
+	Timesheet   *TimesheetConfig   `json:"timesheet"`
 }
 
 // TimelineConfig contains timeline display settings.
@@ -101,6 +102,16 @@ type AIConfig struct {
 	SummaryMode         string `json:"summaryMode"`         // "auto_accept", "drafts", "off"
 	SummaryChunkMinutes int    `json:"summaryChunkMinutes"` // 15, 30, 60
 	AssignmentMode      string `json:"assignmentMode"`      // "auto_accept", "drafts", "off"
+}
+
+// TimesheetConfig contains FunctionFox timesheet settings. Plan B stores
+// credentials in plain config; Plan C will move the password to OS keychain.
+type TimesheetConfig struct {
+	HoursRounding  float64 `json:"hoursRounding"`  // 0.1 / 0.25 / 0.5 / 1.0; default 0.25
+	FFAccountID    string  `json:"ffAccountId"`    // FunctionFox "Organization #" — plain config in Plan B
+	FFUsername     string  `json:"ffUsername"`     // FunctionFox username — plain config in Plan B
+	AINotesEnabled bool    `json:"aiNotesEnabled"` // opt-in: invoke claude/opencode for richer notes
+	AINotesBackend string  `json:"aiNotesBackend"` // "auto" | "claude" | "opencode"
 }
 
 // UpdateConfig contains auto-update settings.
@@ -268,6 +279,7 @@ func (s *ConfigService) GetConfig() (*Config, error) {
 		Update:      s.getDefaultUpdateConfig(),
 		Timeline:    s.getDefaultTimelineConfig(),
 		AI:          s.getDefaultAIConfig(),
+		Timesheet:   s.getDefaultTimesheetConfig(),
 	}
 
 	// Load from database
@@ -469,6 +481,25 @@ func (s *ConfigService) GetConfig() (*Config, error) {
 	}
 	if val, err := s.store.GetConfig("ai.assignmentMode"); err == nil && val != "" {
 		config.AI.AssignmentMode = val
+	}
+
+	// Timesheet settings
+	if val, err := s.store.GetConfig("timesheet.hoursRounding"); err == nil && val != "" {
+		if v, e := strconv.ParseFloat(val, 64); e == nil {
+			config.Timesheet.HoursRounding = v
+		}
+	}
+	if val, err := s.store.GetConfig("timesheet.ffAccountId"); err == nil && val != "" {
+		config.Timesheet.FFAccountID = val
+	}
+	if val, err := s.store.GetConfig("timesheet.ffUsername"); err == nil && val != "" {
+		config.Timesheet.FFUsername = val
+	}
+	if val, err := s.store.GetConfig("timesheet.aiNotesEnabled"); err == nil && val != "" {
+		config.Timesheet.AINotesEnabled = val == "true"
+	}
+	if val, err := s.store.GetConfig("timesheet.aiNotesBackend"); err == nil && val != "" {
+		config.Timesheet.AINotesBackend = val
 	}
 
 	// System settings - only override if explicitly set in database
@@ -676,6 +707,13 @@ func mapToStorageKey(frontendKey string) string {
 		"ai.summaryMode":         "ai.summaryMode",
 		"ai.summaryChunkMinutes": "ai.summaryChunkMinutes",
 		"ai.assignmentMode":      "ai.assignmentMode",
+
+		// Timesheet settings
+		"timesheet.hoursRounding":  "timesheet.hoursRounding",
+		"timesheet.ffAccountId":    "timesheet.ffAccountId",
+		"timesheet.ffUsername":     "timesheet.ffUsername",
+		"timesheet.aiNotesEnabled": "timesheet.aiNotesEnabled",
+		"timesheet.aiNotesBackend": "timesheet.aiNotesBackend",
 	}
 
 	if storageKey, ok := keyMap[frontendKey]; ok {
@@ -991,5 +1029,15 @@ func (s *ConfigService) getDefaultAIConfig() *AIConfig {
 		SummaryMode:         "drafts", // Default: require approval for AI summaries
 		SummaryChunkMinutes: 15,       // Default: summarize in 15-minute chunks
 		AssignmentMode:      "drafts", // Default: require approval for project assignments
+	}
+}
+
+func (s *ConfigService) getDefaultTimesheetConfig() *TimesheetConfig {
+	return &TimesheetConfig{
+		HoursRounding:  0.25,
+		FFAccountID:    "",
+		FFUsername:     "",
+		AINotesEnabled: false,
+		AINotesBackend: "auto",
 	}
 }
