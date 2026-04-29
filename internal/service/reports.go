@@ -3,6 +3,7 @@ package service
 import (
 	"fmt"
 	"html"
+	"log"
 	"math"
 	"regexp"
 	"sort"
@@ -119,6 +120,7 @@ type EnhancedReportContext struct {
 	GitCommits         []*storage.GitCommit
 	ShellCommands      []*storage.ShellCommand
 	FileEvents         []*storage.FileEvent
+	BrowserVisits      []*storage.BrowserVisit
 	TotalMinutes       int64
 	ProductiveMinutes  int64
 	DistractingMinutes int64
@@ -246,6 +248,7 @@ func (s *ReportsService) buildEnhancedReportContext(tr *TimeRange) (*EnhancedRep
 	if err != nil {
 		return nil, fmt.Errorf("failed to get browser history: %w", err)
 	}
+	ctx.BrowserVisits = browserVisits
 	ctx.DomainGroups = s.aggregateBrowserByDomain(browserVisits, focusEvents)
 
 	// Get git commits
@@ -755,6 +758,11 @@ func (s *ReportsService) groupActivitiesByProject(ctx *EnhancedReportContext) []
 
 	// Group focus events by project
 	for _, app := range ctx.AppUsage {
+		if isBrowser(app.AppName) {
+			// Browser focus time is attributed via overlapping browser_history rows
+			// in the dedicated browser-visit pass below.
+			continue
+		}
 		for _, window := range app.Windows {
 			projectName := s.DetectProjectFromWindowTitle(window.WindowTitle, app.AppName)
 			if projectName != "" {
@@ -767,6 +775,54 @@ func (s *ReportsService) groupActivitiesByProject(ctx *EnhancedReportContext) []
 				}
 			}
 		}
+	}
+
+	// Browser visit pass: attribute browser time via the visit's project_id (set
+	// by the backfill / rule engine), falling back to a fresh rule lookup for
+	// visits that haven't been attributed yet. Note: browser-app friendly names
+	// are not added to Project.Apps for these visits (accepted info loss).
+	// Cache is request-scoped: empty strings cache deliberately, so an orphaned
+	// project_id is looked up at most once per report.
+	projectByID := make(map[int64]string)
+	for _, v := range ctx.BrowserVisits {
+		durSec := 0.0
+		if v.VisitDurationSeconds.Valid {
+			durSec = float64(v.VisitDurationSeconds.Int64)
+		}
+		if durSec == 0 {
+			continue
+		}
+
+		var projectName string
+		if v.ProjectID.Valid && v.ProjectID.Int64 != 0 {
+			if name, cached := projectByID[v.ProjectID.Int64]; cached {
+				projectName = name
+			} else {
+				p, err := s.store.GetProject(v.ProjectID.Int64)
+				if err != nil {
+					log.Printf("groupActivitiesByProject: lookup project_id=%d failed: %v", v.ProjectID.Int64, err)
+				} else if p != nil {
+					projectName = p.Name
+				}
+				projectByID[v.ProjectID.Int64] = projectName
+			}
+		} else {
+			title := ""
+			if v.Title.Valid {
+				title = v.Title.String
+			}
+			projectName = s.detectProjectFromLearnedPatterns(&storage.AssignmentContext{
+				Domain:      v.Domain,
+				URL:         v.URL,
+				WindowTitle: title,
+			})
+		}
+		if projectName == "" {
+			continue
+		}
+
+		project := getProject(projectName)
+		project.DurationSeconds += durSec
 	}
 
 	// Add unassigned time to "Other" project
