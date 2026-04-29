@@ -5,7 +5,7 @@ import (
 	"log"
 )
 
-const schemaVersion = 16
+const schemaVersion = 17
 
 const schema = `
 -- ============================================================================
@@ -355,6 +355,13 @@ func (s *Store) Migrate() error {
 		// Migration v16: Add content column to ai_events for prompt text
 		if err := s.applyMigration16(); err != nil {
 			return fmt.Errorf("failed to apply migration 16: %w", err)
+		}
+	}
+
+	if currentVersion < 17 {
+		// Migration v17: Add project assignment columns to browser_history
+		if err := s.applyMigration17(); err != nil {
+			return fmt.Errorf("failed to apply migration 17: %w", err)
 		}
 	}
 
@@ -1111,6 +1118,40 @@ func (s *Store) applyMigration16() error {
 	}
 	if _, err := s.db.Exec(`ALTER TABLE ai_events ADD COLUMN content TEXT`); err != nil {
 		return fmt.Errorf("add content column: %w", err)
+	}
+	return nil
+}
+
+// applyMigration17 adds project_id/project_confidence/project_source to
+// browser_history so browser visits can be attributed to projects via
+// domain rules (in parallel to focus events and git commits). Each ALTER
+// is guarded via pragma_table_info so re-runs no-op cleanly. Matches the
+// pattern used by applyMigration14.
+func (s *Store) applyMigration17() error {
+	columns := []struct {
+		name string
+		ddl  string
+	}{
+		{"project_id", `ALTER TABLE browser_history ADD COLUMN project_id INTEGER REFERENCES projects(id)`},
+		{"project_confidence", `ALTER TABLE browser_history ADD COLUMN project_confidence REAL DEFAULT 0`},
+		{"project_source", `ALTER TABLE browser_history ADD COLUMN project_source TEXT DEFAULT 'unassigned'`},
+	}
+	for _, c := range columns {
+		var count int
+		if err := s.db.QueryRow(
+			`SELECT COUNT(*) FROM pragma_table_info('browser_history') WHERE name = ?`, c.name,
+		).Scan(&count); err != nil {
+			return fmt.Errorf("check %s column: %w", c.name, err)
+		}
+		if count > 0 {
+			continue
+		}
+		if _, err := s.db.Exec(c.ddl); err != nil {
+			return fmt.Errorf("add %s column: %w", c.name, err)
+		}
+	}
+	if _, err := s.db.Exec(`CREATE INDEX IF NOT EXISTS idx_browser_project ON browser_history(project_id)`); err != nil {
+		return fmt.Errorf("create idx_browser_project: %w", err)
 	}
 	return nil
 }
