@@ -100,22 +100,16 @@ func (s *Store) UpdateProject(id int64, name, color, description string) error {
 
 // DeleteProject deletes a project and clears its assignments.
 func (s *Store) DeleteProject(id int64) error {
-	// Clear project assignments from events (ON DELETE CASCADE handles patterns/examples)
-	_, err := s.db.Exec(`UPDATE screenshots SET project_id = NULL, project_source = 'unassigned' WHERE project_id = ?`, id)
-	if err != nil {
-		return fmt.Errorf("failed to clear screenshot assignments: %w", err)
-	}
-	_, err = s.db.Exec(`UPDATE window_focus_events SET project_id = NULL, project_source = 'unassigned' WHERE project_id = ?`, id)
+	// Clear project assignments from events (ON DELETE CASCADE handles patterns/examples).
+	// Screenshots and shell_commands no longer carry project_id columns — their
+	// attribution is derived via timestamp overlap with focus events.
+	_, err := s.db.Exec(`UPDATE window_focus_events SET project_id = NULL, project_source = 'unassigned' WHERE project_id = ?`, id)
 	if err != nil {
 		return fmt.Errorf("failed to clear focus event assignments: %w", err)
 	}
 	_, err = s.db.Exec(`UPDATE git_commits SET project_id = NULL, project_source = 'unassigned' WHERE project_id = ?`, id)
 	if err != nil {
 		return fmt.Errorf("failed to clear git commit assignments: %w", err)
-	}
-	_, err = s.db.Exec(`UPDATE shell_commands SET project_id = NULL, project_source = 'unassigned' WHERE project_id = ?`, id)
-	if err != nil {
-		return fmt.Errorf("failed to clear shell command assignments: %w", err)
 	}
 
 	// Delete the project (cascades to patterns and examples)
@@ -240,18 +234,16 @@ func (s *Store) AddAssignmentExample(projectID int64, eventType string, eventID 
 func (s *Store) SetEventProject(eventType string, eventID, projectID int64, confidence float64, source string) error {
 	var query string
 	switch eventType {
-	case "screenshot":
-		query = `UPDATE screenshots SET project_id = ?, project_confidence = ?, project_source = ? WHERE id = ?`
 	case "focus", "activity":
 		// "activity" is the frontend name for focus events
 		query = `UPDATE window_focus_events SET project_id = ?, project_confidence = ?, project_source = ? WHERE id = ?`
 	case "git":
 		query = `UPDATE git_commits SET project_id = ?, project_confidence = ?, project_source = ? WHERE id = ?`
-	case "shell":
-		query = `UPDATE shell_commands SET project_id = ?, project_confidence = ?, project_source = ? WHERE id = ?`
 	case "browser":
 		query = `UPDATE browser_history SET project_id = ?, project_confidence = ?, project_source = ? WHERE id = ?`
 	default:
+		// "screenshot" and "shell" used to be valid; both are now derived from
+		// focus-event overlap and have no project_id column to write.
 		return fmt.Errorf("unknown event type: %s", eventType)
 	}
 
@@ -271,26 +263,18 @@ func (s *Store) SetEventProject(eventType string, eventID, projectID int64, conf
 
 // GetUnassignedEventCount returns count of events without project assignment.
 //
-// Uses `project_id IS NULL` rather than `project_source = 'unassigned'` so
-// each subquery can use the project_id index (idx_screenshots_project,
-// idx_focus_project, idx_git_project, idx_shell_project) instead of full
-// scans. These are the highest-volume tables in the DB and this function
-// drives a sidebar counter that refetches on timeline navigation.
-//
-// The two formulations are equivalent by construction: SetEventProject
-// always writes project_id and project_source together, so rows with
-// project_id IS NULL always have project_source in ('unassigned', NULL).
+// Counts focus events and git commits — the two event types that carry a
+// project_id column. Screenshots and shell commands derive their attribution
+// from focus-event overlap, so they don't contribute their own counts.
+// Uses `project_id IS NULL` so each subquery can hit the project_id indexes
+// (idx_focus_project, idx_git_project) instead of scanning.
 func (s *Store) GetUnassignedEventCount() (int, error) {
 	var count int
 	err := s.db.QueryRow(`
 		SELECT (
-			SELECT COUNT(*) FROM screenshots WHERE project_id IS NULL
-		) + (
 			SELECT COUNT(*) FROM window_focus_events WHERE project_id IS NULL
 		) + (
 			SELECT COUNT(*) FROM git_commits WHERE project_id IS NULL
-		) + (
-			SELECT COUNT(*) FROM shell_commands WHERE project_id IS NULL
 		)
 	`).Scan(&count)
 	if err != nil {

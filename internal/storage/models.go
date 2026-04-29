@@ -23,10 +23,7 @@ type Screenshot struct {
 	MonitorWidth      sql.NullInt64   `json:"monitorWidth"`
 	MonitorHeight     sql.NullInt64   `json:"monitorHeight"`
 	SessionID         sql.NullInt64   `json:"sessionId"`
-	ProjectID         sql.NullInt64   `json:"projectId"`
-	ProjectConfidence sql.NullFloat64 `json:"projectConfidence"`
-	ProjectSource     sql.NullString  `json:"projectSource"` // 'unassigned', 'user', 'rule', 'ai'
-	MemoryStatus      string          `json:"memoryStatus"`  // 'active' or 'ignored'
+	MemoryStatus      string          `json:"memoryStatus"` // 'active' or 'ignored'
 	CreatedAt         int64           `json:"createdAt"`
 }
 
@@ -96,10 +93,6 @@ type ShellCommand struct {
 	TmuxContext      sql.NullString  `json:"tmuxContext"`
 	SessionID        sql.NullInt64   `json:"sessionId"`
 	CreatedAt        int64           `json:"createdAt"`
-
-	ProjectID         sql.NullInt64   `json:"projectId"`
-	ProjectConfidence sql.NullFloat64 `json:"projectConfidence"`
-	ProjectSource     sql.NullString  `json:"projectSource"`
 }
 
 // GitRepository represents a tracked git repository.

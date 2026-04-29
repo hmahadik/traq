@@ -1,11 +1,33 @@
 package service
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
 	"traq/internal/storage"
 )
+
+func setupProjectAssignmentTest(t *testing.T) (*ProjectAssignmentService, *storage.Store, func()) {
+	t.Helper()
+
+	dir, err := os.MkdirTemp("", "traq-test-*")
+	if err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	store, err := storage.NewStore(filepath.Join(dir, "test.db"))
+	if err != nil {
+		os.RemoveAll(dir)
+		t.Fatalf("NewStore: %v", err)
+	}
+	svc := NewProjectAssignmentService(store)
+	cleanup := func() {
+		store.Close()
+		os.RemoveAll(dir)
+	}
+	return svc, store, cleanup
+}
 
 func TestAutoDiscoverProjects_NamesByRepoBasename(t *testing.T) {
 	svc, store, cleanup := setupProjectAssignmentTest(t)

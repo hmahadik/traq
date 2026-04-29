@@ -5,7 +5,7 @@ import (
 	"log"
 )
 
-const schemaVersion = 17
+const schemaVersion = 18
 
 const schema = `
 -- ============================================================================
@@ -112,15 +112,11 @@ CREATE TABLE IF NOT EXISTS shell_commands (
     hostname TEXT,
     tmux_context TEXT,
     session_id INTEGER REFERENCES sessions(id),
-    project_id INTEGER REFERENCES projects(id),
-    project_confidence REAL DEFAULT 0.0,
-    project_source TEXT DEFAULT 'unassigned',
     created_at INTEGER DEFAULT (strftime('%s', 'now'))
 );
 
 CREATE INDEX IF NOT EXISTS idx_shell_timestamp ON shell_commands(timestamp);
 CREATE INDEX IF NOT EXISTS idx_shell_session ON shell_commands(session_id);
-CREATE INDEX IF NOT EXISTS idx_shell_project ON shell_commands(project_id);
 
 CREATE TABLE IF NOT EXISTS git_repositories (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -365,6 +361,13 @@ func (s *Store) Migrate() error {
 		}
 	}
 
+	if currentVersion < 18 {
+		// Migration v18: Drop dead project_* columns from screenshots and shell_commands
+		if err := s.applyMigration18(); err != nil {
+			return fmt.Errorf("failed to apply migration 18: %w", err)
+		}
+	}
+
 	// Record schema version
 	if currentVersion == 0 {
 		_, err = s.db.Exec("INSERT OR REPLACE INTO schema_version (version) VALUES (?)", schemaVersion)
@@ -509,7 +512,10 @@ func (s *Store) repairFocusEventsTable() {
 }
 
 // repairScreenshotsTable adds missing columns to screenshots table.
-// This repairs databases where migration 9's or 10's ALTER TABLE statements failed silently.
+// This repairs databases where migration 10's ALTER TABLE statements failed silently.
+// Migration 9's project columns are intentionally NOT re-added here — migration
+// 18 drops them as dead, and re-adding would race with that migration on
+// upgrade DBs.
 func (s *Store) repairScreenshotsTable() {
 	// Check if table exists
 	var tableCount int
@@ -518,31 +524,14 @@ func (s *Store) repairScreenshotsTable() {
 		return
 	}
 
-	// Migration 9 columns
-	var count int
-	err = s.db.QueryRow(`SELECT COUNT(*) FROM pragma_table_info('screenshots') WHERE name = 'project_id'`).Scan(&count)
-	if err == nil && count == 0 {
-		s.db.Exec(`ALTER TABLE screenshots ADD COLUMN project_id INTEGER REFERENCES projects(id)`)
-	}
-
-	err = s.db.QueryRow(`SELECT COUNT(*) FROM pragma_table_info('screenshots') WHERE name = 'project_confidence'`).Scan(&count)
-	if err == nil && count == 0 {
-		s.db.Exec(`ALTER TABLE screenshots ADD COLUMN project_confidence REAL DEFAULT 0.0`)
-	}
-
-	err = s.db.QueryRow(`SELECT COUNT(*) FROM pragma_table_info('screenshots') WHERE name = 'project_source'`).Scan(&count)
-	if err == nil && count == 0 {
-		s.db.Exec(`ALTER TABLE screenshots ADD COLUMN project_source TEXT DEFAULT 'unassigned'`)
-	}
-
 	// Migration 10 column
+	var count int
 	err = s.db.QueryRow(`SELECT COUNT(*) FROM pragma_table_info('screenshots') WHERE name = 'memory_status'`).Scan(&count)
 	if err == nil && count == 0 {
 		s.db.Exec(`ALTER TABLE screenshots ADD COLUMN memory_status TEXT NOT NULL DEFAULT 'active'`)
 	}
 
 	// Create indexes if missing
-	s.db.Exec(`CREATE INDEX IF NOT EXISTS idx_screenshots_project ON screenshots(project_id)`)
 	s.db.Exec(`CREATE INDEX IF NOT EXISTS idx_screenshot_memory_status ON screenshots(memory_status)`)
 }
 
@@ -988,14 +977,14 @@ func (s *Store) repairShellCommandsTable() {
 		return
 	}
 
+	// Only tmux_context (migration 13) is repaired here. Migration 14's
+	// project_* columns are intentionally NOT re-added — migration 18 drops
+	// them as dead, and re-adding would race with that migration on upgrade DBs.
 	repairs := []struct {
 		column string
 		ddl    string
 	}{
 		{"tmux_context", `ALTER TABLE shell_commands ADD COLUMN tmux_context TEXT`},
-		{"project_id", `ALTER TABLE shell_commands ADD COLUMN project_id INTEGER REFERENCES projects(id)`},
-		{"project_confidence", `ALTER TABLE shell_commands ADD COLUMN project_confidence REAL DEFAULT 0.0`},
-		{"project_source", `ALTER TABLE shell_commands ADD COLUMN project_source TEXT DEFAULT 'unassigned'`},
 	}
 	for _, r := range repairs {
 		var colCount int
@@ -1013,9 +1002,6 @@ func (s *Store) repairShellCommandsTable() {
 		if _, err := s.db.Exec(r.ddl); err != nil {
 			log.Printf("repairShellCommandsTable: add %s column: %v", r.column, err)
 		}
-	}
-	if _, err := s.db.Exec(`CREATE INDEX IF NOT EXISTS idx_shell_project ON shell_commands(project_id)`); err != nil {
-		log.Printf("repairShellCommandsTable: create idx_shell_project: %v", err)
 	}
 }
 
@@ -1152,6 +1138,59 @@ func (s *Store) applyMigration17() error {
 	}
 	if _, err := s.db.Exec(`CREATE INDEX IF NOT EXISTS idx_browser_project ON browser_history(project_id)`); err != nil {
 		return fmt.Errorf("create idx_browser_project: %w", err)
+	}
+	return nil
+}
+
+// applyMigration18 drops the dead project_id/project_confidence/project_source
+// columns from screenshots and shell_commands. These tables now derive project
+// attribution via timestamp overlap with focus events (see GetProjectStats and
+// the project activity grouping in service/) instead of carrying their own
+// columns. SQLite >= 3.35 supports ALTER TABLE DROP COLUMN; the indexes are
+// dropped explicitly first because the columns are referenced by them.
+//
+// Each step is guarded via pragma_table_info / DROP INDEX IF EXISTS so a
+// re-run (or a fresh DB whose top-level schema already lacks these columns)
+// no-ops cleanly.
+func (s *Store) applyMigration18() error {
+	// Drop dependent indexes first; SQLite refuses DROP COLUMN if an index
+	// references the column.
+	dropIndexes := []string{
+		`DROP INDEX IF EXISTS idx_screenshots_project`,
+		`DROP INDEX IF EXISTS idx_shell_project`,
+	}
+	for _, stmt := range dropIndexes {
+		if _, err := s.db.Exec(stmt); err != nil {
+			return fmt.Errorf("migration 18: %s: %w", stmt, err)
+		}
+	}
+
+	type drop struct {
+		table  string
+		column string
+	}
+	drops := []drop{
+		{"screenshots", "project_id"},
+		{"screenshots", "project_confidence"},
+		{"screenshots", "project_source"},
+		{"shell_commands", "project_id"},
+		{"shell_commands", "project_confidence"},
+		{"shell_commands", "project_source"},
+	}
+	for _, d := range drops {
+		var count int
+		if err := s.db.QueryRow(
+			`SELECT COUNT(*) FROM pragma_table_info(?) WHERE name = ?`, d.table, d.column,
+		).Scan(&count); err != nil {
+			return fmt.Errorf("migration 18: check %s.%s: %w", d.table, d.column, err)
+		}
+		if count == 0 {
+			continue // already dropped (fresh DB or partial re-run)
+		}
+		stmt := fmt.Sprintf(`ALTER TABLE %s DROP COLUMN %s`, d.table, d.column)
+		if _, err := s.db.Exec(stmt); err != nil {
+			return fmt.Errorf("migration 18: %s: %w", stmt, err)
+		}
 	}
 	return nil
 }
