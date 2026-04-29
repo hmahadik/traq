@@ -84,3 +84,44 @@ func TestApplyPatternToEvents_DomainUpdatesBrowserHistory(t *testing.T) {
 		t.Errorf("browser_history project_id = %d, want %d", pid, proj.ID)
 	}
 }
+
+func TestProjectStats_DerivesScreenshotCount(t *testing.T) {
+	store, cleanup := testStore(t)
+	defer cleanup()
+
+	proj, err := store.CreateProject("Traq", "#6366f1", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now().Unix()
+
+	// Focus event 10:00–10:10 attributed to Traq.
+	_, err = store.DB().Exec(`
+		INSERT INTO window_focus_events (start_time, end_time, duration_seconds, app_name, window_title, project_id, project_confidence, project_source)
+		VALUES (?, ?, ?, 'code', 'main.go - traq', ?, 1.0, 'user')`,
+		now, now+600, 600, proj.ID,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Screenshot at 10:05 — overlaps the focus event, so it should be derived to Traq.
+	_, err = store.DB().Exec(`INSERT INTO screenshots (timestamp, filepath, dhash) VALUES (?, '/tmp/x.png', 'h1')`, now+300)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Screenshot at 11:00 — outside any focus event, must NOT be counted.
+	_, err = store.DB().Exec(`INSERT INTO screenshots (timestamp, filepath, dhash) VALUES (?, '/tmp/y.png', 'h2')`, now+3600)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	stats, err := store.GetProjectStats(proj.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if stats.ScreenshotCount != 1 {
+		t.Errorf("ScreenshotCount = %d, want 1", stats.ScreenshotCount)
+	}
+}

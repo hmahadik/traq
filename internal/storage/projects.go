@@ -311,7 +311,15 @@ type ProjectStats struct {
 func (s *Store) GetProjectStats(projectID int64) (*ProjectStats, error) {
 	var stats ProjectStats
 
-	err := s.db.QueryRow(`SELECT COUNT(*) FROM screenshots WHERE project_id = ?`, projectID).Scan(&stats.ScreenshotCount)
+	// Screenshots no longer carry project_id directly — derive count via overlap
+	// with focus events that ARE attributed to the project.
+	err := s.db.QueryRow(`
+		SELECT COUNT(*) FROM screenshots s
+		WHERE EXISTS (
+			SELECT 1 FROM window_focus_events f
+			WHERE f.project_id = ?
+			  AND s.timestamp BETWEEN f.start_time AND f.end_time
+		)`, projectID).Scan(&stats.ScreenshotCount)
 	if err != nil {
 		return nil, fmt.Errorf("failed to count screenshots: %w", err)
 	}
