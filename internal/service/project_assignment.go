@@ -3,6 +3,7 @@ package service
 import (
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"log"
 	"regexp"
 	"strings"
@@ -533,23 +534,6 @@ func (s *ProjectAssignmentService) ExtractEventContext(eventType string, eventID
 	ctx := &storage.AssignmentContext{}
 
 	switch eventType {
-	case "screenshot":
-		screenshot, err := s.store.GetScreenshot(eventID)
-		if err != nil {
-			return nil, err
-		}
-		if screenshot.AppName.Valid {
-			ctx.AppName = screenshot.AppName.String
-		}
-		if screenshot.WindowTitle.Valid {
-			ctx.WindowTitle = screenshot.WindowTitle.String
-		}
-		// Extract URL from window title if browser
-		if isBrowser(ctx.AppName) {
-			ctx.URL = extractURLFromTitle(ctx.WindowTitle)
-			ctx.Domain = extractDomain(ctx.URL)
-		}
-
 	case "focus", "activity":
 		// "activity" is the frontend name for focus events
 		var windowTitle, appName string
@@ -582,21 +566,23 @@ func (s *ProjectAssignmentService) ExtractEventContext(eventType string, eventID
 		ctx.GitRepo = repoURL
 		ctx.BranchName = branch
 
-	case "shell":
-		// working_directory is by far the strongest project signal for shell
-		// commands — a cwd of ~/repos/traq almost always maps to the Traq project.
-		// shell_type ("bash"/"zsh"/"fish") is too generic to learn from, so we
-		// skip populating AppName.
-		var cwd sql.NullString
-		err := s.store.DB().QueryRow(
-			`SELECT working_directory FROM shell_commands WHERE id = ?`, eventID,
-		).Scan(&cwd)
+	case "browser":
+		var url, domain string
+		var title sql.NullString
+		err := s.store.DB().QueryRow(`
+			SELECT url, title, domain FROM browser_history WHERE id = ?
+		`, eventID).Scan(&url, &title, &domain)
 		if err != nil {
 			return nil, err
 		}
-		if cwd.Valid {
-			ctx.FilePath = cwd.String
+		ctx.URL = url
+		ctx.Domain = domain
+		if title.Valid {
+			ctx.WindowTitle = title.String
 		}
+
+	default:
+		return nil, fmt.Errorf("unsupported event type for context extraction: %q", eventType)
 	}
 
 	return ctx, nil
