@@ -164,6 +164,9 @@ type BrowserVisit struct {
 	TransitionType       sql.NullString `json:"transitionType"`
 	SessionID            sql.NullInt64  `json:"sessionId"`
 	CreatedAt            int64          `json:"createdAt"`
+	ProjectID            sql.NullInt64   `json:"projectId"`
+	ProjectConfidence    sql.NullFloat64 `json:"projectConfidence"`
+	ProjectSource        sql.NullString  `json:"projectSource"`
 }
 
 // Report represents a generated report.

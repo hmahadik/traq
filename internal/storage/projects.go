@@ -249,6 +249,8 @@ func (s *Store) SetEventProject(eventType string, eventID, projectID int64, conf
 		query = `UPDATE git_commits SET project_id = ?, project_confidence = ?, project_source = ? WHERE id = ?`
 	case "shell":
 		query = `UPDATE shell_commands SET project_id = ?, project_confidence = ?, project_source = ? WHERE id = ?`
+	case "browser":
+		query = `UPDATE browser_history SET project_id = ?, project_confidence = ?, project_source = ? WHERE id = ?`
 	default:
 		return fmt.Errorf("unknown event type: %s", eventType)
 	}
