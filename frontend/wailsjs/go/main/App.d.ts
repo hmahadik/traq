@@ -272,8 +272,6 @@ export function ListHierarchicalSummaries(arg1:string,arg2:number):Promise<Array
 
 export function MergeTags(arg1:string,arg2:string):Promise<number>;
 
-export function MigrateHardcodedPatterns():Promise<number>;
-
 export function OpenDataDir():Promise<void>;
 
 export function OptimizeDatabase():Promise<number>;

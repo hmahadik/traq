@@ -1130,12 +1130,6 @@ export const projects = {
     return App.ApplyRuleToHistory(patternId);
   },
 
-  /** Migrate legacy hardcoded patterns to database (one-time migration) */
-  migrateHardcodedPatterns: async (): Promise<number> => {
-    await waitForReady();
-    return App.MigrateHardcodedPatterns();
-  },
-
   /** Assign an event to a project */
   assignEvent: async (eventType: string, eventId: number, projectId: number) => {
     await waitForReady();

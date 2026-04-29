@@ -534,10 +534,6 @@ export function MergeTags(arg1, arg2) {
   return window['go']['main']['App']['MergeTags'](arg1, arg2);
 }
 
-export function MigrateHardcodedPatterns() {
-  return window['go']['main']['App']['MigrateHardcodedPatterns']();
-}
-
 export function OpenDataDir() {
   return window['go']['main']['App']['OpenDataDir']();
 }

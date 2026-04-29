@@ -597,7 +597,6 @@ func (s *ReportsService) detectProjectFromLearnedPatterns(ctx *storage.Assignmen
 
 // DetectProjectFromWindowTitle extracts project name from learned patterns.
 // Hardcoded detection rules have been migrated to database patterns.
-// Call MigrateHardcodedPatterns() on first run to populate the patterns.
 func (s *ReportsService) DetectProjectFromWindowTitle(windowTitle, appName string) string {
 	// Use learned patterns from database
 	if projectName := s.detectProjectFromLearnedPatterns(&storage.AssignmentContext{
@@ -627,7 +626,6 @@ func (s *ReportsService) DetectProjectFromWindowTitle(windowTitle, appName strin
 
 // DetectProjectFromGitRepo extracts project name from learned patterns.
 // Hardcoded detection rules have been migrated to database patterns.
-// Call MigrateHardcodedPatterns() on first run to populate the patterns.
 func (s *ReportsService) DetectProjectFromGitRepo(repoPath string) string {
 	// Use learned patterns from database
 	if projectName := s.detectProjectFromLearnedPatterns(&storage.AssignmentContext{
@@ -3003,7 +3001,6 @@ func (s *ReportsService) normalizeProjectName(name string) string {
 
 // DetectProjectFromBrowserTitle detects project from browser page title.
 // Hardcoded detection rules have been migrated to database patterns.
-// Call MigrateHardcodedPatterns() on first run to populate the patterns.
 func (s *ReportsService) DetectProjectFromBrowserTitle(title string) string {
 	// Use learned patterns from database
 	return s.detectProjectFromLearnedPatterns(&storage.AssignmentContext{

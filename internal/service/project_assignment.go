@@ -3,7 +3,6 @@ package service
 import (
 	"database/sql"
 	"encoding/json"
-	"fmt"
 	"log"
 	"regexp"
 	"strings"
@@ -490,129 +489,6 @@ func (e *InvalidInputError) Error() string {
 	return e.Message
 }
 
-// ============================================================================
-// Legacy Pattern Migration (One-time migration of hardcoded rules to DB)
-// ============================================================================
-
-// MigrateHardcodedPatterns creates database patterns from the legacy hardcoded rules.
-// This is idempotent - it won't create duplicates if called multiple times.
-// Returns number of patterns created.
-func (s *ProjectAssignmentService) MigrateHardcodedPatterns() (int, error) {
-	// Define legacy patterns grouped by project
-	type legacyPattern struct {
-		projectName  string
-		projectColor string
-		patternType  string
-		patternValue string
-	}
-
-	legacyPatterns := []legacyPattern{
-		// Traq project
-		{projectName: "Traq", projectColor: "#6366f1", patternType: "window_title", patternValue: "traq"},
-		{projectName: "Traq", projectColor: "#6366f1", patternType: "window_title", patternValue: "activity-tracker"},
-		{projectName: "Traq", projectColor: "#6366f1", patternType: "window_title", patternValue: "activity tracker"},
-		{projectName: "Traq", projectColor: "#6366f1", patternType: "git_repo", patternValue: "traq"},
-		{projectName: "Traq", projectColor: "#6366f1", patternType: "git_repo", patternValue: "activity-tracker"},
-
-		// Synaptics/42T project
-		{projectName: "Synaptics/42T", projectColor: "#f97316", patternType: "window_title", patternValue: "synaptics"},
-		{projectName: "Synaptics/42T", projectColor: "#f97316", patternType: "window_title", patternValue: "sl261"},
-		{projectName: "Synaptics/42T", projectColor: "#f97316", patternType: "window_title", patternValue: "sl2619"},
-		{projectName: "Synaptics/42T", projectColor: "#f97316", patternType: "window_title", patternValue: "torq"},
-		{projectName: "Synaptics/42T", projectColor: "#f97316", patternType: "window_title", patternValue: "tflite"},
-		{projectName: "Synaptics/42T", projectColor: "#f97316", patternType: "window_title", patternValue: "mobilenet"},
-		{projectName: "Synaptics/42T", projectColor: "#f97316", patternType: "window_title", patternValue: "yolo"},
-		{projectName: "Synaptics/42T", projectColor: "#f97316", patternType: "git_repo", patternValue: "synaptics"},
-		{projectName: "Synaptics/42T", projectColor: "#f97316", patternType: "git_repo", patternValue: "42t"},
-		{projectName: "Synaptics/42T", projectColor: "#f97316", patternType: "git_repo", patternValue: "sl261"},
-
-		// Claude Code project
-		{projectName: "Claude Code", projectColor: "#8b5cf6", patternType: "window_title", patternValue: "autonomous-coding"},
-		{projectName: "Claude Code", projectColor: "#8b5cf6", patternType: "window_title", patternValue: "claude-quickstarts"},
-		{projectName: "Claude Code", projectColor: "#8b5cf6", patternType: "git_repo", patternValue: "claude-quickstarts"},
-		{projectName: "Claude Code", projectColor: "#8b5cf6", patternType: "git_repo", patternValue: "autonomous-coding"},
-
-		// Arcturus Admin project
-		{projectName: "Arcturus Admin", projectColor: "#ec4899", patternType: "window_title", patternValue: "arcturus"},
-		{projectName: "Arcturus Admin", projectColor: "#ec4899", patternType: "window_title", patternValue: "eng-mv"},
-		{projectName: "Arcturus Admin", projectColor: "#ec4899", patternType: "window_title", patternValue: "brinq-boyz"},
-
-		// AI/ML Research project
-		{projectName: "AI/ML Research", projectColor: "#14b8a6", patternType: "window_title", patternValue: "functiongemma"},
-		{projectName: "AI/ML Research", projectColor: "#14b8a6", patternType: "window_title", patternValue: "fine-tuning"},
-		{projectName: "AI/ML Research", projectColor: "#14b8a6", patternType: "window_title", patternValue: "gemma"},
-
-		// Acusight project
-		{projectName: "Acusight", projectColor: "#22c55e", patternType: "git_repo", patternValue: "acusight"},
-
-		// Portainer project
-		{projectName: "Portainer", projectColor: "#06b6d4", patternType: "git_repo", patternValue: "portainer"},
-
-		// Fleet project
-		{projectName: "Fleet", projectColor: "#3b82f6", patternType: "git_repo", patternValue: "fleet"},
-	}
-
-	// Get existing projects
-	existingProjects, err := s.store.GetProjects()
-	if err != nil {
-		return 0, err
-	}
-	projectByName := make(map[string]*storage.Project)
-	for i := range existingProjects {
-		projectByName[strings.ToLower(existingProjects[i].Name)] = &existingProjects[i]
-	}
-
-	// Get existing patterns to avoid duplicates
-	allPatterns, err := s.store.GetAllPatterns()
-	if err != nil {
-		return 0, err
-	}
-	existingPatternKeys := make(map[string]bool)
-	for _, p := range allPatterns {
-		key := fmt.Sprintf("%d:%s:%s:contains", p.ProjectID, p.PatternType, strings.ToLower(p.PatternValue))
-		existingPatternKeys[key] = true
-	}
-
-	created := 0
-
-	for _, lp := range legacyPatterns {
-		// Get or create project
-		project := projectByName[strings.ToLower(lp.projectName)]
-		if project == nil {
-			// Create the project
-			newProject, err := s.store.CreateProject(lp.projectName, lp.projectColor, "Migrated from hardcoded patterns")
-			if err != nil {
-				log.Printf("MigrateHardcodedPatterns: failed to create project %s: %v", lp.projectName, err)
-				continue
-			}
-			project = newProject
-			projectByName[strings.ToLower(lp.projectName)] = project
-		}
-
-		// Check if pattern already exists
-		key := fmt.Sprintf("%d:%s:%s:contains", project.ID, lp.patternType, strings.ToLower(lp.patternValue))
-		if existingPatternKeys[key] {
-			continue // Skip duplicate
-		}
-
-		// Create the pattern
-		_, err := s.store.CreatePattern(project.ID, lp.patternType, lp.patternValue, "contains", 1.0)
-		if err != nil {
-			log.Printf("MigrateHardcodedPatterns: failed to create pattern %s/%s: %v", lp.projectName, lp.patternValue, err)
-			continue
-		}
-		existingPatternKeys[key] = true
-		created++
-	}
-
-	// Refresh pattern cache
-	if created > 0 {
-		s.refreshPatternCache()
-		log.Printf("MigrateHardcodedPatterns: created %d patterns", created)
-	}
-
-	return created, nil
-}
 
 // ============================================================================
 // Manual Assignment
