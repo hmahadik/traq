@@ -519,7 +519,13 @@ func buildPatternMatchCondition(patternType, patternValue, matchType string) (co
 		// These would need specific table queries in a real implementation
 		field = "window_title"
 	}
+	return buildPatternMatchConditionForField(field, patternValue, matchType)
+}
 
+// buildPatternMatchConditionForField is the generalized form of
+// buildPatternMatchCondition: callers supply the SQL column expression
+// (e.g. "domain", "r.path") instead of having it inferred from pattern_type.
+func buildPatternMatchConditionForField(field, patternValue, matchType string) (condition string, params []interface{}, needsGoFilter bool) {
 	switch matchType {
 	case "exact":
 		return fmt.Sprintf("LOWER(%s) = LOWER(?)", field), []interface{}{patternValue}, false
@@ -661,8 +667,28 @@ func (s *Store) getSampleMatchingEventsRegex(patternType, patternValue string, l
 }
 
 // ApplyPatternToEvents bulk assigns a project to all events matching a pattern.
-// Returns the number of events updated.
+// Returns the number of events updated. Dispatches to the table appropriate
+// for the pattern_type:
+//   - git_repo    -> git_commits (matched via git_repositories.path)
+//   - domain      -> browser_history.domain
+//   - app_name, window_title, path -> window_focus_events
 func (s *Store) ApplyPatternToEvents(projectID int64, patternType, patternValue, matchType string) (int, error) {
+	switch patternType {
+	case "git_repo":
+		return s.applyPatternToGitCommits(projectID, patternValue, matchType)
+	case "domain":
+		return s.applyPatternToBrowserHistory(projectID, patternValue, matchType)
+	case "app_name", "window_title", "path":
+		return s.applyPatternToFocusEvents(projectID, patternType, patternValue, matchType)
+	default:
+		return 0, fmt.Errorf("unsupported pattern type for apply: %q", patternType)
+	}
+}
+
+// applyPatternToFocusEvents updates window_focus_events for app_name,
+// window_title, and path pattern types. Behavior preserved from the original
+// ApplyPatternToEvents implementation (no project_id IS NULL filter).
+func (s *Store) applyPatternToFocusEvents(projectID int64, patternType, patternValue, matchType string) (int, error) {
 	condition, params, needsGoFilter := buildPatternMatchCondition(patternType, patternValue, matchType)
 
 	if needsGoFilter {
@@ -687,6 +713,50 @@ func (s *Store) ApplyPatternToEvents(projectID int64, patternType, patternValue,
 		return 0, fmt.Errorf("failed to get rows affected: %w", err)
 	}
 	return int(affected), nil
+}
+
+// applyPatternToGitCommits updates git_commits whose repository path matches
+// the pattern. Skips commits already assigned to a project.
+func (s *Store) applyPatternToGitCommits(projectID int64, patternValue, matchType string) (int, error) {
+	if matchType == "regex" {
+		// Regex over repo paths is rare; punt for now and document.
+		return 0, fmt.Errorf("regex match is not supported for git_repo patterns yet")
+	}
+	cond, params, _ := buildPatternMatchConditionForField("r.path", patternValue, matchType)
+	query := fmt.Sprintf(`
+		UPDATE git_commits
+		SET project_id = ?, project_confidence = 1.0, project_source = 'rule'
+		WHERE repository_id IN (SELECT id FROM git_repositories r WHERE %s)
+		  AND project_id IS NULL
+	`, cond)
+	args := append([]interface{}{projectID}, params...)
+	res, err := s.db.Exec(query, args...)
+	if err != nil {
+		return 0, fmt.Errorf("apply git_repo pattern: %w", err)
+	}
+	n, _ := res.RowsAffected()
+	return int(n), nil
+}
+
+// applyPatternToBrowserHistory updates browser_history rows whose domain
+// matches the pattern. Skips rows already assigned to a project.
+func (s *Store) applyPatternToBrowserHistory(projectID int64, patternValue, matchType string) (int, error) {
+	if matchType == "regex" {
+		return 0, fmt.Errorf("regex match is not supported for domain patterns yet")
+	}
+	cond, params, _ := buildPatternMatchConditionForField("domain", patternValue, matchType)
+	query := fmt.Sprintf(`
+		UPDATE browser_history
+		SET project_id = ?, project_confidence = 1.0, project_source = 'rule'
+		WHERE %s AND project_id IS NULL
+	`, cond)
+	args := append([]interface{}{projectID}, params...)
+	res, err := s.db.Exec(query, args...)
+	if err != nil {
+		return 0, fmt.Errorf("apply domain pattern: %w", err)
+	}
+	n, _ := res.RowsAffected()
+	return int(n), nil
 }
 
 // applyPatternToEventsRegex applies pattern using Go regex filtering.
