@@ -175,5 +175,32 @@ func (s *BackfillService) processBackfill(startDate, endDate string, minConfiden
 		}
 	}
 
+	// Process browser visits
+	visits, err := s.store.GetBrowserVisitsForBackfill(startUnix, endUnix)
+	if err == nil {
+		result.TotalProcessed += len(visits)
+		for _, v := range visits {
+			// GetBrowserVisitsForBackfill already filters to project_id IS NULL.
+			title := ""
+			if v.Title.Valid {
+				title = v.Title.String
+			}
+			ctx := &storage.AssignmentContext{
+				Domain:      v.Domain,
+				URL:         v.URL,
+				WindowTitle: title,
+			}
+			match := s.projects.SuggestProject(ctx)
+			if match != nil && match.Confidence >= minConfidence {
+				if commit {
+					s.store.SetEventProject("browser", v.ID, match.ProjectID, match.Confidence, "rule")
+				}
+				result.AutoAssigned++
+				continue
+			}
+			result.NoMatch++
+		}
+	}
+
 	return result, nil
 }
