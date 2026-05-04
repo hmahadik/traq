@@ -23,6 +23,7 @@ const blockTailPadSeconds = 30
 type statFn func(string) (os.FileInfo, error)
 
 type AIBlockDisplay struct {
+	EventID     int64  `json:"eventId"`
 	Tool        string `json:"tool"`
 	SessionID   string `json:"sessionId"`
 	ProjectDir  string `json:"projectDir"`
@@ -43,6 +44,7 @@ type AIBlockDisplay struct {
 // text (a per-prompt detail dialog, for example), add an explicit
 // per-session binding rather than re-adding the field here.
 type AIPromptDisplay struct {
+	EventID     int64  `json:"eventId"`
 	Tool        string `json:"tool"`
 	SessionID   string `json:"sessionId"`
 	ProjectName string `json:"projectName"`
@@ -176,6 +178,7 @@ func (s *AIService) GetAIPromptsForDay(date string) ([]AIPromptDisplay, error) {
 			projectDir = row.ProjectDir
 		}
 		out = append(out, AIPromptDisplay{
+			EventID:     e.ID,
 			Tool:        e.Tool,
 			SessionID:   e.SessionID,
 			ProjectName: filepath.Base(projectDir),
@@ -254,6 +257,7 @@ func (s *AIService) deriveBlocks(startUnix, endUnix int64) ([]AIBlockDisplay, er
 			}
 
 			current = &AIBlockDisplay{
+				EventID:     e.ID,
 				Tool:        e.Tool,
 				SessionID:   e.SessionID,
 				ProjectDir:  projectDir,
@@ -264,6 +268,7 @@ func (s *AIService) deriveBlocks(startUnix, endUnix int64) ([]AIBlockDisplay, er
 				IsLive:      false,
 			}
 		}
+		current.EventID = e.ID
 		current.EndTime = e.Timestamp
 		current.EventCount++
 		prevSessionKey = key

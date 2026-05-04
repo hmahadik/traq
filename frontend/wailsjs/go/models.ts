@@ -215,6 +215,7 @@ export namespace service {
 	    }
 	}
 	export class AIBlockDisplay {
+	    eventId: number;
 	    tool: string;
 	    sessionId: string;
 	    projectDir: string;
@@ -230,6 +231,7 @@ export namespace service {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.eventId = source["eventId"];
 	        this.tool = source["tool"];
 	        this.sessionId = source["sessionId"];
 	        this.projectDir = source["projectDir"];
@@ -257,6 +259,7 @@ export namespace service {
 	    }
 	}
 	export class AIPromptDisplay {
+	    eventId: number;
 	    tool: string;
 	    sessionId: string;
 	    projectName: string;
@@ -270,6 +273,7 @@ export namespace service {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.eventId = source["eventId"];
 	        this.tool = source["tool"];
 	        this.sessionId = source["sessionId"];
 	        this.projectName = source["projectName"];

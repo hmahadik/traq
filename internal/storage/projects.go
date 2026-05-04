@@ -363,26 +363,66 @@ type ProjectActivity struct {
 	Source          string  `json:"source"`
 }
 
-// GetProjectActivities returns activities assigned to a project
+// GetProjectActivities returns activities assigned to a project.
+// Includes focus events, git commits, and AI coding sessions.
 func (s *Store) GetProjectActivities(projectID int64, startTime, endTime int64, limit int) ([]ProjectActivity, error) {
 	query := `
-		SELECT
-			'focus' as event_type,
-			id,
-			app_name,
-			window_title,
-			start_time,
-			duration_seconds,
-			COALESCE(project_confidence, 0) as confidence,
-			COALESCE(project_source, 'unknown') as source
-		FROM window_focus_events
-		WHERE project_id = ?
-		  AND start_time >= ? AND start_time <= ?
+		SELECT event_type, id, app_name, window_title, start_time, duration_seconds, confidence, source
+		FROM (
+			SELECT
+				'focus' as event_type,
+				id,
+				app_name,
+				window_title,
+				start_time,
+				duration_seconds,
+				COALESCE(project_confidence, 0) as confidence,
+				COALESCE(project_source, 'unknown') as source
+			FROM window_focus_events
+			WHERE project_id = ?
+			  AND start_time >= ? AND start_time <= ?
+
+			UNION ALL
+
+			SELECT
+				'git' as event_type,
+				gc.id,
+				gc.message_subject as app_name,
+				COALESCE(r.name, '') as window_title,
+				gc.timestamp as start_time,
+				0.0 as duration_seconds,
+				COALESCE(gc.project_confidence, 0) as confidence,
+				COALESCE(gc.project_source, 'unknown') as source
+			FROM git_commits gc
+			LEFT JOIN git_repositories r ON r.id = gc.repository_id
+			WHERE gc.project_id = ?
+			  AND gc.timestamp >= ? AND gc.timestamp <= ?
+
+			UNION ALL
+
+			SELECT
+				'ai' as event_type,
+				(SELECT COALESCE(MIN(e.id), 0) FROM ai_events e WHERE e.session_id = ai_sessions.id) as id,
+				tool as app_name,
+				COALESCE(project_dir, '') as window_title,
+				started_at as start_time,
+				CAST(last_event_at - started_at AS REAL) as duration_seconds,
+				COALESCE(project_confidence, 0) as confidence,
+				COALESCE(project_source, 'unknown') as source
+			FROM ai_sessions
+			WHERE project_id = ?
+			  AND started_at >= ? AND started_at <= ?
+		)
 		ORDER BY start_time DESC
 		LIMIT ?
 	`
 
-	rows, err := s.db.Query(query, projectID, startTime, endTime, limit)
+	rows, err := s.db.Query(query,
+		projectID, startTime, endTime,
+		projectID, startTime, endTime,
+		projectID, startTime, endTime,
+		limit,
+	)
 	if err != nil {
 		return nil, err
 	}

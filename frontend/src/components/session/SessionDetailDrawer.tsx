@@ -486,7 +486,7 @@ export function SessionDetailDrawer({ open, onOpenChange, sessionId }: SessionDe
                       </TabsList>
 
                       <TabsContent value="focus" className="mt-4">
-                        <div className="max-h-96 overflow-y-auto">
+                        <div className="max-h-96 overflow-auto">
                           <ActivityLogTable focusEvents={safeFocusEvents} />
                         </div>
                       </TabsContent>
