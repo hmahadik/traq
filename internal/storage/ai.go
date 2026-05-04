@@ -174,6 +174,36 @@ func (s *Store) ListAISessionsForDate(startUnix, endUnix int64) ([]AISession, er
 	return out, rows.Err()
 }
 
+// GetAISessionsForBackfill returns AI sessions whose last_event_at falls in
+// [start, end] and that are not yet assigned to a project. Ordered by
+// last_event_at ascending so backfill processes oldest first.
+func (s *Store) GetAISessionsForBackfill(start, end int64) ([]AISession, error) {
+	rows, err := s.db.Query(`
+		SELECT id, tool, COALESCE(project_dir,''), COALESCE(file_path,''),
+		       started_at, last_event_at, event_count, source_offset,
+		       project_id, project_confidence, project_source
+		FROM ai_sessions
+		WHERE last_event_at BETWEEN ? AND ?
+		  AND project_id IS NULL
+		ORDER BY last_event_at ASC
+	`, start, end)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []AISession
+	for rows.Next() {
+		var sess AISession
+		if err := rows.Scan(&sess.ID, &sess.Tool, &sess.ProjectDir, &sess.FilePath,
+			&sess.StartedAt, &sess.LastEventAt, &sess.EventCount, &sess.SourceOffset,
+			&sess.ProjectID, &sess.ProjectConfidence, &sess.ProjectSource); err != nil {
+			return nil, err
+		}
+		out = append(out, sess)
+	}
+	return out, rows.Err()
+}
+
 // SetAISessionProject sets the project assignment for an AI session.
 // Mirrors SetEventProject's behavior for setting/clearing assignments.
 func (s *Store) SetAISessionProject(sessionID string, projectID int64, confidence float64, source string) error {
