@@ -121,6 +121,7 @@ type EnhancedReportContext struct {
 	ShellCommands      []*storage.ShellCommand
 	FileEvents         []*storage.FileEvent
 	BrowserVisits      []*storage.BrowserVisit
+	AISessions         []*storage.AISession
 	TotalMinutes       int64
 	ProductiveMinutes  int64
 	DistractingMinutes int64
@@ -250,6 +251,15 @@ func (s *ReportsService) buildEnhancedReportContext(tr *TimeRange) (*EnhancedRep
 	}
 	ctx.BrowserVisits = browserVisits
 	ctx.DomainGroups = s.aggregateBrowserByDomain(browserVisits, focusEvents)
+
+	// Get AI coding sessions for project attribution
+	aiSessions, err := s.store.ListAISessionsForDate(tr.Start, tr.End)
+	if err == nil {
+		ctx.AISessions = make([]*storage.AISession, len(aiSessions))
+		for i := range aiSessions {
+			ctx.AISessions[i] = &aiSessions[i]
+		}
+	}
 
 	// Get git commits
 	ctx.GitCommits, _ = s.store.GetGitCommitsByTimeRange(tr.Start, tr.End)
@@ -813,6 +823,47 @@ func (s *ReportsService) groupActivitiesByProject(ctx *EnhancedReportContext) []
 				Domain:      v.Domain,
 				URL:         v.URL,
 				WindowTitle: title,
+			})
+		}
+		if projectName == "" {
+			continue
+		}
+
+		project := getProject(projectName)
+		project.DurationSeconds += durSec
+	}
+
+	// AI session pass: attribute AI coding time. Each session contributes
+	// (last_event_at - started_at) seconds to its project — this includes
+	// idle gaps within a session; accepted trade-off (vs. summing per-event
+	// deltas) to keep the path uniform with git commits, which also lack a
+	// duration model. See plan docs/superpowers/plans/2026-05-04-ai-coding-attribution.md.
+	// If unassigned at report time, fall back to learned git_repo patterns matching project_dir.
+	aiProjectByID := make(map[int64]string)
+	for _, sess := range ctx.AISessions {
+		durSec := float64(sess.LastEventAt - sess.StartedAt)
+		if durSec <= 0 {
+			continue
+		}
+
+		var projectName string
+		if sess.ProjectID.Valid && sess.ProjectID.Int64 != 0 {
+			if name, cached := aiProjectByID[sess.ProjectID.Int64]; cached {
+				projectName = name
+			} else {
+				p, err := s.store.GetProject(sess.ProjectID.Int64)
+				if err != nil {
+					log.Printf("groupActivitiesByProject: ai session lookup project_id=%d failed: %v", sess.ProjectID.Int64, err)
+				} else if p != nil {
+					projectName = p.Name
+				}
+				aiProjectByID[sess.ProjectID.Int64] = projectName
+			}
+		} else if sess.ProjectDir != "" {
+			// Fallback: try learned git_repo patterns at report time.
+			projectName = s.detectProjectFromLearnedPatterns(&storage.AssignmentContext{
+				GitRepo:  sess.ProjectDir,
+				FilePath: sess.ProjectDir,
 			})
 		}
 		if projectName == "" {

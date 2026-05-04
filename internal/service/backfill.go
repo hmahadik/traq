@@ -202,5 +202,31 @@ func (s *BackfillService) processBackfill(startDate, endDate string, minConfiden
 		}
 	}
 
+	// Process AI sessions
+	sessions, err := s.store.GetAISessionsForBackfill(startUnix, endUnix)
+	if err == nil {
+		result.TotalProcessed += len(sessions)
+		for _, sess := range sessions {
+			// GetAISessionsForBackfill already filters to project_id IS NULL.
+			if sess.ProjectDir == "" {
+				result.NoMatch++
+				continue
+			}
+			ctx := &storage.AssignmentContext{
+				GitRepo:  sess.ProjectDir,
+				FilePath: sess.ProjectDir,
+			}
+			match := s.projects.SuggestProject(ctx)
+			if match != nil && match.Confidence >= minConfidence {
+				if commit {
+					s.store.SetAISessionProject(sess.ID, match.ProjectID, match.Confidence, "rule")
+				}
+				result.AutoAssigned++
+				continue
+			}
+			result.NoMatch++
+		}
+	}
+
 	return result, nil
 }

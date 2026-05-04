@@ -111,6 +111,10 @@ func (s *Store) DeleteProject(id int64) error {
 	if err != nil {
 		return fmt.Errorf("failed to clear git commit assignments: %w", err)
 	}
+	_, err = s.db.Exec(`UPDATE ai_sessions SET project_id = NULL, project_source = 'unassigned' WHERE project_id = ?`, id)
+	if err != nil {
+		return fmt.Errorf("failed to clear ai session assignments: %w", err)
+	}
 
 	// Delete the project (cascades to patterns and examples)
 	_, err = s.db.Exec(`DELETE FROM projects WHERE id = ?`, id)
@@ -241,6 +245,18 @@ func (s *Store) SetEventProject(eventType string, eventID, projectID int64, conf
 		query = `UPDATE git_commits SET project_id = ?, project_confidence = ?, project_source = ? WHERE id = ?`
 	case "browser":
 		query = `UPDATE browser_history SET project_id = ?, project_confidence = ?, project_source = ? WHERE id = ?`
+	case "ai":
+		// AI events are attributed at the SESSION level. The eventID is an
+		// ai_events.id; resolve to the parent session and update there.
+		// An orphaned ai_event (no parent session) shouldn't exist given
+		// the FK + ON DELETE CASCADE on ai_events.session_id, so a sql.ErrNoRows
+		// here would indicate ingest corruption — surface it as an error rather
+		// than silently no-oping.
+		var sessionID string
+		if err := s.db.QueryRow(`SELECT session_id FROM ai_events WHERE id = ?`, eventID).Scan(&sessionID); err != nil {
+			return fmt.Errorf("resolve ai_event %d to session: %w", eventID, err)
+		}
+		return s.SetAISessionProject(sessionID, projectID, confidence, source)
 	default:
 		// "screenshot" and "shell" used to be valid; both are now derived from
 		// focus-event overlap and have no project_id column to write.
@@ -667,7 +683,12 @@ func (s *Store) getSampleMatchingEventsRegex(patternType, patternValue string, l
 func (s *Store) ApplyPatternToEvents(projectID int64, patternType, patternValue, matchType string) (int, error) {
 	switch patternType {
 	case "git_repo":
-		return s.applyPatternToGitCommits(projectID, patternValue, matchType)
+		commits, err := s.applyPatternToGitCommits(projectID, patternValue, matchType)
+		if err != nil {
+			return commits, err
+		}
+		sessions, err := s.applyPatternToAISessions(projectID, patternValue, matchType)
+		return commits + sessions, err
 	case "domain":
 		return s.applyPatternToBrowserHistory(projectID, patternValue, matchType)
 	case "app_name", "window_title", "path":
@@ -725,6 +746,27 @@ func (s *Store) applyPatternToGitCommits(projectID int64, patternValue, matchTyp
 	res, err := s.db.Exec(query, args...)
 	if err != nil {
 		return 0, fmt.Errorf("apply git_repo pattern: %w", err)
+	}
+	n, _ := res.RowsAffected()
+	return int(n), nil
+}
+
+// applyPatternToAISessions updates ai_sessions whose project_dir matches the
+// pattern. Skips sessions already assigned to a project.
+func (s *Store) applyPatternToAISessions(projectID int64, patternValue, matchType string) (int, error) {
+	if matchType == "regex" {
+		return 0, fmt.Errorf("regex match is not supported for git_repo patterns yet")
+	}
+	cond, params, _ := buildPatternMatchConditionForField("project_dir", patternValue, matchType)
+	query := fmt.Sprintf(`
+		UPDATE ai_sessions
+		SET project_id = ?, project_confidence = 1.0, project_source = 'rule'
+		WHERE %s AND project_id IS NULL
+	`, cond)
+	args := append([]interface{}{projectID}, params...)
+	res, err := s.db.Exec(query, args...)
+	if err != nil {
+		return 0, fmt.Errorf("apply git_repo pattern to ai_sessions: %w", err)
 	}
 	n, _ := res.RowsAffected()
 	return int(n), nil

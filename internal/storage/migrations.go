@@ -5,7 +5,7 @@ import (
 	"log"
 )
 
-const schemaVersion = 18
+const schemaVersion = 19
 
 const schema = `
 -- ============================================================================
@@ -365,6 +365,15 @@ func (s *Store) Migrate() error {
 		// Migration v18: Drop dead project_* columns from screenshots and shell_commands
 		if err := s.applyMigration18(); err != nil {
 			return fmt.Errorf("failed to apply migration 18: %w", err)
+		}
+	}
+
+	if currentVersion < 19 {
+		// Migration v19: Add project attribution columns to ai_sessions so
+		// AI coding time can be credited to projects via git_repo rules
+		// (matched against project_dir).
+		if err := s.applyMigration19(); err != nil {
+			return fmt.Errorf("failed to apply migration 19: %w", err)
 		}
 	}
 
@@ -1191,6 +1200,47 @@ func (s *Store) applyMigration18() error {
 		if _, err := s.db.Exec(stmt); err != nil {
 			return fmt.Errorf("migration 18: %s: %w", stmt, err)
 		}
+	}
+	return nil
+}
+
+// applyMigration19 adds project_id/project_confidence/project_source to
+// ai_sessions. Like git_commits and browser_history, ai_sessions has an
+// intrinsic strong project identity (project_dir = filesystem path of the
+// session's repo), so attribution is stored directly rather than derived.
+func (s *Store) applyMigration19() error {
+	stmts := []struct {
+		probe string
+		alter string
+	}{
+		{
+			`SELECT COUNT(*) FROM pragma_table_info('ai_sessions') WHERE name = 'project_id'`,
+			`ALTER TABLE ai_sessions ADD COLUMN project_id INTEGER REFERENCES projects(id)`,
+		},
+		{
+			`SELECT COUNT(*) FROM pragma_table_info('ai_sessions') WHERE name = 'project_confidence'`,
+			`ALTER TABLE ai_sessions ADD COLUMN project_confidence REAL DEFAULT 0`,
+		},
+		{
+			`SELECT COUNT(*) FROM pragma_table_info('ai_sessions') WHERE name = 'project_source'`,
+			`ALTER TABLE ai_sessions ADD COLUMN project_source TEXT DEFAULT 'unassigned'`,
+		},
+	}
+	for _, p := range stmts {
+		var n int
+		if err := s.db.QueryRow(p.probe).Scan(&n); err != nil {
+			return fmt.Errorf("migration 19 probe failed: %w", err)
+		}
+		if n == 0 {
+			if _, err := s.db.Exec(p.alter); err != nil {
+				return fmt.Errorf("migration 19 alter failed: %w", err)
+			}
+		}
+	}
+	if _, err := s.db.Exec(
+		`CREATE INDEX IF NOT EXISTS idx_ai_sessions_project ON ai_sessions(project_id)`,
+	); err != nil {
+		return fmt.Errorf("migration 19 index failed: %w", err)
 	}
 	return nil
 }

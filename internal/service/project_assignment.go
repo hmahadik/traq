@@ -581,6 +581,22 @@ func (s *ProjectAssignmentService) ExtractEventContext(eventType string, eventID
 			ctx.WindowTitle = title.String
 		}
 
+	case "ai":
+		// eventID is ai_events.id; resolve via session_id to ai_sessions.project_dir
+		// so the rule engine can match git_repo patterns against it.
+		var projectDir string
+		err := s.store.DB().QueryRow(`
+			SELECT COALESCE(s.project_dir, '')
+			FROM ai_events e
+			JOIN ai_sessions s ON s.id = e.session_id
+			WHERE e.id = ?
+		`, eventID).Scan(&projectDir)
+		if err != nil {
+			return nil, err
+		}
+		ctx.GitRepo = projectDir
+		ctx.FilePath = projectDir
+
 	default:
 		return nil, fmt.Errorf("unsupported event type for context extraction: %q", eventType)
 	}
