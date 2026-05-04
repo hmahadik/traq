@@ -834,8 +834,11 @@ func (s *ReportsService) groupActivitiesByProject(ctx *EnhancedReportContext) []
 	}
 
 	// AI session pass: attribute AI coding time. Each session contributes
-	// (last_event_at - started_at) seconds to its project. If unassigned at
-	// report time, fall back to learned git_repo patterns matching project_dir.
+	// (last_event_at - started_at) seconds to its project — this includes
+	// idle gaps within a session; accepted trade-off (vs. summing per-event
+	// deltas) to keep the path uniform with git commits, which also lack a
+	// duration model. See plan docs/superpowers/plans/2026-05-04-ai-coding-attribution.md.
+	// If unassigned at report time, fall back to learned git_repo patterns matching project_dir.
 	aiProjectByID := make(map[int64]string)
 	for _, sess := range ctx.AISessions {
 		durSec := float64(sess.LastEventAt - sess.StartedAt)

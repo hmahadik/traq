@@ -248,6 +248,10 @@ func (s *Store) SetEventProject(eventType string, eventID, projectID int64, conf
 	case "ai":
 		// AI events are attributed at the SESSION level. The eventID is an
 		// ai_events.id; resolve to the parent session and update there.
+		// An orphaned ai_event (no parent session) shouldn't exist given
+		// the FK + ON DELETE CASCADE on ai_events.session_id, so a sql.ErrNoRows
+		// here would indicate ingest corruption — surface it as an error rather
+		// than silently no-oping.
 		var sessionID string
 		if err := s.db.QueryRow(`SELECT session_id FROM ai_events WHERE id = ?`, eventID).Scan(&sessionID); err != nil {
 			return fmt.Errorf("resolve ai_event %d to session: %w", eventID, err)
