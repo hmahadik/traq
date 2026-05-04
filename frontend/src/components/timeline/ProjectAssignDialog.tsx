@@ -19,7 +19,7 @@ interface ProjectAssignDialogProps {
 }
 
 // Supported event types for project assignment
-const ASSIGNABLE_EVENT_TYPES = ['activity', 'focus', 'git', 'browser'];
+const ASSIGNABLE_EVENT_TYPES = ['activity', 'focus', 'git', 'browser', 'ai'];
 
 export function ProjectAssignDialog({
   open,
@@ -102,7 +102,7 @@ export function ProjectAssignDialog({
               Selected items ({activityKeys.length}): {skippedTypes.join(', ')} events
             </p>
             <p className="mt-2">
-              Only <strong>activity</strong>, <strong>git commit</strong>, and <strong>browser visit</strong> events can be assigned to projects.
+              Only <strong>activity</strong>, <strong>git commit</strong>, <strong>browser visit</strong>, and <strong>AI coding</strong> events can be assigned to projects.
             </p>
           </div>
 
