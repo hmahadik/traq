@@ -1,6 +1,9 @@
 package storage
 
-import "database/sql"
+import (
+	"database/sql"
+	"fmt"
+)
 
 // AISession represents one AI coding session (Claude Code or opencode).
 // SourceOffset is tool-specific cursor state: byte offset into the JSONL file
@@ -14,6 +17,10 @@ type AISession struct {
 	LastEventAt  int64
 	EventCount   int
 	SourceOffset int64
+
+	ProjectID         sql.NullInt64
+	ProjectConfidence sql.NullFloat64
+	ProjectSource     sql.NullString
 }
 
 // AIEvent is one atomic turn within an AI session (user prompt, assistant
@@ -49,7 +56,8 @@ func (s *Store) GetAISessionByFilePath(path string) (*AISession, error) {
 	}
 	row := s.db.QueryRow(`
 		SELECT id, tool, COALESCE(project_dir,''), COALESCE(file_path,''),
-		       started_at, last_event_at, event_count, source_offset
+		       started_at, last_event_at, event_count, source_offset,
+		       project_id, project_confidence, project_source
 		FROM ai_sessions WHERE file_path = ?
 	`, path)
 	return scanAISession(row)
@@ -58,7 +66,8 @@ func (s *Store) GetAISessionByFilePath(path string) (*AISession, error) {
 func (s *Store) GetAISessionByID(id string) (*AISession, error) {
 	row := s.db.QueryRow(`
 		SELECT id, tool, COALESCE(project_dir,''), COALESCE(file_path,''),
-		       started_at, last_event_at, event_count, source_offset
+		       started_at, last_event_at, event_count, source_offset,
+		       project_id, project_confidence, project_source
 		FROM ai_sessions WHERE id = ?
 	`, id)
 	return scanAISession(row)
@@ -67,7 +76,8 @@ func (s *Store) GetAISessionByID(id string) (*AISession, error) {
 func scanAISession(row *sql.Row) (*AISession, error) {
 	var out AISession
 	err := row.Scan(&out.ID, &out.Tool, &out.ProjectDir, &out.FilePath,
-		&out.StartedAt, &out.LastEventAt, &out.EventCount, &out.SourceOffset)
+		&out.StartedAt, &out.LastEventAt, &out.EventCount, &out.SourceOffset,
+		&out.ProjectID, &out.ProjectConfidence, &out.ProjectSource)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -140,7 +150,8 @@ func (s *Store) GetMaxAIEventTimestamp(tool string) (int64, error) {
 func (s *Store) ListAISessionsForDate(startUnix, endUnix int64) ([]AISession, error) {
 	rows, err := s.db.Query(`
 		SELECT DISTINCT s.id, s.tool, COALESCE(s.project_dir,''), COALESCE(s.file_path,''),
-		       s.started_at, s.last_event_at, s.event_count, s.source_offset
+		       s.started_at, s.last_event_at, s.event_count, s.source_offset,
+		       s.project_id, s.project_confidence, s.project_source
 		FROM ai_sessions s
 		JOIN ai_events e ON e.session_id = s.id
 		WHERE e.timestamp BETWEEN ? AND ?
@@ -154,12 +165,34 @@ func (s *Store) ListAISessionsForDate(startUnix, endUnix int64) ([]AISession, er
 	for rows.Next() {
 		var s AISession
 		if err := rows.Scan(&s.ID, &s.Tool, &s.ProjectDir, &s.FilePath,
-			&s.StartedAt, &s.LastEventAt, &s.EventCount, &s.SourceOffset); err != nil {
+			&s.StartedAt, &s.LastEventAt, &s.EventCount, &s.SourceOffset,
+			&s.ProjectID, &s.ProjectConfidence, &s.ProjectSource); err != nil {
 			return nil, err
 		}
 		out = append(out, s)
 	}
 	return out, rows.Err()
+}
+
+// SetAISessionProject sets the project assignment for an AI session.
+// Mirrors SetEventProject's behavior for setting/clearing assignments.
+func (s *Store) SetAISessionProject(sessionID string, projectID int64, confidence float64, source string) error {
+	var pid any = projectID
+	if projectID == 0 {
+		pid = nil
+		source = "unassigned"
+		confidence = 0
+	}
+	_, err := s.db.Exec(`
+		UPDATE ai_sessions
+		SET project_id = ?, project_confidence = ?, project_source = ?
+		WHERE id = ?`,
+		pid, confidence, source, sessionID,
+	)
+	if err != nil {
+		return fmt.Errorf("set ai session project: %w", err)
+	}
+	return nil
 }
 
 func aiNullableStr(s string) any {

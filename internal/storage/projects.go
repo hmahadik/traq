@@ -241,6 +241,14 @@ func (s *Store) SetEventProject(eventType string, eventID, projectID int64, conf
 		query = `UPDATE git_commits SET project_id = ?, project_confidence = ?, project_source = ? WHERE id = ?`
 	case "browser":
 		query = `UPDATE browser_history SET project_id = ?, project_confidence = ?, project_source = ? WHERE id = ?`
+	case "ai":
+		// AI events are attributed at the SESSION level. The eventID is an
+		// ai_events.id; resolve to the parent session and update there.
+		var sessionID string
+		if err := s.db.QueryRow(`SELECT session_id FROM ai_events WHERE id = ?`, eventID).Scan(&sessionID); err != nil {
+			return fmt.Errorf("resolve ai_event %d to session: %w", eventID, err)
+		}
+		return s.SetAISessionProject(sessionID, projectID, confidence, source)
 	default:
 		// "screenshot" and "shell" used to be valid; both are now derived from
 		// focus-event overlap and have no project_id column to write.
