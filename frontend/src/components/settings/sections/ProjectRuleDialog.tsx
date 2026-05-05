@@ -32,6 +32,7 @@ const PATTERN_TYPES = [
   { value: 'window_title', label: 'Window Title' },
   { value: 'app_name', label: 'App Name' },
   { value: 'git_repo', label: 'Git Repo / AI session dir' },
+  { value: 'domain', label: 'Domain' },
 ];
 
 // Match type options

@@ -41,7 +41,7 @@ type AssignmentResult struct {
 // ProjectRuleInput is the input for creating/updating a project rule.
 type ProjectRuleInput struct {
 	ProjectID    int64   `json:"projectId"`
-	PatternType  string  `json:"patternType"`  // app_name, window_title, git_repo, path
+	PatternType  string  `json:"patternType"`  // app_name, window_title, git_repo, domain
 	PatternValue string  `json:"patternValue"`
 	MatchType    string  `json:"matchType"` // exact, contains, prefix, suffix, regex
 	Weight       float64 `json:"weight,omitempty"`
@@ -344,7 +344,7 @@ func (s *ProjectAssignmentService) CreateProjectRule(input ProjectRuleInput) (*s
 	}
 
 	// Validate pattern type
-	validTypes := map[string]bool{"app_name": true, "window_title": true, "git_repo": true, "path": true}
+	validTypes := map[string]bool{"app_name": true, "window_title": true, "git_repo": true, "domain": true, "path": true}
 	if !validTypes[input.PatternType] {
 		return nil, errInvalidInput("invalid patternType: " + input.PatternType)
 	}
@@ -359,17 +359,6 @@ func (s *ProjectAssignmentService) CreateProjectRule(input ProjectRuleInput) (*s
 	if input.MatchType == "regex" {
 		if _, err := regexp.Compile(input.PatternValue); err != nil {
 			return nil, errInvalidInput("invalid regex pattern: " + err.Error())
-		}
-	}
-
-	// Check for duplicate before inserting to give a friendly error.
-	existing, err := s.store.GetProjectPatterns(input.ProjectID)
-	if err != nil {
-		return nil, err
-	}
-	for _, p := range existing {
-		if p.PatternType == input.PatternType && p.PatternValue == input.PatternValue && p.MatchType == input.MatchType {
-			return nil, errInvalidInput("a rule with this pattern already exists for the selected project")
 		}
 	}
 
@@ -642,7 +631,10 @@ func (s *ProjectAssignmentService) learnFromAssignment(projectID int64, ctx *sto
 		}
 	}
 
-
+	// 4. Domain extraction from URLs
+	if ctx.Domain != "" && !isGenericDomain(ctx.Domain) {
+		s.store.UpsertPattern(projectID, "domain", ctx.Domain, "contains", 0.7)
+	}
 
 	// Refresh pattern cache
 	s.refreshPatternCache()
@@ -687,6 +679,12 @@ func (s *ProjectAssignmentService) matchPatterns(ctx *storage.AssignmentContext)
 			case "git_repo":
 				matched = s.matchField(ctx.GitRepo, p.PatternValue, p.MatchType)
 				field = "repo"
+			case "domain":
+				matched = s.matchField(ctx.Domain, p.PatternValue, p.MatchType)
+				if !matched {
+					matched = s.matchField(ctx.URL, p.PatternValue, p.MatchType)
+				}
+				field = "url"
 			}
 
 			if matched {
@@ -815,6 +813,22 @@ func isGenericApp(appName string) bool {
 	return false
 }
 
+// isGenericDomain checks if a domain is too generic for pattern learning.
+func isGenericDomain(domain string) bool {
+	generics := []string{
+		"google.com", "github.com", "stackoverflow.com", "youtube.com",
+		"twitter.com", "facebook.com", "linkedin.com", "reddit.com",
+		"amazon.com", "wikipedia.org",
+	}
+	lower := strings.ToLower(domain)
+	for _, g := range generics {
+		if lower == g || strings.HasSuffix(lower, "."+g) {
+			return true
+		}
+	}
+	return false
+}
+
 // extractRepoName gets the repo name from a git URL.
 func extractRepoName(repoURL string) string {
 	if repoURL == "" {
@@ -853,11 +867,14 @@ func extractDomain(url string) string {
 	if url == "" {
 		return ""
 	}
+	// Remove protocol
 	url = strings.TrimPrefix(url, "https://")
 	url = strings.TrimPrefix(url, "http://")
+	// Get host
 	if idx := strings.Index(url, "/"); idx > 0 {
 		url = url[:idx]
 	}
+	// Remove port
 	if idx := strings.Index(url, ":"); idx > 0 {
 		url = url[:idx]
 	}

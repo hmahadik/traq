@@ -213,7 +213,7 @@ type Project struct {
 type ProjectPattern struct {
 	ID           int64   `json:"id"`
 	ProjectID    int64   `json:"projectId"`
-	PatternType  string  `json:"patternType"`  // 'app_name', 'window_title', 'git_repo', 'path'
+	PatternType  string  `json:"patternType"`  // 'app_name', 'window_title', 'git_repo', 'domain', 'path'
 	PatternValue string  `json:"patternValue"`
 	MatchType    string  `json:"matchType"`    // 'exact', 'contains', 'prefix', 'suffix', 'regex'
 	Weight       float64 `json:"weight"`
