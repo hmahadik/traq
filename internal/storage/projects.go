@@ -563,8 +563,7 @@ func buildPatternMatchCondition(patternType, patternValue, matchType string) (co
 	case "app_name":
 		field = "app_name"
 	default:
-		// For other pattern types (git_repo, domain, path), we use window_title as fallback
-		// These would need specific table queries in a real implementation
+		// For other pattern types (git_repo, path), we use window_title as fallback
 		field = "window_title"
 	}
 	return buildPatternMatchConditionForField(field, patternValue, matchType)
@@ -717,8 +716,7 @@ func (s *Store) getSampleMatchingEventsRegex(patternType, patternValue string, l
 // ApplyPatternToEvents bulk assigns a project to all events matching a pattern.
 // Returns the number of events updated. Dispatches to the table appropriate
 // for the pattern_type:
-//   - git_repo    -> git_commits (matched via git_repositories.path)
-//   - domain      -> browser_history.domain
+//   - git_repo    -> git_commits (matched via git_repositories.path) + ai_sessions
 //   - app_name, window_title, path -> window_focus_events
 func (s *Store) ApplyPatternToEvents(projectID int64, patternType, patternValue, matchType string) (int, error) {
 	switch patternType {
@@ -729,8 +727,6 @@ func (s *Store) ApplyPatternToEvents(projectID int64, patternType, patternValue,
 		}
 		sessions, err := s.applyPatternToAISessions(projectID, patternValue, matchType)
 		return commits + sessions, err
-	case "domain":
-		return s.applyPatternToBrowserHistory(projectID, patternValue, matchType)
 	case "app_name", "window_title", "path":
 		return s.applyPatternToFocusEvents(projectID, patternType, patternValue, matchType)
 	default:
@@ -748,13 +744,16 @@ func (s *Store) applyPatternToFocusEvents(projectID int64, patternType, patternV
 		return s.applyPatternToEventsRegex(projectID, patternType, patternValue)
 	}
 
-	// Build update query for window_focus_events
+	// Build update query for window_focus_events.
+	// Skip rows already assigned to this project to avoid spurious RowsAffected counts.
 	query := fmt.Sprintf(`
 		UPDATE window_focus_events
 		SET project_id = ?, project_confidence = 1.0, project_source = 'rule'
 		WHERE %s
+		  AND (project_id IS NULL OR project_id != ?)
 	`, condition)
 	allParams := append([]interface{}{projectID}, params...)
+	allParams = append(allParams, projectID)
 
 	result, err := s.db.Exec(query, allParams...)
 	if err != nil {
@@ -812,27 +811,6 @@ func (s *Store) applyPatternToAISessions(projectID int64, patternValue, matchTyp
 	return int(n), nil
 }
 
-// applyPatternToBrowserHistory updates browser_history rows whose domain
-// matches the pattern. Skips rows already assigned to a project.
-func (s *Store) applyPatternToBrowserHistory(projectID int64, patternValue, matchType string) (int, error) {
-	if matchType == "regex" {
-		return 0, fmt.Errorf("regex match is not supported for domain patterns yet")
-	}
-	cond, params, _ := buildPatternMatchConditionForField("domain", patternValue, matchType)
-	query := fmt.Sprintf(`
-		UPDATE browser_history
-		SET project_id = ?, project_confidence = 1.0, project_source = 'rule'
-		WHERE %s AND project_id IS NULL
-	`, cond)
-	args := append([]interface{}{projectID}, params...)
-	res, err := s.db.Exec(query, args...)
-	if err != nil {
-		return 0, fmt.Errorf("apply domain pattern: %w", err)
-	}
-	n, _ := res.RowsAffected()
-	return int(n), nil
-}
-
 // applyPatternToEventsRegex applies pattern using Go regex filtering.
 func (s *Store) applyPatternToEventsRegex(projectID int64, patternType, patternValue string) (int, error) {
 	field := "window_title"
@@ -840,7 +818,7 @@ func (s *Store) applyPatternToEventsRegex(projectID int64, patternType, patternV
 		field = "app_name"
 	}
 
-	rows, err := s.db.Query(fmt.Sprintf(`SELECT id, %s FROM window_focus_events WHERE %s IS NOT NULL AND %s != ''`, field, field, field))
+	rows, err := s.db.Query(fmt.Sprintf(`SELECT id, %s FROM window_focus_events WHERE %s IS NOT NULL AND %s != '' AND (project_id IS NULL OR project_id != ?)`, field, field, field), projectID)
 	if err != nil {
 		return 0, fmt.Errorf("failed to query events for regex: %w", err)
 	}
