@@ -2398,6 +2398,49 @@ func (a *App) GenerateTimesheet(startDate, endDate string) (*service.TimesheetDa
 	return data, nil
 }
 
+// GetTimesheetPrompts builds the timesheet and returns the verbatim LLM
+// prompt for each non-unattributed entry without firing any LLM calls.
+// Used by the frontend to show a pre-flight review modal.
+func (a *App) GetTimesheetPrompts(startDate, endDate string) (*service.TimesheetPromptResult, error) {
+	cfg, err := a.Config.GetConfig()
+	if err != nil {
+		return nil, fmt.Errorf("get config: %w", err)
+	}
+	rounding := 0.25
+	if cfg.Timesheet != nil && cfg.Timesheet.HoursRounding > 0 {
+		rounding = cfg.Timesheet.HoursRounding
+	}
+	previews, err := a.Timesheet.BuildPromptPreviews(startDate, endDate, rounding)
+	if err != nil {
+		return nil, err
+	}
+	backendName := ""
+	if cfg.Timesheet != nil {
+		backendName = backendDisplayName(cfg.Timesheet.AINotesBackend)
+	} else {
+		backendName = backendDisplayName("")
+	}
+	return &service.TimesheetPromptResult{
+		Previews:    previews,
+		BackendName: backendName,
+	}, nil
+}
+
+// backendDisplayName maps a config backend string to a human-readable label
+// for the prompt-preview modal header.
+func backendDisplayName(backend string) string {
+	switch backend {
+	case "inference":
+		return "Local Inference"
+	case "claude":
+		return "Claude CLI"
+	case "opencode":
+		return "OpenCode CLI"
+	default:
+		return "Auto (Claude or OpenCode)"
+	}
+}
+
 // pickNotesBackend selects the configured notes backend. "inference" routes
 // through the local inference engine (same one summaries can use); the rest
 // route through CLI subprocesses. Returns an error when the requested

@@ -474,6 +474,10 @@ export function GetTimelineGridData(arg1) {
   return window['go']['main']['App']['GetTimelineGridData'](arg1);
 }
 
+export function GetTimesheetPrompts(arg1, arg2) {
+  return window['go']['main']['App']['GetTimesheetPrompts'](arg1, arg2);
+}
+
 export function GetTmuxSetupStatus() {
   return window['go']['main']['App']['GetTmuxSetupStatus']();
 }
