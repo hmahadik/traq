@@ -12,6 +12,8 @@ import {
   Lightbulb,
   Filter,
   FilterX,
+  GitCommit,
+  Bot,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -621,13 +623,14 @@ export function ProjectsUnifiedView({ selectedProjectIds, onNewProject }: Projec
                 />
               </div>
               {selectedProjectIds.size > 1 && <div className="w-6"></div>}
+              <div className="w-5"></div>
               <div className="w-20 px-1 py-1.5">App</div>
               <div className="flex-1 px-1 py-1.5">Window Title</div>
               <div className="w-14 px-1 py-1.5 text-right">Dur</div>
             </div>
 
             {/* Activities list */}
-            <div className="flex-1 overflow-y-auto text-xs">
+            <div className="flex-1 overflow-y-auto text-xs" style={{ scrollbarGutter: 'stable' }}>
               {isLoading ? (
                 <div className="flex items-center justify-center py-8">
                   <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
@@ -670,6 +673,11 @@ export function ProjectsUnifiedView({ selectedProjectIds, onNewProject }: Projec
                           ) : null}
                         </div>
                       )}
+
+                      <div className="w-5 flex items-center justify-center shrink-0">
+                        {activity.eventType === 'git' && <GitCommit className="w-3.5 h-3.5 text-muted-foreground" />}
+                        {activity.eventType === 'ai' && <Bot className="w-3.5 h-3.5 text-muted-foreground" />}
+                      </div>
 
                       <div className="w-20 px-1 py-1.5 truncate font-medium">
                         {activity.appName}

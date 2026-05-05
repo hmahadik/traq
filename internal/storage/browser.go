@@ -31,7 +31,8 @@ func (s *Store) SaveBrowserVisit(visit *BrowserVisit) (int64, error) {
 func (s *Store) GetBrowserVisitsBySession(sessionID int64) ([]*BrowserVisit, error) {
 	rows, err := s.db.Query(`
 		SELECT id, timestamp, url, title, domain, browser,
-		       visit_duration_seconds, transition_type, session_id, created_at
+		       visit_duration_seconds, transition_type, session_id, created_at,
+		       project_id, project_confidence, project_source
 		FROM browser_history
 		WHERE session_id = ?
 		ORDER BY timestamp ASC`, sessionID)
@@ -47,7 +48,8 @@ func (s *Store) GetBrowserVisitsBySession(sessionID int64) ([]*BrowserVisit, err
 func (s *Store) GetBrowserVisitsByTimeRange(start, end int64) ([]*BrowserVisit, error) {
 	rows, err := s.db.Query(`
 		SELECT id, timestamp, url, title, domain, browser,
-		       visit_duration_seconds, transition_type, session_id, created_at
+		       visit_duration_seconds, transition_type, session_id, created_at,
+		       project_id, project_confidence, project_source
 		FROM browser_history
 		WHERE timestamp >= ? AND timestamp <= ?
 		ORDER BY timestamp ASC`, start, end)
@@ -168,7 +170,8 @@ func (s *Store) CountBrowserVisitsByTimeRange(start, end int64) (int64, error) {
 func (s *Store) GetAllBrowserVisits() ([]*BrowserVisit, error) {
 	rows, err := s.db.Query(`
 		SELECT id, timestamp, url, title, domain, browser, visit_duration_seconds,
-		       transition_type, session_id, created_at
+		       transition_type, session_id, created_at,
+		       project_id, project_confidence, project_source
 		FROM browser_history
 		ORDER BY timestamp DESC`)
 	if err != nil {
@@ -184,7 +187,8 @@ func (s *Store) SearchBrowserVisits(query string, limit int) ([]*BrowserVisit, e
 	likeQuery := "%" + query + "%"
 	rows, err := s.db.Query(`
 		SELECT id, timestamp, url, title, domain, browser, visit_duration_seconds,
-		       transition_type, session_id, created_at
+		       transition_type, session_id, created_at,
+		       project_id, project_confidence, project_source
 		FROM browser_history
 		WHERE title LIKE ? OR url LIKE ?
 		ORDER BY timestamp DESC
@@ -301,6 +305,7 @@ func scanBrowserVisits(rows *sql.Rows) ([]*BrowserVisit, error) {
 		err := rows.Scan(
 			&visit.ID, &visit.Timestamp, &visit.URL, &visit.Title, &visit.Domain, &visit.Browser,
 			&visit.VisitDurationSeconds, &visit.TransitionType, &visit.SessionID, &visit.CreatedAt,
+			&visit.ProjectID, &visit.ProjectConfidence, &visit.ProjectSource,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan browser visit: %w", err)
@@ -308,4 +313,24 @@ func scanBrowserVisits(rows *sql.Rows) ([]*BrowserVisit, error) {
 		visits = append(visits, visit)
 	}
 	return visits, rows.Err()
+}
+
+// GetBrowserVisitsForBackfill returns browser visits in [start, end] that
+// don't yet have a project assignment, in chronological order.
+func (s *Store) GetBrowserVisitsForBackfill(start, end int64) ([]*BrowserVisit, error) {
+	rows, err := s.db.Query(`
+		SELECT id, timestamp, url, title, domain, browser,
+		       visit_duration_seconds, transition_type, session_id, created_at,
+		       project_id, project_confidence, project_source
+		FROM browser_history
+		WHERE timestamp BETWEEN ? AND ?
+		  AND project_id IS NULL
+		ORDER BY timestamp ASC`,
+		start, end,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("query browser visits for backfill: %w", err)
+	}
+	defer rows.Close()
+	return scanBrowserVisits(rows)
 }

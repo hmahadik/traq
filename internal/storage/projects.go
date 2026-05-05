@@ -100,12 +100,10 @@ func (s *Store) UpdateProject(id int64, name, color, description string) error {
 
 // DeleteProject deletes a project and clears its assignments.
 func (s *Store) DeleteProject(id int64) error {
-	// Clear project assignments from events (ON DELETE CASCADE handles patterns/examples)
-	_, err := s.db.Exec(`UPDATE screenshots SET project_id = NULL, project_source = 'unassigned' WHERE project_id = ?`, id)
-	if err != nil {
-		return fmt.Errorf("failed to clear screenshot assignments: %w", err)
-	}
-	_, err = s.db.Exec(`UPDATE window_focus_events SET project_id = NULL, project_source = 'unassigned' WHERE project_id = ?`, id)
+	// Clear project assignments from events (ON DELETE CASCADE handles patterns/examples).
+	// Screenshots and shell_commands no longer carry project_id columns — their
+	// attribution is derived via timestamp overlap with focus events.
+	_, err := s.db.Exec(`UPDATE window_focus_events SET project_id = NULL, project_source = 'unassigned' WHERE project_id = ?`, id)
 	if err != nil {
 		return fmt.Errorf("failed to clear focus event assignments: %w", err)
 	}
@@ -113,9 +111,9 @@ func (s *Store) DeleteProject(id int64) error {
 	if err != nil {
 		return fmt.Errorf("failed to clear git commit assignments: %w", err)
 	}
-	_, err = s.db.Exec(`UPDATE shell_commands SET project_id = NULL, project_source = 'unassigned' WHERE project_id = ?`, id)
+	_, err = s.db.Exec(`UPDATE ai_sessions SET project_id = NULL, project_source = 'unassigned' WHERE project_id = ?`, id)
 	if err != nil {
-		return fmt.Errorf("failed to clear shell command assignments: %w", err)
+		return fmt.Errorf("failed to clear ai session assignments: %w", err)
 	}
 
 	// Delete the project (cascades to patterns and examples)
@@ -240,16 +238,28 @@ func (s *Store) AddAssignmentExample(projectID int64, eventType string, eventID 
 func (s *Store) SetEventProject(eventType string, eventID, projectID int64, confidence float64, source string) error {
 	var query string
 	switch eventType {
-	case "screenshot":
-		query = `UPDATE screenshots SET project_id = ?, project_confidence = ?, project_source = ? WHERE id = ?`
 	case "focus", "activity":
 		// "activity" is the frontend name for focus events
 		query = `UPDATE window_focus_events SET project_id = ?, project_confidence = ?, project_source = ? WHERE id = ?`
 	case "git":
 		query = `UPDATE git_commits SET project_id = ?, project_confidence = ?, project_source = ? WHERE id = ?`
-	case "shell":
-		query = `UPDATE shell_commands SET project_id = ?, project_confidence = ?, project_source = ? WHERE id = ?`
+	case "browser":
+		query = `UPDATE browser_history SET project_id = ?, project_confidence = ?, project_source = ? WHERE id = ?`
+	case "ai":
+		// AI events are attributed at the SESSION level. The eventID is an
+		// ai_events.id; resolve to the parent session and update there.
+		// An orphaned ai_event (no parent session) shouldn't exist given
+		// the FK + ON DELETE CASCADE on ai_events.session_id, so a sql.ErrNoRows
+		// here would indicate ingest corruption — surface it as an error rather
+		// than silently no-oping.
+		var sessionID string
+		if err := s.db.QueryRow(`SELECT session_id FROM ai_events WHERE id = ?`, eventID).Scan(&sessionID); err != nil {
+			return fmt.Errorf("resolve ai_event %d to session: %w", eventID, err)
+		}
+		return s.SetAISessionProject(sessionID, projectID, confidence, source)
 	default:
+		// "screenshot" and "shell" used to be valid; both are now derived from
+		// focus-event overlap and have no project_id column to write.
 		return fmt.Errorf("unknown event type: %s", eventType)
 	}
 
@@ -269,26 +279,18 @@ func (s *Store) SetEventProject(eventType string, eventID, projectID int64, conf
 
 // GetUnassignedEventCount returns count of events without project assignment.
 //
-// Uses `project_id IS NULL` rather than `project_source = 'unassigned'` so
-// each subquery can use the project_id index (idx_screenshots_project,
-// idx_focus_project, idx_git_project, idx_shell_project) instead of full
-// scans. These are the highest-volume tables in the DB and this function
-// drives a sidebar counter that refetches on timeline navigation.
-//
-// The two formulations are equivalent by construction: SetEventProject
-// always writes project_id and project_source together, so rows with
-// project_id IS NULL always have project_source in ('unassigned', NULL).
+// Counts focus events and git commits — the two event types that carry a
+// project_id column. Screenshots and shell commands derive their attribution
+// from focus-event overlap, so they don't contribute their own counts.
+// Uses `project_id IS NULL` so each subquery can hit the project_id indexes
+// (idx_focus_project, idx_git_project) instead of scanning.
 func (s *Store) GetUnassignedEventCount() (int, error) {
 	var count int
 	err := s.db.QueryRow(`
 		SELECT (
-			SELECT COUNT(*) FROM screenshots WHERE project_id IS NULL
-		) + (
 			SELECT COUNT(*) FROM window_focus_events WHERE project_id IS NULL
 		) + (
 			SELECT COUNT(*) FROM git_commits WHERE project_id IS NULL
-		) + (
-			SELECT COUNT(*) FROM shell_commands WHERE project_id IS NULL
 		)
 	`).Scan(&count)
 	if err != nil {
@@ -309,7 +311,15 @@ type ProjectStats struct {
 func (s *Store) GetProjectStats(projectID int64) (*ProjectStats, error) {
 	var stats ProjectStats
 
-	err := s.db.QueryRow(`SELECT COUNT(*) FROM screenshots WHERE project_id = ?`, projectID).Scan(&stats.ScreenshotCount)
+	// Screenshots no longer carry project_id directly — derive count via overlap
+	// with focus events that ARE attributed to the project.
+	err := s.db.QueryRow(`
+		SELECT COUNT(*) FROM screenshots s
+		WHERE EXISTS (
+			SELECT 1 FROM window_focus_events f
+			WHERE f.project_id = ?
+			  AND s.timestamp BETWEEN f.start_time AND f.end_time
+		)`, projectID).Scan(&stats.ScreenshotCount)
 	if err != nil {
 		return nil, fmt.Errorf("failed to count screenshots: %w", err)
 	}
@@ -353,26 +363,66 @@ type ProjectActivity struct {
 	Source          string  `json:"source"`
 }
 
-// GetProjectActivities returns activities assigned to a project
+// GetProjectActivities returns activities assigned to a project.
+// Includes focus events, git commits, and AI coding sessions.
 func (s *Store) GetProjectActivities(projectID int64, startTime, endTime int64, limit int) ([]ProjectActivity, error) {
 	query := `
-		SELECT
-			'focus' as event_type,
-			id,
-			app_name,
-			window_title,
-			start_time,
-			duration_seconds,
-			COALESCE(project_confidence, 0) as confidence,
-			COALESCE(project_source, 'unknown') as source
-		FROM window_focus_events
-		WHERE project_id = ?
-		  AND start_time >= ? AND start_time <= ?
+		SELECT event_type, id, app_name, window_title, start_time, duration_seconds, confidence, source
+		FROM (
+			SELECT
+				'focus' as event_type,
+				id,
+				app_name,
+				window_title,
+				start_time,
+				duration_seconds,
+				COALESCE(project_confidence, 0) as confidence,
+				COALESCE(project_source, 'unknown') as source
+			FROM window_focus_events
+			WHERE project_id = ?
+			  AND start_time >= ? AND start_time <= ?
+
+			UNION ALL
+
+			SELECT
+				'git' as event_type,
+				gc.id,
+				gc.message_subject as app_name,
+				COALESCE(r.name, '') as window_title,
+				gc.timestamp as start_time,
+				0.0 as duration_seconds,
+				COALESCE(gc.project_confidence, 0) as confidence,
+				COALESCE(gc.project_source, 'unknown') as source
+			FROM git_commits gc
+			LEFT JOIN git_repositories r ON r.id = gc.repository_id
+			WHERE gc.project_id = ?
+			  AND gc.timestamp >= ? AND gc.timestamp <= ?
+
+			UNION ALL
+
+			SELECT
+				'ai' as event_type,
+				(SELECT COALESCE(MIN(e.id), 0) FROM ai_events e WHERE e.session_id = ai_sessions.id) as id,
+				tool as app_name,
+				COALESCE(project_dir, '') as window_title,
+				started_at as start_time,
+				CAST(last_event_at - started_at AS REAL) as duration_seconds,
+				COALESCE(project_confidence, 0) as confidence,
+				COALESCE(project_source, 'unknown') as source
+			FROM ai_sessions
+			WHERE project_id = ?
+			  AND started_at >= ? AND started_at <= ?
+		)
 		ORDER BY start_time DESC
 		LIMIT ?
 	`
 
-	rows, err := s.db.Query(query, projectID, startTime, endTime, limit)
+	rows, err := s.db.Query(query,
+		projectID, startTime, endTime,
+		projectID, startTime, endTime,
+		projectID, startTime, endTime,
+		limit,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -513,11 +563,16 @@ func buildPatternMatchCondition(patternType, patternValue, matchType string) (co
 	case "app_name":
 		field = "app_name"
 	default:
-		// For other pattern types (git_repo, domain, path), we use window_title as fallback
-		// These would need specific table queries in a real implementation
+		// For other pattern types (git_repo, path), we use window_title as fallback
 		field = "window_title"
 	}
+	return buildPatternMatchConditionForField(field, patternValue, matchType)
+}
 
+// buildPatternMatchConditionForField is the generalized form of
+// buildPatternMatchCondition: callers supply the SQL column expression
+// (e.g. "domain", "r.path") instead of having it inferred from pattern_type.
+func buildPatternMatchConditionForField(field, patternValue, matchType string) (condition string, params []interface{}, needsGoFilter bool) {
 	switch matchType {
 	case "exact":
 		return fmt.Sprintf("LOWER(%s) = LOWER(?)", field), []interface{}{patternValue}, false
@@ -659,21 +714,48 @@ func (s *Store) getSampleMatchingEventsRegex(patternType, patternValue string, l
 }
 
 // ApplyPatternToEvents bulk assigns a project to all events matching a pattern.
-// Returns the number of events updated.
+// Returns the number of events updated. Dispatches to the table appropriate
+// for the pattern_type:
+//   - git_repo    -> git_commits (matched via git_repositories.path) + ai_sessions
+//   - domain      -> browser_history
+//   - app_name, window_title, path -> window_focus_events
 func (s *Store) ApplyPatternToEvents(projectID int64, patternType, patternValue, matchType string) (int, error) {
+	switch patternType {
+	case "git_repo":
+		commits, err := s.applyPatternToGitCommits(projectID, patternValue, matchType)
+		if err != nil {
+			return commits, err
+		}
+		sessions, err := s.applyPatternToAISessions(projectID, patternValue, matchType)
+		return commits + sessions, err
+	case "domain":
+		return s.applyPatternToBrowserHistory(projectID, patternValue, matchType)
+	case "app_name", "window_title", "path":
+		return s.applyPatternToFocusEvents(projectID, patternType, patternValue, matchType)
+	default:
+		return 0, fmt.Errorf("unsupported pattern type for apply: %q", patternType)
+	}
+}
+
+// applyPatternToFocusEvents updates window_focus_events for app_name,
+// window_title, and path pattern types.
+func (s *Store) applyPatternToFocusEvents(projectID int64, patternType, patternValue, matchType string) (int, error) {
 	condition, params, needsGoFilter := buildPatternMatchCondition(patternType, patternValue, matchType)
 
 	if needsGoFilter {
 		return s.applyPatternToEventsRegex(projectID, patternType, patternValue)
 	}
 
-	// Build update query for window_focus_events
+	// Build update query for window_focus_events.
+	// Skip rows already assigned to this project to avoid spurious RowsAffected counts.
 	query := fmt.Sprintf(`
 		UPDATE window_focus_events
 		SET project_id = ?, project_confidence = 1.0, project_source = 'rule'
 		WHERE %s
+		  AND (project_id IS NULL OR project_id != ?)
 	`, condition)
 	allParams := append([]interface{}{projectID}, params...)
+	allParams = append(allParams, projectID)
 
 	result, err := s.db.Exec(query, allParams...)
 	if err != nil {
@@ -687,6 +769,73 @@ func (s *Store) ApplyPatternToEvents(projectID int64, patternType, patternValue,
 	return int(affected), nil
 }
 
+// applyPatternToGitCommits updates git_commits whose repository path matches
+// the pattern. Skips commits already assigned to this project.
+func (s *Store) applyPatternToGitCommits(projectID int64, patternValue, matchType string) (int, error) {
+	if matchType == "regex" {
+		return 0, fmt.Errorf("regex match is not supported for git_repo patterns yet")
+	}
+	cond, params, _ := buildPatternMatchConditionForField("r.path", patternValue, matchType)
+	query := fmt.Sprintf(`
+		UPDATE git_commits
+		SET project_id = ?, project_confidence = 1.0, project_source = 'rule'
+		WHERE repository_id IN (SELECT id FROM git_repositories r WHERE %s)
+		  AND (project_id IS NULL OR project_id != ?)
+	`, cond)
+	args := append([]interface{}{projectID}, params...)
+	args = append(args, projectID)
+	res, err := s.db.Exec(query, args...)
+	if err != nil {
+		return 0, fmt.Errorf("apply git_repo pattern: %w", err)
+	}
+	n, _ := res.RowsAffected()
+	return int(n), nil
+}
+
+// applyPatternToAISessions updates ai_sessions whose project_dir matches the
+// pattern. Skips sessions already assigned to this project.
+func (s *Store) applyPatternToAISessions(projectID int64, patternValue, matchType string) (int, error) {
+	if matchType == "regex" {
+		return 0, fmt.Errorf("regex match is not supported for git_repo patterns yet")
+	}
+	cond, params, _ := buildPatternMatchConditionForField("project_dir", patternValue, matchType)
+	query := fmt.Sprintf(`
+		UPDATE ai_sessions
+		SET project_id = ?, project_confidence = 1.0, project_source = 'rule'
+		WHERE %s AND (project_id IS NULL OR project_id != ?)
+	`, cond)
+	args := append([]interface{}{projectID}, params...)
+	args = append(args, projectID)
+	res, err := s.db.Exec(query, args...)
+	if err != nil {
+		return 0, fmt.Errorf("apply git_repo pattern to ai_sessions: %w", err)
+	}
+	n, _ := res.RowsAffected()
+	return int(n), nil
+}
+
+// applyPatternToBrowserHistory updates browser_history rows whose domain
+// matches the pattern. Skips rows already assigned to this project.
+func (s *Store) applyPatternToBrowserHistory(projectID int64, patternValue, matchType string) (int, error) {
+	if matchType == "regex" {
+		return 0, fmt.Errorf("regex match is not supported for domain patterns yet")
+	}
+	cond, params, _ := buildPatternMatchConditionForField("domain", patternValue, matchType)
+	query := fmt.Sprintf(`
+		UPDATE browser_history
+		SET project_id = ?, project_confidence = 1.0, project_source = 'rule'
+		WHERE %s AND (project_id IS NULL OR project_id != ?)
+	`, cond)
+	args := append([]interface{}{projectID}, params...)
+	args = append(args, projectID)
+	res, err := s.db.Exec(query, args...)
+	if err != nil {
+		return 0, fmt.Errorf("apply domain pattern: %w", err)
+	}
+	n, _ := res.RowsAffected()
+	return int(n), nil
+}
+
 // applyPatternToEventsRegex applies pattern using Go regex filtering.
 func (s *Store) applyPatternToEventsRegex(projectID int64, patternType, patternValue string) (int, error) {
 	field := "window_title"
@@ -694,7 +843,7 @@ func (s *Store) applyPatternToEventsRegex(projectID int64, patternType, patternV
 		field = "app_name"
 	}
 
-	rows, err := s.db.Query(fmt.Sprintf(`SELECT id, %s FROM window_focus_events WHERE %s IS NOT NULL AND %s != ''`, field, field, field))
+	rows, err := s.db.Query(fmt.Sprintf(`SELECT id, %s FROM window_focus_events WHERE %s IS NOT NULL AND %s != '' AND (project_id IS NULL OR project_id != ?)`, field, field, field), projectID)
 	if err != nil {
 		return 0, fmt.Errorf("failed to query events for regex: %w", err)
 	}

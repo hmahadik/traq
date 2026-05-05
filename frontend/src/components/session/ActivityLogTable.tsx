@@ -117,7 +117,13 @@ export function ActivityLogTable({ focusEvents }: ActivityLogTableProps) {
 
       {/* Table */}
       <div className="rounded-md border">
-        <table className="w-full text-sm">
+        <table className="w-full table-fixed text-sm">
+          <colgroup>
+            <col className="w-24" />
+            <col className="w-28" />
+            <col />
+            <col className="w-40" />
+          </colgroup>
           <thead>
             <tr className="border-b bg-muted/50">
               <th className="h-8 px-2 text-left align-middle font-medium text-muted-foreground text-xs">
@@ -182,7 +188,7 @@ export function ActivityLogTable({ focusEvents }: ActivityLogTableProps) {
                       {formatTimestamp(event.startTime)}
                     </td>
                     <td className="p-2 align-middle font-medium text-xs">{event.appName}</td>
-                    <td className="p-2 align-middle max-w-md truncate text-xs" title={event.windowTitle}>
+                    <td className="p-2 align-middle truncate text-xs" title={event.windowTitle}>
                       {event.windowTitle}
                     </td>
                     <td className="p-2 align-middle">

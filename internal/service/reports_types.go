@@ -89,6 +89,8 @@ type EnhancedReportContext struct {
 	GitCommits         []*storage.GitCommit
 	ShellCommands      []*storage.ShellCommand
 	FileEvents         []*storage.FileEvent
+	BrowserVisits      []*storage.BrowserVisit
+	AISessions         []*storage.AISession
 	TotalMinutes       int64
 	ProductiveMinutes  int64
 	DistractingMinutes int64

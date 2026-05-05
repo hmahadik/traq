@@ -50,7 +50,17 @@ func (s *ReportsService) buildEnhancedReportContext(tr *TimeRange) (*EnhancedRep
 	if err != nil {
 		return nil, fmt.Errorf("failed to get browser history: %w", err)
 	}
+	ctx.BrowserVisits = browserVisits
 	ctx.DomainGroups = s.aggregateBrowserByDomain(browserVisits, focusEvents)
+
+	// Get AI coding sessions for project attribution
+	aiSessions, err := s.store.ListAISessionsForDate(tr.Start, tr.End)
+	if err == nil {
+		ctx.AISessions = make([]*storage.AISession, len(aiSessions))
+		for i := range aiSessions {
+			ctx.AISessions[i] = &aiSessions[i]
+		}
+	}
 
 	// Get git commits
 	ctx.GitCommits, _ = s.store.GetGitCommitsByTimeRange(tr.Start, tr.End)

@@ -19,6 +19,7 @@ export interface TimelineGridData {
 }
 
 export interface AIBlockDisplay {
+  eventId: number; // ai_events.id of the first event in the block — use as the assignment key
   tool: string; // "claude" | "opencode"
   sessionId: string;
   projectDir: string;
@@ -30,6 +31,7 @@ export interface AIBlockDisplay {
 }
 
 export interface AIPromptDisplay {
+  eventId: number; // ai_events.id — use as the assignment key
   tool: string;
   sessionId: string;
   projectName: string;
