@@ -362,6 +362,17 @@ func (s *ProjectAssignmentService) CreateProjectRule(input ProjectRuleInput) (*s
 		}
 	}
 
+	// Check for duplicate before inserting to give a friendly error.
+	existing, err := s.store.GetProjectPatterns(input.ProjectID)
+	if err != nil {
+		return nil, err
+	}
+	for _, p := range existing {
+		if p.PatternType == input.PatternType && p.PatternValue == input.PatternValue && p.MatchType == input.MatchType {
+			return nil, errInvalidInput("a rule with this pattern already exists for the selected project")
+		}
+	}
+
 	// Create the pattern
 	id, err := s.store.CreatePattern(input.ProjectID, input.PatternType, input.PatternValue, input.MatchType, input.Weight)
 	if err != nil {
