@@ -131,7 +131,7 @@ export function TimesheetPromptPreviewModal({
           </DialogTitle>
         </DialogHeader>
 
-        <ScrollArea className="flex-1 px-6 py-4">
+        <ScrollArea className="flex-1 px-6 py-4" type="always">
           <div className="mb-4">
             <p className="text-xs font-medium text-muted-foreground mb-1">Instruction sent with every prompt:</p>
             <pre className="text-xs bg-muted rounded p-2 whitespace-pre-wrap font-mono leading-relaxed text-muted-foreground">
