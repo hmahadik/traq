@@ -23,6 +23,7 @@ import {
   ReportPreview,
   TimesheetPreview,
 } from '@/components/reports';
+import { TimesheetPromptPreviewModal } from '@/components/reports/TimesheetPromptPreviewModal';
 import {
   useReportHistory,
   useGenerateReport,
@@ -31,7 +32,9 @@ import {
   useParseTimeRange,
   useProjects,
   useGenerateTimesheet,
+  useGetTimesheetPrompts,
 } from '@/api/hooks';
+import type { service } from '@wailsjs/go/models';
 import { api } from '@/api/client';
 import { Loader2, Sparkles, ImageIcon, History, Trash2, FolderKanban } from 'lucide-react';
 import { formatDate } from '@/lib/utils';
@@ -85,6 +88,11 @@ export function ReportsPage() {
   const exportReport = useExportReport();
   const deleteReport = useDeleteReport();
   const generateTimesheet = useGenerateTimesheet();
+  const getTimesheetPrompts = useGetTimesheetPrompts();
+  const [promptPreviewOpen, setPromptPreviewOpen] = useState(false);
+  const [promptPreviews, setPromptPreviews] = useState<service.TimesheetPromptPreview[]>([]);
+  const [promptBackendName, setPromptBackendName] = useState('');
+  const [pendingTimesheetRange, setPendingTimesheetRange] = useState<{ startDate: string; endDate: string } | null>(null);
 
   const isTimesheet = reportType === 'timesheet';
 
@@ -102,7 +110,28 @@ export function ReportsPage() {
     if (!parsedRange) return;
     const startDate = toLocalDateString(parsedRange.start);
     const endDate = toLocalDateString(parsedRange.end);
-    await generateTimesheet.mutateAsync({ startDate, endDate });
+    const result = await getTimesheetPrompts.mutateAsync({ startDate, endDate });
+    if (!result || result.previews.length === 0) {
+      // Nothing to send to the LLM — skip the modal and generate directly.
+      await generateTimesheet.mutateAsync({ startDate, endDate });
+      return;
+    }
+    setPendingTimesheetRange({ startDate, endDate });
+    setPromptPreviews(result.previews);
+    setPromptBackendName(result.backendName);
+    setPromptPreviewOpen(true);
+  };
+
+  const handlePromptConfirm = async () => {
+    setPromptPreviewOpen(false);
+    if (!pendingTimesheetRange) return;
+    await generateTimesheet.mutateAsync(pendingTimesheetRange);
+    setPendingTimesheetRange(null);
+  };
+
+  const handlePromptCancel = () => {
+    setPromptPreviewOpen(false);
+    setPendingTimesheetRange(null);
   };
 
   const handleGenerate = async () => {
@@ -319,6 +348,14 @@ export function ReportsPage() {
           />
         )}
       </div>
+
+      <TimesheetPromptPreviewModal
+        open={promptPreviewOpen}
+        previews={promptPreviews}
+        backendName={promptBackendName}
+        onConfirm={handlePromptConfirm}
+        onCancel={handlePromptCancel}
+      />
     </div>
   );
 }
