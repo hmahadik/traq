@@ -56,10 +56,7 @@ func (s *ReportsService) buildEnhancedReportContext(tr *TimeRange) (*EnhancedRep
 	// Get AI coding sessions for project attribution
 	aiSessions, err := s.store.ListAISessionsForDate(tr.Start, tr.End)
 	if err == nil {
-		ctx.AISessions = make([]*storage.AISession, len(aiSessions))
-		for i := range aiSessions {
-			ctx.AISessions[i] = &aiSessions[i]
-		}
+		ctx.AISessions = aiSessions
 	}
 
 	// Get git commits
