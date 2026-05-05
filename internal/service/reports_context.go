@@ -360,21 +360,3 @@ func (s *ReportsService) getDailyBreakdown(ctx *EnhancedReportContext) []*Report
 	return result
 }
 
-// toServiceReport converts a storage report to a service report.
-func toServiceReport(r *storage.Report) *Report {
-	if r == nil {
-		return nil
-	}
-	return &Report{
-		ID:         r.ID,
-		Title:      r.Title,
-		TimeRange:  r.TimeRange,
-		ReportType: r.ReportType,
-		Format:     r.Format,
-		Content:    r.Content.String,
-		Filepath:   r.Filepath.String,
-		StartTime:  r.StartTime.Int64,
-		EndTime:    r.EndTime.Int64,
-		CreatedAt:  r.CreatedAt,
-	}
-}

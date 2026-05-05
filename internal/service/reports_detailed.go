@@ -7,44 +7,7 @@ import (
 	"sort"
 	"strings"
 	"time"
-
-	"traq/internal/storage"
 )
-
-// extractAccomplishmentsOptimized pulls key accomplishments from session summaries
-// using a pre-loaded summaries map (eliminates N+1 queries).
-func (s *ReportsService) extractAccomplishmentsOptimized(sessions []*storage.Session, summariesMap map[int64]*storage.Summary) []string {
-	var accomplishments []string
-	seen := make(map[string]bool)
-
-	for _, sess := range sessions {
-		// First try the preloaded map (optimized path)
-		if sum, ok := summariesMap[sess.ID]; ok && sum != nil && sum.Summary != "" {
-			summary := sum.Summary
-			if !seen[summary] && !isGenericSummary(summary) {
-				seen[summary] = true
-				accomplishments = append(accomplishments, summary)
-			}
-		} else if sess.SummaryID.Valid {
-			// Fallback to direct lookup if not in map
-			sum, err := s.store.GetSummary(sess.SummaryID.Int64)
-			if err == nil && sum != nil && sum.Summary != "" {
-				summary := sum.Summary
-				if !seen[summary] && !isGenericSummary(summary) {
-					seen[summary] = true
-					accomplishments = append(accomplishments, summary)
-				}
-			}
-		}
-	}
-
-	// Limit to top 5
-	if len(accomplishments) > 5 {
-		accomplishments = accomplishments[:5]
-	}
-
-	return accomplishments
-}
 
 // generateDetailedReport creates a detailed HTML report with all data.
 func (s *ReportsService) generateDetailedReport(tr *TimeRange, includeScreenshots bool) (string, error) {
