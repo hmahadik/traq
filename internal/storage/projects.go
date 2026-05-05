@@ -717,6 +717,7 @@ func (s *Store) getSampleMatchingEventsRegex(patternType, patternValue string, l
 // Returns the number of events updated. Dispatches to the table appropriate
 // for the pattern_type:
 //   - git_repo    -> git_commits (matched via git_repositories.path) + ai_sessions
+//   - domain      -> browser_history
 //   - app_name, window_title, path -> window_focus_events
 func (s *Store) ApplyPatternToEvents(projectID int64, patternType, patternValue, matchType string) (int, error) {
 	switch patternType {
@@ -727,6 +728,8 @@ func (s *Store) ApplyPatternToEvents(projectID int64, patternType, patternValue,
 		}
 		sessions, err := s.applyPatternToAISessions(projectID, patternValue, matchType)
 		return commits + sessions, err
+	case "domain":
+		return s.applyPatternToBrowserHistory(projectID, patternValue, matchType)
 	case "app_name", "window_title", "path":
 		return s.applyPatternToFocusEvents(projectID, patternType, patternValue, matchType)
 	default:
@@ -768,10 +771,9 @@ func (s *Store) applyPatternToFocusEvents(projectID int64, patternType, patternV
 }
 
 // applyPatternToGitCommits updates git_commits whose repository path matches
-// the pattern. Skips commits already assigned to a project.
+// the pattern. Skips commits already assigned to this project.
 func (s *Store) applyPatternToGitCommits(projectID int64, patternValue, matchType string) (int, error) {
 	if matchType == "regex" {
-		// Regex over repo paths is rare; punt for now and document.
 		return 0, fmt.Errorf("regex match is not supported for git_repo patterns yet")
 	}
 	cond, params, _ := buildPatternMatchConditionForField("r.path", patternValue, matchType)
@@ -779,9 +781,10 @@ func (s *Store) applyPatternToGitCommits(projectID int64, patternValue, matchTyp
 		UPDATE git_commits
 		SET project_id = ?, project_confidence = 1.0, project_source = 'rule'
 		WHERE repository_id IN (SELECT id FROM git_repositories r WHERE %s)
-		  AND project_id IS NULL
+		  AND (project_id IS NULL OR project_id != ?)
 	`, cond)
 	args := append([]interface{}{projectID}, params...)
+	args = append(args, projectID)
 	res, err := s.db.Exec(query, args...)
 	if err != nil {
 		return 0, fmt.Errorf("apply git_repo pattern: %w", err)
@@ -791,7 +794,7 @@ func (s *Store) applyPatternToGitCommits(projectID int64, patternValue, matchTyp
 }
 
 // applyPatternToAISessions updates ai_sessions whose project_dir matches the
-// pattern. Skips sessions already assigned to a project.
+// pattern. Skips sessions already assigned to this project.
 func (s *Store) applyPatternToAISessions(projectID int64, patternValue, matchType string) (int, error) {
 	if matchType == "regex" {
 		return 0, fmt.Errorf("regex match is not supported for git_repo patterns yet")
@@ -800,12 +803,35 @@ func (s *Store) applyPatternToAISessions(projectID int64, patternValue, matchTyp
 	query := fmt.Sprintf(`
 		UPDATE ai_sessions
 		SET project_id = ?, project_confidence = 1.0, project_source = 'rule'
-		WHERE %s AND project_id IS NULL
+		WHERE %s AND (project_id IS NULL OR project_id != ?)
 	`, cond)
 	args := append([]interface{}{projectID}, params...)
+	args = append(args, projectID)
 	res, err := s.db.Exec(query, args...)
 	if err != nil {
 		return 0, fmt.Errorf("apply git_repo pattern to ai_sessions: %w", err)
+	}
+	n, _ := res.RowsAffected()
+	return int(n), nil
+}
+
+// applyPatternToBrowserHistory updates browser_history rows whose domain
+// matches the pattern. Skips rows already assigned to this project.
+func (s *Store) applyPatternToBrowserHistory(projectID int64, patternValue, matchType string) (int, error) {
+	if matchType == "regex" {
+		return 0, fmt.Errorf("regex match is not supported for domain patterns yet")
+	}
+	cond, params, _ := buildPatternMatchConditionForField("domain", patternValue, matchType)
+	query := fmt.Sprintf(`
+		UPDATE browser_history
+		SET project_id = ?, project_confidence = 1.0, project_source = 'rule'
+		WHERE %s AND (project_id IS NULL OR project_id != ?)
+	`, cond)
+	args := append([]interface{}{projectID}, params...)
+	args = append(args, projectID)
+	res, err := s.db.Exec(query, args...)
+	if err != nil {
+		return 0, fmt.Errorf("apply domain pattern: %w", err)
 	}
 	n, _ := res.RowsAffected()
 	return int(n), nil
