@@ -569,3 +569,93 @@ func TestPopulateNotes_GeneratorError_RecordsButContinues(t *testing.T) {
 		t.Errorf("entry[1].Notes = %q, want failure marker", data.Entries[1].Notes)
 	}
 }
+
+func TestBuildPromptPreviews_ExcludesUnattributed(t *testing.T) {
+	store := storage.NewInMemoryTestStore(t)
+	defer store.Close()
+
+	loc := time.Local
+	base := time.Date(2026, 4, 25, 10, 0, 0, 0, loc)
+
+	// Attributed event: window title contains "traq".
+	_, err := store.SaveFocusEvent(&storage.WindowFocusEvent{
+		WindowTitle:     "main.go - traq - Visual Studio Code",
+		AppName:         "code",
+		StartTime:       base.Unix(),
+		EndTime:         base.Add(3600 * time.Second).Unix(),
+		DurationSeconds: 3600,
+	})
+	if err != nil {
+		t.Fatalf("save attributed: %v", err)
+	}
+
+	// Unattributed event: generic title that won't match any project.
+	_, err = store.SaveFocusEvent(&storage.WindowFocusEvent{
+		WindowTitle:     "Untitled - Notepad",
+		AppName:         "notepad",
+		StartTime:       base.Add(2 * time.Hour).Unix(),
+		EndTime:         base.Add(2*time.Hour + 1800*time.Second).Unix(),
+		DurationSeconds: 1800,
+	})
+	if err != nil {
+		t.Fatalf("save unattributed: %v", err)
+	}
+
+	rs := helperReportsServiceForTest(t, store)
+	ts := NewTimesheetService(store, rs)
+
+	previews, err := ts.BuildPromptPreviews("2026-04-25", "2026-04-25", 0.25)
+	if err != nil {
+		t.Fatalf("BuildPromptPreviews: %v", err)
+	}
+
+	// Only the attributed row should appear; unattributed is excluded.
+	if len(previews) != 1 {
+		t.Fatalf("expected 1 preview, got %d: %+v", len(previews), previews)
+	}
+	if previews[0].Project != "traq" {
+		t.Errorf("preview[0].Project = %q, want traq", previews[0].Project)
+	}
+	if previews[0].Date != "2026-04-25" {
+		t.Errorf("preview[0].Date = %q, want 2026-04-25", previews[0].Date)
+	}
+	if previews[0].FullPrompt == "" {
+		t.Error("preview[0].FullPrompt is empty; expected non-empty prompt string")
+	}
+	if !strings.Contains(previews[0].FullPrompt, "traq") {
+		t.Errorf("FullPrompt does not contain project name %q", "traq")
+	}
+}
+
+func TestBuildPromptPreviews_AllUnattributedReturnsEmpty(t *testing.T) {
+	store := storage.NewInMemoryTestStore(t)
+	defer store.Close()
+
+	loc := time.Local
+	base := time.Date(2026, 4, 25, 10, 0, 0, 0, loc)
+
+	_, err := store.SaveFocusEvent(&storage.WindowFocusEvent{
+		WindowTitle:     "Untitled - Notepad",
+		AppName:         "notepad",
+		StartTime:       base.Unix(),
+		EndTime:         base.Add(3600 * time.Second).Unix(),
+		DurationSeconds: 3600,
+	})
+	if err != nil {
+		t.Fatalf("save: %v", err)
+	}
+
+	rs := helperReportsServiceForTest(t, store)
+	ts := NewTimesheetService(store, rs)
+
+	previews, err := ts.BuildPromptPreviews("2026-04-25", "2026-04-25", 0.25)
+	if err != nil {
+		t.Fatalf("BuildPromptPreviews: %v", err)
+	}
+	if previews == nil {
+		t.Error("expected non-nil empty slice, got nil")
+	}
+	if len(previews) != 0 {
+		t.Errorf("expected 0 previews, got %d", len(previews))
+	}
+}

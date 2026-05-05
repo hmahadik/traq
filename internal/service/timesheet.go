@@ -50,6 +50,27 @@ type TimesheetData struct {
 	GeneratedAt      int64             `json:"generatedAt"`      // unix seconds
 }
 
+// TimesheetPromptPreview is the per-row payload returned by GetTimesheetPrompts.
+// The structured fields drive the collapsible sections in the modal;
+// FullPrompt is the verbatim string that will be sent to the LLM.
+type TimesheetPromptPreview struct {
+	Date         string   `json:"date"`
+	Project      string   `json:"project"`
+	Hours        float64  `json:"hours"`
+	AISummaries  []string `json:"aiSummaries"`
+	GitCommits   []string `json:"gitCommits"`
+	WindowTitles []string `json:"windowTitles"`
+	FullPrompt   string   `json:"fullPrompt"`
+}
+
+// TimesheetPromptResult is the top-level response from GetTimesheetPrompts.
+// Previews contains one entry per LLM-eligible row; BackendName is the
+// human-readable name of the configured notes backend (for modal header).
+type TimesheetPromptResult struct {
+	Previews    []TimesheetPromptPreview `json:"previews"`
+	BackendName string                   `json:"backendName"`
+}
+
 // TimesheetService builds TimesheetData for a date range by aggregating
 // window-focus events into per-(project, date) buckets.
 type TimesheetService struct {
@@ -211,6 +232,45 @@ func (s *TimesheetService) BuildTimesheet(startDate, endDate string, hoursRoundi
 		return nil, err
 	}
 	return &data, nil
+}
+
+// BuildPromptPreviews runs the same pipeline as BuildTimesheet (aggregate
+// events → resolve mappings) but stops before the LLM call. It returns
+// the structured prompt data for every non-unattributed entry so the
+// frontend can show a pre-flight review modal.
+func (s *TimesheetService) BuildPromptPreviews(startDate, endDate string, rounding float64) ([]TimesheetPromptPreview, error) {
+	if rounding <= 0 {
+		rounding = 0.25
+	}
+	data, err := s.BuildTimesheet(startDate, endDate, rounding)
+	if err != nil {
+		return nil, err
+	}
+
+	var previews []TimesheetPromptPreview
+	for i := range data.Entries {
+		e := &data.Entries[i]
+		if e.SkipReason == "unattributed" {
+			continue
+		}
+		in, err := s.buildAgentInput(e)
+		if err != nil {
+			return nil, fmt.Errorf("build input for %s/%s: %w", e.Date, e.TraqProject, err)
+		}
+		previews = append(previews, TimesheetPromptPreview{
+			Date:         e.Date,
+			Project:      e.TraqProject,
+			Hours:        e.Hours,
+			AISummaries:  in.AISummaries,
+			GitCommits:   in.GitCommits,
+			WindowTitles: in.WindowTitles,
+			FullPrompt:   aiagent.BuildPrompt(in),
+		})
+	}
+	if previews == nil {
+		previews = []TimesheetPromptPreview{}
+	}
+	return previews, nil
 }
 
 // canonicalizeProjectName matches an LLM-returned project name (which may
