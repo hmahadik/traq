@@ -31,7 +31,7 @@ import { useDebounce } from '@/hooks/useDebounce';
 const PATTERN_TYPES = [
   { value: 'window_title', label: 'Window Title' },
   { value: 'app_name', label: 'App Name' },
-  { value: 'git_repo', label: 'Git Repo' },
+  { value: 'git_repo', label: 'Git Repo / AI session dir' },
   { value: 'domain', label: 'Domain' },
 ];
 
@@ -244,6 +244,11 @@ export function ProjectRuleDialog({
             {matchType === 'regex' && (
               <p className="text-xs text-muted-foreground">
                 Uses Go/RE2 regular expression syntax
+              </p>
+            )}
+            {patternType === 'git_repo' && (
+              <p className="text-xs text-muted-foreground">
+                Matches repo path on git commits AND project_dir on AI coding sessions — one rule covers both. Regex is not supported on this field.
               </p>
             )}
           </div>

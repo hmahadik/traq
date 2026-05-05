@@ -3,6 +3,7 @@ package service
 import (
 	"fmt"
 	"html"
+	"log"
 	"math"
 	"regexp"
 	"sort"
@@ -119,6 +120,8 @@ type EnhancedReportContext struct {
 	GitCommits         []*storage.GitCommit
 	ShellCommands      []*storage.ShellCommand
 	FileEvents         []*storage.FileEvent
+	BrowserVisits      []*storage.BrowserVisit
+	AISessions         []*storage.AISession
 	TotalMinutes       int64
 	ProductiveMinutes  int64
 	DistractingMinutes int64
@@ -246,7 +249,17 @@ func (s *ReportsService) buildEnhancedReportContext(tr *TimeRange) (*EnhancedRep
 	if err != nil {
 		return nil, fmt.Errorf("failed to get browser history: %w", err)
 	}
+	ctx.BrowserVisits = browserVisits
 	ctx.DomainGroups = s.aggregateBrowserByDomain(browserVisits, focusEvents)
+
+	// Get AI coding sessions for project attribution
+	aiSessions, err := s.store.ListAISessionsForDate(tr.Start, tr.End)
+	if err == nil {
+		ctx.AISessions = make([]*storage.AISession, len(aiSessions))
+		for i := range aiSessions {
+			ctx.AISessions[i] = &aiSessions[i]
+		}
+	}
 
 	// Get git commits
 	ctx.GitCommits, _ = s.store.GetGitCommitsByTimeRange(tr.Start, tr.End)
@@ -594,7 +607,6 @@ func (s *ReportsService) detectProjectFromLearnedPatterns(ctx *storage.Assignmen
 
 // DetectProjectFromWindowTitle extracts project name from learned patterns.
 // Hardcoded detection rules have been migrated to database patterns.
-// Call MigrateHardcodedPatterns() on first run to populate the patterns.
 func (s *ReportsService) DetectProjectFromWindowTitle(windowTitle, appName string) string {
 	// Use learned patterns from database
 	if projectName := s.detectProjectFromLearnedPatterns(&storage.AssignmentContext{
@@ -624,7 +636,6 @@ func (s *ReportsService) DetectProjectFromWindowTitle(windowTitle, appName strin
 
 // DetectProjectFromGitRepo extracts project name from learned patterns.
 // Hardcoded detection rules have been migrated to database patterns.
-// Call MigrateHardcodedPatterns() on first run to populate the patterns.
 func (s *ReportsService) DetectProjectFromGitRepo(repoPath string) string {
 	// Use learned patterns from database
 	if projectName := s.detectProjectFromLearnedPatterns(&storage.AssignmentContext{
@@ -755,6 +766,11 @@ func (s *ReportsService) groupActivitiesByProject(ctx *EnhancedReportContext) []
 
 	// Group focus events by project
 	for _, app := range ctx.AppUsage {
+		if isBrowser(app.AppName) {
+			// Browser focus time is attributed via overlapping browser_history rows
+			// in the dedicated browser-visit pass below.
+			continue
+		}
 		for _, window := range app.Windows {
 			projectName := s.DetectProjectFromWindowTitle(window.WindowTitle, app.AppName)
 			if projectName != "" {
@@ -767,6 +783,95 @@ func (s *ReportsService) groupActivitiesByProject(ctx *EnhancedReportContext) []
 				}
 			}
 		}
+	}
+
+	// Browser visit pass: attribute browser time via the visit's project_id (set
+	// by the backfill / rule engine), falling back to a fresh rule lookup for
+	// visits that haven't been attributed yet. Note: browser-app friendly names
+	// are not added to Project.Apps for these visits (accepted info loss).
+	// Cache is request-scoped: empty strings cache deliberately, so an orphaned
+	// project_id is looked up at most once per report.
+	projectByID := make(map[int64]string)
+	for _, v := range ctx.BrowserVisits {
+		durSec := 0.0
+		if v.VisitDurationSeconds.Valid {
+			durSec = float64(v.VisitDurationSeconds.Int64)
+		}
+		if durSec == 0 {
+			continue
+		}
+
+		var projectName string
+		if v.ProjectID.Valid && v.ProjectID.Int64 != 0 {
+			if name, cached := projectByID[v.ProjectID.Int64]; cached {
+				projectName = name
+			} else {
+				p, err := s.store.GetProject(v.ProjectID.Int64)
+				if err != nil {
+					log.Printf("groupActivitiesByProject: lookup project_id=%d failed: %v", v.ProjectID.Int64, err)
+				} else if p != nil {
+					projectName = p.Name
+				}
+				projectByID[v.ProjectID.Int64] = projectName
+			}
+		} else {
+			title := ""
+			if v.Title.Valid {
+				title = v.Title.String
+			}
+			projectName = s.detectProjectFromLearnedPatterns(&storage.AssignmentContext{
+				Domain:      v.Domain,
+				URL:         v.URL,
+				WindowTitle: title,
+			})
+		}
+		if projectName == "" {
+			continue
+		}
+
+		project := getProject(projectName)
+		project.DurationSeconds += durSec
+	}
+
+	// AI session pass: attribute AI coding time. Each session contributes
+	// (last_event_at - started_at) seconds to its project — this includes
+	// idle gaps within a session; accepted trade-off (vs. summing per-event
+	// deltas) to keep the path uniform with git commits, which also lack a
+	// duration model. See plan docs/superpowers/plans/2026-05-04-ai-coding-attribution.md.
+	// If unassigned at report time, fall back to learned git_repo patterns matching project_dir.
+	aiProjectByID := make(map[int64]string)
+	for _, sess := range ctx.AISessions {
+		durSec := float64(sess.LastEventAt - sess.StartedAt)
+		if durSec <= 0 {
+			continue
+		}
+
+		var projectName string
+		if sess.ProjectID.Valid && sess.ProjectID.Int64 != 0 {
+			if name, cached := aiProjectByID[sess.ProjectID.Int64]; cached {
+				projectName = name
+			} else {
+				p, err := s.store.GetProject(sess.ProjectID.Int64)
+				if err != nil {
+					log.Printf("groupActivitiesByProject: ai session lookup project_id=%d failed: %v", sess.ProjectID.Int64, err)
+				} else if p != nil {
+					projectName = p.Name
+				}
+				aiProjectByID[sess.ProjectID.Int64] = projectName
+			}
+		} else if sess.ProjectDir != "" {
+			// Fallback: try learned git_repo patterns at report time.
+			projectName = s.detectProjectFromLearnedPatterns(&storage.AssignmentContext{
+				GitRepo:  sess.ProjectDir,
+				FilePath: sess.ProjectDir,
+			})
+		}
+		if projectName == "" {
+			continue
+		}
+
+		project := getProject(projectName)
+		project.DurationSeconds += durSec
 	}
 
 	// Add unassigned time to "Other" project
@@ -2947,7 +3052,6 @@ func (s *ReportsService) normalizeProjectName(name string) string {
 
 // DetectProjectFromBrowserTitle detects project from browser page title.
 // Hardcoded detection rules have been migrated to database patterns.
-// Call MigrateHardcodedPatterns() on first run to populate the patterns.
 func (s *ReportsService) DetectProjectFromBrowserTitle(title string) string {
 	// Use learned patterns from database
 	return s.detectProjectFromLearnedPatterns(&storage.AssignmentContext{

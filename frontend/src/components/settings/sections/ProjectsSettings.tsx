@@ -17,7 +17,6 @@ import {
   useProjects,
   useProjectPatterns,
   useDeleteProjectPattern,
-  useMigrateHardcodedPatterns,
 } from '@/api/hooks';
 
 interface BackfillResult {
@@ -66,7 +65,6 @@ export function ProjectsSettings() {
   // Projects and patterns for rules UI
   const { data: projects } = useProjects();
   const deletePattern = useDeleteProjectPattern();
-  const migratePatterns = useMigrateHardcodedPatterns();
 
   // Load patterns for all projects
   const projectPatternQueries = useMemo(() => {
@@ -182,21 +180,10 @@ export function ProjectsSettings() {
         title="Project Matching Rules"
         description="Define patterns to automatically assign activities to projects"
         action={
-          <div className="flex gap-2">
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => migratePatterns.mutate()}
-              disabled={migratePatterns.isPending}
-            >
-              {migratePatterns.isPending && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
-              Import Defaults
-            </Button>
-            <Button size="sm" onClick={handleAddRule}>
-              <Plus className="h-4 w-4 mr-1" />
-              Add Rule
-            </Button>
-          </div>
+          <Button size="sm" onClick={handleAddRule}>
+            <Plus className="h-4 w-4 mr-1" />
+            Add Rule
+          </Button>
         }
       >
         {projectPatternQueries.length === 0 ? (

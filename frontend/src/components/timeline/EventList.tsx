@@ -221,8 +221,8 @@ function gridDataToEvents(data: TimelineGridData | undefined): EventDot[] {
   if (data.aiEvents) {
     Object.values(data.aiEvents).flat().forEach((block) => {
       events.push({
-        id: `ai-${block.tool}-${block.sessionId}-${block.startTime}`,
-        originalId: block.startTime,
+        id: makeEventKey('ai', block.eventId),
+        originalId: block.eventId,
         timestamp: new Date(block.startTime * 1000),
         type: 'ai',
         row: 'AI Coding',
@@ -243,10 +243,10 @@ function gridDataToEvents(data: TimelineGridData | undefined): EventDot[] {
 
   // Individual AI user prompts
   if (data.aiPrompts) {
-    data.aiPrompts.forEach((p, idx) => {
+    data.aiPrompts.forEach((p) => {
       events.push({
-        id: `ai-prompt-${p.tool}-${p.sessionId}-${p.timestamp}-${idx}`,
-        originalId: p.timestamp,
+        id: makeEventKey('ai', p.eventId),
+        originalId: p.eventId,
         timestamp: new Date(p.timestamp * 1000),
         type: 'ai',
         row: 'AI Coding',
@@ -295,7 +295,16 @@ function gridDataToEvents(data: TimelineGridData | undefined): EventDot[] {
     });
   }
 
-  return events;
+  // Deduplicate by id — AI blocks and AI prompts share the same event-ID
+  // namespace, so a block whose EventID equals a prompt's EventID produces
+  // duplicate React keys, breaking selection. Blocks are pushed first so
+  // they take precedence over prompts with the same id.
+  const seenIds = new Set<string>();
+  return events.filter(e => {
+    if (seenIds.has(e.id)) return false;
+    seenIds.add(e.id);
+    return true;
+  });
 }
 
 type SortColumn = 'time' | 'duration' | 'app' | 'title';
@@ -486,8 +495,17 @@ export function EventList({
     return events;
   }, [filteredEvents, sortMode, playheadTimestamp, columnSort]);
 
-  // Limit display (unless user clicked "Show all")
-  const displayEvents = showAll ? sortedEvents : sortedEvents.slice(0, maxItems);
+  // Limit display (unless user clicked "Show all"), but always keep selected
+  // items visible so they don't silently vanish from the rendered list when
+  // the playhead sort pushes them beyond the maxItems window.
+  const displayEvents = useMemo(() => {
+    if (showAll) return sortedEvents;
+    const base = sortedEvents.slice(0, maxItems);
+    if (selectedIds.size === 0) return base;
+    const baseSet = new Set(base.map(e => e.id));
+    const pinned = sortedEvents.filter(e => selectedIds.has(e.id) && !baseSet.has(e.id));
+    return pinned.length > 0 ? [...base, ...pinned] : base;
+  }, [sortedEvents, showAll, maxItems, selectedIds]);
   const hasMore = !showAll && sortedEvents.length > maxItems;
 
   // Toggle column sort

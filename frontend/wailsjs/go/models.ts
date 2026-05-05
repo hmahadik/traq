@@ -215,6 +215,7 @@ export namespace service {
 	    }
 	}
 	export class AIBlockDisplay {
+	    eventId: number;
 	    tool: string;
 	    sessionId: string;
 	    projectDir: string;
@@ -230,6 +231,7 @@ export namespace service {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.eventId = source["eventId"];
 	        this.tool = source["tool"];
 	        this.sessionId = source["sessionId"];
 	        this.projectDir = source["projectDir"];
@@ -257,6 +259,7 @@ export namespace service {
 	    }
 	}
 	export class AIPromptDisplay {
+	    eventId: number;
 	    tool: string;
 	    sessionId: string;
 	    projectName: string;
@@ -270,6 +273,7 @@ export namespace service {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.eventId = source["eventId"];
 	        this.tool = source["tool"];
 	        this.sessionId = source["sessionId"];
 	        this.projectName = source["projectName"];
@@ -2702,6 +2706,9 @@ export namespace storage {
 	    transitionType: sql.NullString;
 	    sessionId: sql.NullInt64;
 	    createdAt: number;
+	    projectId: sql.NullInt64;
+	    projectConfidence: sql.NullFloat64;
+	    projectSource: sql.NullString;
 	
 	    static createFrom(source: any = {}) {
 	        return new BrowserVisit(source);
@@ -2719,6 +2726,9 @@ export namespace storage {
 	        this.transitionType = this.convertValues(source["transitionType"], sql.NullString);
 	        this.sessionId = this.convertValues(source["sessionId"], sql.NullInt64);
 	        this.createdAt = source["createdAt"];
+	        this.projectId = this.convertValues(source["projectId"], sql.NullInt64);
+	        this.projectConfidence = this.convertValues(source["projectConfidence"], sql.NullFloat64);
+	        this.projectSource = this.convertValues(source["projectSource"], sql.NullString);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -3078,9 +3088,6 @@ export namespace storage {
 	    monitorWidth: sql.NullInt64;
 	    monitorHeight: sql.NullInt64;
 	    sessionId: sql.NullInt64;
-	    projectId: sql.NullInt64;
-	    projectConfidence: sql.NullFloat64;
-	    projectSource: sql.NullString;
 	    memoryStatus: string;
 	    createdAt: number;
 	
@@ -3106,9 +3113,6 @@ export namespace storage {
 	        this.monitorWidth = this.convertValues(source["monitorWidth"], sql.NullInt64);
 	        this.monitorHeight = this.convertValues(source["monitorHeight"], sql.NullInt64);
 	        this.sessionId = this.convertValues(source["sessionId"], sql.NullInt64);
-	        this.projectId = this.convertValues(source["projectId"], sql.NullInt64);
-	        this.projectConfidence = this.convertValues(source["projectConfidence"], sql.NullFloat64);
-	        this.projectSource = this.convertValues(source["projectSource"], sql.NullString);
 	        this.memoryStatus = source["memoryStatus"];
 	        this.createdAt = source["createdAt"];
 	    }
@@ -3187,9 +3191,6 @@ export namespace storage {
 	    tmuxContext: sql.NullString;
 	    sessionId: sql.NullInt64;
 	    createdAt: number;
-	    projectId: sql.NullInt64;
-	    projectConfidence: sql.NullFloat64;
-	    projectSource: sql.NullString;
 	
 	    static createFrom(source: any = {}) {
 	        return new ShellCommand(source);
@@ -3208,9 +3209,6 @@ export namespace storage {
 	        this.tmuxContext = this.convertValues(source["tmuxContext"], sql.NullString);
 	        this.sessionId = this.convertValues(source["sessionId"], sql.NullInt64);
 	        this.createdAt = source["createdAt"];
-	        this.projectId = this.convertValues(source["projectId"], sql.NullInt64);
-	        this.projectConfidence = this.convertValues(source["projectConfidence"], sql.NullFloat64);
-	        this.projectSource = this.convertValues(source["projectSource"], sql.NullString);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
