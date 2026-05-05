@@ -1285,6 +1285,10 @@ export const timesheet = {
     await waitForReady();
     return withRetry(() => App.GenerateTimesheet(startDate, endDate));
   },
+  getPrompts: async (startDate: string, endDate: string) => {
+    await waitForReady();
+    return withRetry(() => App.GetTimesheetPrompts(startDate, endDate));
+  },
 };
 
 /**

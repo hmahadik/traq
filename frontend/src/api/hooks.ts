@@ -1878,6 +1878,13 @@ export function useGenerateTimesheet() {
   });
 }
 
+export function useGetTimesheetPrompts() {
+  return useMutation({
+    mutationFn: ({ startDate, endDate }: { startDate: string; endDate: string }) =>
+      api.timesheet.getPrompts(startDate, endDate),
+  });
+}
+
 export function useProjectMappings() {
   return useQuery({
     queryKey: ['projectMappings'] as const,
