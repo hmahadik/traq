@@ -8,7 +8,6 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import type { service } from '@wailsjs/go/models';
 
 const PREAMBLE =
@@ -131,7 +130,7 @@ export function TimesheetPromptPreviewModal({
           </DialogTitle>
         </DialogHeader>
 
-        <ScrollArea className="flex-1 px-6 py-4" type="always">
+        <div className="flex-1 overflow-y-auto min-h-0 px-6 py-4">
           <div className="mb-4">
             <p className="text-xs font-medium text-muted-foreground mb-1">Instruction sent with every prompt:</p>
             <pre className="text-xs bg-muted rounded p-2 whitespace-pre-wrap font-mono leading-relaxed text-muted-foreground">
@@ -144,7 +143,7 @@ export function TimesheetPromptPreviewModal({
               <PromptCard key={`${p.date}-${p.project}-${i}`} preview={p} />
             ))}
           </div>
-        </ScrollArea>
+        </div>
 
         <DialogFooter className="px-6 py-4 border-t shrink-0">
           <Button variant="outline" onClick={onCancel}>
