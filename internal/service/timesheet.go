@@ -257,13 +257,25 @@ func (s *TimesheetService) BuildPromptPreviews(startDate, endDate string, roundi
 		if err != nil {
 			return nil, fmt.Errorf("build input for %s/%s: %w", e.Date, e.TraqProject, err)
 		}
+		aiSummaries := in.AISummaries
+		if aiSummaries == nil {
+			aiSummaries = []string{}
+		}
+		gitCommits := in.GitCommits
+		if gitCommits == nil {
+			gitCommits = []string{}
+		}
+		windowTitles := in.WindowTitles
+		if windowTitles == nil {
+			windowTitles = []string{}
+		}
 		previews = append(previews, TimesheetPromptPreview{
 			Date:         e.Date,
 			Project:      e.TraqProject,
 			Hours:        e.Hours,
-			AISummaries:  in.AISummaries,
-			GitCommits:   in.GitCommits,
-			WindowTitles: in.WindowTitles,
+			AISummaries:  aiSummaries,
+			GitCommits:   gitCommits,
+			WindowTitles: windowTitles,
 			FullPrompt:   aiagent.BuildPrompt(in),
 		})
 	}
