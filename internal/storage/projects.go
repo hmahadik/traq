@@ -738,8 +738,7 @@ func (s *Store) ApplyPatternToEvents(projectID int64, patternType, patternValue,
 }
 
 // applyPatternToFocusEvents updates window_focus_events for app_name,
-// window_title, and path pattern types. Behavior preserved from the original
-// ApplyPatternToEvents implementation (no project_id IS NULL filter).
+// window_title, and path pattern types.
 func (s *Store) applyPatternToFocusEvents(projectID int64, patternType, patternValue, matchType string) (int, error) {
 	condition, params, needsGoFilter := buildPatternMatchCondition(patternType, patternValue, matchType)
 
