@@ -600,6 +600,12 @@ func (d *Daemon) SetOnActivitySaved(fn ActivitySavedCallback) {
 	d.git.onActivitySaved = fn
 }
 
+// SetOnSessionEnded forwards a callback to SessionManager that fires after
+// every session closes in storage. Used to trigger AI summary generation.
+func (d *Daemon) SetOnSessionEnded(fn SessionEndedCallback) {
+	d.session.SetOnSessionEnded(fn)
+}
+
 // SetMonitorMode sets the monitor selection mode.
 // mode can be "active_window", "primary", or "specific".
 func (d *Daemon) SetMonitorMode(mode string) {

@@ -6,6 +6,12 @@ import (
 	"traq/internal/storage"
 )
 
+// SessionEndedCallback fires after a session is closed in storage. It runs
+// in a goroutine so callers must not assume synchronous semantics. Used to
+// kick off the AI summary pipeline without coupling the tracker to the
+// service layer.
+type SessionEndedCallback func(sessionID int64)
+
 // SessionManager manages work sessions.
 type SessionManager struct {
 	store          *storage.Store
@@ -13,6 +19,14 @@ type SessionManager struct {
 	afkDetector    *AFKDetector
 	minDuration    time.Duration // Minimum session duration to keep
 	resumeWindow   time.Duration // Time window to resume a session after return
+
+	onSessionEnded SessionEndedCallback
+}
+
+// SetOnSessionEnded registers a callback that fires (in a goroutine) every
+// time EndSession successfully closes a session in storage.
+func (m *SessionManager) SetOnSessionEnded(fn SessionEndedCallback) {
+	m.onSessionEnded = fn
 }
 
 // NewSessionManager creates a new SessionManager.
@@ -94,13 +108,17 @@ func (m *SessionManager) EndSession() error {
 		return nil
 	}
 
+	endedID := m.currentSession.ID
 	now := time.Now().Unix()
-	err := m.store.EndSession(m.currentSession.ID, now)
+	err := m.store.EndSession(endedID, now)
 	if err != nil {
 		return err
 	}
 
 	m.currentSession = nil
+	if m.onSessionEnded != nil {
+		go m.onSessionEnded(endedID)
+	}
 	return nil
 }
 

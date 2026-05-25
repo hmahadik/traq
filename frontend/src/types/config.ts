@@ -9,6 +9,15 @@ export interface Config {
   timeline?: TimelineConfig;
   ai?: AIConfig;
   update?: UpdatesConfig;
+  timesheet?: TimesheetConfig;
+}
+
+export interface TimesheetConfig {
+  hoursRounding: number;
+  ffAccountId: string;
+  ffUsername: string;
+  aiNotesEnabled: boolean;
+  aiNotesBackend: string; // "auto" | "claude" | "opencode"
 }
 
 export interface UpdatesConfig {
@@ -21,6 +30,7 @@ export interface AIConfig {
   summaryMode: 'auto_accept' | 'drafts' | 'off';
   summaryChunkMinutes: number;
   assignmentMode: 'auto_accept' | 'drafts' | 'off';
+  summaryBackend?: 'inference' | 'claude' | 'opencode' | 'auto';
 }
 
 export interface TimelineConfig {

@@ -1769,6 +1769,48 @@ export function useDismissShellOverflow() {
 }
 
 // ============================================================================
+// Tmux Integration Hooks
+// ============================================================================
+
+export function useTmuxSetupStatus() {
+  return useQuery({
+    queryKey: ['tmuxSetup'] as const,
+    queryFn: () => api.tmuxSetup.status(),
+    refetchInterval: 5000,
+  });
+}
+
+export function useInstallTmuxIntegration() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.tmuxSetup.install(),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['tmuxSetup'] });
+      toast.success('Tmux integration installed');
+    },
+    onError: (error: unknown) => {
+      const m = error instanceof Error ? error.message : String(error);
+      toast.error(`Failed to install tmux integration: ${m}`);
+    },
+  });
+}
+
+export function useUninstallTmuxIntegration() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.tmuxSetup.uninstall(),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['tmuxSetup'] });
+      toast.success('Tmux integration removed');
+    },
+    onError: (error: unknown) => {
+      const m = error instanceof Error ? error.message : String(error);
+      toast.error(`Failed to remove tmux integration: ${m}`);
+    },
+  });
+}
+
+// ============================================================================
 // AI coding sessions (Claude Code, opencode)
 // ============================================================================
 
@@ -1784,5 +1826,110 @@ export function useAISession(id: string | null) {
     queryKey: ['ai', 'session', id],
     queryFn: () => api.ai.get(id!),
     enabled: !!id,
+  });
+}
+
+// ============================================================================
+// Timesheet (Plan B)
+// ============================================================================
+
+export function useTimesheet(startDate: string, endDate: string, enabled: boolean) {
+  return useQuery({
+    queryKey: ['timesheet', startDate, endDate] as const,
+    queryFn: () => api.timesheet.generate(startDate, endDate),
+    enabled: enabled && !!startDate && !!endDate,
+    staleTime: 0,
+    refetchOnWindowFocus: false,
+  });
+}
+
+export function useGenerateTimesheet() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ startDate, endDate }: { startDate: string; endDate: string }) =>
+      api.timesheet.generate(startDate, endDate),
+    onSuccess: (_data, vars) => {
+      qc.setQueryData(['timesheet', vars.startDate, vars.endDate], _data);
+    },
+  });
+}
+
+export function useGetTimesheetPrompts() {
+  return useMutation({
+    mutationFn: ({ startDate, endDate }: { startDate: string; endDate: string }) =>
+      api.timesheet.getPrompts(startDate, endDate),
+  });
+}
+
+export function useProjectMappings() {
+  return useQuery({
+    queryKey: ['projectMappings'] as const,
+    queryFn: () => api.projectMappings.list(),
+    staleTime: 30_000,
+  });
+}
+
+export function useSaveProjectMapping() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (mapping: Parameters<typeof api.projectMappings.save>[0]) =>
+      api.projectMappings.save(mapping),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['projectMappings'] });
+      qc.invalidateQueries({ queryKey: ['timesheet'] });
+    },
+    onError: (error: unknown) => {
+      const message = error instanceof Error ? error.message : String(error);
+      toast.error(`Failed to save mapping: ${message}`);
+    },
+  });
+}
+
+export function useDeleteProjectMapping() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (traqProject: string) => api.projectMappings.delete(traqProject),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['projectMappings'] });
+      qc.invalidateQueries({ queryKey: ['timesheet'] });
+    },
+  });
+}
+
+export function useFFCustomers(enabled: boolean = true) {
+  return useQuery({
+    queryKey: ['ff', 'customers'] as const,
+    queryFn: () => api.functionfox.listCustomers(),
+    enabled,
+    staleTime: 5 * 60_000,
+  });
+}
+
+export function useFFJobs(customerID: string) {
+  return useQuery({
+    queryKey: ['ff', 'jobs', customerID] as const,
+    queryFn: () => api.functionfox.listJobs(customerID),
+    enabled: !!customerID,
+    staleTime: 5 * 60_000,
+  });
+}
+
+export function useFFTasks(customerID: string, jobID: string) {
+  return useQuery({
+    queryKey: ['ff', 'tasks', customerID, jobID] as const,
+    queryFn: () => api.functionfox.listTasks(customerID, jobID),
+    enabled: !!customerID && !!jobID,
+    staleTime: 5 * 60_000,
+  });
+}
+
+export function useTestFFConnection() {
+  return useMutation({
+    mutationFn: () => api.functionfox.testConnection(),
+    onSuccess: () => toast.success('FunctionFox connection OK'),
+    onError: (error: unknown) => {
+      const message = error instanceof Error ? error.message : String(error);
+      toast.error(`FunctionFox connection failed: ${message}`);
+    },
   });
 }

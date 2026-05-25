@@ -347,6 +347,30 @@ export function AISettings() {
         </SettingsRow>
 
         <SettingsRow
+          label="Summary Backend"
+          description="Which AI tool generates session summaries"
+        >
+          <Select
+            value={config.ai?.summaryBackend || 'inference'}
+            onValueChange={(value) =>
+              updateConfig.mutate({
+                ai: { ...config.ai, summaryBackend: value as 'inference' | 'claude' | 'opencode' | 'auto' },
+              })
+            }
+          >
+            <SelectTrigger className="w-44">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="inference">Local inference (default)</SelectItem>
+              <SelectItem value="claude">Claude Code (CLI)</SelectItem>
+              <SelectItem value="opencode">OpenCode (CLI)</SelectItem>
+              <SelectItem value="auto">Auto-detect CLI</SelectItem>
+            </SelectContent>
+          </Select>
+        </SettingsRow>
+
+        <SettingsRow
           label="Summary Chunk Size"
           description="Time period for each AI summary"
         >

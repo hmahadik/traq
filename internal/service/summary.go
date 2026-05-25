@@ -1,13 +1,16 @@
 package service
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"log"
 	"sort"
 	"time"
 
 	"traq/internal/inference"
+	"traq/internal/integrations/aiagent"
 	"traq/internal/storage"
 )
 
@@ -25,8 +28,31 @@ func NewSummaryService(store *storage.Store, inf *inference.Service) *SummarySer
 	}
 }
 
-// GenerateSummary generates a summary for a session
+// GenerateSummary generates a summary for a session using the configured
+// inference engine (bundled / Ollama / cloud).
 func (s *SummaryService) GenerateSummary(sessionID int64) (*storage.Summary, error) {
+	return s.generate(sessionID, nil)
+}
+
+// GenerateSummaryWithAgent generates a summary using a CLI-backed aiagent
+// instead of the inference engine. The same prompt builder + response parser
+// are used, so the resulting Summary record is structurally identical — only
+// the transport changes (CLI subprocess vs HTTP to llama-server).
+func (s *SummaryService) GenerateSummaryWithAgent(sessionID int64, gen aiagent.Generator) (*storage.Summary, error) {
+	if gen == nil {
+		return nil, fmt.Errorf("nil generator")
+	}
+	return s.generate(sessionID, gen)
+}
+
+func (s *SummaryService) generate(sessionID int64, gen aiagent.Generator) (*storage.Summary, error) {
+	overallStart := time.Now()
+	backend := "inference"
+	if gen != nil {
+		backend = "agent:" + gen.Name()
+	}
+	log.Printf("[summary] generate session=%d backend=%s: start", sessionID, backend)
+
 	// Get session
 	session, err := s.store.GetSession(sessionID)
 	if err != nil {
@@ -35,23 +61,50 @@ func (s *SummaryService) GenerateSummary(sessionID int64) (*storage.Summary, err
 	if session == nil {
 		return nil, fmt.Errorf("session not found: %d", sessionID)
 	}
+	log.Printf("[summary] generate session=%d: session loaded duration=%vs", sessionID, time.Since(overallStart).Seconds())
 
 	// Build context for the inference
 	ctx, err := s.buildSessionContext(session)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build context: %w", err)
 	}
+	log.Printf("[summary] generate session=%d: context built focus=%d shell=%d git=%d files=%d browser=%d topApps=%v duration=%vs",
+		sessionID, len(ctx.FocusEvents), len(ctx.ShellCommands), len(ctx.GitCommits), len(ctx.FileEvents), len(ctx.BrowserVisits), ctx.TopApps, time.Since(overallStart).Seconds())
 
-	// Check setup status first
-	status := s.inference.GetSetupStatus()
-	if !status.Ready {
-		return nil, fmt.Errorf("inference not ready: %s. %s", status.Issue, status.Suggestion)
-	}
-
-	// Generate summary
-	result, err := s.inference.GenerateSummary(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to generate summary: %w", err)
+	var result *inference.SummaryResult
+	if gen != nil {
+		// CLI path: build the same prompt the inference engine would build,
+		// run it through the agent CLI, parse the output with the shared
+		// parser. No setup-status check — agent generators have their own
+		// Available() probe and the caller has already gated on that.
+		runStart := time.Now()
+		prompt := inference.BuildSummaryPrompt(ctx)
+		log.Printf("[summary] generate session=%d: calling agent %s prompt-bytes=%d", sessionID, gen.Name(), len(prompt))
+		raw, err := gen.GenerateRaw(context.Background(), prompt)
+		log.Printf("[summary] generate session=%d: agent returned err=%v bytes=%d duration=%vs", sessionID, err, len(raw), time.Since(runStart).Seconds())
+		if err != nil {
+			return nil, fmt.Errorf("failed to generate summary via agent %s: %w", gen.Name(), err)
+		}
+		result = inference.ParseSummaryResponse(raw)
+		result.ModelUsed = "agent:" + gen.Name()
+		result.InferenceMs = time.Since(runStart).Milliseconds()
+	} else {
+		// Inference engine path. Setup-status gate matters here because the
+		// engine may not be ready (server not running, model missing, etc.).
+		statusStart := time.Now()
+		status := s.inference.GetSetupStatus()
+		log.Printf("[summary] generate session=%d: setup-status ready=%v engine=%s issue=%q checked-in=%vs",
+			sessionID, status.Ready, status.Engine, status.Issue, time.Since(statusStart).Seconds())
+		if !status.Ready {
+			return nil, fmt.Errorf("inference not ready: %s. %s", status.Issue, status.Suggestion)
+		}
+		inferenceStart := time.Now()
+		log.Printf("[summary] generate session=%d: calling inference.GenerateSummary", sessionID)
+		result, err = s.inference.GenerateSummary(ctx)
+		log.Printf("[summary] generate session=%d: inference returned err=%v duration=%vs", sessionID, err, time.Since(inferenceStart).Seconds())
+		if err != nil {
+			return nil, fmt.Errorf("failed to generate summary: %w", err)
+		}
 	}
 
 	// Get screenshot IDs for this session
@@ -105,6 +158,7 @@ func (s *SummaryService) GenerateSummary(sessionID int64) (*storage.Summary, err
 		fmt.Printf("Warning: failed to link summary to session: %v\n", err)
 	}
 
+	log.Printf("[summary] generate session=%d: done summaryID=%d total=%vs", sessionID, summaryID, time.Since(overallStart).Seconds())
 	return summary, nil
 }
 
@@ -148,15 +202,31 @@ func (s *SummaryService) buildSessionContext(session *storage.Session) (*inferen
 		ctx.DurationSeconds = ctx.EndTime - ctx.StartTime
 	}
 
+	// Pre-load project names so we can annotate focus events that already
+	// have a ProjectID assigned by the auto-assign / rules / AI / manual
+	// pipeline. Lets the LLM see "this 30-min block was already attributed
+	// to Acme" instead of guessing from the window title.
+	projects, _ := s.store.GetProjects()
+	projectNameByID := make(map[int64]string, len(projects))
+	for _, p := range projects {
+		projectNameByID[p.ID] = p.Name
+	}
+
 	// Get focus events
 	focusEvents, _ := s.store.GetWindowFocusEventsBySession(session.ID)
 	appDurations := make(map[string]float64)
 	for _, evt := range focusEvents {
 		appDurations[evt.AppName] += evt.DurationSeconds
+		var projName string
+		if evt.ProjectID.Valid {
+			projName = projectNameByID[evt.ProjectID.Int64]
+		}
 		ctx.FocusEvents = append(ctx.FocusEvents, inference.FocusEvent{
 			AppName:     evt.AppName,
 			WindowTitle: evt.WindowTitle,
 			Duration:    evt.DurationSeconds,
+			StartTime:   evt.StartTime,
+			ProjectName: projName,
 		})
 	}
 
@@ -179,32 +249,88 @@ func (s *SummaryService) buildSessionContext(session *storage.Session) (*inferen
 		ctx.TopApps = append(ctx.TopApps, ad.name)
 	}
 
-	// Get shell commands
+	// Get shell commands — including working directory, the strongest
+	// project signal for terminal time.
 	shellCmds, _ := s.store.GetShellCommandsBySession(session.ID)
 	for _, cmd := range shellCmds {
-		ctx.ShellCommands = append(ctx.ShellCommands, cmd.Command)
+		cwd := ""
+		if cmd.WorkingDirectory.Valid {
+			cwd = cmd.WorkingDirectory.String
+		}
+		ctx.ShellCommands = append(ctx.ShellCommands, inference.ShellEvent{
+			Timestamp:        cmd.Timestamp,
+			Command:          cmd.Command,
+			WorkingDirectory: cwd,
+		})
 	}
 
-	// Get git commits
+	// Get git commits — annotate with repo name (from a small lookup cache)
+	// and branch so the LLM can attribute commits without guessing.
 	gitCommits, _ := s.store.GetGitCommitsBySession(session.ID)
+	repoNameByID := make(map[int64]string)
 	for _, commit := range gitCommits {
-		ctx.GitCommits = append(ctx.GitCommits, commit.MessageSubject)
+		repoName, ok := repoNameByID[commit.RepositoryID]
+		if !ok {
+			if repo, err := s.store.GetGitRepository(commit.RepositoryID); err == nil && repo != nil {
+				repoName = repo.Name
+			}
+			repoNameByID[commit.RepositoryID] = repoName
+		}
+		branch := ""
+		if commit.Branch.Valid {
+			branch = commit.Branch.String
+		}
+		subject := commit.MessageSubject
+		if subject == "" {
+			subject = commit.Message
+		}
+		ctx.GitCommits = append(ctx.GitCommits, inference.GitEvent{
+			Timestamp: commit.Timestamp,
+			Subject:   subject,
+			Repo:      repoName,
+			Branch:    branch,
+		})
 	}
 
 	// Get file events
 	fileEvents, _ := s.store.GetFileEventsBySession(session.ID)
 	for _, evt := range fileEvents {
-		ctx.FileEvents = append(ctx.FileEvents, fmt.Sprintf("%s: %s", evt.EventType, evt.FileName))
+		ctx.FileEvents = append(ctx.FileEvents, inference.FileEvent{
+			Timestamp: evt.Timestamp,
+			EventType: evt.EventType,
+			FileName:  evt.FileName,
+			Directory: evt.Directory,
+		})
 	}
 
 	// Get browser visits
 	browserVisits, _ := s.store.GetBrowserVisitsBySession(session.ID)
 	for _, visit := range browserVisits {
-		title := visit.Domain
-		if visit.Title.Valid && visit.Title.String != "" {
+		title := ""
+		if visit.Title.Valid {
 			title = visit.Title.String
 		}
-		ctx.BrowserVisits = append(ctx.BrowserVisits, title)
+		ctx.BrowserVisits = append(ctx.BrowserVisits, inference.BrowserEvent{
+			Timestamp: visit.Timestamp,
+			Title:     title,
+			Domain:    visit.Domain,
+			URL:       visit.URL,
+		})
+	}
+
+	// Pull AI coding events that overlap this work session. These come from
+	// claude/opencode session logs and provide rich signal: which directory
+	// the AI was pointed at and what the user was actually asking for.
+	if aiEvents, err := s.store.GetAIEventsInRange(ctx.StartTime, ctx.EndTime); err == nil {
+		for _, e := range aiEvents {
+			ctx.AIEvents = append(ctx.AIEvents, inference.AIEvent{
+				Timestamp:  e.Timestamp,
+				Tool:       e.Tool,
+				Kind:       e.Kind,
+				ProjectDir: e.ProjectDir,
+				Content:    e.Content,
+			})
+		}
 	}
 
 	return ctx, nil

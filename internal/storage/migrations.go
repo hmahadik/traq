@@ -5,7 +5,7 @@ import (
 	"log"
 )
 
-const schemaVersion = 19
+const schemaVersion = 20
 
 const schema = `
 -- ============================================================================
@@ -374,6 +374,13 @@ func (s *Store) Migrate() error {
 		// (matched against project_dir).
 		if err := s.applyMigration19(); err != nil {
 			return fmt.Errorf("failed to apply migration 19: %w", err)
+		}
+	}
+
+	if currentVersion < 20 {
+		// Migration v20: Add functionfox_* tables for timesheet integration.
+		if err := s.applyMigration20(); err != nil {
+			return fmt.Errorf("failed to apply migration 20: %w", err)
 		}
 	}
 
@@ -1275,6 +1282,55 @@ func (s *Store) applyMigration15() error {
 		CREATE INDEX IF NOT EXISTS idx_ai_events_ts      ON ai_events(timestamp);
 		CREATE INDEX IF NOT EXISTS idx_ai_events_session ON ai_events(session_id);
 		CREATE INDEX IF NOT EXISTS idx_ai_events_tool_ts ON ai_events(tool, timestamp);
+	`)
+	return err
+}
+
+// applyMigration17 adds functionfox_* tables for timesheet integration.
+// Three tables: functionfox_project_mappings (Traq project → FF client/job/task),
+// functionfox_push_log (push activity audit), and functionfox_pushed_entries (per-entry history).
+func (s *Store) applyMigration20() error {
+	_, err := s.db.Exec(`
+		CREATE TABLE IF NOT EXISTS functionfox_project_mappings (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			traq_project TEXT NOT NULL UNIQUE,
+			ff_client_id TEXT NOT NULL,
+			ff_client_name TEXT NOT NULL,
+			ff_job_id TEXT NOT NULL,
+			ff_job_name TEXT NOT NULL,
+			ff_task_id TEXT NOT NULL,
+			ff_task_name TEXT NOT NULL,
+			enabled INTEGER NOT NULL DEFAULT 1,
+			created_at INTEGER NOT NULL,
+			updated_at INTEGER NOT NULL
+		);
+
+		CREATE TABLE IF NOT EXISTS functionfox_push_log (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			pushed_at INTEGER NOT NULL,
+			date_range_start INTEGER NOT NULL,
+			date_range_end INTEGER NOT NULL,
+			entry_count INTEGER NOT NULL,
+			success_count INTEGER NOT NULL,
+			failure_count INTEGER NOT NULL,
+			error_summary TEXT
+		);
+
+		CREATE TABLE IF NOT EXISTS functionfox_pushed_entries (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			push_log_id INTEGER NOT NULL,
+			traq_project TEXT NOT NULL,
+			entry_date INTEGER NOT NULL,
+			ff_timesheet_id TEXT NOT NULL,
+			hours_pushed REAL NOT NULL,
+			pushed_at INTEGER NOT NULL,
+			superseded_at INTEGER,
+			FOREIGN KEY (push_log_id) REFERENCES functionfox_push_log(id)
+		);
+
+		CREATE INDEX IF NOT EXISTS idx_ffpe_lookup
+			ON functionfox_pushed_entries(traq_project, entry_date)
+			WHERE superseded_at IS NULL;
 	`)
 	return err
 }

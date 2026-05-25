@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -12,6 +13,8 @@ import (
 	"time"
 
 	"traq/internal/inference"
+	"traq/internal/integrations/aiagent"
+	"traq/internal/integrations/functionfox"
 	"traq/internal/lock"
 	"traq/internal/platform"
 	"traq/internal/service"
@@ -57,7 +60,12 @@ type App struct {
 	Embeddings  *service.EmbeddingService
 	Draft       *service.DraftService
 	ShellSetup  *service.ShellSetupService
+	TmuxSetup   *service.TmuxSetupService
 	AI          *service.AIService
+	Timesheet   *service.TimesheetService
+
+	// FunctionFox client (Plan B uses stub; Plan C will use real HTTP client)
+	ffClient functionfox.Client
 
 	// Inference engine
 	inference *inference.Service
@@ -87,6 +95,21 @@ func (a *App) startup(ctx context.Context) {
 
 	// Ensure data directory exists
 	dataDir := a.platform.DataDir()
+
+	// Mirror logs to a stable file in the data dir so users can diagnose
+	// failures without needing to find the terminal that launched wails dev.
+	// File is opened in append mode and capped via lumberjack-style rotation
+	// (manual: keep at most ~5MB of recent logs by truncating on startup).
+	if err := os.MkdirAll(dataDir, 0o755); err == nil {
+		logPath := filepath.Join(dataDir, "traq.log")
+		// Truncate-on-startup keeps the file bounded across runs without
+		// pulling in a rotation dep. Each run gets a clean log; the user's
+		// most recent failure is always at the top.
+		if f, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644); err == nil {
+			log.SetOutput(io.MultiWriter(os.Stderr, f))
+			log.Printf("traq starting: log mirrored to %s", logPath)
+		}
+	}
 
 	// Acquire instance lock to prevent multiple instances
 	a.instanceLock = lock.New(dataDir)
@@ -207,6 +230,12 @@ func (a *App) startup(ctx context.Context) {
 	// Wire up reports service to projects service (for auto-discovery)
 	a.Projects.SetReportsService(a.Reports)
 
+	// Initialize timesheet service (after reports service for project detection)
+	a.Timesheet = service.NewTimesheetService(a.store, a.Reports)
+
+	// Initialize FunctionFox client (Plan B uses stub)
+	a.ffClient = functionfox.NewStubClient()
+
 	// Initialize backfill service (after reports service for detection functions)
 	a.backfillService = service.NewBackfillService(a.store, a.Projects, a.Reports)
 
@@ -221,9 +250,36 @@ func (a *App) startup(ctx context.Context) {
 	// Initialize draft service (for AI draft approval workflow)
 	a.Draft = service.NewDraftService(a.store)
 
+	// Wire up auto-summary generation when sessions close. Without this, the
+	// summary pipeline only fires on manual user action, so most sessions
+	// never get an AI summary or its structured project allocations.
+	if a.daemon != nil {
+		a.daemon.SetOnSessionEnded(func(sessionID int64) {
+			cfg, err := a.Config.GetConfig()
+			if err != nil || cfg == nil || cfg.AI == nil {
+				return
+			}
+			mode := cfg.AI.SummaryMode
+			if mode == "" || mode == "off" {
+				return
+			}
+			summary, err := a.generateSummaryUsingConfiguredBackend(sessionID, cfg)
+			if err != nil {
+				log.Printf("auto-summary: session %d failed: %v", sessionID, err)
+				return
+			}
+			if mode == "drafts" && summary != nil {
+				if err := a.store.UpdateSummaryDraftStatus(summary.ID, true, "pending"); err != nil {
+					log.Printf("auto-summary: mark draft for session %d failed: %v", sessionID, err)
+				}
+			}
+		})
+	}
+
 	// Initialize shell setup service (plugin install/uninstall/status)
 	a.ShellSetup = service.NewShellSetupService(dataDir)
 	a.Config.SetShellSetup(a.ShellSetup)
+	a.TmuxSetup = service.NewTmuxSetupService()
 
 	// Initialize issues service (for crash/manual reporting)
 	a.Issues = service.NewIssueService(a.store, Version)
@@ -725,6 +781,24 @@ func (a *App) DismissShellOverflow() error {
 	return a.ShellSetup.DismissOverflow()
 }
 
+// GetTmuxSetupStatus returns whether Traq's tmux integration block is
+// present in the user's tmux.conf, and whether tmux is on PATH at all.
+func (a *App) GetTmuxSetupStatus() (*service.TmuxSetupStatus, error) {
+	return a.TmuxSetup.Status()
+}
+
+// InstallTmuxIntegration writes Traq's set-titles config block to the
+// user's tmux.conf and live-reloads any running tmux server.
+func (a *App) InstallTmuxIntegration() error {
+	return a.TmuxSetup.Install()
+}
+
+// UninstallTmuxIntegration removes Traq's tmux config block (other tmux
+// settings the user has are left untouched).
+func (a *App) UninstallTmuxIntegration() error {
+	return a.TmuxSetup.Uninstall()
+}
+
 // SearchAllDataSources searches across all event types (git, shell, files, browser, screenshots).
 func (a *App) SearchAllDataSources(query string, maxResults int) ([]*service.SearchResult, error) {
 	if a.Timeline == nil {
@@ -1035,20 +1109,76 @@ func (a *App) GenerateEnhancedWeeklyHTML(startDate, endDate string) (string, err
 // Summary Methods (exposed to frontend)
 // ============================================================================
 
-// GenerateSummary generates an AI summary for a session.
+// GenerateSummary generates an AI summary for a session, dispatching to
+// the inference engine or a CLI agent based on ai.summaryBackend config.
 func (a *App) GenerateSummary(sessionID int64) (*storage.Summary, error) {
 	if a.Summary == nil {
 		return nil, fmt.Errorf("summary service not initialized")
 	}
-	return a.Summary.GenerateSummary(sessionID)
+	cfg, _ := a.Config.GetConfig()
+	return a.generateSummaryUsingConfiguredBackend(sessionID, cfg)
 }
 
-// RegenerateSummary regenerates an AI summary for a session.
+// RegenerateSummary deletes any existing summary for the session and
+// regenerates via the configured backend.
 func (a *App) RegenerateSummary(sessionID int64) (*storage.Summary, error) {
 	if a.Summary == nil {
 		return nil, fmt.Errorf("summary service not initialized")
 	}
-	return a.Summary.RegenerateSummary(sessionID)
+	if existing, err := a.store.GetSummaryBySession(sessionID); err == nil && existing != nil {
+		_ = a.store.DeleteSummary(existing.ID)
+	}
+	cfg, _ := a.Config.GetConfig()
+	return a.generateSummaryUsingConfiguredBackend(sessionID, cfg)
+}
+
+// generateSummaryUsingConfiguredBackend reads ai.summaryBackend and either
+// runs the local inference engine (default) or routes through an aiagent
+// CLI subprocess. CLI failure when explicitly configured returns the error;
+// CLI unavailability under "auto" silently falls back to inference so the
+// pipeline keeps working when claude/opencode aren't installed.
+func (a *App) generateSummaryUsingConfiguredBackend(sessionID int64, cfg *service.Config) (*storage.Summary, error) {
+	if cfg == nil || cfg.AI == nil || cfg.AI.SummaryBackend == "" || cfg.AI.SummaryBackend == "inference" {
+		return a.Summary.GenerateSummary(sessionID)
+	}
+	gen, err := pickSummaryAgent(cfg.AI.SummaryBackend)
+	if err != nil {
+		// auto mode: fall back to inference rather than failing the user.
+		if cfg.AI.SummaryBackend == "auto" {
+			log.Printf("summary-backend: %v; falling back to inference", err)
+			return a.Summary.GenerateSummary(sessionID)
+		}
+		return nil, err
+	}
+	return a.Summary.GenerateSummaryWithAgent(sessionID, gen)
+}
+
+// pickSummaryAgent mirrors pickAIGenerator but is scoped to summary
+// generation. Kept as a separate function so the timesheet AI-notes path
+// (which has its own backend selection) doesn't bind to summary settings.
+func pickSummaryAgent(backend string) (aiagent.Generator, error) {
+	switch backend {
+	case "claude":
+		g := aiagent.NewClaudeGenerator()
+		if !g.Available() {
+			return nil, fmt.Errorf("claude CLI not on PATH")
+		}
+		return g, nil
+	case "opencode":
+		g := aiagent.NewOpenCodeGenerator()
+		if !g.Available() {
+			return nil, fmt.Errorf("opencode CLI not on PATH")
+		}
+		return g, nil
+	case "auto":
+		g := aiagent.NewAutoGenerator()
+		if !g.Available() {
+			return nil, fmt.Errorf("no AI agent CLI on PATH (install claude or opencode)")
+		}
+		return g, nil
+	default:
+		return nil, fmt.Errorf("unknown summary backend: %s", backend)
+	}
 }
 
 // DeleteSummary deletes an AI summary.
@@ -2198,4 +2328,184 @@ func (a *App) GetAISession(id string) (*service.AISessionDetail, error) {
 // fields come back empty and the frontend renders timestamp-only rows.
 func (a *App) GetAIPromptsForDay(date string) ([]service.AIPromptDisplay, error) {
 	return a.AI.GetAIPromptsForDay(date)
+}
+
+// =============================================================================
+// Timesheet (Plan B)
+// =============================================================================
+
+// GenerateTimesheet builds a structured per-(project, date) timesheet for the
+// given date range and resolves FF mappings. Notes are NOT generated unless
+// AI notes are enabled in settings (handled by GenerateTimesheetWithAINotes).
+func (a *App) GenerateTimesheet(startDate, endDate string) (*service.TimesheetData, error) {
+	cfg, err := a.Config.GetConfig()
+	if err != nil {
+		return nil, fmt.Errorf("get config: %w", err)
+	}
+	rounding := 0.25
+	if cfg.Timesheet != nil && cfg.Timesheet.HoursRounding > 0 {
+		rounding = cfg.Timesheet.HoursRounding
+	}
+	data, err := a.Timesheet.BuildTimesheet(startDate, endDate, rounding)
+	if err != nil {
+		return nil, err
+	}
+	if cfg.Timesheet == nil || !cfg.Timesheet.AINotesEnabled {
+		log.Printf("[timesheet] notes skipped: aiNotesEnabled=%v",
+			cfg.Timesheet != nil && cfg.Timesheet.AINotesEnabled)
+		return data, nil
+	}
+	log.Printf("[timesheet] notes enabled backend=%q entries=%d",
+		cfg.Timesheet.AINotesBackend, len(data.Entries))
+	backend, err := a.pickNotesBackend(cfg.Timesheet.AINotesBackend)
+	if err != nil {
+		// Surface the failure as a generated-but-noted-as-failed marker on
+		// every non-skipped row, so the user sees something concrete in the
+		// preview instead of "huh, no notes." The previous behavior (silent
+		// fall-through) made misconfigured backends indistinguishable from
+		// the AI-notes-off case.
+		log.Printf("[timesheet] notes backend unavailable: %v", err)
+		marker := fmt.Sprintf("[notes backend %q unavailable: %v]", cfg.Timesheet.AINotesBackend, err)
+		for i := range data.Entries {
+			if !data.Entries[i].Skipped {
+				data.Entries[i].Notes = marker
+			}
+		}
+		return data, nil
+	}
+	log.Printf("[timesheet] notes backend selected: %s", backend.Name())
+	if err := a.Timesheet.PopulateNotes(a.ctx, data, backend); err != nil {
+		log.Printf("[timesheet] PopulateNotes returned err=%v", err)
+		return data, fmt.Errorf("populate notes: %w", err)
+	}
+	// Quick post-condition: did anything actually land?
+	populated := 0
+	for _, e := range data.Entries {
+		if e.Notes != "" && !strings.HasPrefix(e.Notes, "[") {
+			populated++
+		}
+	}
+	log.Printf("[timesheet] notes populated %d/%d entries", populated, len(data.Entries))
+	return data, nil
+}
+
+// GetTimesheetPrompts builds the timesheet and returns the verbatim LLM
+// prompt for each non-unattributed entry without firing any LLM calls.
+// Used by the frontend to show a pre-flight review modal.
+func (a *App) GetTimesheetPrompts(startDate, endDate string) (*service.TimesheetPromptResult, error) {
+	cfg, err := a.Config.GetConfig()
+	if err != nil {
+		return nil, fmt.Errorf("get config: %w", err)
+	}
+	rounding := 0.25
+	if cfg.Timesheet != nil && cfg.Timesheet.HoursRounding > 0 {
+		rounding = cfg.Timesheet.HoursRounding
+	}
+	previews, err := a.Timesheet.BuildPromptPreviews(startDate, endDate, rounding)
+	if err != nil {
+		return nil, err
+	}
+	backendName := ""
+	if cfg.Timesheet != nil {
+		backendName = backendDisplayName(cfg.Timesheet.AINotesBackend)
+	} else {
+		backendName = backendDisplayName("")
+	}
+	return &service.TimesheetPromptResult{
+		Previews:    previews,
+		BackendName: backendName,
+	}, nil
+}
+
+// backendDisplayName maps a config backend string to a human-readable label
+// for the prompt-preview modal header.
+func backendDisplayName(backend string) string {
+	switch backend {
+	case "inference":
+		return "Local Inference"
+	case "claude":
+		return "Claude CLI"
+	case "opencode":
+		return "OpenCode CLI"
+	default:
+		return "Auto (Claude or OpenCode)"
+	}
+}
+
+// pickNotesBackend selects the configured notes backend. "inference" routes
+// through the local inference engine (same one summaries can use); the rest
+// route through CLI subprocesses. Returns an error when the requested
+// backend isn't available — caller decides whether to abort or fall through.
+func (a *App) pickNotesBackend(backend string) (service.NotesBackend, error) {
+	switch backend {
+	case "inference":
+		if a.inference == nil {
+			return nil, fmt.Errorf("inference service not initialized")
+		}
+		if status := a.inference.GetSetupStatus(); !status.Ready {
+			return nil, fmt.Errorf("inference not ready: %s", status.Issue)
+		}
+		return service.NewInferenceNotesBackend(a.inference), nil
+	case "claude":
+		g := aiagent.NewClaudeGenerator()
+		if !g.Available() {
+			return nil, fmt.Errorf("claude CLI not on PATH")
+		}
+		return service.NewAgentNotesBackend(g), nil
+	case "opencode":
+		g := aiagent.NewOpenCodeGenerator()
+		if !g.Available() {
+			return nil, fmt.Errorf("opencode CLI not on PATH")
+		}
+		return service.NewAgentNotesBackend(g), nil
+	case "auto", "":
+		g := aiagent.NewAutoGenerator()
+		if !g.Available() {
+			return nil, fmt.Errorf("no AI agent CLI on PATH (install claude or opencode)")
+		}
+		return service.NewAgentNotesBackend(g), nil
+	default:
+		return nil, fmt.Errorf("unknown AI notes backend: %s", backend)
+	}
+}
+
+// ListProjectMappings returns all stored Traq project → FunctionFox mappings.
+func (a *App) ListProjectMappings() ([]*storage.FunctionFoxProjectMapping, error) {
+	return a.store.ListFunctionFoxProjectMappings()
+}
+
+// SaveProjectMapping inserts or updates a Traq project → FunctionFox mapping.
+// Returns the row ID (insert) or 0 (update — sqlite driver-specific behavior).
+func (a *App) SaveProjectMapping(m *storage.FunctionFoxProjectMapping) (int64, error) {
+	if m == nil {
+		return 0, fmt.Errorf("mapping is nil")
+	}
+	return a.store.SaveFunctionFoxProjectMapping(m)
+}
+
+// DeleteProjectMapping removes the mapping for the given Traq project.
+func (a *App) DeleteProjectMapping(traqProject string) error {
+	return a.store.DeleteFunctionFoxProjectMapping(traqProject)
+}
+
+// ListFFCustomers returns the list of FunctionFox customers (clients) visible
+// to the configured account. Plan B uses a stub; Plan C wires the real HTTP client.
+func (a *App) ListFFCustomers() ([]functionfox.Customer, error) {
+	return a.ffClient.ListCustomers(a.ctx)
+}
+
+// ListFFJobs returns the jobs (projects) under a given FF customer.
+func (a *App) ListFFJobs(customerID string) ([]functionfox.Job, error) {
+	return a.ffClient.ListJobs(a.ctx, customerID)
+}
+
+// ListFFTasks returns the tasks (activities) within a given FF job.
+func (a *App) ListFFTasks(customerID, jobID string) ([]functionfox.Task, error) {
+	return a.ffClient.ListTasks(a.ctx, customerID, jobID)
+}
+
+// TestFFConnection verifies the FunctionFox client is reachable. Plan B's stub
+// always returns nil. Plan C will perform a real login round-trip.
+func (a *App) TestFFConnection() error {
+	return a.ffClient.TestConnection(a.ctx)
 }

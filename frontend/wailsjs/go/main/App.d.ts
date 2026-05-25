@@ -5,6 +5,7 @@ import {service} from '../models';
 import {main} from '../models';
 import {inference} from '../models';
 import {tracker} from '../models';
+import {functionfox} from '../models';
 
 export function AcceptAssignmentDraft(arg1:number):Promise<void>;
 
@@ -56,6 +57,8 @@ export function DeleteModel(arg1:string):Promise<void>;
 
 export function DeleteProject(arg1:number):Promise<void>;
 
+export function DeleteProjectMapping(arg1:string):Promise<void>;
+
 export function DeleteProjectPattern(arg1:number):Promise<void>;
 
 export function DeleteReport(arg1:number):Promise<void>;
@@ -93,6 +96,8 @@ export function GenerateProjectReport(arg1:string,arg2:string,arg3:boolean,arg4:
 export function GenerateReport(arg1:string,arg2:string,arg3:boolean):Promise<service.Report>;
 
 export function GenerateSummary(arg1:number):Promise<storage.Summary>;
+
+export function GenerateTimesheet(arg1:string,arg2:string):Promise<service.TimesheetData>;
 
 export function GenerateWeeklySummaryMarkdown(arg1:string,arg2:string):Promise<string>;
 
@@ -238,6 +243,10 @@ export function GetThumbnailPath(arg1:number):Promise<string>;
 
 export function GetTimelineGridData(arg1:string):Promise<service.TimelineGridData>;
 
+export function GetTimesheetPrompts(arg1:string,arg2:string):Promise<service.TimesheetPromptResult>;
+
+export function GetTmuxSetupStatus():Promise<service.TmuxSetupStatus>;
+
 export function GetTopWindows(arg1:string,arg2:number):Promise<Array<service.WindowUsage>>;
 
 export function GetTopWindowsRange(arg1:number,arg2:number,arg3:number):Promise<Array<service.WindowUsage>>;
@@ -264,11 +273,21 @@ export function IgnoreActivities(arg1:string,arg2:Array<number>):Promise<void>;
 
 export function InstallShellPlugin(arg1:string):Promise<void>;
 
+export function InstallTmuxIntegration():Promise<void>;
+
 export function IsReady():Promise<boolean>;
 
 export function ListAISessions(arg1:string):Promise<Array<service.AISessionDisplay>>;
 
+export function ListFFCustomers():Promise<Array<functionfox.Customer>>;
+
+export function ListFFJobs(arg1:string):Promise<Array<functionfox.Job>>;
+
+export function ListFFTasks(arg1:string,arg2:string):Promise<Array<functionfox.Task>>;
+
 export function ListHierarchicalSummaries(arg1:string,arg2:number):Promise<Array<storage.HierarchicalSummary>>;
+
+export function ListProjectMappings():Promise<Array<storage.FunctionFoxProjectMapping>>;
 
 export function MergeTags(arg1:string,arg2:string):Promise<number>;
 
@@ -306,6 +325,8 @@ export function ResumeCapture():Promise<void>;
 
 export function SaveAppCategory(arg1:string,arg2:string):Promise<void>;
 
+export function SaveProjectMapping(arg1:storage.FunctionFoxProjectMapping):Promise<number>;
+
 export function SearchAllDataSources(arg1:string,arg2:number):Promise<Array<service.SearchResult>>;
 
 export function SetAppTimelineCategory(arg1:string,arg2:string):Promise<void>;
@@ -328,6 +349,8 @@ export function StopTracking():Promise<void>;
 
 export function SuggestProject(arg1:storage.AssignmentContext):Promise<service.AssignmentResult>;
 
+export function TestFFConnection():Promise<void>;
+
 export function TestIssueWebhook():Promise<void>;
 
 export function TriggerUpdate():Promise<void>;
@@ -335,6 +358,8 @@ export function TriggerUpdate():Promise<void>;
 export function UnignoreActivities(arg1:string,arg2:Array<number>):Promise<void>;
 
 export function UninstallShellPlugin(arg1:string):Promise<void>;
+
+export function UninstallTmuxIntegration():Promise<void>;
 
 export function UnregisterGitRepository(arg1:number):Promise<void>;
 

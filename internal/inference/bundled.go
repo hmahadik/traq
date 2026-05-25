@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net"
 	"net/http"
 	"os"
@@ -231,9 +232,13 @@ func (e *BundledEngine) Start() error {
 	serverDir := filepath.Dir(e.config.ServerPath)
 	e.cmd.Env = append(os.Environ(), fmt.Sprintf("LD_LIBRARY_PATH=%s", serverDir))
 
-	// Suppress output
+	// Capture stderr to a ring buffer so startup failures (e.g. missing
+	// shared libraries) surface in the returned error instead of just timing
+	// out as "failed to start within 30 seconds". Stdout is still discarded
+	// to avoid log spam.
+	stderrBuf := &boundedBuffer{max: 4096}
 	e.cmd.Stdout = nil
-	e.cmd.Stderr = nil
+	e.cmd.Stderr = stderrBuf
 
 	if err := e.cmd.Start(); err != nil {
 		return fmt.Errorf("failed to start llama server: %w", err)
@@ -259,6 +264,10 @@ func (e *BundledEngine) Start() error {
 
 	if !<-ready {
 		e.Stop()
+		stderr := strings.TrimSpace(stderrBuf.String())
+		if stderr != "" {
+			return fmt.Errorf("llama server failed to start within 30 seconds: %s", stderr)
+		}
 		return fmt.Errorf("llama server failed to start within 30 seconds")
 	}
 
@@ -298,6 +307,32 @@ func (e *BundledEngine) Stop() error {
 	return nil
 }
 
+// boundedBuffer is a thread-safe io.Writer that retains the last `max`
+// bytes written. Used to capture llama-server's stderr without unbounded
+// memory growth, so startup-failure diagnostics survive a long-running
+// process.
+type boundedBuffer struct {
+	mu  sync.Mutex
+	buf []byte
+	max int
+}
+
+func (b *boundedBuffer) Write(p []byte) (int, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.buf = append(b.buf, p...)
+	if overflow := len(b.buf) - b.max; overflow > 0 {
+		b.buf = b.buf[overflow:]
+	}
+	return len(p), nil
+}
+
+func (b *boundedBuffer) String() string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return string(b.buf)
+}
+
 // IsRunning returns whether the server is currently running
 func (e *BundledEngine) IsRunning() bool {
 	e.mu.RLock()
@@ -315,7 +350,15 @@ func (e *BundledEngine) checkHealth() bool {
 	return resp.StatusCode == http.StatusOK
 }
 
-// Complete sends a completion request to the bundled server
+// Complete sends a chat-completion request to the bundled server.
+//
+// We use the OpenAI-compatible /v1/chat/completions endpoint rather than the
+// raw /completion endpoint because llama-server applies the model's chat
+// template automatically — Phi-3 needs <|user|>...<|end|><|assistant|>
+// markers, Llama-3 needs different ones, etc. Without the template the model
+// doesn't know it's supposed to "be the assistant" and degenerates into
+// repeating or extending the user content (e.g. echoing prompt instructions
+// back as the answer).
 func (e *BundledEngine) Complete(prompt string) (string, error) {
 	e.mu.RLock()
 	running := e.running
@@ -325,12 +368,12 @@ func (e *BundledEngine) Complete(prompt string) (string, error) {
 		return "", fmt.Errorf("bundled server is not running")
 	}
 
-	// Use the OpenAI-compatible /v1/completions endpoint
 	reqBody := map[string]interface{}{
-		"prompt":      prompt,
+		"messages": []map[string]string{
+			{"role": "user", "content": prompt},
+		},
 		"max_tokens":  1024,
 		"temperature": 0.7,
-		"stop":        []string{"\n\n\n"},
 	}
 
 	jsonBody, err := json.Marshal(reqBody)
@@ -338,12 +381,16 @@ func (e *BundledEngine) Complete(prompt string) (string, error) {
 		return "", err
 	}
 
-	url := fmt.Sprintf("http://localhost:%d/completion", e.config.Port)
+	url := fmt.Sprintf("http://localhost:%d/v1/chat/completions", e.config.Port)
+	postTS := time.Now()
+	log.Printf("[bundled] POST %s body=%d", url, len(jsonBody))
 	resp, err := e.client.Post(url, "application/json", bytes.NewReader(jsonBody))
 	if err != nil {
+		log.Printf("[bundled] POST failed err=%v after=%vs", err, time.Since(postTS).Seconds())
 		return "", fmt.Errorf("failed to call bundled server: %w", err)
 	}
 	defer resp.Body.Close()
+	log.Printf("[bundled] POST returned status=%d after=%vs", resp.StatusCode, time.Since(postTS).Seconds())
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -351,17 +398,27 @@ func (e *BundledEngine) Complete(prompt string) (string, error) {
 	}
 
 	if resp.StatusCode != http.StatusOK {
+		log.Printf("[bundled] non-200 body=%s", string(body))
 		return "", fmt.Errorf("bundled server returned status %d: %s", resp.StatusCode, string(body))
 	}
+	log.Printf("[bundled] response bytes=%d", len(body))
 
+	// /v1/chat/completions response shape:
+	//   { "choices": [ { "message": { "content": "..." } } ], ... }
 	var result struct {
-		Content string `json:"content"`
+		Choices []struct {
+			Message struct {
+				Content string `json:"content"`
+			} `json:"message"`
+		} `json:"choices"`
 	}
 	if err := json.Unmarshal(body, &result); err != nil {
 		return "", fmt.Errorf("failed to parse response: %w", err)
 	}
-
-	return result.Content, nil
+	if len(result.Choices) == 0 {
+		return "", fmt.Errorf("bundled server returned no choices: %s", string(body))
+	}
+	return result.Choices[0].Message.Content, nil
 }
 
 // GetModelInfo returns information about the loaded model

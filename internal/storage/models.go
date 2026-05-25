@@ -338,3 +338,18 @@ type EmbeddingContext struct {
 	Domain      string `json:"domain,omitempty"`
 	FilePath    string `json:"filePath,omitempty"`
 }
+
+// FunctionFoxProjectMapping maps a Traq project name to FunctionFox client/job/task IDs.
+type FunctionFoxProjectMapping struct {
+	ID           int64  `json:"id"`
+	TraqProject  string `json:"traqProject"`
+	FFClientID   string `json:"ffClientId"`
+	FFClientName string `json:"ffClientName"`
+	FFJobID      string `json:"ffJobId"`
+	FFJobName    string `json:"ffJobName"`
+	FFTaskID     string `json:"ffTaskId"`
+	FFTaskName   string `json:"ffTaskName"`
+	Enabled      bool   `json:"enabled"`
+	CreatedAt    int64  `json:"createdAt"`
+	UpdatedAt    int64  `json:"updatedAt"`
+}
