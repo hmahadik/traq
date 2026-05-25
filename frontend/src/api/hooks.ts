@@ -1463,30 +1463,6 @@ export function useApplyRuleToHistory() {
 }
 
 /**
- * Migrate legacy hardcoded patterns to database (one-time operation)
- */
-export function useMigrateHardcodedPatterns() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: () => api.projects.migrateHardcodedPatterns(),
-    onSuccess: (count) => {
-      queryClient.invalidateQueries({ queryKey: ['project'] });
-      if (count > 0) {
-        toast.success(`Migrated ${count} patterns to database`);
-      } else {
-        toast.info('All patterns already migrated');
-      }
-    },
-    onError: (error: unknown) => {
-      console.error('Migration failed:', error);
-      const message = error instanceof Error ? error.message : String(error);
-      toast.error(`Failed to migrate patterns: ${message}`);
-    },
-  });
-}
-
-/**
  * Assign an event to a project
  */
 export function useAssignEventToProject() {

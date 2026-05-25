@@ -2065,15 +2065,6 @@ func (a *App) ApplyRuleToHistory(patternID int64) (int, error) {
 	return a.Projects.ApplyRuleToHistory(patternID)
 }
 
-// MigrateHardcodedPatterns migrates legacy hardcoded project detection rules to the database.
-// This is idempotent and safe to call multiple times.
-func (a *App) MigrateHardcodedPatterns() (int, error) {
-	if a.Projects == nil {
-		return 0, fmt.Errorf("projects service not initialized")
-	}
-	return a.Projects.MigrateHardcodedPatterns()
-}
-
 // AssignEventToProject manually assigns an event to a project.
 func (a *App) AssignEventToProject(eventType string, eventID, projectID int64) error {
 	if a.Projects == nil {

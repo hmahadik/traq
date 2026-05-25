@@ -44,18 +44,20 @@ type EmbeddingWithProject struct {
 	ProjectName sql.NullString `json:"projectName"`
 }
 
-// GetAllEmbeddingsWithProjects returns all embeddings that have project assignments
+// GetAllEmbeddingsWithProjects returns all embeddings that have project assignments.
+// Only focus-event embeddings are returned because focus events are the only
+// event type whose project attribution is stored as a column. Screenshot/shell
+// project attribution is derived via focus-event overlap, not stored.
 func (s *Store) GetAllEmbeddingsWithProjects() ([]EmbeddingWithProject, error) {
 	rows, err := s.db.Query(`
 		SELECT
 			e.id, e.event_type, e.event_id, e.embedding, e.context_text, e.context_hash, e.created_at,
-			COALESCE(f.project_id, s.project_id) as project_id,
+			f.project_id as project_id,
 			p.name as project_name
 		FROM activity_embeddings e
-		LEFT JOIN window_focus_events f ON e.event_type = 'focus' AND e.event_id = f.id
-		LEFT JOIN screenshots s ON e.event_type = 'screenshot' AND e.event_id = s.id
-		LEFT JOIN projects p ON p.id = COALESCE(f.project_id, s.project_id)
-		WHERE COALESCE(f.project_id, s.project_id) IS NOT NULL
+		JOIN window_focus_events f ON e.event_type = 'focus' AND e.event_id = f.id
+		LEFT JOIN projects p ON p.id = f.project_id
+		WHERE f.project_id IS NOT NULL
 	`)
 	if err != nil {
 		return nil, err

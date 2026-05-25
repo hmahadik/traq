@@ -50,7 +50,14 @@ func (s *ReportsService) buildEnhancedReportContext(tr *TimeRange) (*EnhancedRep
 	if err != nil {
 		return nil, fmt.Errorf("failed to get browser history: %w", err)
 	}
+	ctx.BrowserVisits = browserVisits
 	ctx.DomainGroups = s.aggregateBrowserByDomain(browserVisits, focusEvents)
+
+	// Get AI coding sessions for project attribution
+	aiSessions, err := s.store.ListAISessionsForDate(tr.Start, tr.End)
+	if err == nil {
+		ctx.AISessions = aiSessions
+	}
 
 	// Get git commits
 	ctx.GitCommits, _ = s.store.GetGitCommitsByTimeRange(tr.Start, tr.End)
@@ -360,21 +367,3 @@ func (s *ReportsService) getDailyBreakdown(ctx *EnhancedReportContext) []*Report
 	return result
 }
 
-// toServiceReport converts a storage report to a service report.
-func toServiceReport(r *storage.Report) *Report {
-	if r == nil {
-		return nil
-	}
-	return &Report{
-		ID:         r.ID,
-		Title:      r.Title,
-		TimeRange:  r.TimeRange,
-		ReportType: r.ReportType,
-		Format:     r.Format,
-		Content:    r.Content.String,
-		Filepath:   r.Filepath.String,
-		StartTime:  r.StartTime.Int64,
-		EndTime:    r.EndTime.Int64,
-		CreatedAt:  r.CreatedAt,
-	}
-}

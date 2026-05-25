@@ -291,8 +291,6 @@ export function ListProjectMappings():Promise<Array<storage.FunctionFoxProjectMa
 
 export function MergeTags(arg1:string,arg2:string):Promise<number>;
 
-export function MigrateHardcodedPatterns():Promise<number>;
-
 export function OpenDataDir():Promise<void>;
 
 export function OptimizeDatabase():Promise<number>;

@@ -10,6 +10,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"traq/internal/storage"
 )
 
 // esc escapes a string for safe embedding in HTML output.
@@ -375,4 +377,55 @@ func formatNumber(n int64) string {
 		result = append(result, byte(c))
 	}
 	return string(result)
+}
+
+// toServiceReport converts a storage report to a service report.
+func toServiceReport(r *storage.Report) *Report {
+	if r == nil {
+		return nil
+	}
+	return &Report{
+		ID:         r.ID,
+		Title:      r.Title,
+		TimeRange:  r.TimeRange,
+		ReportType: r.ReportType,
+		Format:     r.Format,
+		Content:    r.Content.String,
+		Filepath:   r.Filepath.String,
+		StartTime:  r.StartTime.Int64,
+		EndTime:    r.EndTime.Int64,
+		CreatedAt:  r.CreatedAt,
+	}
+}
+
+// extractAccomplishmentsOptimized pulls key accomplishments from session summaries
+// using a pre-loaded summaries map (eliminates N+1 queries).
+func (s *ReportsService) extractAccomplishmentsOptimized(sessions []*storage.Session, summariesMap map[int64]*storage.Summary) []string {
+	var accomplishments []string
+	seen := make(map[string]bool)
+
+	for _, sess := range sessions {
+		if sum, ok := summariesMap[sess.ID]; ok && sum != nil && sum.Summary != "" {
+			summary := sum.Summary
+			if !seen[summary] && !isGenericSummary(summary) {
+				seen[summary] = true
+				accomplishments = append(accomplishments, summary)
+			}
+		} else if sess.SummaryID.Valid {
+			sum, err := s.store.GetSummary(sess.SummaryID.Int64)
+			if err == nil && sum != nil && sum.Summary != "" {
+				summary := sum.Summary
+				if !seen[summary] && !isGenericSummary(summary) {
+					seen[summary] = true
+					accomplishments = append(accomplishments, summary)
+				}
+			}
+		}
+	}
+
+	if len(accomplishments) > 5 {
+		accomplishments = accomplishments[:5]
+	}
+
+	return accomplishments
 }

@@ -89,7 +89,11 @@ type EnhancedReportContext struct {
 	GitCommits         []*storage.GitCommit
 	ShellCommands      []*storage.ShellCommand
 	FileEvents         []*storage.FileEvent
-	TotalMinutes       int64
+	// BrowserVisits and AISessions are fetched for future per-project attribution;
+	// not yet consumed by report generators.
+	BrowserVisits []*storage.BrowserVisit
+	AISessions    []storage.AISession
+	TotalMinutes  int64
 	ProductiveMinutes  int64
 	DistractingMinutes int64
 	NeutralMinutes     int64
