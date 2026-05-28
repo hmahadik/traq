@@ -210,7 +210,10 @@ export function Timeline({
   const [hoveredEvent, setHoveredEvent] = useState<EventDot | null>(null);
   const [tooltipPosition, setTooltipPosition] = useState<{ x: number; y: number } | null>(null);
   const tooltipHideTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const tooltipShowTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isMouseOverTooltipRef = useRef(false);
+  // Timestamp of the most recent shift+wheel pan, used to suppress tooltips during/just after panning.
+  const lastShiftPanAtRef = useRef<number>(0);
   const [currentZoom, setCurrentZoom] = useState<d3.ZoomTransform>(d3.zoomIdentity);
   const [visibleTimeRange, setVisibleTimeRange] = useState<{ start: Date; end: Date } | null>(null);
   const [playheadTimestamp, setPlayheadTimestamp] = useState<Date | null>(null);
@@ -221,8 +224,13 @@ export function Timeline({
   const playheadTimestampRef = useRef<Date | null>(null);
   const zoomSyncTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const dragSafetyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  // Throttled live sync of visibleTimeRange/playheadTimestamp during active pan/zoom
+  // so the filmstrip stays in sync with movement instead of waiting for the end event.
+  const liveSyncTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isZoomingRef = useRef(false);
   const zoomRafRef = useRef<number | null>(null);
+  // Cancels the wheel handler's pending RAF when the chart effect re-runs or component unmounts.
+  const wheelRafCancelRef = useRef<(() => void) | null>(null);
   const lastAxisUpdateRef = useRef<number>(0);
 
   // === SCALE REF: Store xScale for use in other effects ===
@@ -365,20 +373,27 @@ export function Timeline({
       if (dragSafetyTimeoutRef.current) {
         clearTimeout(dragSafetyTimeoutRef.current);
       }
+      if (liveSyncTimeoutRef.current) {
+        clearTimeout(liveSyncTimeoutRef.current);
+      }
       if (zoomRafRef.current) {
         cancelAnimationFrame(zoomRafRef.current);
       }
+      wheelRafCancelRef.current?.();
       // Reset chart refs on unmount so fresh mount creates structure anew
       chartInitializedRef.current = false;
       zoomRef.current = null;
     };
   }, []);
 
-  // Cleanup tooltip hide timeout on unmount
+  // Cleanup tooltip timeouts on unmount
   useEffect(() => {
     return () => {
       if (tooltipHideTimeoutRef.current) {
         clearTimeout(tooltipHideTimeoutRef.current);
+      }
+      if (tooltipShowTimeoutRef.current) {
+        clearTimeout(tooltipShowTimeoutRef.current);
       }
     };
   }, []);
@@ -394,19 +409,31 @@ export function Timeline({
     return () => clearInterval(interval);
   }, []);
 
-  // Handler to show tooltip on hover
+  // Handler to show tooltip on hover — deferred so a quick mouse pass doesn't trigger it.
   const showTooltip = useCallback((event: EventDot, clientX: number, clientY: number) => {
     // Cancel any pending hide
     if (tooltipHideTimeoutRef.current) {
       clearTimeout(tooltipHideTimeoutRef.current);
       tooltipHideTimeoutRef.current = null;
     }
-    setHoveredEvent(event);
-    setTooltipPosition({ x: clientX, y: clientY });
+    // Cancel any pending show — we'll re-arm with the latest target
+    if (tooltipShowTimeoutRef.current) {
+      clearTimeout(tooltipShowTimeoutRef.current);
+    }
+    tooltipShowTimeoutRef.current = setTimeout(() => {
+      tooltipShowTimeoutRef.current = null;
+      setHoveredEvent(event);
+      setTooltipPosition({ x: clientX, y: clientY });
+    }, 400); // hover-intent delay
   }, []);
 
   // Handler to hide tooltip with delay (allows moving mouse to tooltip)
   const hideTooltipWithDelay = useCallback(() => {
+    // If a show was queued but hasn't fired yet, cancel it — mouse left before intent confirmed.
+    if (tooltipShowTimeoutRef.current) {
+      clearTimeout(tooltipShowTimeoutRef.current);
+      tooltipShowTimeoutRef.current = null;
+    }
     // Don't hide if mouse moved to tooltip
     if (isMouseOverTooltipRef.current) return;
 
@@ -686,6 +713,10 @@ export function Timeline({
         if (isZoomingRef.current) {
           console.warn('Drag safety: auto-releasing stuck drag state');
           isZoomingRef.current = false;
+          if (liveSyncTimeoutRef.current) {
+            clearTimeout(liveSyncTimeoutRef.current);
+            liveSyncTimeoutRef.current = null;
+          }
           // Force sync state
           setCurrentZoom(zoomTransformRef.current);
           setVisibleTimeRange(visibleTimeRangeRef.current);
@@ -718,6 +749,20 @@ export function Timeline({
       visibleTimeRangeRef.current = { start: visibleStart, end: visibleEnd };
 
       playheadTimestampRef.current = centerTimestamp;
+
+      // Trailing-throttle a state sync so the filmstrip re-renders during movement
+      // (~50ms = ~20fps). Skip during programmatic restores to avoid feedback loops.
+      if (liveSyncTimeoutRef.current === null && restoreCountRef.current === 0) {
+        liveSyncTimeoutRef.current = setTimeout(() => {
+          liveSyncTimeoutRef.current = null;
+          if (visibleTimeRangeRef.current) {
+            setVisibleTimeRange(visibleTimeRangeRef.current);
+          }
+          if (playheadTimestampRef.current) {
+            setPlayheadTimestamp(playheadTimestampRef.current);
+          }
+        }, 50);
+      }
 
       if (zoomRafRef.current) {
         cancelAnimationFrame(zoomRafRef.current);
@@ -820,6 +865,10 @@ export function Timeline({
         clearTimeout(dragSafetyTimeoutRef.current);
         dragSafetyTimeoutRef.current = null;
       }
+      if (liveSyncTimeoutRef.current) {
+        clearTimeout(liveSyncTimeoutRef.current);
+        liveSyncTimeoutRef.current = null;
+      }
 
       // Deterministic guard: if this zoom-end was triggered by programmatic zoom restore,
       // clear the flag and skip state propagation to prevent feedback loops
@@ -848,29 +897,73 @@ export function Timeline({
     // Apply zoom to SVG
     svg.call(zoom);
 
-    // Override wheel behavior: plain wheel = horizontal pan, Shift+wheel = zoom on playhead
-    // PERFORMANCE: No transition on wheel - direct zoom/pan for instant response
+    // Override wheel behavior: plain wheel = zoom on playhead, Shift+wheel = horizontal pan.
+    // Scrolling accumulates a pan/zoom *target*; an animation loop eases toward it ~25%/frame.
+    // This turns a single mouse-wheel notch (deltaY=100) into a smooth ~10-frame animation
+    // instead of a jarring teleport, while still tracking continuous trackpad input.
+    let panTarget = 0;          // remaining pan in screen pixels
+    let zoomTarget = 1;         // remaining multiplicative scale factor
+    let animRaf: number | null = null;
+    const EASE = 0.5;
+    const tick = () => {
+      animRaf = null;
+      if (!zoomRef.current) return;
+
+      let stillAnimating = false;
+      if (Math.abs(panTarget) >= 0.5) {
+        const step = panTarget * EASE;
+        svg.call(zoomRef.current.translateBy as any, step, 0);
+        panTarget -= step;
+        stillAnimating = true;
+      } else {
+        panTarget = 0;
+      }
+      if (Math.abs(Math.log(zoomTarget)) > 0.001) {
+        const step = Math.pow(zoomTarget, EASE);
+        svg.call(
+          zoomRef.current.scaleBy as any,
+          step,
+          [chartCenterXRef.current, dimensionsRef.current.height / 2]
+        );
+        zoomTarget /= step;
+        stillAnimating = true;
+      } else {
+        zoomTarget = 1;
+      }
+      if (stillAnimating) animRaf = requestAnimationFrame(tick);
+    };
+
     svg.on('wheel.zoom', function(event: WheelEvent) {
       event.preventDefault();
       if (!zoomRef.current) return;
 
+      // Normalize to pixels (deltaMode: 0=pixel, 1=line, 2=page)
+      const chartWidth = dimensionsRef.current.width - MARGIN.left - MARGIN.right;
+      const unit = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? chartWidth : 1;
+      const dyPx = event.deltaY * unit;
+      const dxPx = event.deltaX * unit;
+
       if (event.shiftKey) {
-        // Shift+wheel: zoom centered on playhead — gentle 5% steps
-        // Use deltaY (browsers may put shifted scroll in deltaX, but deltaY is more reliable here)
-        const delta = event.deltaY || event.deltaX;
-        const direction = delta > 0 ? 0.95 : 1.05;
-        svg.call(
-          zoomRef.current.scaleBy as any,
-          direction,
-          [chartCenterXRef.current, dimensionsRef.current.height / 2]
-        );
+        // Shift+wheel: horizontal pan. Proportional to scroll magnitude.
+        const PAN_SCALE = 0.025;
+        panTarget -= (dxPx + dyPx) * PAN_SCALE;
+        lastShiftPanAtRef.current = performance.now();
       } else {
-        // Plain wheel: horizontal pan — scroll 0.5% of chart width per tick
-        const chartWidth = dimensionsRef.current.width - MARGIN.left - MARGIN.right;
-        const panDelta = (event.deltaY > 0 ? -1 : 1) * chartWidth * 0.005;
-        svg.call(zoomRef.current.translateBy as any, panDelta, 0);
+        // Plain wheel: zoom centered on playhead. ~5% per typical wheel notch.
+        zoomTarget *= Math.pow(1.0005, -dyPx);
       }
+
+      if (animRaf == null) animRaf = requestAnimationFrame(tick);
     });
+    wheelRafCancelRef.current?.();
+    wheelRafCancelRef.current = () => {
+      if (animRaf != null) {
+        cancelAnimationFrame(animRaf);
+        animRaf = null;
+      }
+      panTarget = 0;
+      zoomTarget = 1;
+    };
   }, [dimensions, getComputedColor]);
 
   // PageUp/PageDown keyboard navigation — throttled to one pan per animation frame
@@ -1197,8 +1290,12 @@ export function Timeline({
           .duration(100)
           .attr('width', BAR_WIDTH + 2)
           .attr('x', () => currentScale(d.timestamp) - (BAR_WIDTH + 2) / 2);
-        // Show tooltip on hover
-        showTooltipRef.current(d, event.clientX, event.clientY);
+        // Show tooltip on hover — suppress during/just-after a shift+wheel pan.
+        // (Shift held without recent panning, e.g. for shift+click range-select, still allows tooltip.)
+        const PAN_QUIET_MS = 300;
+        if (performance.now() - lastShiftPanAtRef.current > PAN_QUIET_MS) {
+          showTooltipRef.current(d, event.clientX, event.clientY);
+        }
       })
       .on('mouseleave', function (_event, d) {
         // Use transformed scale from current zoom to avoid position jumping
@@ -1254,8 +1351,12 @@ export function Timeline({
           .transition()
           .duration(100)
           .attr('fill-opacity', 0.9);
-        // Show tooltip on hover
-        showTooltipRef.current(d, event.clientX, event.clientY);
+        // Show tooltip on hover — suppress during/just-after a shift+wheel pan.
+        // (Shift held without recent panning, e.g. for shift+click range-select, still allows tooltip.)
+        const PAN_QUIET_MS = 300;
+        if (performance.now() - lastShiftPanAtRef.current > PAN_QUIET_MS) {
+          showTooltipRef.current(d, event.clientX, event.clientY);
+        }
       })
       .on('mouseleave', function () {
         d3.select(this)
