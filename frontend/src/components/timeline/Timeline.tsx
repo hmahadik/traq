@@ -75,6 +75,9 @@ const DOT_HOVER_RADIUS = 8;
 const BAR_MIN_DURATION = 10; // Minimum duration (seconds) to render as bar
 const BAR_MIN_PIXELS = 6; // Minimum pixel width to render as bar
 const BAR_WIDTH = 1; // Width of thin bars for instant/brief events (event-dot)
+// Cap how far the timeline can zoom OUT. The navigable domain is wider than this (so you
+// can pan across not-yet-loaded days), but the visible window never exceeds this span.
+const MAX_VISIBLE_MS = 2 * 24 * 60 * 60 * 1000; // 2 days
 
 // Multi-scale time formatting (marmelab EventDrops style) — pure function, no closures
 const formatMillisecond = d3.timeFormat('.%L');
@@ -216,10 +219,27 @@ export function Timeline({
   const lastShiftPanAtRef = useRef<number>(0);
   const [currentZoom, setCurrentZoom] = useState<d3.ZoomTransform>(d3.zoomIdentity);
   const [visibleTimeRange, setVisibleTimeRange] = useState<{ start: Date; end: Date } | null>(null);
+  // Bumped by the pan fast-path when a pan approaches the buffer edge, forcing the main render
+  // effect to re-virtualize (re-window the dots/bars join around the new visible region).
+  const [panVirtualizeTick, setPanVirtualizeTick] = useState(0);
   const [playheadTimestamp, setPlayheadTimestamp] = useState<Date | null>(null);
   // === ZOOM DECOUPLING: Use refs during active zoom, sync to state on zoom end ===
   // These refs hold "live" values during zoom/pan - updated synchronously without React re-renders
   const zoomTransformRef = useRef<d3.ZoomTransform>(d3.zoomIdentity);
+  // The transform at which the dots/bars layer is currently attr-positioned. During a
+  // pure pan (zoom level unchanged) we GPU-composite the layer by translating it instead
+  // of rewriting every rect's x/width — this is the difference from a full re-rasterization.
+  const committedTransformRef = useRef<d3.ZoomTransform>(d3.zoomIdentity);
+  // True while the dots layer is offset by a live pan transform that hasn't been baked
+  // back into element attributes yet (committed on gesture end).
+  const panActiveRef = useRef(false);
+  // Time-domain bounds of the currently-rendered (buffered) dots/bars subset. The join only
+  // contains events overlapping this window (visible ± ~1 viewport), so the dots-pan layer's
+  // content bounding box stays ~3× viewport — small enough to be GPU-cacheable during pans.
+  const bufferBoundsRef = useRef<{ startMs: number; endMs: number } | null>(null);
+  // Debounce guard: prevents the pan fast-path from scheduling more than one re-virtualization
+  // per buffer crossing. Set true when a re-virtualize is queued; cleared by the render effect.
+  const revirtualizeScheduledRef = useRef(false);
   const visibleTimeRangeRef = useRef<{ start: Date; end: Date } | null>(null);
   const playheadTimestampRef = useRef<Date | null>(null);
   const zoomSyncTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -659,18 +679,30 @@ export function Timeline({
         if (!isFinite(centerX)) return transform;
 
         // Get the current data boundaries from the scale's domain
-        const [domainStart] = currentScale.domain();
+        const [domainStart, domainEnd] = currentScale.domain();
+
+        let newTransform = transform;
+
+        // Limit max zoom-OUT: never show more than MAX_VISIBLE_MS at once. Floor k while
+        // keeping the viewport-center timestamp fixed. (The domain is wider than this so
+        // you can still pan across not-yet-loaded days — only the visible span is capped.)
+        const domainMs = domainEnd.getTime() - domainStart.getTime();
+        const minK = domainMs > 0 ? domainMs / MAX_VISIBLE_MS : 0;
+        if (isFinite(minK) && minK > 0 && newTransform.k < minK) {
+          const baseCenter = (centerX - newTransform.x) / newTransform.k;
+          newTransform = d3.zoomIdentity
+            .translate(centerX - baseCenter * minK, newTransform.y)
+            .scale(minK);
+        }
 
         // Calculate what the center timestamp would be with this transform
-        const testScale = transform.rescaleX(currentScale);
+        const testScale = newTransform.rescaleX(currentScale);
         const centerTimestamp = testScale.invert(centerX);
 
         // Validate calculations
         if (!centerTimestamp || !isFinite(centerTimestamp.getTime())) {
-          return transform;
+          return newTransform;
         }
-
-        let newTransform = transform;
 
         // If center would be before data start, clamp it
         if (centerTimestamp < domainStart) {
@@ -732,6 +764,12 @@ export function Timeline({
       const currentScale = xScaleRef.current;
       if (!currentScale) return;
 
+      // Programmatic zooms (init, restore via svg.call(zoom.transform)) have a null
+      // sourceEvent. Only real user gestures use the composite fast-path; programmatic
+      // ones do a full attr reposition so they never leave a stale transform behind
+      // (their rAF lands after the synchronous 'end', so commit can't clean up).
+      const isUserGesture = event.sourceEvent != null;
+
       // Use ref for chartCenterX to avoid stale closure
       const centerX = chartCenterXRef.current;
 
@@ -750,8 +788,12 @@ export function Timeline({
 
       playheadTimestampRef.current = centerTimestamp;
 
-      // Trailing-throttle a state sync so the filmstrip re-renders during movement
-      // (~50ms = ~20fps). Skip during programmatic restores to avoid feedback loops.
+      // Trailing-throttle a state sync so the filmstrip re-renders during movement.
+      // 150ms (~7fps) rather than 50ms: each sync re-renders TimelinePage + the (unvirtualized,
+      // playhead-sorted) EventList over all events, so 20fps caused heavy over-rendering /
+      // jank on fast multi-day drags. The center label stays smooth (it's updated directly
+      // by the rAF handler, not via state), and zoom-end does a final exact sync.
+      // Skip during programmatic restores to avoid feedback loops.
       if (liveSyncTimeoutRef.current === null && restoreCountRef.current === 0) {
         liveSyncTimeoutRef.current = setTimeout(() => {
           liveSyncTimeoutRef.current = null;
@@ -761,7 +803,7 @@ export function Timeline({
           if (playheadTimestampRef.current) {
             setPlayheadTimestamp(playheadTimestampRef.current);
           }
-        }, 50);
+        }, 150);
       }
 
       if (zoomRafRef.current) {
@@ -802,9 +844,10 @@ export function Timeline({
           .each(function(d) {
             const g = d3.select(this);
             const x = latestScale(d);
+            const labelX = Math.max(MARGIN.left + 45, x);
             g.select('line').attr('x1', x).attr('x2', x);
-            g.select('rect').attr('x', x - 45);
-            g.select('text').attr('x', x);
+            g.select('rect').attr('x', labelX - 45);
+            g.select('text').attr('x', labelX);
           });
 
         svg.select('.loading-indicators')
@@ -830,18 +873,54 @@ export function Timeline({
             }
           });
 
-        // Reposition ALL event elements on every zoom/drag frame.
-        // No viewport culling — pixel dedup already bounds DOM element count,
-        // and skipping out-of-view elements leaves ghosts at the edges.
-        svg.selectAll<SVGRectElement, EventDot>('.event-dot')
-          .attr('x', (d) => latestScale(d.timestamp) - BAR_WIDTH / 2);
+        // === DOTS/BARS: the ~900 elements that dominate rasterization cost ===
+        // Pure pan (zoom level unchanged): GPU-composite the whole dots layer with a single
+        // transform instead of rewriting every rect's x/width. This turns a full per-frame
+        // SVG re-raster into a cheap layer translation — the fix for the drag GPU spike.
+        // Zoom (scale changed): fall back to the exact per-element reposition. Zoom isn't
+        // the hot path and a scale change alters pixel dedup, so a true reposition is needed.
+        const committed = committedTransformRef.current;
+        const isPurePan = Math.abs(latestTransform.k - committed.k) < 1e-9;
+        const dotsPan = svg.select<SVGGElement>('.dots-pan');
 
-        svg.selectAll<SVGRectElement, EventDot>('.event-bar')
-          .attr('x', (d) => latestScale(d.timestamp))
-          .attr('width', (d) => {
-            const endTime = Math.min(d.endTimeMs || d.timestamp.getTime(), nowTimeRef.current);
-            return Math.max(BAR_MIN_PIXELS, latestScale(endTime) - latestScale(d.timestamp));
-          });
+        if (isPurePan && isUserGesture && !dotsPan.empty()) {
+          const dx = latestTransform.x - committed.x;
+          // Promote the layer to its own GPU compositing layer for the duration of the pan.
+          // Safe now that viewport virtualization bounds the layer to ~3× viewport (a few
+          // thousand px), so the backing store is small. Guarded by panActiveRef so the style
+          // is written once at pan start, not every frame.
+          if (!panActiveRef.current) dotsPan.style('will-change', 'transform');
+          dotsPan.attr('transform', `translate(${dx},0)`);
+          panActiveRef.current = true;
+
+          // Re-virtualization trigger: if the pan has carried the visible window within half a
+          // viewport of either buffer edge, re-window the join around the new region. Debounced
+          // by revirtualizeScheduledRef (cleared in the render effect) + the half-viewport margin
+          // so this fires at most once per buffer crossing, not every frame.
+          const bounds = bufferBoundsRef.current;
+          if (bounds && !revirtualizeScheduledRef.current) {
+            const vStart = latestScale.invert(MARGIN.left).getTime();
+            const vEnd = latestScale.invert(rafWidth - MARGIN.right).getTime();
+            const margin = (vEnd - vStart) * 0.5;
+            if (vStart - bounds.startMs < margin || bounds.endMs - vEnd < margin) {
+              revirtualizeScheduledRef.current = true;
+              setPanVirtualizeTick((t) => t + 1);
+            }
+          }
+        } else {
+          dotsPan.attr('transform', null).style('will-change', null);
+          panActiveRef.current = false;
+          committedTransformRef.current = latestTransform;
+          svg.selectAll<SVGRectElement, EventDot>('.event-dot')
+            .attr('x', (d) => latestScale(d.timestamp) - BAR_WIDTH / 2);
+
+          svg.selectAll<SVGRectElement, EventDot>('.event-bar')
+            .attr('x', (d) => latestScale(d.timestamp))
+            .attr('width', (d) => {
+              const endTime = Math.min(d.endTimeMs || d.timestamp.getTime(), nowTimeRef.current);
+              return Math.max(BAR_MIN_PIXELS, latestScale(endTime) - latestScale(d.timestamp));
+            });
+        }
 
         svg.select('.now-line')
           .attr('x1', (d: any) => latestScale(d))
@@ -860,6 +939,24 @@ export function Timeline({
     .on('end', () => {
       isZoomingRef.current = false;
       lastAxisUpdateRef.current = 0;
+
+      // Bake any live pan transform back into element positions, then clear it.
+      // During a pan we only translated the dots layer (GPU composite); commit the exact
+      // attr positions at the final scale so subsequent renders/hovers stay correct.
+      if (panActiveRef.current && xScaleRef.current) {
+        const finalScale = zoomTransformRef.current.rescaleX(xScaleRef.current);
+        svg.selectAll<SVGRectElement, EventDot>('.event-dot')
+          .attr('x', (d) => finalScale(d.timestamp) - BAR_WIDTH / 2);
+        svg.selectAll<SVGRectElement, EventDot>('.event-bar')
+          .attr('x', (d) => finalScale(d.timestamp))
+          .attr('width', (d) => {
+            const endTime = Math.min(d.endTimeMs || d.timestamp.getTime(), nowTimeRef.current);
+            return Math.max(BAR_MIN_PIXELS, finalScale(endTime) - finalScale(d.timestamp));
+          });
+        svg.select('.dots-pan').attr('transform', null).style('will-change', null);
+        committedTransformRef.current = zoomTransformRef.current;
+        panActiveRef.current = false;
+      }
 
       if (dragSafetyTimeoutRef.current) {
         clearTimeout(dragSafetyTimeoutRef.current);
@@ -945,7 +1042,7 @@ export function Timeline({
 
       if (event.shiftKey) {
         // Shift+wheel: horizontal pan. Proportional to scroll magnitude.
-        const PAN_SCALE = 0.025;
+        const PAN_SCALE = 0.25;
         panTarget -= (dxPx + dyPx) * PAN_SCALE;
         lastShiftPanAtRef.current = performance.now();
       } else {
@@ -1162,7 +1259,11 @@ export function Timeline({
     if (dayBoundariesGroup.empty()) {
       dayBoundariesGroup = chartGroup.append('g').attr('class', 'day-boundaries');
     }
-    const dayBoundaryData = d3.timeDay.range(timeRange.start, timeRange.end).slice(1); // Skip first day's start
+    // Day boundary markers at every midnight in the domain, INCLUDING the first day's
+    // start (the left edge) so a day marker is always shown even when the data before it
+    // isn't preloaded. Computed from timeRange (the stable domain), independent of which
+    // days' data has actually arrived — so dividers never disappear while a day loads.
+    const dayBoundaryData = d3.timeDay.range(timeRange.start, timeRange.end);
 
     const dayBoundaryGroups = dayBoundariesGroup.selectAll<SVGGElement, Date>('.day-boundary')
       .data(dayBoundaryData, d => d.getTime().toString())
@@ -1203,24 +1304,33 @@ export function Timeline({
         day: 'numeric',
       });
 
+      // Clamp the label so the leftmost (edge) marker's pill stays on-screen.
+      const labelX = Math.max(MARGIN.left + 45, x);
       g.select('line')
         .attr('x1', x)
         .attr('x2', x)
         .attr('y1', MARGIN.top - 20)
         .attr('y2', height - MARGIN.bottom);
       g.select('rect')
-        .attr('x', x - 45);
+        .attr('x', labelX - 45);
       g.select('text')
-        .attr('x', x)
+        .attr('x', labelX)
         .text(dateLabel);
     });
 
-    // Get or create clipped group for dots
+    // Get or create clipped group for dots. The clip lives on this OUTER group (fixed in
+    // viewport); the dots/bars themselves live in an INNER 'dots-pan' group that gets a
+    // translate transform during a pure pan. Translating the inner group keeps the clip
+    // window stationary while the content slides — a GPU composite, not a re-raster.
     let dotsGroup = chartGroup.select<SVGGElement>('.dots-group');
     if (dotsGroup.empty()) {
       dotsGroup = chartGroup.append('g')
         .attr('class', 'dots-group')
         .attr('clip-path', `url(#${clipId})`);
+    }
+    let dotsPan = dotsGroup.select<SVGGElement>('.dots-pan');
+    if (dotsPan.empty()) {
+      dotsPan = dotsGroup.append('g').attr('class', 'dots-pan');
     }
 
     // Flatten all events for rendering
@@ -1234,10 +1344,14 @@ export function Timeline({
     // If we have a saved zoom transform, use that. Otherwise, compute what the
     // initial ~3h zoom would be.
     let effectiveScale = xScale;
+    // Track the transform behind effectiveScale so the pan fast-path knows the scale at
+    // which dots/bars are attr-positioned ("committed"). Pure-pan translates relative to it.
+    let effectiveTransform = d3.zoomIdentity;
     // Bug #11 fix: always use saved transform if chart is initialized (even at k===1).
     // Previously, k===1 fell through to base scale, misclassifying events.
     if (chartInitializedRef.current && zoomTransformRef.current) {
-      effectiveScale = zoomTransformRef.current.rescaleX(xScale);
+      effectiveTransform = zoomTransformRef.current;
+      effectiveScale = effectiveTransform.rescaleX(xScale);
     } else if (!chartInitializedRef.current) {
       // First render: compute initial zoom level (~3h visible)
       const desiredVisibleMs = 3 * 60 * 60 * 1000; // 3 hours
@@ -1250,8 +1364,30 @@ export function Timeline({
       const targetX = xScale(initialCenterTime);
       const initialTx = chartCenterX - targetX * initialK;
       const simulatedTransform = d3.zoomIdentity.translate(initialTx, 0).scale(initialK);
+      effectiveTransform = simulatedTransform;
       effectiveScale = simulatedTransform.rescaleX(xScale);
     }
+
+    // Reset any leftover pan offset: this render attr-positions dots/bars at effectiveScale,
+    // so the layer must start from translate(0). Record where they're now committed so the
+    // pan fast-path can translate relative to it.
+    dotsPan.attr('transform', null).style('will-change', null);
+    committedTransformRef.current = effectiveTransform;
+    panActiveRef.current = false;
+
+    // === VIEWPORT VIRTUALIZATION: compute visible window + ~1-viewport buffer (time domain) ===
+    // Only events overlapping [bufferStartMs, bufferEndMs] are joined below. This bounds the
+    // dots-pan content bounding box to ~3× viewport so the layer is GPU-cacheable during pans.
+    // Uses the finalized effectiveScale (post-/pre-restore) — see plan §5 for restore safety.
+    const visibleStart = effectiveScale.invert(MARGIN.left).getTime();
+    const visibleEnd = effectiveScale.invert(width - MARGIN.right).getTime();
+    const visibleMs = visibleEnd - visibleStart;
+    const bufferStartMs = visibleStart - visibleMs;
+    const bufferEndMs = visibleEnd + visibleMs;
+    bufferBoundsRef.current = { startMs: bufferStartMs, endMs: bufferEndMs };
+    // New render re-windows the join, so clear the pan debounce guard (allows the next
+    // buffer-crossing pan to schedule another re-virtualization).
+    revirtualizeScheduledRef.current = false;
 
     // Update nowTimeRef at the start of each render cycle for consistency
     nowTimeRef.current = Date.now();
@@ -1259,10 +1395,17 @@ export function Timeline({
     // Filter out events that start after "now" (defensive - shouldn't happen but prevents future rendering)
     const eventsBeforeNow = allEvents.filter((e) => e.timestamp.getTime() <= nowTimeRef.current);
 
+    // Viewport-virtualization window: keep only events whose [start, end] interval overlaps the
+    // buffer. Interval-overlap (not point-in-window) so a bar straddling the buffer edge survives.
+    const windowedEvents = eventsBeforeNow.filter((e) => {
+      const endT = e.endTimeMs ?? e.timestamp.getTime();
+      return endT >= bufferStartMs && e.timestamp.getTime() <= bufferEndMs;
+    });
+
     // Split events into dots and bars based on duration - use effective (zoomed) scale,
     // then pixel-deduplicate each set independently (a dot and bar at same pixel both survive)
-    const rawDotEvents = eventsBeforeNow.filter((e) => !shouldRenderAsBar(e, effectiveScale));
-    const rawBarEvents = eventsBeforeNow.filter((e) => shouldRenderAsBar(e, effectiveScale));
+    const rawDotEvents = windowedEvents.filter((e) => !shouldRenderAsBar(e, effectiveScale));
+    const rawBarEvents = windowedEvents.filter((e) => shouldRenderAsBar(e, effectiveScale));
     const dotEvents = deduplicateByPixel(rawDotEvents, effectiveScale);
     const barEvents = deduplicateByPixel(rawBarEvents, effectiveScale);
 
@@ -1270,7 +1413,7 @@ export function Timeline({
     const isSelected = (d: EventDot) => selectedEventKeysRef.current?.has(d.id) || false;
 
     // Create thin bars for brief/instant events (instead of circles)
-    dotsGroup.selectAll('.event-dot')
+    dotsPan.selectAll('.event-dot')
       .data(dotEvents, (d) => (d as EventDot).id)
       .join('rect')
       .attr('class', 'event-dot')
@@ -1328,7 +1471,7 @@ export function Timeline({
       });
 
     // Create rectangles for duration events - sharp corners (no rx/ry)
-    dotsGroup.selectAll('.event-bar')
+    dotsPan.selectAll('.event-bar')
       .data(barEvents, (d) => (d as EventDot).id)
       .join('rect')
       .attr('class', 'event-bar')
@@ -1700,7 +1843,8 @@ export function Timeline({
 
   // loadingDays and targetPlayheadDate removed — each has its own dedicated effect below.
   // zoomBucket triggers re-dedup after significant zoom changes (Bug 3 fix).
-  }, [timelineData, dimensions, getComputedColor, zoomBucket]);
+  // panVirtualizeTick triggers re-windowing of the dots/bars join when a pan nears the buffer edge.
+  }, [timelineData, dimensions, getComputedColor, zoomBucket, panVirtualizeTick]);
 
   // === LOADING INDICATORS EFFECT ===
   // Separated from main effect so loading state changes only update shimmers,

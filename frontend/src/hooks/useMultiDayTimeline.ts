@@ -58,13 +58,17 @@ function dateToEndOfDay(dateStr: string): Date {
 // D3 rendering and backend calls. The zoom scaleExtent in Timeline.tsx
 // prevents zooming out beyond 3 days visible.
 function getDaysToLoadCount(_zoomLevel: number): number {
-  return 3;
+  // Days of data to PRE-LOAD around the center (the navigable domain is wider still and
+  // the visible span is capped separately in Timeline.tsx). A larger buffer means panning
+  // shows data immediately instead of an empty-then-fill, at the cost of processing more
+  // events. Capped at 7 by the candidate-window / hook count (day0..day6).
+  return 5;
 }
 
-// Single bucket since we always load 3 days. Kept as a function for the
+// Single bucket since we always load a fixed window. Kept as a function for the
 // bucket-change detection in updateCenterFromPlayhead.
 function getZoomBucket(_zoomLevel: number): number {
-  return 3;
+  return 5;
 }
 
 // Pure function — normalize screenshots to common shape (no closures, safe at module level)
@@ -226,7 +230,13 @@ export function useMultiDayTimeline(initialDate: string) {
     const now = new Date();
     const todayStr2 = getDateString(now);
 
-    const windowDates = datesToLoad.length > 0 ? datesToLoad : [centerDate];
+    // The NAVIGABLE domain spans the full candidate window (allPossibleDates), which is
+    // wider than the days that are actually loaded (datesToLoad). This lets you pan into
+    // not-yet-loaded days — they show day markers and lazy-load as the center shifts —
+    // instead of hard-snapping to the loaded edge at midnight. It's deterministic per
+    // centerDate (never collapses the way an async loadedDays-derived domain did, which
+    // was the freeze→jump bug). The zoom constraint caps the VISIBLE span separately.
+    const windowDates = allPossibleDates.length > 0 ? allPossibleDates : [centerDate];
     const firstDate = windowDates[0];
     const lastDate = windowDates[windowDates.length - 1];
 
@@ -237,7 +247,7 @@ export function useMultiDayTimeline(initialDate: string) {
       start: dateToStartOfDay(firstDate),
       end,
     };
-  }, [datesToLoad, centerDate]);
+  }, [allPossibleDates, centerDate]);
 
   // Merge all screenshots
   const allScreenshots = useMemo(() => {
