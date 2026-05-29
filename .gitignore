@@ -101,3 +101,14 @@ target_report.md
 # ONNX model files (too large for git, download separately)
 assets/models/*.onnx
 assets/models/tokenizer.json
+
+# Babysitter orchestration run state (local only)
+.a5c/
+
+# pprof dev helper (local profiling, gated behind TRAQ_PPROF=1) — kept local, not shipped
+pprof.go
+
+# AppImage build tooling (downloaded by scripts/build-appimage.sh)
+build/appimagetool-*.AppImage
+build/linuxdeploy-*.AppImage
+build/linuxdeploy-plugin-*.sh
