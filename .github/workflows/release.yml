@@ -145,6 +145,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # full history + tags so git-cliff can build the changelog
 
       - name: Download all artifacts
         uses: actions/download-artifact@v4
@@ -153,6 +155,15 @@ jobs:
 
       - name: Display artifacts
         run: ls -R artifacts
+
+      # Generate categorized release notes from conventional commits (feat/fix/perf/...).
+      # Replaces GitHub's PR-based auto-notes, which were empty because we ship direct to master.
+      - name: Generate release notes (git-cliff)
+        uses: orhun/git-cliff-action@v4
+        id: cliff
+        with:
+          config: cliff.toml
+          args: --latest --strip header
 
       - name: Create/Update Release
         uses: softprops/action-gh-release@v2
@@ -164,4 +175,4 @@ jobs:
           # Mark as latest release (not pre-release) when CI passes
           prerelease: false
           make_latest: true
-          generate_release_notes: true
+          body: ${{ steps.cliff.outputs.content }}
