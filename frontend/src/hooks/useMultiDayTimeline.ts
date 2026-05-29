@@ -211,27 +211,33 @@ export function useMultiDayTimeline(initialDate: string) {
     return map;
   }, [slot0, slot1, slot2, slot3, slot4, slot5, slot6]);
 
-  // Calculate combined time range
-  // Cap end time at "now" if today is included to prevent timeline extending into future
+  // Calculate combined time range.
+  //
+  // Derive the domain from the INTENDED window (datesToLoad) rather than the
+  // async `loadedDays` set. loadedDays changes as React Query fetches/evicts days,
+  // so during fast panning it transiently shrinks — or empties entirely, which used
+  // to collapse the domain to "today". A collapsing/shifting domain made the
+  // zoom-restore clamp the playhead to a wrong edge, causing the UI to freeze and
+  // then jump to an absurd timestamp. datesToLoad is contiguous, chronological, and
+  // already clamped to <= today, and only changes when centerDate/zoom change — so
+  // the axis stays stable while individual days load (they just render empty).
+  // Cap end at "now" if today is the last day to avoid extending into the future.
   const timeRange = useMemo(() => {
-    const sortedDates = Array.from(loadedDays.keys()).sort();
     const now = new Date();
-    const todayStr = getDateString(now);
+    const todayStr2 = getDateString(now);
 
-    if (sortedDates.length === 0) {
-      return { start: dateToStartOfDay(todayStr), end: now };
-    }
+    const windowDates = datesToLoad.length > 0 ? datesToLoad : [centerDate];
+    const firstDate = windowDates[0];
+    const lastDate = windowDates[windowDates.length - 1];
 
-    const lastDate = sortedDates[sortedDates.length - 1];
     const rawEnd = dateToEndOfDay(lastDate);
-    // If today is included, cap end at current time
-    const end = (lastDate === todayStr && rawEnd > now) ? now : rawEnd;
+    const end = (lastDate === todayStr2 && rawEnd > now) ? now : rawEnd;
 
     return {
-      start: dateToStartOfDay(sortedDates[0]),
+      start: dateToStartOfDay(firstDate),
       end,
     };
-  }, [loadedDays]);
+  }, [datesToLoad, centerDate]);
 
   // Merge all screenshots
   const allScreenshots = useMemo(() => {

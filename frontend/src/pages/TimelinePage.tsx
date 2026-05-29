@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useEffect } from 'react';
+import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Calendar, Sparkles, Loader2, ChevronLeft, ChevronRight, X } from 'lucide-react';
@@ -180,6 +180,16 @@ export function TimelinePage() {
   const centerDayData = loadedDays.get(centerDate);
   const gridData = centerDayData?.gridData ?? null;
   const isLoading = isLoadingAny && !gridData;
+
+  // Keep the Timeline mounted once ANY data has ever loaded. During fast navigation the
+  // center day's gridData briefly goes null (the new window is still fetching) — and the
+  // multi-day Timeline doesn't even need gridData (it renders from loadedDays/timeRange).
+  // Previously, unmounting the Timeline on a null center day made it re-initialize on
+  // remount and jump to an absurd timestamp (timeRange.end / today). This sticky flag
+  // prevents that: only the genuine first load shows the spinner / empty state.
+  const hasEverLoadedRef = useRef(false);
+  if (loadedDays.size > 0) hasEverLoadedRef.current = true;
+  const hasEverLoaded = hasEverLoadedRef.current;
 
   const { data: calendarData, isLoading: calendarLoading } = useCalendarHeatmap(
     calendarYear,
@@ -506,7 +516,10 @@ export function TimelinePage() {
 
   // Render timeline content
   const renderContent = () => {
-    if (isLoading) {
+    // Only block on the very FIRST load (nothing has ever loaded). After the timeline
+    // has shown data once, keep it mounted through transient loading/empty windows so it
+    // never re-initializes mid-interaction (which caused the freeze→jump→absurd-timestamp).
+    if (!hasEverLoaded && isLoading) {
       return (
         <div className="flex items-center justify-center h-64">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -514,7 +527,7 @@ export function TimelinePage() {
       );
     }
 
-    if (!gridData) {
+    if (!hasEverLoaded && !gridData) {
       return (
         <div className="flex items-center justify-center h-64 text-muted-foreground">
           No data available
@@ -527,9 +540,9 @@ export function TimelinePage() {
         {/* Left Sidebar */}
         <div className="xl:w-72 xl:flex-shrink-0">
           <div className="xl:sticky xl:top-0 space-y-3">
-            <DailySummaryCard stats={gridData.dayStats || null} isToday={centerDate === todayStr} />
-            <BreakdownBar stats={gridData.dayStats || null} />
-            <TopAppsSection topApps={gridData.topApps || []} />
+            <DailySummaryCard stats={gridData?.dayStats || null} isToday={centerDate === todayStr} />
+            <BreakdownBar stats={gridData?.dayStats || null} />
+            <TopAppsSection topApps={gridData?.topApps || []} />
           </div>
         </div>
 
