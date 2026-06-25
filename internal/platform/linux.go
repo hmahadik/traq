@@ -423,6 +423,31 @@ func (l *Linux) autostartDesktopPath() string {
 	return filepath.Join(autostartDir, "traq.desktop")
 }
 
+// autostartExecPath returns the stable path to launch on login.
+//
+// For an AppImage, os.Executable() resolves /proc/self/exe to the FUSE-mounted
+// inner binary (e.g. /tmp/.mount_traq.<random>/usr/bin/traq) — a path with a
+// random suffix that only exists while the app is running. Writing that into
+// the autostart .desktop makes login launches silently fail on the next boot.
+// The AppImage runtime exports $APPIMAGE pointing at the real .AppImage file,
+// so prefer it (matching the updater's resolution in service/updater.go).
+func autostartExecPath() (string, error) {
+	if appImage := os.Getenv("APPIMAGE"); appImage != "" {
+		return appImage, nil
+	}
+
+	exe, err := os.Executable()
+	if err != nil {
+		return "", fmt.Errorf("failed to get executable path: %w", err)
+	}
+	// Resolve symlinks so the entry points at the real binary, not a launcher.
+	resolved, err := filepath.EvalSymlinks(exe)
+	if err != nil {
+		return "", fmt.Errorf("failed to resolve executable path: %w", err)
+	}
+	return resolved, nil
+}
+
 // SetAutoStart enables or disables autostart on login.
 func (l *Linux) SetAutoStart(enabled bool) error {
 	desktopPath := l.autostartDesktopPath()
@@ -435,10 +460,10 @@ func (l *Linux) SetAutoStart(enabled bool) error {
 		return nil
 	}
 
-	// Find the executable path
-	execPath, err := os.Executable()
+	// Find the executable path (stable across launches; see autostartExecPath).
+	execPath, err := autostartExecPath()
 	if err != nil {
-		return fmt.Errorf("failed to get executable path: %w", err)
+		return err
 	}
 
 	// Ensure the autostart directory exists
