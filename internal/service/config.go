@@ -230,6 +230,10 @@ type GitConfig struct {
 	Enabled     bool     `json:"enabled"`
 	SearchPaths []string `json:"searchPaths"`
 	MaxDepth    int      `json:"maxDepth"`
+	// AuthorEmails is the allowlist of commit author emails counted as the
+	// user's own work. Only commits authored by one of these are logged.
+	// Empty means no filtering (all commits are logged).
+	AuthorEmails []string `json:"authorEmails"`
 }
 
 // FilesConfig contains file watching settings.
@@ -359,6 +363,9 @@ func (s *ConfigService) GetConfig() (*Config, error) {
 		if v, e := strconv.Atoi(val); e == nil {
 			config.DataSources.Git.MaxDepth = v
 		}
+	}
+	if val, err := s.store.GetConfig("git.authorEmails"); err == nil && val != "" {
+		json.Unmarshal([]byte(val), &config.DataSources.Git.AuthorEmails)
 	}
 	if val, err := s.store.GetConfig("files.enabled"); err == nil {
 		config.DataSources.Files.Enabled = val == "true"
@@ -608,6 +615,19 @@ func (s *ConfigService) handleConfigSideEffect(key string, value interface{}) er
 			ai := config.DataSources.AITracking
 			s.daemon.SetAITrackingFlags(ai.Enabled, ai.ClaudeEnabled, ai.OpenCodeEnabled)
 		}
+	case "git.authorEmails":
+		// Hot-reload the author allowlist so the change applies on the next
+		// git poll without waiting for an app restart.
+		if s.daemon == nil {
+			return nil
+		}
+		config, err := s.GetConfig()
+		if err != nil {
+			return fmt.Errorf("refresh git author config: %w", err)
+		}
+		if config.DataSources != nil && config.DataSources.Git != nil {
+			s.daemon.SetGitAuthorEmails(config.DataSources.Git.AuthorEmails)
+		}
 	case "shell.enabled":
 		if s.shellSetup == nil {
 			return nil
@@ -678,6 +698,7 @@ func mapToStorageKey(frontendKey string) string {
 		"dataSources.git.enabled":              "git.enabled",
 		"dataSources.git.searchPaths":          "git.searchPaths",
 		"dataSources.git.maxDepth":             "git.maxDepth",
+		"dataSources.git.authorEmails":         "git.authorEmails",
 		"dataSources.files.enabled":            "files.enabled",
 		"dataSources.files.excludePatterns":    "files.excludePatterns",
 		"dataSources.browser.enabled":          "browser.enabled",
@@ -833,6 +854,9 @@ func (s *ConfigService) RestartDaemon() error {
 		daemonConfig.AITrackingEnabled = true
 		daemonConfig.AIClaudeEnabled = true
 		daemonConfig.AIOpenCodeEnabled = true
+	}
+	if config.DataSources != nil && config.DataSources.Git != nil {
+		daemonConfig.GitAuthorEmails = config.DataSources.Git.AuthorEmails
 	}
 	s.daemon.UpdateConfig(daemonConfig)
 

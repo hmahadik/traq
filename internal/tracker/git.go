@@ -21,6 +21,12 @@ type GitTracker struct {
 	checkpointFile  string
 	maxCommits      int
 	onActivitySaved ActivitySavedCallback
+
+	// selfEmails is the set of author emails (lowercased) considered to be the
+	// user. Only commits authored by one of these are logged as the user's own
+	// work. When empty, no author filtering is applied (all commits are saved),
+	// preserving the previous behavior for unconfigured installs.
+	selfEmails map[string]bool
 }
 
 // GitCheckpoint stores the last seen commit for each repository.
@@ -34,12 +40,36 @@ func NewGitTracker(store *storage.Store, dataDir string) *GitTracker {
 		store:          store,
 		checkpointFile: filepath.Join(dataDir, "git_checkpoint.json"),
 		maxCommits:     100, // Max commits to fetch per poll
+		selfEmails:     map[string]bool{},
 	}
 }
 
 // SetMaxCommits sets the maximum number of commits to fetch per poll.
 func (t *GitTracker) SetMaxCommits(max int) {
 	t.maxCommits = max
+}
+
+// SetAuthorEmails sets the allowlist of author emails treated as the user's own
+// commits. Emails are matched case-insensitively. Passing an empty list clears
+// the filter (all commits are logged).
+func (t *GitTracker) SetAuthorEmails(emails []string) {
+	set := make(map[string]bool, len(emails))
+	for _, e := range emails {
+		if e = strings.ToLower(strings.TrimSpace(e)); e != "" {
+			set[e] = true
+		}
+	}
+	t.selfEmails = set
+}
+
+// isSelfAuthored reports whether a commit by the given author email should be
+// logged as the user's own work. When no allowlist is configured, every commit
+// qualifies (backward-compatible default).
+func (t *GitTracker) isSelfAuthored(email string) bool {
+	if len(t.selfEmails) == 0 {
+		return true
+	}
+	return t.selfEmails[strings.ToLower(strings.TrimSpace(email))]
 }
 
 // RegisterRepository adds a repository to track.
@@ -109,27 +139,30 @@ func (t *GitTracker) Poll(sessionID int64) ([]*storage.GitCommit, error) {
 		}
 
 		lastCommit := checkpoint.LastCommits[repo.ID]
-		commits, err := t.getNewCommits(repo, lastCommit, sessionID)
+		commits, newestHash, err := t.getNewCommits(repo, lastCommit, sessionID)
 		if err != nil {
 			continue // Log but continue with other repos
 		}
 
-		if len(commits) > 0 {
-			// Save commits
-			for _, commit := range commits {
-				id, err := t.store.SaveGitCommit(commit)
-				if err != nil {
-					continue
-				}
-				commit.ID = id
-				allCommits = append(allCommits, commit)
-				if t.onActivitySaved != nil {
-					go t.onActivitySaved("git", id, "", "", repo.Path)
-				}
+		// Save commits (already filtered to the user's own authorship).
+		for _, commit := range commits {
+			id, err := t.store.SaveGitCommit(commit)
+			if err != nil {
+				continue
 			}
+			commit.ID = id
+			allCommits = append(allCommits, commit)
+			if t.onActivitySaved != nil {
+				go t.onActivitySaved("git", id, "", "", repo.Path)
+			}
+		}
 
-			// Update checkpoint with newest commit
-			checkpoint.LastCommits[repo.ID] = commits[0].CommitHash
+		// Advance the checkpoint to the newest commit the scan actually saw,
+		// regardless of author. Anchoring on the newest *saved* commit would
+		// re-scan (and re-run expensive diff stats on) teammates' commits every
+		// poll whenever the tip of the branch isn't one of ours.
+		if newestHash != "" {
+			checkpoint.LastCommits[repo.ID] = newestHash
 		}
 
 		// Update last scanned time
@@ -141,8 +174,11 @@ func (t *GitTracker) Poll(sessionID int64) ([]*storage.GitCommit, error) {
 	return allCommits, nil
 }
 
-// getNewCommits fetches commits newer than the given hash.
-func (t *GitTracker) getNewCommits(repo *storage.GitRepository, sinceHash string, sessionID int64) ([]*storage.GitCommit, error) {
+// getNewCommits fetches commits newer than the given hash. It returns the
+// commits authored by the user (per the configured author allowlist) along with
+// the newest commit hash the scan saw, regardless of author, so the caller can
+// advance its checkpoint without re-scanning teammates' commits every poll.
+func (t *GitTracker) getNewCommits(repo *storage.GitRepository, sinceHash string, sessionID int64) ([]*storage.GitCommit, string, error) {
 	args := []string{"-C", repo.Path, "log", "--format=%H|%an|%ae|%at|%s", "-n", strconv.Itoa(t.maxCommits)}
 
 	if sinceHash != "" {
@@ -156,19 +192,31 @@ func (t *GitTracker) getNewCommits(repo *storage.GitRepository, sinceHash string
 	cmd := exec.Command("git", args...)
 	output, err := cmd.Output()
 	if err != nil {
-		return nil, fmt.Errorf("git log failed: %w", err)
+		return nil, "", fmt.Errorf("git log failed: %w", err)
 	}
 
 	// Get current branch once for the entire batch, not per-commit
 	branch := t.getCurrentBranch(repo.Path)
 
 	var commits []*storage.GitCommit
+	var newestHash string
 	scanner := bufio.NewScanner(strings.NewReader(string(output)))
 
 	for scanner.Scan() {
 		line := scanner.Text()
 		parts := strings.SplitN(line, "|", 5)
 		if len(parts) != 5 {
+			continue
+		}
+
+		// git log lists newest-first, so the first parseable line is the tip.
+		if newestHash == "" {
+			newestHash = parts[0]
+		}
+
+		// Skip commits not authored by the user before doing any expensive
+		// per-commit work (diff stats shell out to `git show`).
+		if !t.isSelfAuthored(parts[2]) {
 			continue
 		}
 
@@ -201,7 +249,7 @@ func (t *GitTracker) getNewCommits(repo *storage.GitRepository, sinceHash string
 		commits = append(commits, commit)
 	}
 
-	return commits, nil
+	return commits, newestHash, nil
 }
 
 type commitStats struct {

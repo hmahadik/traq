@@ -35,6 +35,10 @@ type DaemonConfig struct {
 	AITrackingEnabled bool
 	AIClaudeEnabled   bool
 	AIOpenCodeEnabled bool
+
+	// GitAuthorEmails is the allowlist of author emails whose commits are
+	// logged as the user's own work. Empty means no filtering (log all).
+	GitAuthorEmails []string
 }
 
 // DefaultDaemonConfig returns a default configuration.
@@ -104,6 +108,7 @@ func NewDaemon(config *DaemonConfig, store *storage.Store, plat platform.Platfor
 	window := NewWindowTracker(plat, store)
 	shell := NewShellTracker(plat, store, config.DataDir)
 	git := NewGitTracker(store, config.DataDir)
+	git.SetAuthorEmails(config.GitAuthorEmails)
 
 	// FileTracker is optional - don't fail if it can't be created
 	files, _ := NewFileTracker(store)
@@ -558,6 +563,15 @@ func (d *Daemon) UpdateConfig(config *DaemonConfig) {
 		d.ai.SetToolEnabled("claude", config.AIClaudeEnabled)
 		d.ai.SetToolEnabled("opencode", config.AIOpenCodeEnabled)
 	}
+	if d.git != nil {
+		d.git.SetAuthorEmails(config.GitAuthorEmails)
+	}
+}
+
+// SetGitAuthorEmails hot-reloads the git author allowlist on the running
+// daemon so a settings change takes effect on the next git poll.
+func (d *Daemon) SetGitAuthorEmails(emails []string) {
+	d.git.SetAuthorEmails(emails)
 }
 
 // SetAITrackingFlags forwards the master + per-tool enable toggles to the

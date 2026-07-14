@@ -954,6 +954,7 @@ export namespace service {
 	    enabled: boolean;
 	    searchPaths: string[];
 	    maxDepth: number;
+	    authorEmails: string[];
 	
 	    static createFrom(source: any = {}) {
 	        return new GitConfig(source);
@@ -964,6 +965,7 @@ export namespace service {
 	        this.enabled = source["enabled"];
 	        this.searchPaths = source["searchPaths"];
 	        this.maxDepth = source["maxDepth"];
+	        this.authorEmails = source["authorEmails"];
 	    }
 	}
 	export class ShellConfig {

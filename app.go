@@ -167,6 +167,9 @@ func (a *App) startup(ctx context.Context) {
 			daemonConfig.AIClaudeEnabled = ai.ClaudeEnabled
 			daemonConfig.AIOpenCodeEnabled = ai.OpenCodeEnabled
 		}
+		if cfg.DataSources != nil && cfg.DataSources.Git != nil {
+			daemonConfig.GitAuthorEmails = cfg.DataSources.Git.AuthorEmails
+		}
 	}
 	a.daemon, err = tracker.NewDaemon(daemonConfig, a.store, a.platform)
 	if err != nil {
