@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState, useCallback, useMemo, useId } from 'react';
+import { useRef, useEffect, useLayoutEffect, useState, useCallback, useMemo, useId } from 'react';
 import * as d3 from 'd3';
 import { ChevronDown, ChevronRight, Eye, Camera } from 'lucide-react';
 import type { TimelineGridData } from '@/types/timeline';
@@ -75,6 +75,11 @@ const DOT_HOVER_RADIUS = 8;
 const BAR_MIN_DURATION = 10; // Minimum duration (seconds) to render as bar
 const BAR_MIN_PIXELS = 6; // Minimum pixel width to render as bar
 const BAR_WIDTH = 1; // Width of thin bars for instant/brief events (event-dot)
+// Max pointer travel (px) between mousedown and mouseup that still counts as a click, not a
+// drag-pan. d3-zoom defaults this to 0, so ANY jitter (near-universal on trackpads) marks the
+// gesture "moved" and suppresses the child dot/bar click — making items unselectable. A few px
+// of slop restores click-to-select while a sub-threshold pan is visually negligible anyway.
+const ZOOM_CLICK_DISTANCE = 6;
 // Cap how far the timeline can zoom OUT. The navigable domain is wider than this (so you
 // can pan across not-yet-loaded days), but the visible window never exceeds this span.
 const MAX_VISIBLE_MS = 2 * 24 * 60 * 60 * 1000; // 2 days
@@ -497,6 +502,23 @@ export function Timeline({
     selectedEventKeysRef.current = selectedEventKeys;
   }, [selectedEventKeys]);
 
+  // Repaint the selection highlight when the selection changes. The main render effect doesn't
+  // depend on selectedEventKeys (rebuilding the whole chart on every click would be wasteful and
+  // janky), so nothing else updates the stroke — without this, clicking a dot/bar registers the
+  // selection but the item never visually highlights, reading as "selection doesn't work". Update
+  // just the stroke attributes directly here; mirrors the values set in the main render effect.
+  useEffect(() => {
+    const svg = d3.select(svgRef.current);
+    if (!svg.node()) return;
+    const isSel = (d: EventDot) => selectedEventKeys?.has(d.id) || false;
+    svg.selectAll<SVGRectElement, EventDot>('.event-dot')
+      .attr('stroke', (d) => isSel(d) ? '#fff' : getDarkerColor(d.color))
+      .attr('stroke-width', (d) => isSel(d) ? 2.5 : 1);
+    svg.selectAll<SVGRectElement, EventDot>('.event-bar')
+      .attr('stroke', (d) => isSel(d) ? '#fff' : getDarkerColor(d.color))
+      .attr('stroke-width', (d) => isSel(d) ? 2.5 : 1.5);
+  }, [selectedEventKeys]);
+
   useEffect(() => {
     onTargetReachedRef.current = onTargetReached;
   }, [onTargetReached]);
@@ -613,6 +635,29 @@ export function Timeline({
     }
   }, []);
 
+  // Measure the container synchronously on mount, before the chart's passive effect runs and
+  // before async data can arrive. `dimensions` defaults to 800px; if the chart initializes its
+  // (width-dependent) zoom transform at that placeholder width and the real width arrives later,
+  // the saved transform centers the viewport days away from the data and virtualization windows
+  // out every event — an empty, unselectable timeline (worse the wider the display). Seeding the
+  // real width here makes the chart initialize at the correct width and win the race against both
+  // the async ResizeObserver and the async data fetch.
+  useLayoutEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    const width = container.getBoundingClientRect().width;
+    if (width > 0) {
+      const numRows = timelineData?.rows.length || 1;
+      const calculatedHeight = MARGIN.top + MARGIN.bottom + numRows * rowHeight;
+      const minHeight = container.clientHeight || 300;
+      const newDims = { width, height: Math.max(calculatedHeight, minHeight) };
+      dimensionsRef.current = newDims;
+      setDimensions(newDims);
+    }
+    // Mount-only: seed the initial width. The ResizeObserver below handles subsequent changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Handle resize
   useEffect(() => {
     const container = containerRef.current;
@@ -660,6 +705,9 @@ export function Timeline({
 
     const zoom = d3.zoom<SVGSVGElement, unknown>()
       .scaleExtent([minScale, 1440])
+      // Allow a few px of pointer travel during a click before it's treated as a drag-pan,
+      // otherwise trackpad/mouse jitter suppresses the dot/bar click and items can't be selected.
+      .clickDistance(ZOOM_CLICK_DISTANCE)
       .extent([[MARGIN.left, 0], [width - MARGIN.right, height]])
       .constrain((transform, _extent, _translateExtent) => {
         // During programmatic zoom restore (domain shift), skip constraints to avoid
@@ -1194,8 +1242,18 @@ export function Timeline({
       .attr('height', height - MARGIN.top - MARGIN.bottom)
       .attr('fill', 'transparent');
 
-    // Add background for rows (alternating) - uses data join for enter/update/exit
-    chartGroup.selectAll<SVGRectElement, typeof rows[0]>('.row-bg')
+    // Add background for rows (alternating) - uses data join for enter/update/exit.
+    // The rects live in a persistent group so that rows entering AFTER the initial mount
+    // (lanes stream in as data loads lazily) get appended inside this group rather than at the
+    // end of chart-group. Appending at chart-group's end would paint the row backgrounds on top
+    // of the dots layer, and those full-width rects then swallow every click — making timeline
+    // events impossible to select (you can still drag-to-pan via the zoom-rect). Keeping the
+    // backgrounds in an early, fixed-position group keeps them behind the dots permanently.
+    let rowBgGroup = chartGroup.select<SVGGElement>('.row-bg-group');
+    if (rowBgGroup.empty()) {
+      rowBgGroup = chartGroup.append('g').attr('class', 'row-bg-group');
+    }
+    rowBgGroup.selectAll<SVGRectElement, typeof rows[0]>('.row-bg')
       .data(rows, d => d.name)
       .join(
         enter => enter.append('rect')
