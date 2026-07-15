@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -246,21 +247,30 @@ func (t *ShellTracker) parseHistory(path, shellType string, offset int64) ([]*st
 func (t *ShellTracker) parseBashHistory(scanner *bufio.Scanner) []*storage.ShellCommand {
 	var commands []*storage.ShellCommand
 	var timestamp int64
+	var skippedNoTimestamp int
 	hostname, _ := os.Hostname()
 
 	for scanner.Scan() {
 		line := scanner.Text()
 
 		if strings.HasPrefix(line, "#") {
-			// Timestamp line
+			// Timestamp line — bash writes these only when HISTTIMEFORMAT is set.
 			ts, err := strconv.ParseInt(strings.TrimPrefix(line, "#"), 10, 64)
 			if err == nil {
 				timestamp = ts
 			}
 		} else if line != "" {
-			// Command line
+			// Command line. Require a real timestamp from a preceding `#<epoch>` line.
+			// Bash omits these unless HISTTIMEFORMAT is set, and there's no other way to
+			// know when the command actually ran. We used to fabricate time.Now() here,
+			// which made every historic command look like it just ran AND defeated the
+			// (timestamp, command) dedup — so the whole history got re-imported with fresh
+			// timestamps on each history-file rotation, flooding "recent" with old commands.
+			// Skip untimestamped commands instead; the Traq shell plugin (real-time, with
+			// accurate timestamps) is the supported path for shells without HISTTIMEFORMAT.
 			if timestamp == 0 {
-				timestamp = time.Now().Unix()
+				skippedNoTimestamp++
+				continue
 			}
 			commands = append(commands, &storage.ShellCommand{
 				Timestamp: timestamp,
@@ -270,6 +280,12 @@ func (t *ShellTracker) parseBashHistory(scanner *bufio.Scanner) []*storage.Shell
 			})
 			timestamp = 0
 		}
+	}
+
+	if skippedNoTimestamp > 0 {
+		log.Printf("shell: skipped %d bash-history command(s) with no timestamp; set "+
+			"HISTTIMEFORMAT (e.g. export HISTTIMEFORMAT='%%F %%T ') or install the Traq shell "+
+			"plugin for accurate shell tracking", skippedNoTimestamp)
 	}
 
 	return commands

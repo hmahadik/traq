@@ -432,17 +432,18 @@ some command without timestamp
 		t.Fatalf("Poll failed: %v", err)
 	}
 
-	// Should parse all commands
-	if len(saved) < 2 {
-		t.Errorf("Expected at least 2 commands, got %d", len(saved))
+	// Only the two timestamped commands are ingested. The trailing
+	// "some command without timestamp" has no preceding `#<epoch>` line, so it's skipped
+	// rather than stamped with time.Now() (which would misreport it as recent).
+	if len(saved) != 2 {
+		t.Errorf("Expected exactly 2 timestamped commands, got %d", len(saved))
 	}
-
-	// Check timestamp parsing
 	for _, cmd := range saved {
-		if cmd.Command == `echo "hello world"` {
-			if cmd.Timestamp != 1704067200 {
-				t.Errorf("Expected timestamp 1704067200, got %d", cmd.Timestamp)
-			}
+		if cmd.Command == "some command without timestamp" {
+			t.Errorf("untimestamped command should have been skipped, but it was saved")
+		}
+		if cmd.Command == `echo "hello world"` && cmd.Timestamp != 1704067200 {
+			t.Errorf("Expected timestamp 1704067200, got %d", cmd.Timestamp)
 		}
 	}
 }
