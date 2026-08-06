@@ -60,6 +60,10 @@ func (h *screenshotHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Screenshots are immutable (timestamped filenames), so let the webview
+	// cache them aggressively; WebKitGTK won't reuse uncached scheme responses
+	w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+
 	// Serve the file
 	http.ServeFile(w, r, fullPath)
 }
@@ -68,6 +72,9 @@ func (h *screenshotHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 const SentryDSN = "https://5bad525b80919fbf0be0f8617d24d259@o4510716123348992.ingest.us.sentry.io/4510716130623488"
 
 func main() {
+	// Webview environment quirks must be set before the webview is created
+	platform.ConfigureWebviewEnv()
+
 	// Check for pending updates BEFORE starting the app
 	// This applies any staged update from a previous session
 	plat := platform.New()

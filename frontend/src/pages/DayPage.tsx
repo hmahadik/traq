@@ -89,10 +89,12 @@ export function DayPage() {
   // Fetch screenshots for the gallery hour
   const { data: galleryHourData } = useScreenshotsForHour(dateString, galleryHour);
 
-  // Keyboard navigation
+  // Keyboard navigation — disabled while the gallery is open so arrow keys
+  // navigate screenshots instead of switching days underneath the overlay
   useKeyboardNav({
     onLeft: goToPreviousDay,
     onRight: goToNextDay,
+    enabled: !galleryOpen,
   });
 
   return (

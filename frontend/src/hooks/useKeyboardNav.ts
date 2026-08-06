@@ -1,5 +1,14 @@
 import { useState, useEffect, useCallback } from 'react';
 
+// Keys typed into a field belong to the field, not to navigation
+export function isEditableTarget(target: EventTarget | null): boolean {
+  return (
+    target instanceof HTMLInputElement ||
+    target instanceof HTMLTextAreaElement ||
+    (target instanceof HTMLElement && target.isContentEditable)
+  );
+}
+
 interface KeyboardNavHandlers {
   onLeft?: () => void;
   onRight?: () => void;
@@ -33,11 +42,7 @@ export function useKeyboardNav({
   const handleKeyDown = useCallback(
     (event: KeyboardEvent) => {
       // Don't handle if user is typing in an input
-      if (
-        event.target instanceof HTMLInputElement ||
-        event.target instanceof HTMLTextAreaElement ||
-        (event.target instanceof HTMLElement && event.target.isContentEditable)
-      ) {
+      if (isEditableTarget(event.target)) {
         return;
       }
 
