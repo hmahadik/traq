@@ -43,6 +43,8 @@ export interface AIPromptDisplay {
 export interface DayStats {
   totalSeconds: number;
   totalHours: number;
+  workedSeconds: number; // Full span first-to-last activity, including breaks and AFK
+  workedHours: number; // workedSeconds / 3600
   breakCount: number;
   breakDuration: number; // Total AFK seconds
   longestFocus: number; // Longest continuous focus seconds
@@ -224,6 +226,7 @@ export interface WeekDayData {
   dayName: string; // "Mon", "Tue", etc.
   isToday: boolean;
   totalHours: number;
+  workedHours: number; // First-to-last activity span, including breaks and AFK
   timeBlocks: WeekTimeBlock[];
   hasAiSummary: boolean;
   screenshotCount: number;
@@ -242,7 +245,9 @@ export interface WeekTimeBlock {
 
 export interface WeekSummaryStats {
   totalHours: number;
+  workedHours: number; // Sum of daily worked hours (incl. breaks and AFK)
   averageDaily: number;
+  averageDailyWorked: number; // Average worked hours per active day
   mostActiveDay: string; // "Monday", "Tuesday", etc.
   categoryBreakdown: Record<string, number>; // category -> hours
 }

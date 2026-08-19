@@ -30,6 +30,8 @@ type TimelineGridData struct {
 type DayStats struct {
 	TotalSeconds       float64                   `json:"totalSeconds"`
 	TotalHours         float64                   `json:"totalHours"`
+	WorkedSeconds      float64                   `json:"workedSeconds"` // Full span first-to-last activity, including breaks and AFK
+	WorkedHours        float64                   `json:"workedHours"`   // WorkedSeconds / 3600
 	BreakCount         int                       `json:"breakCount"`
 	BreakDuration      float64                   `json:"breakDuration"`      // Total AFK seconds
 	LongestFocus       float64                   `json:"longestFocus"`       // Longest continuous focus seconds
@@ -384,6 +386,7 @@ type WeekDayData struct {
 	DayName           string             `json:"dayName"`           // "Mon", "Tue", etc.
 	IsToday           bool               `json:"isToday"`
 	TotalHours        float64            `json:"totalHours"`
+	WorkedHours       float64            `json:"workedHours"`       // First-to-last activity span, including breaks and AFK
 	TimeBlocks        []*WeekTimeBlock   `json:"timeBlocks"`        // 48 blocks (30-min each)
 	HasAISummary      bool               `json:"hasAiSummary"`
 	ScreenshotCount   int64              `json:"screenshotCount"`
@@ -403,10 +406,12 @@ type WeekTimeBlock struct {
 
 // WeekSummaryStats contains aggregated statistics for the week.
 type WeekSummaryStats struct {
-	TotalHours        float64            `json:"totalHours"`
-	AverageDaily      float64            `json:"averageDaily"`
-	MostActiveDay     string             `json:"mostActiveDay"`     // "Monday", "Tuesday", etc.
-	CategoryBreakdown map[string]float64 `json:"categoryBreakdown"` // category -> hours
+	TotalHours         float64            `json:"totalHours"`
+	WorkedHours        float64            `json:"workedHours"`        // Sum of daily worked hours (incl. breaks and AFK)
+	AverageDaily       float64            `json:"averageDaily"`
+	AverageDailyWorked float64            `json:"averageDailyWorked"` // Average worked hours per active day
+	MostActiveDay      string             `json:"mostActiveDay"`      // "Monday", "Tuesday", etc.
+	CategoryBreakdown  map[string]float64 `json:"categoryBreakdown"`  // category -> hours
 }
 
 // GetTimelineGridData retrieves all data needed for the v3 timeline grid view.
@@ -1037,6 +1042,8 @@ func (s *TimelineService) calculateDayStats(focusEvents []*storage.WindowFocusEv
 		return &DayStats{
 			TotalSeconds:       0,
 			TotalHours:         0,
+			WorkedSeconds:      0,
+			WorkedHours:        0,
 			BreakCount:         0,
 			BreakDuration:      0,
 			LongestFocus:       0,
@@ -1176,6 +1183,7 @@ func (s *TimelineService) calculateDayStats(focusEvents []*storage.WindowFocusEv
 	// Calculate day span (first to last activity, excluding AFK)
 	// IMPORTANT: Clamp to day boundaries to avoid counting time from previous/next day
 	var daySpan *DaySpan
+	var workedSeconds float64
 	if len(sortedEvents) > 0 {
 		firstActivity := sortedEvents[0].StartTime
 		if firstActivity < dayStartUnix {
@@ -1191,6 +1199,12 @@ func (s *TimelineService) calculateDayStats(focusEvents []*storage.WindowFocusEv
 			StartTime: firstActivity,
 			EndTime:   lastActivity,
 			SpanHours: spanSeconds / 3600.0,
+		}
+
+		// Worked time = full span including breaks and AFK time
+		workedSeconds = spanSeconds
+		if workedSeconds < 0 {
+			workedSeconds = 0
 		}
 
 		// Recalculate totalSeconds as daySpan - AFK duration (matches v1 logic)
@@ -1282,6 +1296,8 @@ func (s *TimelineService) calculateDayStats(focusEvents []*storage.WindowFocusEv
 	return &DayStats{
 		TotalSeconds:       totalSeconds,
 		TotalHours:         totalSeconds / 3600.0,
+		WorkedSeconds:      workedSeconds,
+		WorkedHours:        workedSeconds / 3600.0,
 		BreakCount:         breakCount,
 		BreakDuration:      breakDuration,
 		LongestFocus:       longestFocus,
@@ -1351,6 +1367,7 @@ func (s *TimelineService) GetWeekTimelineData(startDate string) (*WeekTimelineDa
 	fullDayNames := []string{"Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"}
 
 	var totalWeekHours float64
+	var totalWeekWorkedHours float64
 	var mostActiveDay string
 	var mostActiveHours float64
 	weekCategoryBreakdown := map[string]float64{
@@ -1395,6 +1412,9 @@ func (s *TimelineService) GetWeekTimelineData(startDate string) (*WeekTimelineDa
 			"other":    0,
 		}
 
+		// Track first-to-last activity span for worked hours (incl. breaks/AFK)
+		var firstActivity, lastActivity int64
+
 		for _, event := range dayEvents {
 			// Clip event to day boundaries
 			effectiveStart := event.StartTime
@@ -1407,6 +1427,13 @@ func (s *TimelineService) GetWeekTimelineData(startDate string) (*WeekTimelineDa
 			}
 			if effectiveStart >= effectiveEnd {
 				continue
+			}
+
+			if firstActivity == 0 || effectiveStart < firstActivity {
+				firstActivity = effectiveStart
+			}
+			if effectiveEnd > lastActivity {
+				lastActivity = effectiveEnd
 			}
 
 			category := categories[event.AppName]
@@ -1488,6 +1515,12 @@ func (s *TimelineService) GetWeekTimelineData(startDate string) (*WeekTimelineDa
 		}
 		dayTotalHours := dayTotalSeconds / 3600.0
 
+		// Worked hours = full span including breaks and AFK time
+		var dayWorkedHours float64
+		if lastActivity > firstActivity {
+			dayWorkedHours = float64(lastActivity-firstActivity) / 3600.0
+		}
+
 		// Convert category breakdown to hours
 		dayCategoryHours := make(map[string]float64)
 		for cat, secs := range dayCategoryBreakdown {
@@ -1501,6 +1534,7 @@ func (s *TimelineService) GetWeekTimelineData(startDate string) (*WeekTimelineDa
 			mostActiveDay = fullDayNames[i]
 		}
 		totalWeekHours += dayTotalHours
+		totalWeekWorkedHours += dayWorkedHours
 
 		// Get screenshot count for the day
 		screenshotCount, _ := s.store.CountScreenshotsByTimeRange(dayStart.Unix(), dayEnd.Unix())
@@ -1521,6 +1555,7 @@ func (s *TimelineService) GetWeekTimelineData(startDate string) (*WeekTimelineDa
 			DayName:           dayNames[i],
 			IsToday:           dayStr == todayStr,
 			TotalHours:        dayTotalHours,
+			WorkedHours:       dayWorkedHours,
 			TimeBlocks:        timeBlocks,
 			HasAISummary:      hasAISummary,
 			ScreenshotCount:   screenshotCount,
@@ -1537,15 +1572,19 @@ func (s *TimelineService) GetWeekTimelineData(startDate string) (*WeekTimelineDa
 	}
 
 	averageDaily := 0.0
+	averageDailyWorked := 0.0
 	if activeDays > 0 {
 		averageDaily = totalWeekHours / float64(activeDays)
+		averageDailyWorked = totalWeekWorkedHours / float64(activeDays)
 	}
 
 	weekStats := &WeekSummaryStats{
-		TotalHours:        totalWeekHours,
-		AverageDaily:      averageDaily,
-		MostActiveDay:     mostActiveDay,
-		CategoryBreakdown: weekCategoryBreakdown,
+		TotalHours:         totalWeekHours,
+		WorkedHours:        totalWeekWorkedHours,
+		AverageDaily:       averageDaily,
+		AverageDailyWorked: averageDailyWorked,
+		MostActiveDay:      mostActiveDay,
+		CategoryBreakdown:  weekCategoryBreakdown,
 	}
 
 	return &WeekTimelineData{

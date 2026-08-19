@@ -1129,6 +1129,7 @@ export namespace service {
 	    startDate: string;
 	    endDate: string;
 	    totalActive: number;
+	    totalWorked: number;
 	    activeDays: number;
 	
 	    static createFrom(source: any = {}) {
@@ -1141,6 +1142,7 @@ export namespace service {
 	        this.startDate = source["startDate"];
 	        this.endDate = source["endDate"];
 	        this.totalActive = source["totalActive"];
+	        this.totalWorked = source["totalWorked"];
 	        this.activeDays = source["activeDays"];
 	    }
 	}
@@ -1165,6 +1167,7 @@ export namespace service {
 	    totalScreenshots: number;
 	    totalSessions: number;
 	    activeMinutes: number;
+	    workedMinutes: number;
 	    topApps: AppUsage[];
 	    shellCommands: number;
 	    gitCommits: number;
@@ -1182,6 +1185,7 @@ export namespace service {
 	        this.totalScreenshots = source["totalScreenshots"];
 	        this.totalSessions = source["totalSessions"];
 	        this.activeMinutes = source["activeMinutes"];
+	        this.workedMinutes = source["workedMinutes"];
 	        this.topApps = this.convertValues(source["topApps"], AppUsage);
 	        this.shellCommands = source["shellCommands"];
 	        this.gitCommits = source["gitCommits"];
@@ -1459,6 +1463,8 @@ export namespace service {
 	export class DayStats {
 	    totalSeconds: number;
 	    totalHours: number;
+	    workedSeconds: number;
+	    workedHours: number;
 	    breakCount: number;
 	    breakDuration: number;
 	    longestFocus: number;
@@ -1477,6 +1483,8 @@ export namespace service {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.totalSeconds = source["totalSeconds"];
 	        this.totalHours = source["totalHours"];
+	        this.workedSeconds = source["workedSeconds"];
+	        this.workedHours = source["workedHours"];
 	        this.breakCount = source["breakCount"];
 	        this.breakDuration = source["breakDuration"];
 	        this.longestFocus = source["longestFocus"];
@@ -1714,6 +1722,7 @@ export namespace service {
 	    startDate: string;
 	    endDate: string;
 	    totalActive: number;
+	    totalWorked: number;
 	    activeDays: number;
 	    sessions: number;
 	    screenshots: number;
@@ -1729,6 +1738,7 @@ export namespace service {
 	        this.startDate = source["startDate"];
 	        this.endDate = source["endDate"];
 	        this.totalActive = source["totalActive"];
+	        this.totalWorked = source["totalWorked"];
 	        this.activeDays = source["activeDays"];
 	        this.sessions = source["sessions"];
 	        this.screenshots = source["screenshots"];
@@ -1742,6 +1752,7 @@ export namespace service {
 	    dailyStats: DailyStats[];
 	    weeklyStats: WeekStats[];
 	    totalActive: number;
+	    totalWorked: number;
 	    averages?: DailyStats;
 	
 	    static createFrom(source: any = {}) {
@@ -1757,6 +1768,7 @@ export namespace service {
 	        this.dailyStats = this.convertValues(source["dailyStats"], DailyStats);
 	        this.weeklyStats = this.convertValues(source["weeklyStats"], WeekStats);
 	        this.totalActive = source["totalActive"];
+	        this.totalWorked = source["totalWorked"];
 	        this.averages = this.convertValues(source["averages"], DailyStats);
 	    }
 	
@@ -2610,6 +2622,7 @@ export namespace service {
 	    dayName: string;
 	    isToday: boolean;
 	    totalHours: number;
+	    workedHours: number;
 	    timeBlocks: WeekTimeBlock[];
 	    hasAiSummary: boolean;
 	    screenshotCount: number;
@@ -2626,6 +2639,7 @@ export namespace service {
 	        this.dayName = source["dayName"];
 	        this.isToday = source["isToday"];
 	        this.totalHours = source["totalHours"];
+	        this.workedHours = source["workedHours"];
 	        this.timeBlocks = this.convertValues(source["timeBlocks"], WeekTimeBlock);
 	        this.hasAiSummary = source["hasAiSummary"];
 	        this.screenshotCount = source["screenshotCount"];
@@ -2653,7 +2667,9 @@ export namespace service {
 	
 	export class WeekSummaryStats {
 	    totalHours: number;
+	    workedHours: number;
 	    averageDaily: number;
+	    averageDailyWorked: number;
 	    mostActiveDay: string;
 	    categoryBreakdown: Record<string, number>;
 	
@@ -2664,7 +2680,9 @@ export namespace service {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.totalHours = source["totalHours"];
+	        this.workedHours = source["workedHours"];
 	        this.averageDaily = source["averageDaily"];
+	        this.averageDailyWorked = source["averageDailyWorked"];
 	        this.mostActiveDay = source["mostActiveDay"];
 	        this.categoryBreakdown = source["categoryBreakdown"];
 	    }
@@ -2711,6 +2729,7 @@ export namespace service {
 	    endDate: string;
 	    dailyStats: DailyStats[];
 	    totalActive: number;
+	    totalWorked: number;
 	    averages?: DailyStats;
 	
 	    static createFrom(source: any = {}) {
@@ -2723,6 +2742,7 @@ export namespace service {
 	        this.endDate = source["endDate"];
 	        this.dailyStats = this.convertValues(source["dailyStats"], DailyStats);
 	        this.totalActive = source["totalActive"];
+	        this.totalWorked = source["totalWorked"];
 	        this.averages = this.convertValues(source["averages"], DailyStats);
 	    }
 	
@@ -2770,6 +2790,7 @@ export namespace service {
 	    endDate: string;
 	    monthlyStats: MonthStats[];
 	    totalActive: number;
+	    totalWorked: number;
 	    activeMonths: number;
 	    averages?: MonthStats;
 	
@@ -2784,6 +2805,7 @@ export namespace service {
 	        this.endDate = source["endDate"];
 	        this.monthlyStats = this.convertValues(source["monthlyStats"], MonthStats);
 	        this.totalActive = source["totalActive"];
+	        this.totalWorked = source["totalWorked"];
 	        this.activeMonths = source["activeMonths"];
 	        this.averages = this.convertValues(source["averages"], MonthStats);
 	    }

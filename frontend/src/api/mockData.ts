@@ -171,6 +171,7 @@ export const mockData = {
     totalScreenshots: 580,
     totalSessions: 8,
     activeMinutes: 420,
+    workedMinutes: 480, // 8h span incl. breaks and AFK
     topApps: [
       { appName: 'VS Code', durationSeconds: 8400, percentage: 49, focusCount: 6 },
       { appName: 'Firefox', durationSeconds: 3600, percentage: 21, focusCount: 8 },
@@ -197,6 +198,7 @@ export const mockData = {
       totalScreenshots: 2850,
       totalSessions: 48,
       totalActiveMinutes: 1680,
+      totalWorked: 7 * 480, // worked minutes incl. breaks and AFK
       dailyBreakdown: days.map(date => mockData.getDailyStats(date)),
       topApps: [
         { appName: 'VS Code', durationSeconds: 50400, percentage: 50, focusCount: 35 },
@@ -701,6 +703,8 @@ export const mockData = {
     const dayStats = {
       totalSeconds: 6 * 3600 + 42 * 60, // 6h 42m
       totalHours: 6.7,
+      workedSeconds: 8.5 * 3600, // Full span incl. breaks and AFK
+      workedHours: 8.5,
       breakCount: 3,
       breakDuration: 42 * 60, // 42m
       longestFocus: 1 * 3600 + 48 * 60, // 1h 48m

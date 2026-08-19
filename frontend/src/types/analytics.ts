@@ -20,6 +20,7 @@ export interface DailyStats {
   totalScreenshots: number;
   totalSessions: number;
   activeMinutes: number;
+  workedMinutes: number; // First-to-last session span, including breaks and AFK
   topApps: AppUsage[];
   shellCommands: number;
   gitCommits: number;
@@ -33,6 +34,7 @@ export interface WeeklyStats {
   endDate: string;
   dailyStats: DailyStats[];
   totalActive: number;
+  totalWorked: number; // Sum of daily worked minutes (incl. breaks and AFK)
   averages: DailyStats | null;
 }
 
@@ -44,6 +46,7 @@ export interface MonthlyStats {
   dailyStats: DailyStats[];
   weeklyStats: WeekStats[];
   totalActive: number;
+  totalWorked: number; // Sum of daily worked minutes (incl. breaks and AFK)
   averages: DailyStats | null;
 }
 
@@ -52,6 +55,7 @@ export interface WeekStats {
   startDate: string;
   endDate: string;
   totalActive: number;
+  totalWorked: number; // Worked minutes for the week (incl. breaks and AFK)
   activeDays: number;
 }
 
@@ -144,6 +148,7 @@ export interface YearlyStats {
   endDate: string;
   monthlyStats: MonthStats[];
   totalActive: number;
+  totalWorked: number; // Sum of daily worked minutes (incl. breaks and AFK)
   activeMonths: number;
   averages: MonthStats | null;
 }
@@ -154,6 +159,7 @@ export interface MonthStats {
   startDate: string;
   endDate: string;
   totalActive: number;
+  totalWorked: number; // Worked minutes for the month (incl. breaks and AFK)
   activeDays: number;
   sessions: number;
   screenshots: number;

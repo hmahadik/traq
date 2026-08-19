@@ -43,6 +43,7 @@ type DailyStats struct {
 	TotalScreenshots int64        `json:"totalScreenshots"`
 	TotalSessions    int64        `json:"totalSessions"`
 	ActiveMinutes    int64        `json:"activeMinutes"`
+	WorkedMinutes    int64        `json:"workedMinutes"` // First-to-last session span, including breaks and AFK
 	TopApps          []*AppUsage  `json:"topApps"`
 	ShellCommands    int64        `json:"shellCommands"`
 	GitCommits       int64        `json:"gitCommits"`
@@ -75,6 +76,7 @@ type WeeklyStats struct {
 	EndDate     string        `json:"endDate"`
 	DailyStats  []*DailyStats `json:"dailyStats"`
 	TotalActive int64         `json:"totalActive"`
+	TotalWorked int64         `json:"totalWorked"` // Sum of daily worked minutes (incl. breaks and AFK)
 	Averages    *DailyStats   `json:"averages"`
 }
 
@@ -87,6 +89,7 @@ type MonthlyStats struct {
 	DailyStats  []*DailyStats `json:"dailyStats"`
 	WeeklyStats []*WeekStats  `json:"weeklyStats"`
 	TotalActive int64         `json:"totalActive"`
+	TotalWorked int64         `json:"totalWorked"` // Sum of daily worked minutes (incl. breaks and AFK)
 	Averages    *DailyStats   `json:"averages"`
 }
 
@@ -97,6 +100,7 @@ type YearlyStats struct {
 	EndDate       string        `json:"endDate"`
 	MonthlyStats  []*MonthStats `json:"monthlyStats"`
 	TotalActive   int64         `json:"totalActive"`
+	TotalWorked   int64         `json:"totalWorked"` // Sum of daily worked minutes (incl. breaks and AFK)
 	ActiveMonths  int           `json:"activeMonths"`
 	Averages      *MonthStats   `json:"averages"`
 }
@@ -108,6 +112,7 @@ type MonthStats struct {
 	StartDate   string `json:"startDate"`
 	EndDate     string `json:"endDate"`
 	TotalActive int64  `json:"totalActive"` // Total active minutes for the month
+	TotalWorked int64  `json:"totalWorked"` // Worked minutes for the month (incl. breaks and AFK)
 	ActiveDays  int    `json:"activeDays"`  // Number of days with activity
 	Sessions    int64  `json:"sessions"`
 	Screenshots int64  `json:"screenshots"`
@@ -119,6 +124,7 @@ type WeekStats struct {
 	StartDate   string `json:"startDate"`
 	EndDate     string `json:"endDate"`
 	TotalActive int64  `json:"totalActive"` // Total active minutes for the week
+	TotalWorked int64  `json:"totalWorked"` // Worked minutes for the week (incl. breaks and AFK)
 	ActiveDays  int    `json:"activeDays"`  // Number of days with activity
 }
 
@@ -297,6 +303,7 @@ func (s *AnalyticsService) GetDailyStatsWithComparison(date string, withComparis
 	// This ensures Analytics Day tab shows the same metric as Timeline
 	currentTime := time.Now().Unix()
 	var totalActiveSeconds int64
+	var firstSessionStart, lastSessionEnd int64
 	for _, session := range sessions {
 		// Calculate session duration, clamping to day boundaries
 		sessionStart := session.StartTime
@@ -318,9 +325,22 @@ func (s *AnalyticsService) GetDailyStatsWithComparison(date string, withComparis
 		duration := sessionEnd - sessionStart
 		if duration > 0 {
 			totalActiveSeconds += duration
+
+			// Track the day's first-to-last session span for worked time
+			if firstSessionStart == 0 || sessionStart < firstSessionStart {
+				firstSessionStart = sessionStart
+			}
+			if sessionEnd > lastSessionEnd {
+				lastSessionEnd = sessionEnd
+			}
 		}
 	}
 	stats.ActiveMinutes = totalActiveSeconds / 60
+
+	// Worked time = full span first-to-last session, including breaks and AFK
+	if lastSessionEnd > firstSessionStart {
+		stats.WorkedMinutes = (lastSessionEnd - firstSessionStart) / 60
+	}
 
 	// Get top apps from focus events for app usage tracking
 	// Clamp durations to day boundaries for events spanning midnight
@@ -405,6 +425,7 @@ func (s *AnalyticsService) GetWeeklyStats(startDate string) (*WeeklyStats, error
 	}
 
 	var totalActive int64
+	var totalWorked int64
 	for i := 0; i < 7; i++ {
 		day := t.AddDate(0, 0, i)
 		dayStats, err := s.GetDailyStats(day.Format("2006-01-02"))
@@ -413,8 +434,10 @@ func (s *AnalyticsService) GetWeeklyStats(startDate string) (*WeeklyStats, error
 		}
 		stats.DailyStats = append(stats.DailyStats, dayStats)
 		totalActive += dayStats.ActiveMinutes
+		totalWorked += dayStats.WorkedMinutes
 	}
 	stats.TotalActive = totalActive
+	stats.TotalWorked = totalWorked
 
 	return stats, nil
 }
@@ -435,6 +458,7 @@ func (s *AnalyticsService) GetMonthlyStats(year, month int) (*MonthlyStats, erro
 
 	// Get daily stats for each day in the month
 	var totalActive int64
+	var totalWorked int64
 	var totalScreenshots int64
 	var totalSessions int64
 	var activeDays int
@@ -447,6 +471,7 @@ func (s *AnalyticsService) GetMonthlyStats(year, month int) (*MonthlyStats, erro
 		}
 		stats.DailyStats = append(stats.DailyStats, dayStats)
 		totalActive += dayStats.ActiveMinutes
+		totalWorked += dayStats.WorkedMinutes
 
 		// Track active days
 		if dayStats.ActiveMinutes > 0 {
@@ -459,6 +484,7 @@ func (s *AnalyticsService) GetMonthlyStats(year, month int) (*MonthlyStats, erro
 	}
 
 	stats.TotalActive = totalActive
+	stats.TotalWorked = totalWorked
 
 	// Calculate averages (only for active days)
 	if activeDays > 0 {
@@ -501,6 +527,7 @@ func (s *AnalyticsService) calculateWeeklyBreakdown(dailyStats []*DailyStats, mo
 		// Add to current week
 		currentWeek.EndDate = dayStat.Date
 		currentWeek.TotalActive += dayStat.ActiveMinutes
+		currentWeek.TotalWorked += dayStat.WorkedMinutes
 		if dayStat.ActiveMinutes > 0 {
 			currentWeek.ActiveDays++
 		}
@@ -527,6 +554,7 @@ func (s *AnalyticsService) GetYearlyStats(year int) (*YearlyStats, error) {
 
 	// Get monthly stats for each month
 	var totalActive int64
+	var totalWorked int64
 	var totalScreenshots int64
 	var totalSessions int64
 	var activeMonths int
@@ -555,6 +583,7 @@ func (s *AnalyticsService) GetYearlyStats(year int) (*YearlyStats, error) {
 			StartDate:   monthStats.StartDate,
 			EndDate:     monthStats.EndDate,
 			TotalActive: monthStats.TotalActive,
+			TotalWorked: monthStats.TotalWorked,
 			ActiveDays:  activeDays,
 			Sessions:    monthSessions,
 			Screenshots: monthScreenshots,
@@ -562,6 +591,7 @@ func (s *AnalyticsService) GetYearlyStats(year int) (*YearlyStats, error) {
 
 		stats.MonthlyStats = append(stats.MonthlyStats, monthSummary)
 		totalActive += monthStats.TotalActive
+		totalWorked += monthStats.TotalWorked
 
 		// Track active months
 		if monthStats.TotalActive > 0 {
@@ -574,6 +604,7 @@ func (s *AnalyticsService) GetYearlyStats(year int) (*YearlyStats, error) {
 	}
 
 	stats.TotalActive = totalActive
+	stats.TotalWorked = totalWorked
 	stats.ActiveMonths = activeMonths
 
 	// Calculate averages (only for active months)
@@ -1838,6 +1869,7 @@ func (s *AnalyticsService) getWeeklyBucketedStats(start, end time.Time, stats *C
 		// Update current week
 		currentWeek.EndDate = dayStat.Date
 		currentWeek.TotalActive += dayStat.ActiveMinutes
+		currentWeek.TotalWorked += dayStat.WorkedMinutes
 		if dayStat.ActiveMinutes > 0 {
 			currentWeek.ActiveDays++
 		}

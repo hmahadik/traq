@@ -42,10 +42,18 @@ export const DailySummaryCard: React.FC<DailySummaryCardProps> = ({ stats, onHig
     });
   };
 
+  // Hours worked = full first-to-last-activity span, including breaks and AFK
+  // time. Fall back to active time if the backend hasn't been updated yet.
+  const workedSeconds = stats.workedSeconds ?? stats.totalSeconds;
+
   // Calculate percentage of 8-hour workday (can be over 100%)
-  const workdayPercent = Math.round((stats.totalSeconds / WORKDAY_SECONDS) * 100);
+  const workdayPercent = Math.round((workedSeconds / WORKDAY_SECONDS) * 100);
   // For progress bar, cap at 100%
   const progressBarPercent = Math.min(workdayPercent, 100);
+
+  // For today, the end time is an estimate: start time + 8 hours
+  const estimatedEndTime =
+    isToday && stats.daySpan ? stats.daySpan.startTime + WORKDAY_SECONDS : null;
 
   return (
     <div className="space-y-4">
@@ -54,7 +62,7 @@ export const DailySummaryCard: React.FC<DailySummaryCardProps> = ({ stats, onHig
         <div className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Hours Worked</div>
         <div className="flex items-baseline gap-2">
           <span className="text-4xl font-bold text-foreground">
-            {formatDuration(stats.totalSeconds)}
+            {formatDuration(workedSeconds)}
           </span>
           <span className="text-lg text-muted-foreground">/ 8h</span>
           <span className={`text-sm font-medium ${workdayPercent >= 100 ? 'text-emerald-500' : 'text-muted-foreground'}`}>
@@ -77,10 +85,22 @@ export const DailySummaryCard: React.FC<DailySummaryCardProps> = ({ stats, onHig
             <div className="text-xs text-muted-foreground uppercase tracking-wide mb-0.5">Start Time</div>
             <div className="text-lg font-semibold">{formatTime(stats.daySpan.startTime)}</div>
           </div>
-          <div>
-            <div className="text-xs text-muted-foreground uppercase tracking-wide mb-0.5">End Time</div>
-            <div className="text-lg font-semibold">{formatTime(stats.daySpan.endTime)}</div>
-          </div>
+          {estimatedEndTime !== null ? (
+            <div>
+              <div className="text-xs text-muted-foreground uppercase tracking-wide mb-0.5">Est. End Time</div>
+              <div
+                className="text-lg font-semibold text-muted-foreground/60 italic"
+                title="Estimated: 8 hours after start time"
+              >
+                {`~${formatTime(estimatedEndTime)}`}
+              </div>
+            </div>
+          ) : (
+            <div>
+              <div className="text-xs text-muted-foreground uppercase tracking-wide mb-0.5">End Time</div>
+              <div className="text-lg font-semibold">{formatTime(stats.daySpan.endTime)}</div>
+            </div>
+          )}
         </div>
       )}
 

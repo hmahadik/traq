@@ -67,16 +67,17 @@ export function WeeklyAnalytics({ data, isLoading, onDayClick }: WeeklyAnalytics
   }
 
   // Calculate metrics
+  // Worked time = first-to-last activity span per day, including breaks and
+  // AFK time. Fall back to active time if the backend hasn't been updated yet.
   const totalActiveMinutes = data.totalActive;
+  const totalWorkedMinutes = data.totalWorked ?? totalActiveMinutes;
   const activeDays = data.dailyStats.filter(d => d.activeMinutes > 0).length;
-  const avgDailyMinutes = activeDays > 0 ? totalActiveMinutes / activeDays : 0;
+  const avgDailyMinutes = activeDays > 0 ? totalWorkedMinutes / activeDays : 0;
 
-  // Calculate total break time (assuming work time is 8 hours, breaks are the rest)
-  // This is a simplified calculation - in reality you'd track breaks separately
+  // Break time = worked span minus active time per day (actual breaks + AFK)
   const totalBreakMinutes = data.dailyStats.reduce((sum, d) => {
-    const workMinutes = d.activeMinutes;
-    const breakMinutes = workMinutes > 0 ? Math.max(0, (8 * 60) - workMinutes) : 0;
-    return sum + breakMinutes;
+    const workedMinutes = d.workedMinutes ?? d.activeMinutes;
+    return sum + Math.max(0, workedMinutes - d.activeMinutes);
   }, 0);
 
   // Chart data - parse date strings as local time to get correct weekday labels
@@ -97,14 +98,22 @@ export function WeeklyAnalytics({ data, isLoading, onDayClick }: WeeklyAnalytics
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Total Active Time
+            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-1.5">
+              Total Hours Worked
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Info className="h-3.5 w-3.5 cursor-help" />
+                </TooltipTrigger>
+                <TooltipContent className="max-w-xs">
+                  <p>First-to-last activity each day, including breaks and AFK time</p>
+                </TooltipContent>
+              </Tooltip>
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatHours(totalActiveMinutes)}</div>
+            <div className="text-2xl font-bold">{formatHours(totalWorkedMinutes)}</div>
             <p className="text-xs text-muted-foreground mt-1">
-              Across {activeDays} {activeDays === 1 ? 'day' : 'days'}
+              {formatHours(totalActiveMinutes)} active across {activeDays} {activeDays === 1 ? 'day' : 'days'}
             </p>
           </CardContent>
         </Card>
@@ -132,7 +141,7 @@ export function WeeklyAnalytics({ data, isLoading, onDayClick }: WeeklyAnalytics
                   <Info className="h-3.5 w-3.5 cursor-help" />
                 </TooltipTrigger>
                 <TooltipContent className="max-w-xs">
-                  <p>Estimated break time calculated as the difference between 8-hour workday and actual active time for each day</p>
+                  <p>Breaks and AFK time between the first and last activity of each day</p>
                 </TooltipContent>
               </Tooltip>
             </CardTitle>
@@ -140,7 +149,7 @@ export function WeeklyAnalytics({ data, isLoading, onDayClick }: WeeklyAnalytics
           <CardContent>
             <div className="text-2xl font-bold">{formatHours(totalBreakMinutes)}</div>
             <p className="text-xs text-muted-foreground mt-1">
-              Estimated breaks
+              Breaks and AFK time
             </p>
           </CardContent>
         </Card>

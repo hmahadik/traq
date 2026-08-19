@@ -9,6 +9,13 @@ import {
 } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import {
+  Tooltip as UITooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import { Info } from 'lucide-react';
 import type { YearlyStats } from '@/types';
 
 interface YearlyAnalyticsProps {
@@ -65,15 +72,18 @@ export function YearlyAnalytics({ data, isLoading, onMonthClick }: YearlyAnalyti
   }
 
   // Calculate metrics
+  // Worked time = first-to-last activity span per day, including breaks and
+  // AFK time. Fall back to active time if the backend hasn't been updated yet.
   const totalActiveMinutes = data.totalActive;
+  const totalWorkedMinutes = data.totalWorked ?? totalActiveMinutes;
   const activeMonths = data.activeMonths;
-  const avgMonthlyMinutes = activeMonths > 0 ? totalActiveMinutes / activeMonths : 0;
+  const avgMonthlyMinutes = activeMonths > 0 ? totalWorkedMinutes / activeMonths : 0;
 
   // Calculate totals
   const totalScreenshots = data.monthlyStats.reduce((sum, m) => sum + m.screenshots, 0);
   const totalSessions = data.monthlyStats.reduce((sum, m) => sum + m.sessions, 0);
   const totalActiveDays = data.monthlyStats.reduce((sum, m) => sum + m.activeDays, 0);
-  const avgDailyMinutes = totalActiveDays > 0 ? totalActiveMinutes / totalActiveDays : 0;
+  const avgDailyMinutes = totalActiveDays > 0 ? totalWorkedMinutes / totalActiveDays : 0;
 
   // Find peak month
   const peakMonth = data.monthlyStats.reduce((max, month) =>
@@ -99,14 +109,24 @@ export function YearlyAnalytics({ data, isLoading, onMonthClick }: YearlyAnalyti
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Total Active Time
+            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-1.5">
+              Total Hours Worked
+              <TooltipProvider>
+                <UITooltip>
+                  <TooltipTrigger asChild>
+                    <Info className="h-3.5 w-3.5 cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-xs">
+                    <p>First-to-last activity each day, including breaks and AFK time</p>
+                  </TooltipContent>
+                </UITooltip>
+              </TooltipProvider>
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatHours(totalActiveMinutes)}</div>
+            <div className="text-2xl font-bold">{formatHours(totalWorkedMinutes)}</div>
             <p className="text-xs text-muted-foreground mt-1">
-              Across {activeMonths} {activeMonths === 1 ? 'month' : 'months'}
+              {formatHours(totalActiveMinutes)} active across {activeMonths} {activeMonths === 1 ? 'month' : 'months'}
             </p>
           </CardContent>
         </Card>
