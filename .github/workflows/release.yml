@@ -67,6 +67,11 @@ jobs:
         if: matrix.platform == 'linux'
         timeout-minutes: 8
         run: |
+          # azure.archive.ubuntu.com goes down at times, and the
+          # archive.ubuntu.com fallback then stalls under the load of every
+          # Azure runner failing over to it. Put an independent mirror first
+          # in the runner's mirror list, keeping archive.ubuntu.com as backup.
+          printf 'https://mirrors.edge.kernel.org/ubuntu/\nhttps://archive.ubuntu.com/ubuntu/\n' | sudo tee /etc/apt/apt-mirrors.txt
           # Mirrors occasionally stall mid-fetch and apt won't abort on its
           # own, so cap fetch time, retry within apt, and retry the whole
           # update+install up to 3 times before failing the step.
