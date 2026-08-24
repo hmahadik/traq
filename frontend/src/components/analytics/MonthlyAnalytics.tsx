@@ -115,6 +115,7 @@ export function MonthlyAnalytics({ data, isLoading, onDayClick }: MonthlyAnalyti
       day: dayNum,
       dayLabel: `${dayNum}`,
       activeMinutes: d.activeMinutes,
+      workedMinutes: d.workedMinutes ?? d.activeMinutes,
       sessions: d.totalSessions,
       screenshots: d.totalScreenshots,
     };
@@ -230,14 +231,14 @@ export function MonthlyAnalytics({ data, isLoading, onDayClick }: MonthlyAnalyti
             <div className="text-2xl font-bold">
               {dailyChartData.length > 0
                 ? (() => {
-                    const peakDay = dailyChartData.reduce((max, d) => d.activeMinutes > max.activeMinutes ? d : max, dailyChartData[0]);
+                    const peakDay = dailyChartData.reduce((max, d) => d.workedMinutes > max.workedMinutes ? d : max, dailyChartData[0]);
                     const [y, m, d] = peakDay.date.split('-').map(Number);
                     return new Date(y, m - 1, d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
                   })()
                 : 'N/A'}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              Most active day
+              Most hours worked
             </p>
           </CardContent>
         </Card>
@@ -259,12 +260,12 @@ export function MonthlyAnalytics({ data, isLoading, onDayClick }: MonthlyAnalyti
         </Card>
       </div>
 
-      {/* Daily Activity Chart */}
+      {/* Daily Hours Chart */}
       <Card>
         <CardHeader>
-          <CardTitle>Daily Activity</CardTitle>
+          <CardTitle>Daily Hours</CardTitle>
           <p className="text-sm text-muted-foreground">
-            Active time for each day in {monthName}
+            Hours worked each day in {monthName} (incl. breaks and AFK)
           </p>
         </CardHeader>
         <CardContent>
@@ -302,6 +303,9 @@ export function MonthlyAnalytics({ data, isLoading, onDayClick }: MonthlyAnalyti
                           })()}
                         </p>
                         <p className="text-sm text-muted-foreground">
+                          Worked: {formatHours(data.workedMinutes)}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
                           Active: {formatHours(data.activeMinutes)}
                         </p>
                         <p className="text-sm text-muted-foreground">
@@ -314,7 +318,7 @@ export function MonthlyAnalytics({ data, isLoading, onDayClick }: MonthlyAnalyti
                 }}
               />
               <Bar
-                dataKey="activeMinutes"
+                dataKey="workedMinutes"
                 fill="hsl(var(--chart-1))"
                 radius={[4, 4, 0, 0]}
                 cursor={onDayClick ? 'pointer' : 'default'}

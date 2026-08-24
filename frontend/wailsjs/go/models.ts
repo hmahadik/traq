@@ -1217,6 +1217,7 @@ export namespace service {
 	    endDate: string;
 	    bucketType: string;
 	    totalActive: number;
+	    totalWorked: number;
 	    averages?: DailyStats;
 	    hourlyBuckets?: HourlyActivity[];
 	    dailyBuckets?: DailyStats[];
@@ -1232,6 +1233,7 @@ export namespace service {
 	        this.endDate = source["endDate"];
 	        this.bucketType = source["bucketType"];
 	        this.totalActive = source["totalActive"];
+	        this.totalWorked = source["totalWorked"];
 	        this.averages = this.convertValues(source["averages"], DailyStats);
 	        this.hourlyBuckets = this.convertValues(source["hourlyBuckets"], HourlyActivity);
 	        this.dailyBuckets = this.convertValues(source["dailyBuckets"], DailyStats);

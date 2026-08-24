@@ -15,8 +15,10 @@ interface CustomRangeStats {
   endDate: string;
   bucketType: 'hourly' | 'daily' | 'weekly';
   totalActive: number;
+  totalWorked?: number; // Sum of daily worked minutes (incl. breaks and AFK)
   averages?: {
     activeMinutes: number;
+    workedMinutes?: number;
     totalScreenshots: number;
     totalSessions: number;
   };
@@ -28,6 +30,7 @@ interface CustomRangeStats {
   dailyBuckets?: Array<{
     date: string;
     activeMinutes: number;
+    workedMinutes?: number;
     totalScreenshots: number;
     totalSessions: number;
     shellCommands: number;
@@ -38,6 +41,7 @@ interface CustomRangeStats {
     startDate: string;
     endDate: string;
     totalActive: number;
+    totalWorked?: number;
     activeDays: number;
   }>;
 }
@@ -168,6 +172,7 @@ export function CustomRangeAnalytics({ data, isLoading, onDayClick }: CustomRang
         date: d.date,
         label: new Date(y, m - 1, dy).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
         activeMinutes: d.activeMinutes,
+        workedMinutes: d.workedMinutes ?? d.activeMinutes,
         sessions: d.totalSessions,
       };
     });
@@ -175,9 +180,9 @@ export function CustomRangeAnalytics({ data, isLoading, onDayClick }: CustomRang
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Daily Activity</CardTitle>
+          <CardTitle>Daily Hours</CardTitle>
           <p className="text-sm text-muted-foreground">
-            Activity breakdown by day
+            Hours worked per day (incl. breaks and AFK)
           </p>
         </CardHeader>
         <CardContent>
@@ -216,6 +221,9 @@ export function CustomRangeAnalytics({ data, isLoading, onDayClick }: CustomRang
                           })()}
                         </p>
                         <p className="text-sm text-muted-foreground">
+                          Worked: {formatHours(data.workedMinutes)}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
                           Active: {formatHours(data.activeMinutes)}
                         </p>
                         <p className="text-sm text-muted-foreground">
@@ -228,7 +236,7 @@ export function CustomRangeAnalytics({ data, isLoading, onDayClick }: CustomRang
                 }}
               />
               <Bar
-                dataKey="activeMinutes"
+                dataKey="workedMinutes"
                 fill="hsl(var(--chart-1))"
                 radius={[4, 4, 0, 0]}
                 onClick={(data) => onDayClick?.(data.date)}
@@ -249,15 +257,16 @@ export function CustomRangeAnalytics({ data, isLoading, onDayClick }: CustomRang
       startDate: w.startDate,
       endDate: w.endDate,
       totalActive: w.totalActive,
+      totalWorked: w.totalWorked ?? w.totalActive,
       activeDays: w.activeDays,
     }));
 
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Weekly Activity</CardTitle>
+          <CardTitle>Weekly Hours</CardTitle>
           <p className="text-sm text-muted-foreground">
-            Activity breakdown by week
+            Hours worked per week (incl. breaks and AFK)
           </p>
         </CardHeader>
         <CardContent>
@@ -294,6 +303,9 @@ export function CustomRangeAnalytics({ data, isLoading, onDayClick }: CustomRang
                           })()}
                         </p>
                         <p className="text-sm text-muted-foreground">
+                          Worked: {formatHours(data.totalWorked)}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
                           Active: {formatHours(data.totalActive)}
                         </p>
                         <p className="text-sm text-muted-foreground">
@@ -306,7 +318,7 @@ export function CustomRangeAnalytics({ data, isLoading, onDayClick }: CustomRang
                 }}
               />
               <Bar
-                dataKey="totalActive"
+                dataKey="totalWorked"
                 fill="hsl(var(--chart-1))"
                 radius={[4, 4, 0, 0]}
               />
@@ -339,15 +351,16 @@ export function CustomRangeAnalytics({ data, isLoading, onDayClick }: CustomRang
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              Total Active Time
+              Total Hours Worked
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatHours(data.totalActive)}</div>
+            <div className="text-2xl font-bold">{formatHours(data.totalWorked ?? data.totalActive)}</div>
             <p className="text-xs text-muted-foreground mt-1">
-              {data.bucketType === 'hourly' ? 'Aggregated hours' :
-               data.bucketType === 'daily' ? `Across ${activeDays} ${activeDays === 1 ? 'day' : 'days'}` :
-               `Across ${data.weeklyBuckets?.length} ${data.weeklyBuckets?.length === 1 ? 'week' : 'weeks'}`}
+              {formatHours(data.totalActive)} active{' '}
+              {data.bucketType === 'hourly' ? 'in range' :
+               data.bucketType === 'daily' ? `across ${activeDays} ${activeDays === 1 ? 'day' : 'days'}` :
+               `across ${data.weeklyBuckets?.length} ${data.weeklyBuckets?.length === 1 ? 'week' : 'weeks'}`}
             </p>
           </CardContent>
         </Card>
@@ -361,10 +374,10 @@ export function CustomRangeAnalytics({ data, isLoading, onDayClick }: CustomRang
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                {formatHours(data.averages.activeMinutes)}
+                {formatHours(data.averages.workedMinutes ?? data.averages.activeMinutes)}
               </div>
               <p className="text-xs text-muted-foreground mt-1">
-                Per active day{activeDays > 0 ? ` (${activeDays} ${activeDays === 1 ? 'day' : 'days'})` : ''}
+                Worked per active day{activeDays > 0 ? ` (${activeDays} ${activeDays === 1 ? 'day' : 'days'})` : ''}
               </p>
             </CardContent>
           </Card>

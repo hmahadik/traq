@@ -303,7 +303,7 @@ func (s *AnalyticsService) GetDailyStatsWithComparison(date string, withComparis
 	// This ensures Analytics Day tab shows the same metric as Timeline
 	currentTime := time.Now().Unix()
 	var totalActiveSeconds int64
-	var firstSessionStart, lastSessionEnd int64
+	sessionIntervals := make([]timeInterval, 0, len(sessions))
 	for _, session := range sessions {
 		// Calculate session duration, clamping to day boundaries
 		sessionStart := session.StartTime
@@ -325,22 +325,15 @@ func (s *AnalyticsService) GetDailyStatsWithComparison(date string, withComparis
 		duration := sessionEnd - sessionStart
 		if duration > 0 {
 			totalActiveSeconds += duration
-
-			// Track the day's first-to-last session span for worked time
-			if firstSessionStart == 0 || sessionStart < firstSessionStart {
-				firstSessionStart = sessionStart
-			}
-			if sessionEnd > lastSessionEnd {
-				lastSessionEnd = sessionEnd
-			}
+			sessionIntervals = append(sessionIntervals, timeInterval{Start: sessionStart, End: sessionEnd})
 		}
 	}
 	stats.ActiveMinutes = totalActiveSeconds / 60
 
-	// Worked time = full span first-to-last session, including breaks and AFK
-	if lastSessionEnd > firstSessionStart {
-		stats.WorkedMinutes = (lastSessionEnd - firstSessionStart) / 60
-	}
+	// Worked time = sum of working-block spans (sessions grouped together when
+	// the gap between them is at most maxWorkedGapSeconds). Breaks and AFK
+	// count; an untracked multi-hour gap (machine off) does not.
+	stats.WorkedMinutes = workedBlocks(sessionIntervals, start, end, maxWorkedGapSeconds).WorkedSeconds / 60
 
 	// Get top apps from focus events for app usage tracking
 	// Clamp durations to day boundaries for events spanning midnight
@@ -1702,6 +1695,7 @@ type CustomRangeStats struct {
 	EndDate     string        `json:"endDate"`
 	BucketType  string        `json:"bucketType"` // "hourly", "daily", or "weekly"
 	TotalActive int64         `json:"totalActive"`
+	TotalWorked int64         `json:"totalWorked"` // Sum of daily worked minutes (incl. breaks and AFK)
 	Averages    *DailyStats   `json:"averages"`
 	// Buckets contains the activity data based on BucketType:
 	// - hourly: HourlyActivity for each hour in range
@@ -1769,6 +1763,11 @@ func (s *AnalyticsService) getHourlyBucketedStats(start, end time.Time, stats *C
 			hourlyMap[hourData.Hour].ActiveMinutes += hourData.ActiveMinutes
 			totalActive += hourData.ActiveMinutes
 		}
+
+		// Worked time comes from the day-level rollup (working-block spans)
+		if dayStats, err := s.GetDailyStats(dateStr); err == nil {
+			stats.TotalWorked += dayStats.WorkedMinutes
+		}
 	}
 
 	// Convert map to sorted slice
@@ -1783,6 +1782,7 @@ func (s *AnalyticsService) getHourlyBucketedStats(start, end time.Time, stats *C
 // getDailyBucketedStats aggregates daily stats across 3-60 days.
 func (s *AnalyticsService) getDailyBucketedStats(start, end time.Time, stats *CustomRangeStats) (*CustomRangeStats, error) {
 	var totalActive int64
+	var totalWorked int64
 	var totalScreenshots int64
 	var totalSessions int64
 	var activeDays int
@@ -1797,6 +1797,7 @@ func (s *AnalyticsService) getDailyBucketedStats(start, end time.Time, stats *Cu
 
 		stats.DailyBuckets = append(stats.DailyBuckets, dayStats)
 		totalActive += dayStats.ActiveMinutes
+		totalWorked += dayStats.WorkedMinutes
 		totalScreenshots += dayStats.TotalScreenshots
 		totalSessions += dayStats.TotalSessions
 
@@ -1806,6 +1807,7 @@ func (s *AnalyticsService) getDailyBucketedStats(start, end time.Time, stats *Cu
 	}
 
 	stats.TotalActive = totalActive
+	stats.TotalWorked = totalWorked
 
 	// Calculate averages
 	if activeDays > 0 {
@@ -1814,6 +1816,7 @@ func (s *AnalyticsService) getDailyBucketedStats(start, end time.Time, stats *Cu
 			TotalScreenshots: totalScreenshots / int64(activeDays),
 			TotalSessions:    totalSessions / int64(activeDays),
 			ActiveMinutes:    totalActive / int64(activeDays),
+			WorkedMinutes:    totalWorked / int64(activeDays),
 		}
 	}
 
@@ -1823,6 +1826,7 @@ func (s *AnalyticsService) getDailyBucketedStats(start, end time.Time, stats *Cu
 // getWeeklyBucketedStats aggregates weekly stats across 60+ days.
 func (s *AnalyticsService) getWeeklyBucketedStats(start, end time.Time, stats *CustomRangeStats) (*CustomRangeStats, error) {
 	var totalActive int64
+	var totalWorked int64
 	var totalScreenshots int64
 	var totalSessions int64
 	var activeDays int
@@ -1838,6 +1842,7 @@ func (s *AnalyticsService) getWeeklyBucketedStats(start, end time.Time, stats *C
 
 		allDailyStats = append(allDailyStats, dayStats)
 		totalActive += dayStats.ActiveMinutes
+		totalWorked += dayStats.WorkedMinutes
 		totalScreenshots += dayStats.TotalScreenshots
 		totalSessions += dayStats.TotalSessions
 
@@ -1881,6 +1886,7 @@ func (s *AnalyticsService) getWeeklyBucketedStats(start, end time.Time, stats *C
 	}
 
 	stats.TotalActive = totalActive
+	stats.TotalWorked = totalWorked
 
 	// Calculate averages
 	if activeDays > 0 {
@@ -1889,6 +1895,7 @@ func (s *AnalyticsService) getWeeklyBucketedStats(start, end time.Time, stats *C
 			TotalScreenshots: totalScreenshots / int64(activeDays),
 			TotalSessions:    totalSessions / int64(activeDays),
 			ActiveMinutes:    totalActive / int64(activeDays),
+			WorkedMinutes:    totalWorked / int64(activeDays),
 		}
 	}
 

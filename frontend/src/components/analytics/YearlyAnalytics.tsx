@@ -85,9 +85,10 @@ export function YearlyAnalytics({ data, isLoading, onMonthClick }: YearlyAnalyti
   const totalActiveDays = data.monthlyStats.reduce((sum, m) => sum + m.activeDays, 0);
   const avgDailyMinutes = totalActiveDays > 0 ? totalWorkedMinutes / totalActiveDays : 0;
 
-  // Find peak month
+  // Find peak month (by worked hours, consistent with the chart)
+  const workedOf = (m: typeof data.monthlyStats[0]) => m.totalWorked ?? m.totalActive;
   const peakMonth = data.monthlyStats.reduce((max, month) =>
-    month.totalActive > max.totalActive ? month : max
+    workedOf(month) > workedOf(max) ? month : max
   , data.monthlyStats[0]);
 
   // Calculate consistency (how many months have activity)
@@ -99,6 +100,7 @@ export function YearlyAnalytics({ data, isLoading, onMonthClick }: YearlyAnalyti
     monthFull: month.monthName,
     monthNumber: month.monthNumber,
     activeMinutes: month.totalActive,
+    workedMinutes: workedOf(month),
     activeDays: month.activeDays,
     sessions: month.sessions,
   }));
@@ -210,7 +212,7 @@ export function YearlyAnalytics({ data, isLoading, onMonthClick }: YearlyAnalyti
           <CardContent>
             <div className="text-2xl font-bold">{peakMonth.monthName.substring(0, 3)}</div>
             <p className="text-xs text-muted-foreground mt-1">
-              {formatHours(peakMonth.totalActive)}
+              {formatHours(workedOf(peakMonth))} worked
             </p>
           </CardContent>
         </Card>
@@ -233,8 +235,8 @@ export function YearlyAnalytics({ data, isLoading, onMonthClick }: YearlyAnalyti
       {/* Monthly Activity Chart */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Monthly Activity</CardTitle>
-          <p className="text-sm text-muted-foreground">Active time per month throughout the year</p>
+          <CardTitle className="text-base">Monthly Hours</CardTitle>
+          <p className="text-sm text-muted-foreground">Hours worked per month throughout the year (incl. breaks and AFK)</p>
         </CardHeader>
         <CardContent>
           <ResponsiveContainer width="100%" height={400}>
@@ -258,6 +260,9 @@ export function YearlyAnalytics({ data, isLoading, onMonthClick }: YearlyAnalyti
                       <div className="bg-popover text-popover-foreground border border-border rounded-lg p-3 shadow-md">
                         <p className="font-semibold">{data.monthFull}</p>
                         <p className="text-sm">
+                          Worked: {formatHours(data.workedMinutes)}
+                        </p>
+                        <p className="text-sm">
                           Active Time: {formatHours(data.activeMinutes)}
                         </p>
                         <p className="text-sm">
@@ -273,7 +278,7 @@ export function YearlyAnalytics({ data, isLoading, onMonthClick }: YearlyAnalyti
                 }}
               />
               <Bar
-                dataKey="activeMinutes"
+                dataKey="workedMinutes"
                 fill="hsl(var(--chart-1))"
                 radius={[4, 4, 0, 0]}
                 onClick={(data) => {

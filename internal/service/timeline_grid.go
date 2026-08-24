@@ -1180,59 +1180,44 @@ func (s *TimelineService) calculateDayStats(focusEvents []*storage.WindowFocusEv
 		lastEndTime = event.EndTime
 	}
 
-	// Calculate day span (first to last activity, excluding AFK)
-	// IMPORTANT: Clamp to day boundaries to avoid counting time from previous/next day
+	// Group activity into working blocks. Gaps longer than maxWorkedGapSeconds
+	// (overnight, machine off, an afternoon out) split the day; shorter gaps
+	// (lunch, AFK) are included in worked time. Without this, a 30s blip just
+	// after midnight followed by a 14h gap reports a 17h workday.
 	var daySpan *DaySpan
 	var workedSeconds float64
 	if len(sortedEvents) > 0 {
-		firstActivity := sortedEvents[0].StartTime
-		if firstActivity < dayStartUnix {
-			firstActivity = dayStartUnix
+		intervals := make([]timeInterval, 0, len(sortedEvents))
+		for _, event := range sortedEvents {
+			intervals = append(intervals, timeInterval{Start: event.StartTime, End: event.EndTime})
 		}
-		lastActivity := sortedEvents[len(sortedEvents)-1].EndTime
-		if lastActivity > dayEndUnix {
-			lastActivity = dayEndUnix
-		}
-		spanSeconds := float64(lastActivity - firstActivity)
+		blocks := workedBlocks(intervals, dayStartUnix, dayEndUnix, maxWorkedGapSeconds)
+		workedSeconds = float64(blocks.WorkedSeconds)
 
-		daySpan = &DaySpan{
-			StartTime: firstActivity,
-			EndTime:   lastActivity,
-			SpanHours: spanSeconds / 3600.0,
-		}
-
-		// Worked time = full span including breaks and AFK time
-		workedSeconds = spanSeconds
-		if workedSeconds < 0 {
-			workedSeconds = 0
+		// Start/end time describe the primary (longest) working block, so a
+		// stray blip hours before real work doesn't become the "start time".
+		if blocks.Primary != nil {
+			daySpan = &DaySpan{
+				StartTime: blocks.Primary.Start,
+				EndTime:   blocks.Primary.End,
+				SpanHours: float64(blocks.Primary.Seconds()) / 3600.0,
+			}
 		}
 
-		// Recalculate totalSeconds as daySpan - AFK duration (matches v1 logic)
-		// This is more accurate than summing focus events which can overlap
-		var totalAFKWithinSpan float64
+		// Active time = worked time minus AFK time that falls inside a working
+		// block (matches v1 logic: more accurate than summing focus events,
+		// which can overlap).
+		var afkWithinBlocks int64
 		for _, afk := range afkEvents {
 			if !afk.EndTime.Valid {
 				continue
 			}
-			afkStart := afk.StartTime
-			afkEnd := afk.EndTime.Int64
-
-			// Clip AFK to day span
-			if afkStart < firstActivity {
-				afkStart = firstActivity
-			}
-			if afkEnd > lastActivity {
-				afkEnd = lastActivity
-			}
-
-			// Only count if AFK falls within span
-			if afkStart < afkEnd {
-				totalAFKWithinSpan += float64(afkEnd - afkStart)
+			afkInterval := timeInterval{Start: afk.StartTime, End: afk.EndTime.Int64}
+			for _, block := range blocks.Blocks {
+				afkWithinBlocks += overlapSeconds(afkInterval, block)
 			}
 		}
-
-		// Active time = span - AFK time within span
-		totalSeconds = spanSeconds - totalAFKWithinSpan
+		totalSeconds = workedSeconds - float64(afkWithinBlocks)
 		if totalSeconds < 0 {
 			totalSeconds = 0
 		}
@@ -1412,8 +1397,9 @@ func (s *TimelineService) GetWeekTimelineData(startDate string) (*WeekTimelineDa
 			"other":    0,
 		}
 
-		// Track first-to-last activity span for worked hours (incl. breaks/AFK)
-		var firstActivity, lastActivity int64
+		// Collect activity intervals for worked hours (grouped into working
+		// blocks below so untracked multi-hour gaps don't inflate the day)
+		dayIntervals := make([]timeInterval, 0, len(dayEvents))
 
 		for _, event := range dayEvents {
 			// Clip event to day boundaries
@@ -1429,12 +1415,7 @@ func (s *TimelineService) GetWeekTimelineData(startDate string) (*WeekTimelineDa
 				continue
 			}
 
-			if firstActivity == 0 || effectiveStart < firstActivity {
-				firstActivity = effectiveStart
-			}
-			if effectiveEnd > lastActivity {
-				lastActivity = effectiveEnd
-			}
+			dayIntervals = append(dayIntervals, timeInterval{Start: effectiveStart, End: effectiveEnd})
 
 			category := categories[event.AppName]
 			if category == "" {
@@ -1515,11 +1496,10 @@ func (s *TimelineService) GetWeekTimelineData(startDate string) (*WeekTimelineDa
 		}
 		dayTotalHours := dayTotalSeconds / 3600.0
 
-		// Worked hours = full span including breaks and AFK time
-		var dayWorkedHours float64
-		if lastActivity > firstActivity {
-			dayWorkedHours = float64(lastActivity-firstActivity) / 3600.0
-		}
+		// Worked hours = sum of working-block spans, including breaks and AFK
+		// but excluding gaps longer than maxWorkedGapSeconds
+		dayBlocks := workedBlocks(dayIntervals, dayStart.Unix(), dayEnd.Unix(), maxWorkedGapSeconds)
+		dayWorkedHours := float64(dayBlocks.WorkedSeconds) / 3600.0
 
 		// Convert category breakdown to hours
 		dayCategoryHours := make(map[string]float64)

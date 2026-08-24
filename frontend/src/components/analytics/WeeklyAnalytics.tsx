@@ -87,6 +87,7 @@ export function WeeklyAnalytics({ data, isLoading, onDayClick }: WeeklyAnalytics
       date: d.date,
       label: new Date(y, m - 1, dy).toLocaleDateString('en-US', { weekday: 'short' }),
       activeMinutes: d.activeMinutes,
+      workedMinutes: d.workedMinutes ?? d.activeMinutes,
       sessions: d.totalSessions,
     };
   });
@@ -233,12 +234,12 @@ export function WeeklyAnalytics({ data, isLoading, onDayClick }: WeeklyAnalytics
         </Card>
       </div>
 
-      {/* Daily Activity Chart */}
+      {/* Daily Hours Chart */}
       <Card>
         <CardHeader>
-          <CardTitle>Daily Activity</CardTitle>
+          <CardTitle>Daily Hours</CardTitle>
           <p className="text-sm text-muted-foreground">
-            Active time for each day this week
+            Hours worked each day this week (incl. breaks and AFK)
           </p>
         </CardHeader>
         <CardContent>
@@ -274,6 +275,9 @@ export function WeeklyAnalytics({ data, isLoading, onDayClick }: WeeklyAnalytics
                           })()}
                         </p>
                         <p className="text-sm text-muted-foreground">
+                          Worked: {formatHours(data.workedMinutes)}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
                           Active: {formatHours(data.activeMinutes)}
                         </p>
                         <p className="text-sm text-muted-foreground">
@@ -286,7 +290,7 @@ export function WeeklyAnalytics({ data, isLoading, onDayClick }: WeeklyAnalytics
                 }}
               />
               <Bar
-                dataKey="activeMinutes"
+                dataKey="workedMinutes"
                 fill="hsl(var(--chart-1))"
                 radius={[4, 4, 0, 0]}
                 onClick={(data) => onDayClick?.(data.date)}
