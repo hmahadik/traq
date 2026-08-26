@@ -288,7 +288,6 @@ export function useScreenshotsForDate(date: string, options?: { enabled?: boolea
     queryFn: () => api.timeline.getScreenshotsForDate(date),
     staleTime: 60_000,
     enabled: options?.enabled,
-    refetchOnWindowFocus: false, // Desktop app: refreshes via Wails events, not tab focus
   });
 }
 
@@ -298,7 +297,6 @@ export function useTimelineGridData(date: string, options?: { enabled?: boolean 
     queryFn: () => api.timeline.getTimelineGridData(date),
     staleTime: 120_000, // 2 minutes - grid data changes slowly
     enabled: options?.enabled !== false && !!date,
-    refetchOnWindowFocus: false, // Desktop app: refreshes via Wails events, not tab focus
   });
 }
 

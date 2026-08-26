@@ -425,11 +425,21 @@ export function Timeline({
 
   // Periodically update NOW time to prevent drift (Bug 6 fix).
   // Without this, the NOW line and active bar caps become stale after ~30min idle.
-  const [, setNowTick] = useState(0);
+  // A React re-render doesn't help here (the D3 render effect's deps don't change on a
+  // time tick), so reposition the existing elements directly with the live scale — the
+  // same pattern the zoom handler uses per frame.
   useEffect(() => {
     const interval = setInterval(() => {
       nowTimeRef.current = Date.now();
-      setNowTick(t => t + 1); // Force re-render to update NOW line position
+      const svg = d3.select(svgRef.current);
+      if (!svg.node() || !xScaleRef.current) return;
+      const scale = zoomTransformRef.current.rescaleX(xScaleRef.current);
+      const tickNow = new Date(nowTimeRef.current);
+      svg.select<SVGLineElement>('.now-line').datum(tickNow)
+        .attr('x1', scale(tickNow))
+        .attr('x2', scale(tickNow));
+      svg.select<SVGTextElement>('.now-text').datum(tickNow)
+        .attr('x', scale(tickNow));
     }, 60_000); // Every minute
     return () => clearInterval(interval);
   }, []);
@@ -1652,14 +1662,16 @@ export function Timeline({
       .attr('fill', mutedForeground)
       .text(d => `${d.dotCount}`);
 
-    // Add "now" indicator if "now" is within the time range (works for multi-day views)
-    // Uses data join so it properly appears/disappears based on time range
-    // Use nowTimeRef for consistency with bar capping
-    // Buffer handles staleness: timeRange.end is capped at "now" when useMemo runs,
-    // but time passes before this effect runs. Use 15 minute buffer to handle this.
+    // Add "now" indicator if the view's window still includes the current moment.
+    // timeRange.end is capped at a "now" captured when the domain memo last ran, and the
+    // domain is deliberately kept stable while sitting on today — so that timestamp can be
+    // arbitrarily stale by the time a re-render fires (e.g. a focus refetch after an hour
+    // away). Compare against the END of timeRange.end's calendar day instead: the marker
+    // shows whenever the window's last day is still today, hides when viewing past days.
     const nowDate = new Date(nowTimeRef.current);
-    const bufferMs = 15 * 60 * 1000; // 15 minute buffer to handle timeRange staleness
-    const nowData = (nowDate >= timeRange.start && nowDate.getTime() <= timeRange.end.getTime() + bufferMs) ? [nowDate] : [];
+    const domainDayEnd = new Date(timeRange.end);
+    domainDayEnd.setHours(23, 59, 59, 999);
+    const nowData = (nowDate >= timeRange.start && nowDate.getTime() <= domainDayEnd.getTime()) ? [nowDate] : [];
 
     // Now line - uses data join for proper enter/update/exit
     chartGroup.selectAll<SVGLineElement, Date>('.now-line')
@@ -1802,6 +1814,10 @@ export function Timeline({
     // The prop isn't in this effect's dep array, so reading it directly was stale.
     const hasPendingNavigation = targetPlayheadDateRef.current !== null;
 
+    // NOTE: the restore must run on EVERY data reload, not just domain shifts: the joins
+    // above draw chrome (grid lines, day boundaries, axis) at the BASE xScale, and it's
+    // this zoom.transform call — via the zoom handler — that repositions everything into
+    // the current view space. Skipping it leaves chrome at base-domain positions.
     if (isDataReload && !hasPendingNavigation && zoom) {
       const savedTimestamp = playheadTimestampRef.current!;
       // Bug #3 fix: convert visible duration to k for the new domain.
@@ -1815,10 +1831,20 @@ export function Timeline({
       const savedZoomLevel = Math.max(1, totalDomainMs / savedVisibleMs);
 
       // Check if saved timestamp is within the new time range
-      // If not, we need to clamp it to avoid positioning outside visible area
+      // If not, we need to clamp it to avoid positioning outside visible area.
+      // Don't clamp to timeRange.end directly: it can be a stale "now" captured when the
+      // domain memo last ran, while the pan constraint lets the playhead reach LIVE now —
+      // clamping to the stale end would snap the view back to an older timestamp. Allow
+      // up to live now, bounded by the end of the domain's last calendar day.
+      const restoreDayEnd = new Date(timeRange.end);
+      restoreDayEnd.setHours(23, 59, 59, 999);
+      const restoreEndMs = Math.max(
+        timeRange.end.getTime(),
+        Math.min(Date.now(), restoreDayEnd.getTime())
+      );
       const clampedTimestamp = new Date(
         Math.max(timeRange.start.getTime(),
-          Math.min(timeRange.end.getTime(), savedTimestamp.getTime()))
+          Math.min(restoreEndMs, savedTimestamp.getTime()))
       );
 
       // Calculate where the saved timestamp would be in the new scale
