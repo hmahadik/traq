@@ -207,9 +207,11 @@ export function useScrubImageCache(
     thumbInFlightRef.current.clear();
   }, []);
 
-  // Strip thumbnails are ~4KB and decode in about a millisecond, so they can
-  // keep up with any hold. They're what makes a fast scrub actually move:
+  // Strip thumbnails are a few KB and decode in roughly a millisecond, so they
+  // can keep up with any hold. They're what makes a fast scrub actually move:
   // full-res frames arrive far too slowly to land on every painted frame.
+  // Widening the stored thumbnail (see defaultThumbnailWidth in the tracker)
+  // raises decode cost with the pixel count, so it trades against hold speed.
   const loadThumb = useCallback(
     async (id: number, priority = false) => {
       // Dedup against in-flight decodes synchronously. Checking this only

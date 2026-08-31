@@ -14,6 +14,11 @@ import (
 	"github.com/kbinani/screenshot"
 )
 
+// defaultThumbnailWidth is the width of the generated WebP thumbnail. Sized so
+// the largest place a thumbnail is shown (the ~112px timeline filmstrip) still
+// has real pixels to work with on a 2x display.
+const defaultThumbnailWidth = 400
+
 // ScreenCapture handles screenshot capture and processing.
 type ScreenCapture struct {
 	outputDir       string
@@ -41,7 +46,7 @@ func NewScreenCapture(outputDir string, quality int) *ScreenCapture {
 	return &ScreenCapture{
 		outputDir:       outputDir,
 		quality:         quality,
-		thumbnailWidth:  200,
+		thumbnailWidth:  defaultThumbnailWidth,
 		duplicateThresh: 3, // Hamming distance threshold for duplicates
 	}
 }

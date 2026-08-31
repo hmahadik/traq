@@ -238,8 +238,9 @@ export function ImageGallery({
 
   const altText = getNullableString(currentScreenshot.windowTitle) || 'Screenshot';
   // Whatever the canvas and the hosted full-res node don't cover. Scrubbing
-  // shows the thumbnail (filling the frame — the 200px strip thumbnail would
-  // otherwise sit as a postage stamp mid-viewer); at rest, the settled image.
+  // shows the thumbnail (filling the frame — the strip thumbnail is a few
+  // hundred px wide and would otherwise sit as a postage stamp mid-viewer);
+  // at rest, the settled image.
   const overlay =
     usingCanvas || hostElement ? null : (
       (() => {

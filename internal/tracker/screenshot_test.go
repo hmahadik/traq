@@ -15,8 +15,8 @@ func TestNewScreenCapture(t *testing.T) {
 	if sc.quality != 80 {
 		t.Errorf("got quality=%d, want 80", sc.quality)
 	}
-	if sc.thumbnailWidth != 200 {
-		t.Errorf("got thumbnailWidth=%d, want 200", sc.thumbnailWidth)
+	if sc.thumbnailWidth != defaultThumbnailWidth {
+		t.Errorf("got thumbnailWidth=%d, want %d", sc.thumbnailWidth, defaultThumbnailWidth)
 	}
 	if sc.duplicateThresh != 3 {
 		t.Errorf("got duplicateThresh=%d, want 3", sc.duplicateThresh)
