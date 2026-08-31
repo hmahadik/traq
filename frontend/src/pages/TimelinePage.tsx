@@ -1,7 +1,7 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Calendar, Sparkles, Loader2, ChevronLeft, ChevronRight, X } from 'lucide-react';
+import { Calendar, Sparkles, Loader2, ChevronLeft, ChevronRight, Home, X } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { SplitPanel } from '@/components/common/SplitPanel';
 import { EventList } from '@/components/timeline/EventList';
@@ -170,11 +170,8 @@ export function TimelinePage() {
     clearTargetPlayhead,
   } = useMultiDayTimeline(dateStr);
 
-  // Use centerDate (actual view position) for button highlighting, not selectedDate
+  // Use centerDate (actual view position), not selectedDate, to gate next-day nav
   const todayStr = getDateString(new Date());
-  const yesterdayStr = getDateString(addDays(new Date(), -1));
-  const isViewingToday = centerDate === todayStr;
-  const isViewingYesterday = centerDate === yesterdayStr;
 
   // Get the center day's grid data for sidebar stats
   const centerDayData = loadedDays.get(centerDate);
@@ -452,21 +449,15 @@ export function TimelinePage() {
     goToDate(date);
   }, [goToDate]);
 
-  const handleGoToToday = useCallback(() => {
+  // "Home": snap the playhead back to the live NOW marker. Works from any day, and
+  // also when already on today (goToToday always targets a fresh "now").
+  const handleGoToNow = useCallback(() => {
     const today = new Date();
     setSelectedDate(today);
     setCalendarYear(today.getFullYear());
     setCalendarMonth(today.getMonth() + 1);
     goToToday();
   }, [goToToday]);
-
-  const handleGoToYesterday = useCallback(() => {
-    const yesterday = addDays(new Date(), -1);
-    setSelectedDate(yesterday);
-    setCalendarYear(yesterday.getFullYear());
-    setCalendarMonth(yesterday.getMonth() + 1);
-    goToDate(yesterday);
-  }, [goToDate]);
 
   const handlePrevDay = useCallback(() => {
     // goToPrevDay reads from a synchronous ref, not stale React state.
@@ -573,25 +564,17 @@ export function TimelinePage() {
                 <ChevronRight className="h-4 w-4" />
               </Button>
 
-              {/* Quick nav buttons */}
-              <div className="flex items-center gap-1 ml-2">
-                <Button
-                  variant={isViewingToday ? 'secondary' : 'ghost'}
-                  size="sm"
-                  className="h-7 text-xs"
-                  onClick={handleGoToToday}
-                >
-                  Today
-                </Button>
-                <Button
-                  variant={isViewingYesterday ? 'secondary' : 'ghost'}
-                  size="sm"
-                  className="h-7 text-xs"
-                  onClick={handleGoToYesterday}
-                >
-                  Yesterday
-                </Button>
-              </div>
+              {/* Snap back to the NOW marker */}
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 ml-1"
+                onClick={handleGoToNow}
+                title="Jump to now"
+                aria-label="Jump to now"
+              >
+                <Home className="h-4 w-4" />
+              </Button>
 
               {/* Active app filter badge */}
               {appFilter && (
@@ -715,12 +698,14 @@ export function TimelinePage() {
             <ChevronRight className="h-4 w-4" />
           </Button>
           <Button
-            variant={isViewingToday ? 'secondary' : 'ghost'}
-            size="sm"
-            className="h-7 text-xs"
-            onClick={handleGoToToday}
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7"
+            onClick={handleGoToNow}
+            title="Jump to now"
+            aria-label="Jump to now"
           >
-            Today
+            <Home className="h-4 w-4" />
           </Button>
           {/* Active app filter badge - mobile */}
           {appFilter && (

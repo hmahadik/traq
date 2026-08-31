@@ -2062,7 +2062,17 @@ export function Timeline({
     // Only navigate if target is within the current loaded scale domain.
     // Without this check, navigating to a date outside the domain produces extreme
     // transform values that crash WebKit (the Wails webview).
-    if (targetTime < domain[0].getTime() || targetTime > domain[1].getTime()) return;
+    //
+    // The upper bound is the END of the domain's last calendar day, not domain[1]:
+    // domain[1] is a "now" captured when the range memo last ran, and the domain is
+    // deliberately kept stable while sitting on today, so it can be arbitrarily stale
+    // (same reasoning as the NOW-marker visibility check). Comparing a live "now"
+    // target against it would drop the jump — exactly the "snap back to NOW while
+    // already on today" case. Overshoot is safe: the scale extrapolates by at most
+    // one day's worth of pixels, and the zoom constraint clamps the centre to live now.
+    const domainDayEnd = new Date(domain[1]);
+    domainDayEnd.setHours(23, 59, 59, 999);
+    if (targetTime < domain[0].getTime() || targetTime > domainDayEnd.getTime()) return;
 
     const { width } = dimensions;
     const chartCenterX = MARGIN.left + (width - MARGIN.left - MARGIN.right) / 2;
@@ -2098,51 +2108,6 @@ export function Timeline({
       onTargetReachedRef.current?.();
     }
   }, [targetPlayheadDate, dimensions, timelineData]);
-
-  // Reset zoom handler — centers on playhead (or now) at default zoom level (Bug #13 fix)
-  const handleResetZoom = useCallback(() => {
-    const svg = d3.select(svgRef.current);
-    const zoom = zoomRef.current;
-
-    if (!svg.node() || !zoom || !timelineData) return;
-
-    // Bug #13 fix: center on current playhead position (or now), not midpoint of data range.
-    // Users expect "reset" to return to where they are, not jump to an arbitrary midpoint.
-    const centerTime = playheadTimestampRef.current
-      || new Date(Math.min(Date.now(), timelineData.timeRange.end.getTime()));
-
-    const currentScale = xScaleRef.current;
-    if (!currentScale) return;
-
-    const { width } = dimensions;
-    const chartCenterX = MARGIN.left + (width - MARGIN.left - MARGIN.right) / 2;
-
-    // Calculate zoom level for ~3h visible dynamically based on domain size
-    const desiredVisibleMs = 3 * 60 * 60 * 1000; // 3 hours
-    const totalDomainMs = timelineData.timeRange.end.getTime() - timelineData.timeRange.start.getTime();
-    const targetK = Math.max(1, totalDomainMs / desiredVisibleMs);
-    const centerX = currentScale(centerTime);
-    const newTx = chartCenterX - centerX * targetK;
-
-    const newTransform = d3.zoomIdentity.translate(newTx, 0).scale(targetK);
-
-    svg.transition()
-      .duration(300)
-      .ease(d3.easeCubicOut)
-      .call(zoom.transform as any, newTransform);
-
-    // Calculate ACTUAL visible range at the reset zoom level (not the full data range)
-    const resetScale = newTransform.rescaleX(currentScale);
-    const resetVisibleRange = {
-      start: resetScale.invert(MARGIN.left),
-      end: resetScale.invert(width - MARGIN.right),
-    };
-    setVisibleTimeRange(resetVisibleRange);
-    visibleTimeRangeRef.current = resetVisibleRange;
-    setPlayheadTimestamp(centerTime);
-    playheadTimestampRef.current = centerTime;
-    onPlayheadChangeRef.current?.(centerTime, resetVisibleRange, targetK);
-  }, [timelineData, dimensions]);
 
   // Format time for filmstrip display
   const formatEventTime = (date: Date) => {
@@ -2237,24 +2202,6 @@ export function Timeline({
 
     return () => { cancelled = true; };
   }, [filmstripScreenshots, playheadScreenshotIndex]);
-
-  // Calculate visible duration for zoom indicator
-  const visibleDurationLabel = useMemo(() => {
-    const range = visibleTimeRange || timelineData?.timeRange;
-    if (!range) return null;
-    const durationMs = range.end.getTime() - range.start.getTime();
-    const durationHours = durationMs / (1000 * 60 * 60);
-
-    if (durationHours >= 24) {
-      return `${Math.round(durationHours)}h`;
-    } else if (durationHours >= 1) {
-      const hours = Math.floor(durationHours);
-      const minutes = Math.round((durationHours - hours) * 60);
-      return minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`;
-    } else {
-      return `${Math.round(durationHours * 60)}m`;
-    }
-  }, [visibleTimeRange, timelineData]);
 
   // Derive empty state flag — but do NOT early return, because unmounting the SVG
   // would detach D3 zoom and break drag/pan on subsequent renders.
@@ -2436,7 +2383,7 @@ export function Timeline({
       {/* Timeline visualization */}
       <div className="relative flex-1 min-h-[200px]">
         {/* Controls */}
-        <div className="absolute top-2 right-2 z-10 flex gap-1">
+        <div className="absolute top-2 left-2 z-10 flex gap-1">
           {/* Lane visibility dropdown */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -2446,7 +2393,7 @@ export function Timeline({
                 <ChevronDown className="h-3 w-3 ml-1" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56 max-h-[70vh] overflow-y-auto">
+            <DropdownMenuContent align="start" className="w-56 max-h-[70vh] overflow-y-auto">
               <DropdownMenuLabel className="text-xs flex justify-between items-center">
                 <span>Visible Lanes</span>
                 <div className="flex gap-1">
@@ -2551,17 +2498,6 @@ export function Timeline({
               })()}
             </DropdownMenuContent>
           </DropdownMenu>
-          <button
-            onClick={handleResetZoom}
-            className="px-2 py-1 text-xs bg-muted hover:bg-muted/80 rounded text-muted-foreground"
-          >
-            Reset Zoom
-          </button>
-          {currentZoom.k !== 1 && visibleDurationLabel && (
-            <span className="px-2 py-1 text-xs bg-muted rounded text-muted-foreground">
-              {visibleDurationLabel} visible
-            </span>
-          )}
         </div>
 
         <div ref={containerRef} className="h-full overflow-hidden outline-none" tabIndex={0}>
