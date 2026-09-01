@@ -202,6 +202,36 @@ def badge(size: int) -> Image.Image:
     return icon
 
 
+def tray_badge(size: int) -> Image.Image:
+    """The badge for the Linux system tray, with strictly binary alpha.
+
+    fyne.io/systray v1.12.0 converts our PNG to the StatusNotifierItem ARGB32
+    pixmap with `byte(v)` on the 16-bit values from color.Color.RGBA()
+    (argbForImage, systray_unix.go) -- it keeps the low byte where it wants the
+    high one. For an opaque pixel that is accidentally lossless, because
+    RGBA() returns c*257 and (c*257)&0xff == c; for a *partly* transparent one
+    the premultiply makes the low byte arbitrary, so the colour comes out as
+    bright, saturated noise. The badge is full-bleed, so its only partly
+    transparent pixels are the four rounded corners -- which is exactly where
+    the speckled outline appeared.
+
+    So: threshold the alpha, and keep the badge colour underneath it rather
+    than the usual transparent black, so that any host doing non-premultiplied
+    filtering bleeds badge colour into the corners instead of black. The
+    corners come out hard-edged at this size and the panel's own downscale
+    smooths them; TRAY_SIZE is set high enough that it does so cleanly.
+    """
+    icon = _gradient(size).convert("RGBA")     # opaque RGB everywhere, corners included
+    mw, mh, pos = _mark_box(size)
+    fg = Image.new("RGBA", (mw, mh), MARK_COLOR + (0,))
+    fg.putalpha(mark_alpha(mw, mh))
+    icon.alpha_composite(fg, pos)
+
+    mask = _rounded_mask(size).point(lambda v: 255 if v >= 128 else 0)
+    icon.putalpha(mask)
+    return icon
+
+
 def bare(width: int) -> Image.Image:
     """The mark alone, MARK_COLOR on transparent, cropped to its own bounds."""
     h = max(1, round(width * MARK_VB_H / MARK_VB_W))
@@ -254,13 +284,17 @@ ROOT = Path(__file__).resolve().parent.parent
 # Windows shells pick whichever of these fits; 256 is the Explorer "extra large".
 ICO_SIZES = [(16, 16), (24, 24), (32, 32), (48, 48), (64, 64), (128, 128), (256, 256)]
 
+# 4x a 32px panel slot, and 2x a 64px one on a HiDPI panel -- enough for the
+# host's own downscale to smooth tray_badge()'s hard corners. See tray_badge().
+TRAY_SIZE = 128
+
 PNG_TARGETS = [
-    ("build/appicon.png", 1024),                          # Wails: source for macOS .icns
-    ("build/appicon.orig.png", 1024),                     # preferred by scripts/build-appimage.sh
-    ("internal/tray/icon.png", 64),                       # go:embed in internal/tray
-    ("frontend/src/assets/logo.png", 512),
-    ("frontend/src/assets/logo.resized.png", 1024),
-    ("frontend/src/assets/images/logo-universal.png", 1024),
+    ("build/appicon.png", 1024, badge),                   # Wails: source for macOS .icns
+    ("build/appicon.orig.png", 1024, badge),              # preferred by scripts/build-appimage.sh
+    ("internal/tray/icon.png", TRAY_SIZE, tray_badge),    # go:embed in internal/tray
+    ("frontend/src/assets/logo.png", 512, badge),
+    ("frontend/src/assets/logo.resized.png", 1024, badge),
+    ("frontend/src/assets/images/logo-universal.png", 1024, badge),
 ]
 
 SVG_TARGETS = [
@@ -286,15 +320,15 @@ def main() -> int:
           f"badge {_hex(BADGE_TOP)}->{_hex(BADGE_BOTTOM)}, fg {_hex(MARK_COLOR)}")
 
     print("PNG:")
-    cache: dict[int, Image.Image] = {}
-    for rel, size in PNG_TARGETS:
-        img = cache.setdefault(size, badge(size))
+    cache: dict[tuple[str, int], Image.Image] = {}
+    for rel, size, maker in PNG_TARGETS:
+        img = cache.setdefault((maker.__name__, size), maker(size))
         write(ROOT / rel, lambda p, i=img: i.save(p, "PNG", optimize=True))
 
     print("ICO:")
     # Render every frame from the vector rather than downscaling one raster --
     # the 16 and 24px frames are visibly crisper that way.
-    frames = [cache.setdefault(w, badge(w)) for w, _ in ICO_SIZES]
+    frames = [cache.setdefault(("badge", w), badge(w)) for w, _ in ICO_SIZES]
     write(ROOT / "build/windows/icon.ico",
           lambda p: frames[-1].save(p, "ICO", sizes=ICO_SIZES,
                                     append_images=frames[:-1]))
