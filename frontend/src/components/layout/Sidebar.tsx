@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Clock, PieChart, ClipboardList, Camera, Image, Loader2, Menu, X, Pause, Play, Settings, Bug, FolderKanban } from 'lucide-react';
-import logoSrc from '@/assets/logo-minimal.svg';
+import logoSrc from '@/assets/logo.svg';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
