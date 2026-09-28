@@ -22,8 +22,8 @@ func NewOpenCodeGenerator() *OpenCodeGenerator {
 func (g *OpenCodeGenerator) Name() string { return "opencode" }
 
 func (g *OpenCodeGenerator) Available() bool {
-	_, err := exec.LookPath("opencode")
-	return err == nil
+	_, ok := resolveCLI("opencode")
+	return ok
 }
 
 // ansiRE strips terminal color/control sequences from CLI output.
@@ -45,7 +45,12 @@ func (g *OpenCodeGenerator) Generate(ctx context.Context, in Input) (*Output, er
 // GenerateRaw runs `opencode run <prompt>` and returns trimmed, ANSI-stripped
 // stdout. Used by callers that build their own prompt structure.
 func (g *OpenCodeGenerator) GenerateRaw(ctx context.Context, prompt string) (string, error) {
-	cmd := g.commandFunc(ctx, "opencode", "run", prompt)
+	bin, ok := resolveCLI("opencode")
+	if !ok {
+		bin = "opencode" // let exec report the not-found error
+	}
+	cmd := g.commandFunc(ctx, bin, "run", prompt)
+	cmd.Env = commandEnv(bin)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
