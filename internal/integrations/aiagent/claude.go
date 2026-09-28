@@ -23,8 +23,8 @@ func NewClaudeGenerator() *ClaudeGenerator {
 func (g *ClaudeGenerator) Name() string { return "claude" }
 
 func (g *ClaudeGenerator) Available() bool {
-	_, err := exec.LookPath("claude")
-	return err == nil
+	_, ok := resolveCLI("claude")
+	return ok
 }
 
 func (g *ClaudeGenerator) Generate(ctx context.Context, in Input) (*Output, error) {
@@ -53,7 +53,12 @@ func (g *ClaudeGenerator) Generate(ctx context.Context, in Input) (*Output, erro
 // is asking Claude to summarize Traq's own session data, not to read its
 // own source code repo.
 func (g *ClaudeGenerator) GenerateRaw(ctx context.Context, prompt string) (string, error) {
-	cmd := g.commandFunc(ctx, "claude", "-p", prompt)
+	bin, ok := resolveCLI("claude")
+	if !ok {
+		bin = "claude" // let exec report the not-found error
+	}
+	cmd := g.commandFunc(ctx, bin, "-p", prompt)
+	cmd.Env = commandEnv(bin)
 	cmd.Dir = os.TempDir()
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
