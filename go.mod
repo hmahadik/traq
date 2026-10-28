@@ -15,11 +15,12 @@ require (
 	github.com/jezek/xgb v1.3.0
 	github.com/kbinani/screenshot v0.0.0-20250624051815-089614a94018
 	github.com/mattn/go-sqlite3 v1.14.33
-	github.com/wailsapp/wails/v2 v2.11.0
+	github.com/wailsapp/wails/v2 v2.12.0
 	github.com/yalue/onnxruntime_go v1.25.0
 )
 
 require (
+	git.sr.ht/~jackmordaunt/go-toast/v2 v2.0.3 // indirect
 	github.com/bep/debounce v1.2.1 // indirect
 	github.com/gen2brain/shm v0.1.0 // indirect
 	github.com/go-ole/go-ole v1.3.0 // indirect
